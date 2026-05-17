@@ -1,0 +1,10 @@
+dist
+.git
+.env
+.env.*
+coverage
+npm-debug.log
+node_modules
+*.idea
+frontend/node_modules
+backend/.venv
