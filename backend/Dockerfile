@@ -24,4 +24,4 @@ EXPOSE 8000
 
 # Esto es una construccion del comando a la hora del runtime
 # del contenedor (ej. uvicorn app.main:app --host 0.0.0.0 --port 8000)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
