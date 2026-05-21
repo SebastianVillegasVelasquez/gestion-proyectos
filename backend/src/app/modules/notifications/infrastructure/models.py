@@ -1,12 +1,19 @@
+from __future__ import annotations
 import enum
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import TimestampMixin, UUIDMixin
+
+
+if TYPE_CHECKING:
+    from app.modules.identity.infrastructure.models import User
+    from app.modules.project.infrastructure.models import Project
 
 
 class NotificationType(str, enum.Enum):
@@ -82,13 +89,13 @@ class Notification(Base, UUIDMixin, TimestampMixin):
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    recipient: Mapped["User"] = relationship(  # type: ignore[name-defined]
+    recipient: Mapped[User] = relationship(  # type: ignore[name-defined]
         "User", back_populates="notifications"
     )
-    project: Mapped["Project | None"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project | None] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="notifications"
     )
-    delivery_logs: Mapped[list["DeliveryLog"]] = relationship(
+    delivery_logs: Mapped[list[DeliveryLog]] = relationship(
         "DeliveryLog",
         back_populates="notification",
         cascade="all, delete-orphan",

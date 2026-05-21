@@ -7,12 +7,14 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from src.core.config import settings
+from app.core.config import get_settings
+
+settings = get_settings()
 
 # ── Engine ─────────────────────────────────────────────────────────────────────
 engine = create_async_engine(
-    settings.database_url,
-    echo=settings.is_dev,
+    settings.DATABASE_URL,
+    echo=settings.IS_DEV,
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,

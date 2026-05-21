@@ -1,5 +1,7 @@
+from __future__ import annotations
 import enum
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -14,8 +16,16 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.identity.infrastructure.models import User
+    from app.modules.tasks.infrastructure.models import Task
+    from app.modules.client_portal.infrastructure.models import ClientAccess
+    from app.modules.ia_reporting.infrastructure.models import ReportSchedule, Report
+    from app.modules.notifications.infrastructure.models import Notification
+    from app.modules.scheduling.infrastructure.models import Schedule
 
 
 class ProjectStatusType(str, enum.Enum):
@@ -96,18 +106,18 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    coordinator: Mapped["User"] = relationship(  # type: ignore[name-defined]
+    coordinator: Mapped[User] = relationship(  # type: ignore[name-defined]
         "User",
         foreign_keys=[coordinator_id],
         back_populates="coordinated_projects",
         lazy="select",
     )
-    current_status: Mapped["ProjectStatus | None"] = relationship(
+    current_status: Mapped[ProjectStatus | None] = relationship(
         "ProjectStatus",
         foreign_keys=[current_status_id],
         lazy="select",
     )
-    statuses: Mapped[list["ProjectStatus"]] = relationship(
+    statuses: Mapped[list[ProjectStatus]] = relationship(
         "ProjectStatus",
         primaryjoin="and_(ProjectStatus.project_id == Project.id, "
         "ProjectStatus.id != Project.current_status_id)",
@@ -115,52 +125,52 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         lazy="select",
         order_by="ProjectStatus.order",
     )
-    members: Mapped[list["ProjectMember"]] = relationship(
+    members: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select",
     )
-    modules: Mapped[list["Module"]] = relationship(
+    modules: Mapped[list[Module]] = relationship(
         "Module",
         back_populates="project",
         cascade="all, delete-orphan",
         order_by="Module.order",
         lazy="select",
     )
-    tasks: Mapped[list["Task"]] = relationship(  # type: ignore[name-defined]
+    tasks: Mapped[list[Task]] = relationship(  # type: ignore[name-defined]
         "Task",
         back_populates="project",
         lazy="select",
     )
-    schedule: Mapped["Schedule | None"] = relationship(  # type: ignore[name-defined]
+    schedule: Mapped[Schedule | None] = relationship(  # type: ignore[name-defined]
         "Schedule",
         back_populates="project",
         uselist=False,
         lazy="select",
     )
-    notifications: Mapped[list["Notification"]] = relationship(  # type: ignore[name-defined]
+    notifications: Mapped[list[Notification]] = relationship(  # type: ignore[name-defined]
         "Notification",
         back_populates="project",
         lazy="select",
     )
-    reports: Mapped[list["Report"]] = relationship(  # type: ignore[name-defined]
+    reports: Mapped[list[Report]] = relationship(  # type: ignore[name-defined]
         "Report",
         back_populates="project",
         lazy="select",
     )
-    report_schedule: Mapped["ReportSchedule | None"] = relationship(  # type: ignore[name-defined]
+    report_schedule: Mapped[ReportSchedule | None] = relationship(  # type: ignore[name-defined]
         "ReportSchedule",
         back_populates="project",
         uselist=False,
         lazy="select",
     )
-    client_accesses: Mapped[list["ClientAccess"]] = relationship(  # type: ignore[name-defined]
+    client_accesses: Mapped[list[ClientAccess]] = relationship(  # type: ignore[name-defined]
         "ClientAccess",
         back_populates="project",
         lazy="select",
     )
-    risks: Mapped[list["Risk"]] = relationship(
+    risks: Mapped[list[Risk]] = relationship(
         "Risk",
         back_populates="project",
         cascade="all, delete-orphan",
@@ -205,7 +215,7 @@ class ProjectStatus(Base, UUIDMixin, TimestampMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(
+    project: Mapped[Project] = relationship(
         "Project",
         foreign_keys=[project_id],
         back_populates="statuses",
@@ -247,7 +257,7 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship("Project", back_populates="members")
+    project: Mapped[Project] = relationship("Project", back_populates="members")
     user: Mapped["User"] = relationship(  # type: ignore[name-defined]
         "User", back_populates="project_memberships"
     )
@@ -290,8 +300,8 @@ class Module(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship("Project", back_populates="modules")
-    tasks: Mapped[list["Task"]] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship("Project", back_populates="modules")
+    tasks: Mapped[list[Task]] = relationship(  # type: ignore[name-defined]
         "Task",
         back_populates="module",
         lazy="select",
@@ -326,7 +336,7 @@ class Risk(Base, UUIDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship("Project", back_populates="risks")
+    project: Mapped[Project] = relationship("Project", back_populates="risks")
 
     def __repr__(self) -> str:
         return f"<Risk id={self.id} level={self.level} project={self.project_id}>"

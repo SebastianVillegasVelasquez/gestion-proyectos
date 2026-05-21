@@ -1,4 +1,6 @@
+from __future__ import annotations
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -10,8 +12,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.project.infrastructure.models import Project
+    from app.modules.tasks.infrastructure.models import Task
+    from app.modules.identity.infrastructure.models import User
 
 
 # ── Schedule ───────────────────────────────────────────────────────────────────
@@ -56,16 +63,16 @@ class Schedule(Base, UUIDMixin, TimestampMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="schedule"
     )
-    entries: Mapped[list["GanttEntry"]] = relationship(
+    entries: Mapped[list[GanttEntry]] = relationship(
         "GanttEntry",
         back_populates="schedule",
         cascade="all, delete-orphan",
         lazy="select",
     )
-    reprogrammings: Mapped[list["Reprogramming"]] = relationship(
+    reprogrammings: Mapped[list[Reprogramming]] = relationship(
         "Reprogramming",
         back_populates="schedule",
         cascade="all, delete-orphan",
@@ -124,8 +131,8 @@ class GanttEntry(Base, UUIDMixin, TimestampMixin):
     delay_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    schedule: Mapped["Schedule"] = relationship("Schedule", back_populates="entries")
-    task: Mapped["Task"] = relationship(  # type: ignore[name-defined]
+    schedule: Mapped[Schedule] = relationship("Schedule", back_populates="entries")
+    task: Mapped[Task] = relationship(  # type: ignore[name-defined]
         "Task", back_populates="gantt_entry"
     )
 
@@ -163,10 +170,10 @@ class Reprogramming(Base, UUIDMixin, TimestampMixin):
     new_dates_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    schedule: Mapped["Schedule"] = relationship(
+    schedule: Mapped[Schedule] = relationship(
         "Schedule", back_populates="reprogrammings"
     )
-    requested_by: Mapped["User"] = relationship("User", lazy="select")  # type: ignore[name-defined]
+    requested_by: Mapped[User] = relationship("User", lazy="select")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return f"<Reprogramming schedule={self.schedule_id} by={self.requested_by_id}>"

@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 import enum
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.identity.infrastructure.models import User
+    from app.modules.project.infrastructure.models import Project
 
 
 class ReportType(str, enum.Enum):
@@ -83,10 +90,10 @@ class Report(Base, UUIDMixin, TimestampMixin):
     )
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="reports"
     )
-    generated_by: Mapped["User | None"] = relationship(  # type: ignore[name-defined]
+    generated_by: Mapped[User | None] = relationship(  # type: ignore[name-defined]
         "User", lazy="select"
     )
 
@@ -140,7 +147,7 @@ class ReportSchedule(Base, UUIDMixin, TimestampMixin):
     send_by_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="report_schedule"
     )
 

@@ -1,9 +1,18 @@
-import enum
+from __future__ import annotations
 
-from src.core.database import Base
-from src.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+import enum
+from typing import TYPE_CHECKING
+
+from app.core.database import Base
+from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from sqlalchemy import Boolean, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+
+if TYPE_CHECKING:
+    from app.modules.notifications.infrastructure.models import Notification
+    from app.modules.project.infrastructure.models import Project, ProjectMember
+    from app.modules.tasks.infrastructure.models import Task
 
 
 class UserRole(str, enum.Enum):
@@ -39,27 +48,27 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
     # Un usuario puede coordinar múltiples proyectos
-    coordinated_projects: Mapped[list["Project"]] = relationship(  # type: ignore[name-defined]
+    coordinated_projects: Mapped[list[Project]] = relationship(  # type: ignore[name-defined]
         "Project",
         foreign_keys="Project.coordinator_id",
         back_populates="coordinator",
         lazy="select",
     )
     # Membresías en proyectos
-    project_memberships: Mapped[list["ProjectMember"]] = relationship(  # type: ignore[name-defined]
+    project_memberships: Mapped[list[ProjectMember]] = relationship(  # type: ignore[name-defined]
         "ProjectMember",
         back_populates="user",
         lazy="select",
     )
     # Tareas asignadas
-    assigned_tasks: Mapped[list["Task"]] = relationship(  # type: ignore[name-defined]
+    assigned_tasks: Mapped[list[Task]] = relationship(  # type: ignore[name-defined]
         "Task",
         foreign_keys="Task.assignee_id",
         back_populates="assignee",
         lazy="select",
     )
     # Notificaciones recibidas
-    notifications: Mapped[list["Notification"]] = relationship(  # type: ignore[name-defined]
+    notifications: Mapped[list[Notification]] = relationship(  # type: ignore[name-defined]
         "Notification",
         back_populates="recipient",
         lazy="select",

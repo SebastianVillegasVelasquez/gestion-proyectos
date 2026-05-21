@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import enum
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -14,8 +17,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.project.infrastructure.models import Project, Module
+    from app.modules.identity.infrastructure.models import User
+    from app.modules.scheduling.infrastructure.models import GanttEntry
 
 
 class TaskType(str, enum.Enum):
@@ -136,13 +144,13 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     actual_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="tasks", lazy="select"
     )
-    module: Mapped["Module | None"] = relationship(  # type: ignore[name-defined]
+    module: Mapped[Module | None] = relationship(  # type: ignore[name-defined]
         "Module", back_populates="tasks", lazy="select"
     )
-    assignee: Mapped["User | None"] = relationship(  # type: ignore[name-defined]
+    assignee: Mapped[User | None] = relationship(  # type: ignore[name-defined]
         "User",
         foreign_keys=[assignee_id],
         back_populates="assigned_tasks",
@@ -150,14 +158,14 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     # Jerarquía
-    parent: Mapped["Task | None"] = relationship(
+    parent: Mapped[Task | None] = relationship(
         "Task",
         foreign_keys=[parent_task_id],
         back_populates="children",
         remote_side="Task.id",
         lazy="select",
     )
-    children: Mapped[list["Task"]] = relationship(
+    children: Mapped[list[Task]] = relationship(
         "Task",
         foreign_keys=[parent_task_id],
         back_populates="parent",
@@ -166,7 +174,7 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     # Dependencias: esta tarea depende de otras
-    dependencies: Mapped[list["TaskDependency"]] = relationship(
+    dependencies: Mapped[list[TaskDependency]] = relationship(
         "TaskDependency",
         foreign_keys="TaskDependency.task_id",
         back_populates="task",
@@ -174,28 +182,28 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         lazy="select",
     )
     # Otras tareas que dependen de esta
-    dependents: Mapped[list["TaskDependency"]] = relationship(
+    dependents: Mapped[list[TaskDependency]] = relationship(
         "TaskDependency",
         foreign_keys="TaskDependency.depends_on_id",
         back_populates="depends_on",
         lazy="select",
     )
 
-    comments: Mapped[list["TaskComment"]] = relationship(
+    comments: Mapped[list[TaskComment]] = relationship(
         "TaskComment",
         back_populates="task",
         cascade="all, delete-orphan",
         order_by="TaskComment.created_at",
         lazy="select",
     )
-    status_history: Mapped[list["TaskStatusHistory"]] = relationship(
+    status_history: Mapped[list[TaskStatusHistory]] = relationship(
         "TaskStatusHistory",
         back_populates="task",
         cascade="all, delete-orphan",
         order_by="TaskStatusHistory.created_at",
         lazy="select",
     )
-    gantt_entry: Mapped["GanttEntry | None"] = relationship(  # type: ignore[name-defined]
+    gantt_entry: Mapped[GanttEntry | None] = relationship(  # type: ignore[name-defined]
         "GanttEntry",
         back_populates="task",
         uselist=False,
@@ -240,10 +248,10 @@ class TaskDependency(Base, UUIDMixin, TimestampMixin):
     lag_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    task: Mapped["Task"] = relationship(
+    task: Mapped[Task] = relationship(
         "Task", foreign_keys=[task_id], back_populates="dependencies"
     )
-    depends_on: Mapped["Task"] = relationship(
+    depends_on: Mapped[Task] = relationship(
         "Task", foreign_keys=[depends_on_id], back_populates="dependents"
     )
 
@@ -276,8 +284,8 @@ class TaskComment(Base, UUIDMixin, TimestampMixin):
     is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    task: Mapped["Task"] = relationship("Task", back_populates="comments")
-    author: Mapped["User"] = relationship("User", lazy="select")  # type: ignore[name-defined]
+    task: Mapped[Task] = relationship("Task", back_populates="comments")
+    author: Mapped[User] = relationship("User", lazy="select")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return f"<TaskComment task={self.task_id} author={self.author_id}>"
@@ -317,8 +325,8 @@ class TaskStatusHistory(Base, UUIDMixin, TimestampMixin):
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    task: Mapped["Task"] = relationship("Task", back_populates="status_history")
-    changed_by: Mapped["User"] = relationship("User", lazy="select")  # type: ignore[name-defined]
+    task: Mapped[Task] = relationship("Task", back_populates="status_history")
+    changed_by: Mapped[User] = relationship("User", lazy="select")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return f"<TaskStatusHistory task={self.task_id} {self.from_status} → {self.to_status}>"

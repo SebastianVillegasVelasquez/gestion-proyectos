@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
-from src.shared.base_entity import TimestampMixin, UUIDMixin
+from app.core.database import Base
+from app.shared.base_entity import TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.identity.infrastructure.models import User
+    from app.modules.project.infrastructure.models import Project
 
 
 class ClientAccess(Base, UUIDMixin, TimestampMixin):
@@ -52,10 +59,10 @@ class ClientAccess(Base, UUIDMixin, TimestampMixin):
     access_count: Mapped[int] = mapped_column(default=0)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    project: Mapped["Project"] = relationship(  # type: ignore[name-defined]
+    project: Mapped[Project] = relationship(  # type: ignore[name-defined]
         "Project", back_populates="client_accesses"
     )
-    user: Mapped["User | None"] = relationship("User", lazy="select")  # type: ignore[name-defined]
+    user: Mapped[User | None] = relationship("User", lazy="select")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return f"<ClientAccess project={self.project_id} label={self.label!r} active={self.is_active}>"

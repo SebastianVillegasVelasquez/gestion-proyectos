@@ -3,7 +3,7 @@ name = "backend"
 version = "0.1.0"
 description = ""
 authors = ["SebastianVillegasVelasquez <villegasvelasquezs@gmail.com>"]
-package-mode = false
+packages = [{ include = "app", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.13"
@@ -21,13 +21,22 @@ pydantic-settings = "^2.14.1"
 pytest = "^9.0.3"
 ruff = "^0.15.13"
 mypy = "^2.1.0"
+pre-commit = "^4.6.0"
 
-[tool.pytests.ini_options]
+[tool.pytest.ini_options]
 testpaths = [
     "tests",
     "integration",
 ]
 addopts = "-ra -q"
+files = [
+    "test_*.py"
+]
+marks =[
+    "unit: mark a test as a unit test.",
+    "integration: mark a test as an integration test.",
+    "config: mark a test as a configuration test.",
+]
 
 [build-system]
 requires = ["poetry-core"]
