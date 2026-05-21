@@ -14,12 +14,20 @@ alembic = "^1.18.4"
 pydantic = {extras = ["email", "settings"], version = "^2.13.4"}
 asyncpg = "^0.31.0"
 httpx = "^0.28.1"
+pydantic-settings = "^2.14.1"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
 ruff = "^0.15.13"
 mypy = "^2.1.0"
+
+[tool.pytests.ini_options]
+testpaths = [
+    "tests",
+    "integration",
+]
+addopts = "-ra -q"
 
 [build-system]
 requires = ["poetry-core"]
