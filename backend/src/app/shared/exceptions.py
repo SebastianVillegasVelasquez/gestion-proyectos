@@ -28,3 +28,7 @@ class CyclicDependencyError(DomainException):
 
 class InvalidStateTransitionError(DomainException):
     """Transición de estado no permitida."""
+
+
+class EntityNotSavedError(DomainException):
+    """Entidad no guardada en la base de datos."""
