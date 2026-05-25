@@ -7,8 +7,8 @@ class TestConfig:
     @pytest.mark.config
     def test_url_construct(self, valid_env, settings: Settings):
         # Configuración de variables de entorno para la prueba
-
-        expected_url = "postgresql+asyncpg://" "user:pass@localhost:5432/db"
+        # valid_env sets: test_user, test_pass, test_db
+        expected_url = "postgresql+asyncpg://test_user:test_pass@localhost:5432/test_db"
 
         assert settings.DATABASE_URL == expected_url
 

@@ -37,7 +37,8 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         String(254), unique=True, nullable=False, index=True
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role"),

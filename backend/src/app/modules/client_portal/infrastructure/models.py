@@ -23,7 +23,7 @@ class ClientAccess(Base, UUIDMixin, TimestampMixin):
     generar uno nuevo).
 
     El cliente accede a: GET /client/{token}/project — que devuelve
-    un read model con datos limitados (sin tareas internas, sin usuarios,
+    un read _model con datos limitados (sin tareas internas, sin usuarios,
     solo progreso general, Gantt y reportes aprobados).
     """
 

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",")]
         return v
 
-    @computed_field
+    @computed_field  # type: ignore
     @property
     def DATABASE_URL(self) -> str:
         return (

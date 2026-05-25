@@ -5,10 +5,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.identity.infrastructure.models import User
+from app.shared.exceptions import EntityNotSavedError
+
 T = TypeVar("T")
 
 
-class Repository(ABC, Generic[T]):
+class Repository(Generic[T], ABC):
     """Contrato base para todos los repositorios del dominio.
 
     Cada módulo implementa esta interfaz en su capa de infraestructura
@@ -27,6 +30,9 @@ class Repository(ABC, Generic[T]):
     @abstractmethod
     async def update(self, entity: T) -> T: ...
 
+    @abstractmethod
+    async def add(self, entity: T) -> T: ...
+
 
 class BaseRepository(Repository[T]):
     """Implementación base de Repository con métodos comunes.
@@ -36,38 +42,45 @@ class BaseRepository(Repository[T]):
 
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
-        self.entity = type[T]
+    def __init__(self, model: type[T], session: AsyncSession) -> None:
+        self._session = session
+        self._model = model
 
     async def get_by_id(self, entity_id: UUID) -> T | None:
-        # Implementación común para obtener por ID
-        try:
-            result = await self.session.get(self.entity, entity_id)
-            return result
-        except Exception as e:
-            print(f"Error al obtener el usuario por ID: {e}")
-            return None
+        return await self._session.get(self._model, entity_id)
 
     async def save(self, entity: T) -> T:
-        # Implementación común para guardar una entidad
         try:
-            self.session.add(entity)
-            await self.session.commit()
+            self._session.add(entity)
+            await self._session.flush()
+            await self._session.refresh(entity)
             return entity
         except Exception as e:
-            print(f"Error al guardar la entidad: {e}")
-            await self.session.rollback()
-            raise
+            raise EntityNotSavedError("Error al guardar el registro: " + str(e))
 
     async def get_all(self) -> list[T]:
-        # Implementación común para obtener todas las entidades
-        query = select(self.entity)
-        result = await self.session.execute(query)
+        query = select(self._model)
+        result = await self._session.execute(query)
         return list(result.scalars().all())
 
+    async def add(self, entity: T) -> T:
+        result = await self.save(entity)
+        return result
+
     async def update(self, entity: T) -> T:
-        # Implementación común para actualizar una entidad
-        self.session.merge(entity)
-        await self.session.commit()
+        await self.save(entity)
         return entity
+
+
+class UserRepository(BaseRepository[User]):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(model=User, session=session)
+
+    async def get_by_email(self, email: str) -> User | None:
+        query = select(User).where(User.email == email)
+        result = await self._session.execute(query)
+        return result.scalars().first()
+
+    async def is_email_available(self, email: str) -> bool:
+        user = await self.get_by_email(email)
+        return user is not None
