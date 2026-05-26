@@ -3,11 +3,12 @@ from typing import Literal
 
 from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env" if not os.getenv("TESTING") else None,
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="forbid",
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
 
     # ── Database ────────────────────────────────
     DATABASE_HOST: str
-    DATABASE_PORT: int = 5432
+    DATABASE_PORT: int
     DATABASE_NAME: str
     DATABASE_USER: str
     DATABASE_PASSWORD: str
@@ -63,6 +64,7 @@ class Settings(BaseSettings):
             f"{self.DATABASE_NAME}"
         )
 
+    @computed_field  # type: ignore
     @property
     def IS_DEV(self) -> bool:
         return self.APP_ENV == "development"

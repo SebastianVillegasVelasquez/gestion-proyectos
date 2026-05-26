@@ -1,8 +1,3 @@
-"""Fixtures de configuración para tests.
-
-Proporciona fixtures para settings y variables de entorno.
-"""
-
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
@@ -15,6 +10,7 @@ def valid_env(monkeypatch: MonkeyPatch):
     monkeypatch.setenv("DATABASE_NAME", "test_db")
     monkeypatch.setenv("DATABASE_HOST", "localhost")
     monkeypatch.setenv("DATABASE_PORT", "5432")
+    monkeypatch.setenv("SECRET_KEY", "test_secret_key")
 
 
 @pytest.fixture

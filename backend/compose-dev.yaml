@@ -1,0 +1,28 @@
+services:
+
+  db_dev:
+    container_name: db_dev
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  db_test:
+    container_name: db_test
+    image: postgres:17-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    tmpfs:
+      - /var/lib/postgresql/data
+
+volumes:
+  db_data:

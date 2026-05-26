@@ -1,1 +1,19 @@
-# This workflow will build the frontend
+run-name: Frontend CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: 14.x
+      - run: npm ci
+      - run: npm run build --if-present

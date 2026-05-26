@@ -83,4 +83,4 @@ class UserRepository(BaseRepository[User]):
 
     async def is_email_available(self, email: str) -> bool:
         user = await self.get_by_email(email)
-        return user is not None
+        return True if user is None else False

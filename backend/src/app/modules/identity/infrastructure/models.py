@@ -48,28 +48,25 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # ── Relaciones ─────────────────────────────────────────────────────────────
-    # Un usuario puede coordinar múltiples proyectos
-    coordinated_projects: Mapped[list[Project]] = relationship(  # type: ignore[name-defined]
+    coordinated_projects: Mapped[list[Project]] = relationship(
         "Project",
-        foreign_keys="Project.coordinator_id",
         back_populates="coordinator",
         lazy="select",
     )
-    # Membresías en proyectos
-    project_memberships: Mapped[list[ProjectMember]] = relationship(  # type: ignore[name-defined]
+
+    project_memberships: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember",
         back_populates="user",
         lazy="select",
     )
-    # Tareas asignadas
-    assigned_tasks: Mapped[list[Task]] = relationship(  # type: ignore[name-defined]
+
+    assigned_tasks: Mapped[list[Task]] = relationship(
         "Task",
-        foreign_keys="Task.assignee_id",
         back_populates="assignee",
         lazy="select",
     )
-    # Notificaciones recibidas
-    notifications: Mapped[list[Notification]] = relationship(  # type: ignore[name-defined]
+
+    notifications: Mapped[list[Notification]] = relationship(
         "Notification",
         back_populates="recipient",
         lazy="select",

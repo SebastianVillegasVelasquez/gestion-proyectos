@@ -8,6 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# ── Import all models to register SQLAlchemy mappers ──────────────────────────
+# Important: Import before creating app to ensure all relationships are resolved
+from app.core.models_registry import *  # noqa: F401, F403
+
 from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.shared.exceptions import (
@@ -92,10 +96,11 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 # from app.modules.identity.presentation.router import router as auth_router
-# from app.modules.identity.presentation.router import users_router
+from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
+
 #
 # app.include_router(auth_router, prefix="/api/v1")
-# app.include_router(users_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 # Próximos:
 # from app.modules.projects.presentation.router import router as projects_router
 # app.include_router(projects_router, prefix="/api/v1")

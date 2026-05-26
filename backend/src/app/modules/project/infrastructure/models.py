@@ -119,11 +119,11 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
     statuses: Mapped[list[ProjectStatus]] = relationship(
         "ProjectStatus",
-        primaryjoin="and_(ProjectStatus.project_id == Project.id, "
-        "ProjectStatus.id != Project.current_status_id)",
+        foreign_keys="ProjectStatus.project_id",
         back_populates="project",
         lazy="select",
         order_by="ProjectStatus.order",
+        cascade="all, delete-orphan",
     )
     members: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember",

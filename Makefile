@@ -48,7 +48,7 @@ shell-front:
 # =========================
 
 backend-dev:
-	cd backend && poetry run uvicorn app.main:app --reload
+	cd backend && poetry env activate && poetry run uvicorn app.main:app --reload
 
 backend-test:
 	cd backend && poetry run pytest
@@ -68,6 +68,11 @@ backend-migrate:
 backend-makemigrations:
 	cd backend && poetry run alembic revision --autogenerate -m "migration"
 
+up-db-dev:
+	cd backend && docker compose --env-file .env -f compose-dev.yaml up db_dev -d
+
+up-db-test:
+	cd backend && docker compose --env-file .env.test -f compose-test.yaml up db_test -d
 # =========================
 # Frontend
 # =========================
