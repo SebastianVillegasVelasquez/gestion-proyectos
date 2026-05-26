@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.shared.base_database import Base
 from app.shared.base_entity import TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:

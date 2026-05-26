@@ -7,7 +7,7 @@ from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import base
-from app.core.database import Base
+from app.shared.base_database import Base
 
 # Imports de modelos ORM
 

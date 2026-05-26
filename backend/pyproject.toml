@@ -32,14 +32,6 @@ testpaths = [
     "integration",
 ]
 addopts = "-ra -q"
-files = [
-    "test_*.py"
-]
-marks =[
-    "unit: mark a test as a unit test.",
-    "integration: mark a test as an integration test.",
-    "config: mark a test as a configuration test.",
-]
 asyncio_mode = "auto"
 
 [build-system]

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
         env_file=".env" if not os.getenv("TESTING") else None,
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="forbid",
+        extra="allow",
     )
 
     # ── App ─────────────────────────────────────

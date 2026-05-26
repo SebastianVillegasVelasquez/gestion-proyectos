@@ -1,7 +1,4 @@
-import os
+from app.core.models_registry import *  # noqa: F401, F403
 
-os.environ["TESTING"] = "1"
 
-pytest_plugins = [
-    "tests.fixtures.config",
-]
+pytest_plugins = ["tests.fixtures.config", "tests.fixtures.identity"]

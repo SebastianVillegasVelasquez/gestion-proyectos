@@ -43,7 +43,7 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
 
-    model_config = {"from_attributes": True}  # permite crear desde ORM objects
+    model_config = {"from_attributes": True}
 
 
 class TokenResponse(BaseModel):

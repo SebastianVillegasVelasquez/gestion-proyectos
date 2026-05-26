@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
 
 
 # ── Engine ─────────────────────────────────────────────────────────────────────
@@ -30,11 +29,6 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False,
 )
-
-
-# ── Base declarativa para todos los modelos ORM ────────────────────────────────
-class Base(DeclarativeBase):
-    pass
 
 
 # ── Dependency para FastAPI ────────────────────────────────────────────────────
