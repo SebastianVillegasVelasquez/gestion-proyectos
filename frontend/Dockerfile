@@ -8,7 +8,8 @@ RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-RUN pnpm install
+RUN pnpm fetch
+RUN pnpm install --offline
 
 COPY . .
 
