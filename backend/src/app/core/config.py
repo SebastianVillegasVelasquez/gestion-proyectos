@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     # ── Database ────────────────────────────────
-    DATABASE_HOST: str
-    DATABASE_PORT: int
-    DATABASE_NAME: str
-    DATABASE_USER: str
-    DATABASE_PASSWORD: str
+    DATABASE_HOST: str = ""
+    DATABASE_PORT: int = 0
+    DATABASE_NAME: str = ""
+    DATABASE_USER: str = ""
+    DATABASE_PASSWORD: str = ""
 
     # ── Security ────────────────────────────────
-    SECRET_KEY: str
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30

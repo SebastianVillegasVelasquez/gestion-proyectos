@@ -1846,6 +1846,33 @@ trio = ">=0.11"
 wsproto = ">=0.14"
 
 [[package]]
+name = "types-pyasn1"
+version = "0.6.0.20260408"
+description = "Typing stubs for pyasn1"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "types_pyasn1-0.6.0.20260408-py3-none-any.whl", hash = "sha256:ee7fbd98bce61193c5d4f8f7812fa53cddc5b8cc5ceb9fcda6eea539947c6d6b"},
+    {file = "types_pyasn1-0.6.0.20260408.tar.gz", hash = "sha256:32dc90927adbe504fd2eee83ae30cf5ef934e5db0d1d94886071fed47eb50c8c"},
+]
+
+[[package]]
+name = "types-python-jose"
+version = "3.5.0.20260408"
+description = "Typing stubs for python-jose"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "types_python_jose-3.5.0.20260408-py3-none-any.whl", hash = "sha256:968d8a8eac1ff9da249d6335a2bb9f82288d59ba23afe91fcc2662eb9f485e2a"},
+    {file = "types_python_jose-3.5.0.20260408.tar.gz", hash = "sha256:3f8dccdc327bfffea7a81084ea1cea722fa499f13c1d04f7978b491dd36e0cf1"},
+]
+
+[package.dependencies]
+types-pyasn1 = "*"
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -1965,4 +1992,4 @@ h11 = ">=0.16.0,<1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "995d80234138551dd971f7e694f9780a10ed9926594dd13e408072130625257f"
+content-hash = "779cc66e4afb7e37a65e595b055020aa98f37384b90d33e195ff72dfaea3cee3"
