@@ -1,7 +1,7 @@
 from fastapi import Depends
 from fastapi.routing import APIRouter
 
-from app.core.dependencies import repo_dependency, get_current_user, require_role
+from app.core.dependencies import get_current_user, repo_dependency, require_role
 from app.modules.identity.application.use_cases import CreateUserUseCase, LoginUseCase
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,

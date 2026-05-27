@@ -1,12 +1,12 @@
-from app.core.security import verify_password, create_access_token, create_refresh_token
+from app.core.security import create_access_token, create_refresh_token, verify_password
 from app.modules.identity.domain.services import UserService
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
-    UserResponse,
     TokenResponse,
+    UserResponse,
 )
 from app.shared.base_repository import UserRepository
-from app.shared.exceptions import ConflictError, ForbiddenError
+from app.shared.exceptions import ConflictError, UnauthorizedError
 
 
 class CreateUserUseCase:
@@ -32,10 +32,10 @@ class LoginUseCase:
         user = await self._repo.get_by_email(email)
 
         if not user or not verify_password(password, user.hashed_password):
-            raise ForbiddenError("Credenciales incorrectas")
+            raise UnauthorizedError("Credenciales incorrectas")
 
         if not user.is_active:
-            raise ForbiddenError("Usuario inactivo")
+            raise UnauthorizedError("Usuario inactivo")
 
         return TokenResponse(
             access_token=create_access_token(user.id, user.role.value),

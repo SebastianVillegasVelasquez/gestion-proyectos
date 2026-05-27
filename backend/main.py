@@ -20,6 +20,7 @@ from app.shared.exceptions import (
     ForbiddenError,
     NotFoundError,
     ValidationError,
+    UnauthorizedError,
 )
 
 logger = get_logger(__name__)
@@ -71,7 +72,11 @@ async def not_found_handler(request: Request, exc: NotFoundError):
     return JSONResponse(status_code=404, content={"detail": exc.message})
 
 
-@app.exception_handler(ForbiddenError)
+@app.exception_handler(UnauthorizedError)
+async def unauthorized_handler(request: Request, exc: UnauthorizedError):
+    return JSONResponse(status_code=401, content={"detail": exc.message})
+
+
 async def forbidden_handler(request: Request, exc: ForbiddenError):
     return JSONResponse(status_code=403, content={"detail": exc.message})
 

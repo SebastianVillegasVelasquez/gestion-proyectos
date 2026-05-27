@@ -18,6 +18,10 @@ class ForbiddenError(DomainException):
     """El usuario no tiene permiso para esta acción."""
 
 
+class UnauthorizedError(DomainException):
+    """El usuario no está autenticado o el token es inválido."""
+
+
 class ValidationError(DomainException):
     """Validación de dominio fallida (diferente al 422 de Pydantic)."""
 
