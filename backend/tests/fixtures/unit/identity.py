@@ -1,9 +1,20 @@
+from dataclasses import dataclass
 from uuid import UUID
 
 import pytest
 
-from app.modules.identity.infrastructure.models import User
+from app.modules.identity.infrastructure.enums import UserRole
 from app.modules.identity.presentation.schemas import CreateUserRequest
+
+
+@dataclass
+class FakeUser:
+    id: UUID
+    email: str
+    name: str
+    last_name: str
+    role: UserRole
+    is_active: bool
 
 
 class FakeIdentityRepository:
@@ -17,9 +28,9 @@ class FakeIdentityRepository:
     async def is_email_available(self, email: str) -> bool:
         return not any(u.email == email for u in self.users)
 
-    async def add(self, user: CreateUserRequest) -> User:
+    async def add(self, user: CreateUserRequest) -> FakeUser:
         self.saved_users.append(user)
-        return User(
+        return FakeUser(
             id=UUID(int=1),
             email=user.email,
             name=user.name,

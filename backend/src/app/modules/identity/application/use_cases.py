@@ -1,8 +1,11 @@
+from uuid import UUID
+
 from app.core.security import create_access_token, create_refresh_token, verify_password
 from app.modules.identity.domain.services import UserService
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     TokenResponse,
+    UpdateUserRequest,
     UserResponse,
 )
 from app.shared.base_repository import UserRepository
@@ -15,8 +18,7 @@ class CreateUserUseCase:
         self.user_service = UserService(user_repo)
 
     async def execute(self, data: CreateUserRequest) -> UserResponse:
-        is_available = await self.user_repo.is_email_available(data.email)
-        if not is_available:
+        if not await self.user_repo.is_email_available(data.email):
             raise ConflictError("El correo ya se encuentra registrado")
 
         result = await self.user_service.create_user(data)
@@ -49,3 +51,43 @@ class LoginUseCase:
                 is_active=user.is_active,
             ),
         )
+
+
+class GetUserByIdUseCase:
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+        self.user_service = UserService(user_repo)
+
+    async def execute(self, user_id: UUID) -> UserResponse:
+        return await self.user_service.get_by_id(user_id)
+
+
+class UpdateUserUseCase:
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+        self.user_service = UserService(user_repo)
+
+    async def execute(
+        self,
+        user_id: UUID,
+        data: UpdateUserRequest,
+    ) -> UserResponse:
+        updated_user = await self.user_service.update(user_id, data)
+
+        return updated_user
+
+    async def patch(
+        self,
+        user_id: UUID,
+        data: UpdateUserRequest,
+    ) -> UserResponse:
+        return await self.user_service.update(user_id, data)
+
+
+class DeleteUserUseCase:
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+        self.user_service = UserService(user_repo)
+
+    async def execute(self, user_id: UUID) -> None:
+        await self.user_service.delete(user_id=user_id)

@@ -1,16 +1,24 @@
+from uuid import UUID
+
 from fastapi import Depends
 from fastapi.routing import APIRouter
 
 from app.core.dependencies import get_current_user, repo_dependency, require_role
-from app.modules.identity.application.use_cases import CreateUserUseCase, LoginUseCase
+from app.modules.identity.application.use_cases import (
+    CreateUserUseCase,
+    DeleteUserUseCase,
+    GetUserByIdUseCase,
+    LoginUseCase,
+    UpdateUserUseCase,
+)
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     LoginRequest,
     TokenResponse,
+    UpdateUserRequest,
     UserResponse,
 )
 from app.shared.base_repository import UserRepository
-from app.shared.exceptions import ForbiddenError
 
 router = APIRouter(prefix="/identity", tags=["Identity"])
 
@@ -41,6 +49,78 @@ async def get_users(
     repo: UserRepository = Depends(repo_dependency),
     current_user=Depends(require_role("admin", "super_admin")),
 ):
-    if current_user.role != "admin":
-        raise ForbiddenError("No tienes permisos para acceder a esta ruta")
     return await repo.get_all()
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=UserResponse,
+)
+async def get_user_by_id(
+    user_id: UUID,
+    repo: UserRepository = Depends(repo_dependency),
+    current_user=Depends(
+        require_role(
+            "admin",
+            "super_admin",
+            "member",
+        )
+    ),
+):
+    return await GetUserByIdUseCase(repo).execute(user_id)
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=UserResponse,
+)
+async def patch_user(
+    user_id: UUID,
+    data: UpdateUserRequest,
+    repo: UserRepository = Depends(repo_dependency),
+    current_user=Depends(
+        require_role(
+            "admin",
+            "super_admin",
+        )
+    ),
+):
+    return await UpdateUserUseCase(repo).execute(
+        user_id=user_id,
+        data=data,
+    )
+
+
+@router.put(
+    "/users/{user_id}",
+    response_model=UserResponse,
+)
+async def update_user(
+    user_id: UUID,
+    data: UpdateUserRequest,
+    repo: UserRepository = Depends(repo_dependency),
+    current_user=Depends(
+        require_role(
+            "admin",
+            "super_admin",
+        )
+    ),
+):
+    return await UpdateUserUseCase(repo).execute(
+        user_id=user_id,
+        data=data,
+    )
+
+
+@router.delete("/users/{user_id}", status_code=200)
+async def delete_user(
+    user_id: UUID,
+    repo: UserRepository = Depends(repo_dependency),
+    current_user=Depends(
+        require_role(
+            "admin",
+            "super_admin",
+        )
+    ),
+):
+    await DeleteUserUseCase(repo).execute(user_id)

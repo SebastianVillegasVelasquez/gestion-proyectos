@@ -52,7 +52,7 @@ async def get_current_user(
 def require_role(*roles: str):
     async def _check(current_user=Depends(get_current_user)):
         if current_user.role not in roles:
-            raise ForbiddenError("No tienes permiso")
+            raise ForbiddenError("No tienes permiso para acceder a este recurso")
         return current_user
 
     return _check

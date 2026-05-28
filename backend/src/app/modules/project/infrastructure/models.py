@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import enum
 import uuid
 from typing import TYPE_CHECKING
@@ -20,12 +21,12 @@ from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
-    from app.modules.identity.infrastructure.models import User
-    from app.modules.tasks.infrastructure.models import Task
     from app.modules.client_portal.infrastructure.models import ClientAccess
-    from app.modules.ia_reporting.infrastructure.models import ReportSchedule, Report
+    from app.modules.ia_reporting.infrastructure.models import Report, ReportSchedule
+    from app.modules.identity.infrastructure.models import User
     from app.modules.notifications.infrastructure.models import Notification
     from app.modules.scheduling.infrastructure.models import Schedule
+    from app.modules.tasks.infrastructure.models import Task
 
 
 class ProjectStatusType(str, enum.Enum):
@@ -77,7 +78,12 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Estado actual del proyecto: FK a project_statuses
     current_status_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("project_statuses.id", ondelete="SET NULL"),
+        ForeignKey(
+            "project_statuses.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_projects_current_status_id",
+        ),
         nullable=True,
         index=True,
     )
@@ -116,6 +122,7 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         "ProjectStatus",
         foreign_keys=[current_status_id],
         lazy="select",
+        post_update=True,
     )
     statuses: Mapped[list[ProjectStatus]] = relationship(
         "ProjectStatus",

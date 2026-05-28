@@ -2,7 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.modules.identity.infrastructure.models import UserRole
+from app.modules.identity.infrastructure.enums import UserRole
 
 
 class LoginRequest(BaseModel):
@@ -26,7 +26,9 @@ class CreateUserRequest(BaseModel):
 
 
 class UpdateUserRequest(BaseModel):
-    full_name: str | None = Field(default=None, min_length=2, max_length=200)
+    email: EmailStr
+    name: str = Field(min_length=2, max_length=200)
+    last_name: str = Field(min_length=2, max_length=200)
     role: UserRole | None = None
     is_active: bool | None = None
 

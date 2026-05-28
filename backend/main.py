@@ -24,7 +24,6 @@ from app.shared.exceptions import (
 )
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 # ── Lifespan (startup / shutdown) ──────────────────────────────────────────────
 
@@ -33,8 +32,8 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     logger.info(
         "Iniciando OBJ Digital PM",
-        env=settings.APP_ENV,
-        debug=settings.DEBUG,
+        env=get_settings().APP_ENV,
+        debug=get_settings().DEBUG,
     )
     yield
     logger.info("Cerrando OBJ Digital PM")
@@ -46,8 +45,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OBJ Digital — Sistema de Gestión de Proyectos",
     version="0.1.0",
-    docs_url="/docs" if settings.IS_DEV else None,
-    redoc_url="/redoc" if settings.IS_DEV else None,
+    docs_url="/docs" if get_settings().IS_DEV else None,
+    redoc_url="/redoc" if get_settings().IS_DEV else None,
     lifespan=lifespan,
 )
 
@@ -55,7 +54,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=get_settings().CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -108,4 +107,4 @@ app.include_router(users_router, prefix="/api/v1")
 @app.get("/ping", tags=["health"])
 async def ping():
     """Health check — confirma que el API está corriendo."""
-    return {"status": "ok", "env": settings.APP_ENV}
+    return {"status": "ok", "env": get_settings().APP_ENV}

@@ -1,27 +1,19 @@
 from __future__ import annotations
 
-import enum
 from typing import TYPE_CHECKING
 
-from app.shared.base_database import Base
-from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from sqlalchemy import Boolean, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.shared.base_database import Base
+from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+
+from .enums import UserRole
 
 if TYPE_CHECKING:
     from app.modules.notifications.infrastructure.models import Notification
     from app.modules.project.infrastructure.models import Project, ProjectMember
     from app.modules.tasks.infrastructure.models import Task
-
-
-class UserRole(str, enum.Enum):
-    SUPER_ADMIN = "super_admin"
-    ADMIN = "admin"
-    COORDINATOR = "coordinator"
-    COLLABORATOR = "collaborator"
-    MEMBER = "member"
-    CLIENT = "client"
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
