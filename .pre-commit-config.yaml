@@ -7,6 +7,7 @@ repos:
         entry: bash -c 'cd backend && poetry run pytest ./tests/unit'
         language: system
         pass_filenames: false
+        files: ^backend/
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -14,6 +15,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        files: ^backend/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.2
@@ -32,6 +34,7 @@ repos:
         entry: poetry -C backend run pytest tests/unit
         language: system
         pass_filenames: false
+        files: ^backend/
 
 
   # Frontend
