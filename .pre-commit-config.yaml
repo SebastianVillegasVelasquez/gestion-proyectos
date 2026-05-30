@@ -13,7 +13,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        files: ^backend/
       - id: end-of-file-fixer
+        files: ^backend/
       - id: check-yaml
         files: ^backend/
 
