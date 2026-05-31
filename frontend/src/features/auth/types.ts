@@ -7,18 +7,21 @@ export interface LoginResponse {
     token: string;
 }
 
-export interface Register{
+export interface RegisterRequest{
     name: string;
     lastname: string;
     email: string;
     password: string;
+    role: typeof Role.COLLABORATOR
 }
 
-export const ROLES = {
-    SUPER_ADMIN : "super_admin",
-    ADMIN : "admin",
-    COORDINATOR : "coordinator",
-    COLLABORATOR : "collaborator",
-    MEMBER : "member",
-    CLIENT : "client"
-}
+export const Role = {
+    SUPER_ADMIN: "super_admin",
+    ADMIN: "admin",
+    COORDINATOR: "coordinator",
+    COLLABORATOR: "collaborator",
+    MEMBER: "member",
+    CLIENT: "client",
+} as const;
+
+export type Role = typeof Role[keyof typeof Role];

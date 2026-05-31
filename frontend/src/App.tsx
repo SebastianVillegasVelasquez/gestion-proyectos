@@ -1,13 +1,9 @@
 import './App.css'
-import Login from '@/features/auth/components/Login.tsx'
+import {AppRouter} from "@/router/AppRouter.tsx";
 
-function App() {
 
-    return (
-        <>
-            <div><Login></Login></div>
-        </>
-    )
+const App = () => {
+    return <AppRouter />
 }
 
 export default App
