@@ -9,7 +9,7 @@ export interface LoginResponse {
 
 export interface RegisterRequest{
     name: string;
-    lastname: string;
+    last_name: string;
     email: string;
     password: string;
     role: typeof Role.COLLABORATOR

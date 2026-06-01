@@ -1,6 +1,6 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type FieldName = "name" | "lastname" | "email" | "password";
+export type FieldName = "name" | "last_name" | "email" | "password";
 
 // ── Validación por campo ──
 export function validateField(name: FieldName, value: string, isRegister: boolean): string | undefined {
@@ -9,7 +9,7 @@ export function validateField(name: FieldName, value: string, isRegister: boolea
         case "name":
             if (isRegister && !v) return "Ingresa tu nombre.";
             return;
-        case "lastname":
+        case "last_name":
             if (isRegister && !v) return "Ingresa tu apellido.";
             return;
         case "email":

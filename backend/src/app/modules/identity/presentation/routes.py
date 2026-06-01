@@ -31,7 +31,7 @@ async def create(
     return await CreateUserUseCase(user_repo=repo).execute(data)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/auth/login", response_model=TokenResponse)
 async def login(
     data: LoginRequest,
     repo: UserRepository = Depends(repo_dependency),
