@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
+from app.modules.project.infrastructure.models import Project
 from app.shared.exceptions import EntityNotSavedError
 
 T = TypeVar("T")
@@ -73,25 +74,3 @@ class BaseRepository(Repository[T], Generic[T]):
                 setattr(entity, field, value)
 
         return await self.save(entity)
-
-
-class UserRepository(BaseRepository[User]):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(model=User, session=session)
-
-    async def get_by_email(self, email: str) -> User | None:
-        query = select(User).where(User.email == email)
-
-        result = await self._session.execute(query)
-
-        return result.scalars().first()
-
-    async def is_email_available(self, email: str) -> bool:
-        user = await self.get_by_email(email)
-
-        return user is None
-
-    async def soft_delete(self, user: User) -> User:
-        user.is_active = False
-
-        return await self.save(user)

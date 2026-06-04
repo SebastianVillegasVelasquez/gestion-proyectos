@@ -10,7 +10,7 @@ export function useLogin() {
     return useMutation({
         mutationFn: (data: LoginRequest) => authService.login(data),
         onSuccess: (res) => {
-            localStorage.setItem("token", res.access_token);
+            localStorage.setItem("access_token", res.access_token);
             navigate("/dashboard");
         },
         onError: (error) => {
@@ -25,7 +25,7 @@ export function useRegister() {
     return useMutation({
         mutationFn: (data: RegisterRequest) => authService.register(data),
         onSuccess: (res) => {
-            localStorage.setItem("token", res.access_token);
+            localStorage.setItem("access_token", res.access_token);
             navigate("/dashboard");
         },
         onError: (error) => {

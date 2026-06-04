@@ -8,16 +8,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.modules.identity.presentation.schemas import UserResponse
-from app.shared.base_repository import UserRepository
+from app.modules.project.infrastructure.repository import ProjectRepository, ProjectStatusRepository, \
+    ProjectMemberRepository, ModuleRepository, RiskRepostory
+from app.modules.identity.infrastructure.repository import UserRepository
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
-def repo_dependency(db: AsyncSession = Depends(get_db)):
+class ProjectRepositories:
+    def __init__(self, db: AsyncSession = Depends(get_db)) -> None:
+        self.project_repo = ProjectRepository(db)
+        self.status_repo = ProjectStatusRepository(db)
+        self.member_repo = ProjectMemberRepository(db)
+        self.module_repo = ModuleRepository(db)
+        self.risk_repo = RiskRepostory(db)
+
+def get_project_repos(db: AsyncSession = Depends(get_db)) -> ProjectRepositories:
+    return ProjectRepositories(db)
+
+def identity_repo_dependency(db: AsyncSession = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

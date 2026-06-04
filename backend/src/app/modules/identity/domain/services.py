@@ -6,7 +6,7 @@ from app.modules.identity.presentation.schemas import (
     UpdateUserRequest,
     UserResponse,
 )
-from app.shared.base_repository import UserRepository
+from app.modules.identity.infrastructure.repository import UserRepository
 from app.shared.exceptions import NotFoundError, ConflictError
 
 

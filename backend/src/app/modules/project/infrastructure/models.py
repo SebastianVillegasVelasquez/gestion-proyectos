@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import uuid
 from typing import TYPE_CHECKING
 
@@ -19,6 +18,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.modules.project.infrastructure.enums import (
+    RiskLevel,
+    ProjectStatusType,
+    ProjectMemberRole
+)
 
 if TYPE_CHECKING:
     from app.modules.client_portal.infrastructure.models import ClientAccess
@@ -27,36 +31,6 @@ if TYPE_CHECKING:
     from app.modules.notifications.infrastructure.models import Notification
     from app.modules.scheduling.infrastructure.models import Schedule
     from app.modules.tasks.infrastructure.models import Task
-
-
-class ProjectStatusType(str, enum.Enum):
-    """
-    Estados BASE fijos del sistema. Cada proyecto arranca con estos
-    seeded y puede agregar estados custom adicionales a través de
-    ProjectStatus con is_base=False.
-    """
-
-    PENDING = "pending"  # Por iniciar
-    IN_PROGRESS = "in_progress"  # En progreso
-    IN_REVIEW = "in_review"  # En revisión
-    COMPLETED = "completed"  # Completado
-    ON_HOLD = "on_hold"  # En pausa
-    CANCELLED = "cancelled"  # Cancelado
-
-
-class RiskLevel(str, enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class ProjectMemberRole(str, enum.Enum):
-    """Rol dentro de un proyecto específico (diferente al rol global)."""
-
-    COORDINATOR = "coordinator"
-    MEMBER = "member"
-    OBSERVER = "observer"
 
 
 # ── Project ────────────────────────────────────────────────────────────────────

@@ -1,10 +1,11 @@
 import { Outlet } from 'react-router-dom'
-import {Sidebar} from "lucide-react";
+// import {Sidebar} from "lucide-react";
+import {Sidebar as SidebarComponent} from "@/components/layout/SideBar.tsx";
 
 export const AppLayout = () => {
     return (
         <div style={{ display: 'flex' }}>
-    <Sidebar />
+    <SidebarComponent/>
     <div style={{ flex: 1 }}>
     {/*<Topbar />*/}
     <main>

@@ -100,9 +100,10 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
+from app.modules.project.presentation.routes import router as projects_router
 
 app.include_router(users_router, prefix="/api/v1")
-
+app.include_router(projects_router, prefix="/api/v1")
 
 @app.get("/ping", tags=["health"])
 async def ping():

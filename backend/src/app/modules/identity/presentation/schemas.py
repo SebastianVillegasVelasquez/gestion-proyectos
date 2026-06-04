@@ -1,20 +1,39 @@
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import EmailStr, StringConstraints, field_validator
 
 from app.modules.identity.infrastructure.enums import UserRole
+from app.shared.base_model import BaseModelConfig
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(BaseModelConfig):
     email: EmailStr
-    password: str = Field(min_length=1)
+
+    password: Annotated[
+        str,
+        StringConstraints(min_length=1),
+    ]
 
 
-class CreateUserRequest(BaseModel):
+class CreateUserRequest(BaseModelConfig):
     email: EmailStr
-    password: str = Field(min_length=8, description="Mínimo 8 caracteres")
-    name: str = Field(min_length=2, max_length=200)
-    last_name: str = Field(min_length=2, max_length=200)
+
+    password: Annotated[
+        str,
+        StringConstraints(min_length=8),
+    ]
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
     role: UserRole = UserRole.MEMBER
 
     @field_validator("password")
@@ -25,35 +44,51 @@ class CreateUserRequest(BaseModel):
         return v
 
 
-class UpdateUserRequest(BaseModel):
+class UpdateUserRequest(BaseModelConfig):
     email: EmailStr
-    name: str = Field(min_length=2, max_length=200)
-    last_name: str = Field(min_length=2, max_length=200)
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
     role: UserRole | None = None
     is_active: bool | None = None
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(BaseModelConfig):
     refresh_token: str
 
 
-class UserResponse(BaseModel):
+class UserResponse(BaseModelConfig):
     id: UUID
     email: str
-    name: str
-    last_name: str
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
     role: UserRole
     is_active: bool
 
-    model_config = {"from_attributes": True}
 
-
-class TokenResponse(BaseModel):
+class TokenResponse(BaseModelConfig):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(BaseModelConfig):
     message: str

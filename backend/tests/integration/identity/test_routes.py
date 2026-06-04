@@ -115,7 +115,7 @@ class TestLoginRoute:
         )
 
         response = await client.post(
-            "/api/v1/identity/login",
+            "/api/v1/identity/auth/login",
             json={
                 "email": "admin@example.com",
                 "password": "password123",
@@ -166,7 +166,7 @@ class TestLoginRoute:
         )
 
         response = await client.post(
-            "/api/v1/identity/login",
+            "/api/v1/identity/auth/login",
             json={
                 "email": "admin@example.com",
                 "password": "wrong-password",
@@ -180,7 +180,7 @@ class TestLoginRoute:
         client,
     ):
         response = await client.post(
-            "/api/v1/identity/login",
+            "/api/v1/identity/auth/login",
             json={
                 "email": "notfound@example.com",
                 "password": "password123",
@@ -194,7 +194,7 @@ class TestLoginRoute:
         client,
     ):
         response = await client.post(
-            "/api/v1/identity/login",
+            "/api/v1/identity/auth/login",
             json={
                 "password": "password123",
             },
@@ -207,7 +207,7 @@ class TestLoginRoute:
         client,
     ):
         response = await client.post(
-            "/api/v1/identity/login",
+            "/api/v1/identity/auth/login",
             json={
                 "email": "admin@example.com",
             },

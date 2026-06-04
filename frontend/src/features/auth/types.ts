@@ -4,7 +4,14 @@ export interface LoginRequest{
 }
 
 export interface LoginResponse {
-    token: string;
+    access_token: string;
+    token_type: string;
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        role: Role;
+    };
 }
 
 export interface RegisterRequest{
