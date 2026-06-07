@@ -1,10 +1,14 @@
 import datetime
 import uuid
-from typing import Annotated
+from typing import Annotated, Optional
 
 from pydantic import field_validator, Field, StringConstraints
 
-from app.modules.project.infrastructure.enums import ProjectStatusType, ProjectMemberRole, RiskLevel
+from app.modules.project.infrastructure.enums import (
+    ProjectStatusType,
+    ProjectMemberRole,
+    RiskLevel,
+)
 from app.shared.base_model import BaseModelConfig
 
 StatusName = Annotated[
@@ -58,6 +62,7 @@ class ProjectStatusResponse(BaseModelConfig):
 # PROJECT MEMBER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ProjectMemberAdd(BaseModelConfig):
     user_id: uuid.UUID
     role: ProjectMemberRole = ProjectMemberRole.MEMBER
@@ -79,6 +84,7 @@ class ProjectMemberResponse(BaseModelConfig):
 # MODULE
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ModuleCreate(BaseModelConfig):
     name: Annotated[
         str,
@@ -94,17 +100,23 @@ class ModuleCreate(BaseModelConfig):
 
 
 class ModuleUpdate(BaseModelConfig):
-    name: Annotated[
-              str,
-              StringConstraints(max_length=200),
-          ] | None = None
+    name: (
+        Annotated[
+            str,
+            StringConstraints(max_length=200),
+        ]
+        | None
+    ) = None
 
     description: str | None = None
 
-    order: Annotated[
-               int,
-               Field(ge=0),
-           ] | None = None
+    order: (
+        Annotated[
+            int,
+            Field(ge=0),
+        ]
+        | None
+    ) = None
 
 
 class ModuleResponse(BaseModelConfig):
@@ -132,6 +144,7 @@ class ModuleResponse(BaseModelConfig):
 # RISK
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class RiskCreate(BaseModelConfig):
     title: Annotated[
         str,
@@ -144,10 +157,13 @@ class RiskCreate(BaseModelConfig):
 
 
 class RiskUpdate(BaseModelConfig):
-    title: Annotated[
-               str,
-               StringConstraints(max_length=300),
-           ] | None = None
+    title: (
+        Annotated[
+            str,
+            StringConstraints(max_length=300),
+        ]
+        | None
+    ) = None
 
     description: str | None = None
     level: RiskLevel | None = None
@@ -177,6 +193,7 @@ class RiskResponse(BaseModelConfig):
 # PROJECT
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ProjectCreateRequest(BaseModelConfig):
     name: Annotated[
         str,
@@ -185,22 +202,31 @@ class ProjectCreateRequest(BaseModelConfig):
 
     description: str | None = None
 
-    client_name: Annotated[
-                     str,
-                     StringConstraints(max_length=200),
-                 ] | None = None
+    client_name: (
+        Annotated[
+            str,
+            StringConstraints(max_length=200),
+        ]
+        | None
+    ) = None
 
     coordinator_id: uuid.UUID
 
-    start_date: Annotated[
-                    str,
-                    StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-                ] | None = None
+    start_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    ) = None
 
-    end_date: Annotated[
-                  str,
-                  StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-              ] | None = None
+    end_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    ) = None
 
     is_template: bool = False
 
@@ -216,29 +242,41 @@ class ProjectCreateRequest(BaseModelConfig):
 
 
 class ProjectUpdate(BaseModelConfig):
-    name: Annotated[
-              str,
-              StringConstraints(max_length=300),
-          ] | None = None
+    name: (
+        Annotated[
+            str,
+            StringConstraints(max_length=300),
+        ]
+        | None
+    ) = None
 
     description: str | None = None
 
-    client_name: Annotated[
-                     str,
-                     StringConstraints(max_length=200),
-                 ] | None = None
+    client_name: (
+        Annotated[
+            str,
+            StringConstraints(max_length=200),
+        ]
+        | None
+    ) = None
 
     coordinator_id: uuid.UUID | None = None
 
-    start_date: Annotated[
-                    str,
-                    StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-                ] | None = None
+    start_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    ) = None
 
-    end_date: Annotated[
-                  str,
-                  StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-              ] | None = None
+    end_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    ) = None
 
     current_status_id: uuid.UUID | None = None
 
@@ -251,23 +289,32 @@ class ProjectSummaryResponse(BaseModelConfig):
         StringConstraints(max_length=300),
     ]
 
-    client_name: Annotated[
-                     str,
-                     StringConstraints(max_length=200),
-                 ] | None
+    client_name: (
+        Annotated[
+            str,
+            StringConstraints(max_length=200),
+        ]
+        | None
+    )
 
     progress_pct: float
     current_status: ProjectStatusResponse | None
 
-    start_date: Annotated[
-                    str,
-                    StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-                ] | None
+    start_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    )
 
-    end_date: Annotated[
-                  str,
-                  StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-              ] | None
+    end_date: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        ]
+        | None
+    )
 
     is_template: bool
     created_at: datetime.datetime
@@ -281,5 +328,6 @@ class ProjectDetailResponse(ProjectSummaryResponse):
     members: list[ProjectMemberResponse] = []
     modules: list[ModuleResponse] = []
     risks: list[RiskResponse] = []
+    duplicated_from_id: Optional[uuid.UUID] = None
 
     updated_at: datetime.datetime

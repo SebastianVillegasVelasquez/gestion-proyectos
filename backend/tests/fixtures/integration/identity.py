@@ -32,7 +32,7 @@ async def created_user(db_session):
         hashed_password=hash_password("User123*"),
         name="Juan",
         last_name="García",
-        role=UserRole.MEMBER,
+        role=UserRole.INTEGRANTE,
         is_active=True,
     )
 
@@ -51,7 +51,7 @@ async def second_user(db_session):
         hashed_password=hash_password("User123*"),
         name="Pedro",
         last_name="Lopez",
-        role=UserRole.MEMBER,
+        role=UserRole.INTEGRANTE,
         is_active=True,
     )
 

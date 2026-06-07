@@ -8,12 +8,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core.config import get_settings
+from app.core.logger import get_logger
+
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
-
-from app.core.config import get_settings
-from app.core.logger import get_logger
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
@@ -24,6 +24,7 @@ from app.shared.exceptions import (
 )
 
 logger = get_logger(__name__)
+
 
 # ── Lifespan (startup / shutdown) ──────────────────────────────────────────────
 
@@ -100,10 +101,11 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
-from app.modules.project.presentation.routes import router as projects_router
+# from app.modules.project.presentation.routes import router as projects_router
 
 app.include_router(users_router, prefix="/api/v1")
-app.include_router(projects_router, prefix="/api/v1")
+# app.include_router(projects_router, prefix="/api/v1")
+
 
 @app.get("/ping", tags=["health"])
 async def ping():

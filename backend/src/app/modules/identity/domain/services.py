@@ -49,9 +49,7 @@ class UserService:
         update_data = data.model_dump(exclude_unset=True)
 
         if "password" in update_data:
-            update_data["hashed_password"] = self.hash_password(
-                update_data.pop("password")
-            )
+            update_data["password"] = self.hash_password(update_data.pop("password"))
 
         for field, value in update_data.items():
             setattr(existing_user, field, value)

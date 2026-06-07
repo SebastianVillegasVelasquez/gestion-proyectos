@@ -1,5 +1,6 @@
 import enum
 
+
 class ProjectStatusType(str, enum.Enum):
     """
     Estados BASE fijos del sistema. Cada proyecto arranca con estos
@@ -7,27 +8,17 @@ class ProjectStatusType(str, enum.Enum):
     ProjectStatus con is_base=False.
     """
 
-    PENDING = "pending"  # Por iniciar
-    IN_PROGRESS = "in_progress"  # En progreso
-    IN_REVIEW = "in_review"  # En revisión
-    COMPLETED = "completed"  # Completado
-    ON_HOLD = "on_hold"  # En pausa
-    CANCELLED = "cancelled"  # Cancelado
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    IN_REVIEW = "in_review"
+    COMPLETED = "completed"
+    ON_HOLD = "on_hold"
+    CANCELLED = "cancelled"
     DONE = "done"
     TODO = "todo"
 
 
-class RiskLevel(str, enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class ProjectMemberRole(str, enum.Enum):
-    """Rol dentro de un proyecto específico (diferente al rol global)."""
-
-    ADMIN = "admin"
-    COORDINATOR = "coordinator"
-    MEMBER = "member"
-    OBSERVER = "observer"
+class NodeType(str, enum.Enum):
+    PROGRAMA = "PROGRAMA"
+    CURSO = "CURSO"
+    MODULO = "MODULO"

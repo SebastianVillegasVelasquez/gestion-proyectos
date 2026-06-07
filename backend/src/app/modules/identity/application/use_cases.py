@@ -33,7 +33,7 @@ class LoginUseCase:
     async def execute(self, email: str, password: str) -> TokenResponse:
         user = await self._repo.get_by_email(email)
 
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not verify_password(password, user.password):
             raise UnauthorizedError("Credenciales incorrectas")
 
         if not user.is_active:

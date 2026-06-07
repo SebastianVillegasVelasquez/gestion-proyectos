@@ -34,7 +34,7 @@ class CreateUserRequest(BaseModelConfig):
         StringConstraints(min_length=2, max_length=200),
     ]
 
-    role: UserRole = UserRole.MEMBER
+    role: UserRole = UserRole.INTEGRANTE
 
     @field_validator("password")
     @classmethod

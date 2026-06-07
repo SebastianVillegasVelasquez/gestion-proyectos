@@ -23,7 +23,7 @@ class TestIdentityUseCases:
                     password="password1",
                     name="Carlos",
                     last_name="López",
-                    role=UserRole.COLLABORATOR,
+                    role=UserRole.COLABORADOR,
                 )
             )
 
@@ -36,10 +36,10 @@ class TestIdentityUseCases:
                 password="password1",
                 name="Carlos",
                 last_name="López",
-                role=UserRole.MEMBER,
+                role=UserRole.INTEGRANTE,
             )
         )
         assert response.id is not None
         assert isinstance(response.id, UUID)
         assert not hasattr(response, "password")
-        assert response.role == UserRole.MEMBER
+        assert response.role == UserRole.INTEGRANTE

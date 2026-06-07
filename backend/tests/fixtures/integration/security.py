@@ -40,7 +40,7 @@ async def member_user(db_session):
         hashed_password=hash_password("Member123*"),
         name="Member",
         last_name="Test",
-        role=UserRole.MEMBER,
+        role=UserRole.INTEGRANTE,
         is_active=True,
     )
 
