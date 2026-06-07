@@ -69,10 +69,11 @@ class UserService:
     def convert_to_orm(self, data: CreateUserRequest) -> User:
         return User(
             email=data.email,
-            hashed_password=self.hash_password(data.password),
+            password=self.hash_password(data.password),
             name=data.name,
             last_name=data.last_name,
             role=data.role,
+            position=data.position,
         )
 
     @staticmethod

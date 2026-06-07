@@ -1,6 +1,7 @@
 import pytest
 
 from app.core.security import create_access_token, hash_password
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.infrastructure.models import User, UserRole
 
 
@@ -8,10 +9,11 @@ from app.modules.identity.infrastructure.models import User, UserRole
 async def admin_user(db_session):
     user = User(
         email="admin@test.com",
-        hashed_password=hash_password("Admin123*"),
+        password=hash_password("Admin123*"),
         name="Admin",
         last_name="Test",
         role=UserRole.ADMIN,
+        position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
 
@@ -37,10 +39,11 @@ async def admin_token(admin_user):
 async def member_user(db_session):
     user = User(
         email="member@test.com",
-        hashed_password=hash_password("Member123*"),
+        password=hash_password("Member123*"),
         name="Member",
         last_name="Test",
         role=UserRole.INTEGRANTE,
+        position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
 

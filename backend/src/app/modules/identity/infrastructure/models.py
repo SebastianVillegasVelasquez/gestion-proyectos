@@ -8,10 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from .enums import UserRole, UserPosition
-from ...tasks.infrastructure.models import Task
 
 if TYPE_CHECKING:
-    pass
+    from app.modules.project.infrastructure.models import ProjectMember
+    from app.modules.tasks.infrastructure.models import Task
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -31,8 +31,8 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         default=UserRole.INTEGRANTE,
     )
 
-    position: Mapped[UserRole] = mapped_column(
-        Enum(UserPosition, name="user_role"), nullable=False
+    position: Mapped[UserPosition] = mapped_column(
+        Enum(UserPosition, name="user_position"), nullable=False
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -40,6 +40,10 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Relaciones
 
     tasks: Mapped[list[Task]] = relationship("Task", back_populates="assignee")
+
+    project_members: Mapped[list[ProjectMember]] = relationship(
+        "ProjectMember", back_populates="user"
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"

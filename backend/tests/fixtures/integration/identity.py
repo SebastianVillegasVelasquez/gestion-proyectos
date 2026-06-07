@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest_asyncio
 
 from app.core.security import hash_password
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.infrastructure.models import User, UserRole
 
 
@@ -10,10 +11,11 @@ from app.modules.identity.infrastructure.models import User, UserRole
 async def admin_user(db_session):
     user = User(
         email=f"admin-{uuid4()}@test.com",
-        hashed_password=hash_password("Admin123*"),
+        password=hash_password("Admin123*"),
         name="Admin",
         last_name="Test",
         role=UserRole.ADMIN,
+        position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
 
@@ -29,10 +31,11 @@ async def admin_user(db_session):
 async def created_user(db_session):
     user = User(
         email=f"user-{uuid4()}@test.com",
-        hashed_password=hash_password("User123*"),
+        password=hash_password("User123*"),
         name="Juan",
         last_name="García",
         role=UserRole.INTEGRANTE,
+        position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
 
@@ -48,10 +51,11 @@ async def created_user(db_session):
 async def second_user(db_session):
     user = User(
         email=f"second-{uuid4()}@test.com",
-        hashed_password=hash_password("User123*"),
+        password=hash_password("User123*"),
         name="Pedro",
         last_name="Lopez",
         role=UserRole.INTEGRANTE,
+        position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
 

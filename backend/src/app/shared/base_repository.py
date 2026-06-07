@@ -5,8 +5,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.models import Project
 from app.shared.exceptions import EntityNotSavedError
 
 T = TypeVar("T")

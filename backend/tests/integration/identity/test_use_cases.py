@@ -11,7 +11,8 @@ async def test_create_user_test_case(client):
             "password": "secret123",
             "name": "Juan",
             "last_name": "García",
-            "role": "member",
+            "role": "integrante",
+            "position": "desarrollador",
         },
     )
 
@@ -28,7 +29,7 @@ async def test_create_user_password_should_have_at_least_8_characters(client):
             "password": "pass",
             "name": "Juan",
             "last_name": "García",
-            "role": "member",
+            "role": "integrante",
         },
     )
 
@@ -47,7 +48,7 @@ async def test_create_user_password_should_have_at_least_1_number(client):
             "password": "passworddd",
             "name": "Juan",
             "last_name": "García",
-            "role": "member",
+            "role": "integrante",
         },
     )
 

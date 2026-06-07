@@ -9,8 +9,8 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
-    volumes:
-      - postgres-data-dev:/var/lib/postgresql/data
+    tmpfs:
+      - /var/lib/postgresql/data
 
   db_test:
     container_name: db_test
@@ -26,4 +26,4 @@ services:
 
 volumes:
   db_data:
-  postgres-data-dev:
+#  postgres-data-dev:

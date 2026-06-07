@@ -11,6 +11,7 @@ class TestCreateUserRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
+                "position": "desarrollador",
             },
         )
 
@@ -44,6 +45,7 @@ class TestCreateUserRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
+                "position": "desarrollador",
             },
         )
 
@@ -57,6 +59,7 @@ class TestCreateUserRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
+                "position": "desarrollador",
             },
         )
 
@@ -71,6 +74,7 @@ class TestCreateUserRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "super-admin",
+                "position": "desarrollador",
             },
         )
 
@@ -86,6 +90,7 @@ class TestCreateUserRoute:
             "name": "John",
             "last_name": "Doe",
             "role": "admin",
+            "position": "desarrollador",
         }
 
         await client.post(
@@ -111,6 +116,7 @@ class TestLoginRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
+                "position": "desarrollador",
             },
         )
 
@@ -162,6 +168,7 @@ class TestLoginRoute:
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
+                "position": "desarrollador",
             },
         )
 

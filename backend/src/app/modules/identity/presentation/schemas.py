@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.enums import UserRole
+from app.modules.identity.infrastructure.enums import UserRole, UserPosition
 from app.shared.base_model import BaseModelConfig
 
 
@@ -35,6 +35,8 @@ class CreateUserRequest(BaseModelConfig):
     ]
 
     role: UserRole = UserRole.INTEGRANTE
+
+    position: UserPosition = UserPosition.SIN_CARGO
 
     @field_validator("password")
     @classmethod

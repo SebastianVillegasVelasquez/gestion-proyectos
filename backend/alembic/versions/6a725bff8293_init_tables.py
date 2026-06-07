@@ -1,8 +1,8 @@
 """Init tables
 
-Revision ID: 7b2c1977bef4
+Revision ID: 6a725bff8293
 Revises:
-Create Date: 2026-06-07 13:33:32.675226
+Create Date: 2026-06-07 15:11:35.025075
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "7b2c1977bef4"
+revision: str = "6a725bff8293"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -74,7 +74,7 @@ def upgrade() -> None:
                 "DESARROLLADOR",
                 "EXPERTO_MULTIMEDIA",
                 "PROJECT_MANAGER",
-                name="user_role",
+                name="user_position",
             ),
             nullable=False,
         ),

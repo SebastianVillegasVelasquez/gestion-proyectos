@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Date
 
+from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import NodeType
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
@@ -64,8 +65,6 @@ class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True,
     )
 
-    project: Mapped[Project] = relationship("Project", back_populates="members")
-
     children: Mapped[list[ProjectNode]] = relationship(
         "ProjectNode",
         back_populates="parent",
@@ -77,6 +76,8 @@ class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         remote_side="ProjectNode.id",
         back_populates="children",
     )
+
+    project: Mapped[Project] = relationship("Project", back_populates="nodes")
 
 
 class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -93,5 +94,8 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         ForeignKey("users.id"),
         nullable=False,
     )
+
+    user: Mapped[User] = relationship("User", back_populates="project_members")
+    project: Mapped[Project] = relationship("Project", back_populates="members")
 
     role: Mapped[str] = mapped_column(String(20), nullable=False)
