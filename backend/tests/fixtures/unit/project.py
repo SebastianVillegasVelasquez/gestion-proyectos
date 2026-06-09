@@ -46,3 +46,14 @@ def fake_project_node() -> CreateProjectNodeRequest:
         parent_id=UUID(int=1),
         project_id=UUID(int=1),
     )
+
+
+@pytest.fixture
+def valid_project_payload() -> dict:
+    return {
+        "name": "Test Project",
+        "description": "This is a test project",
+        "client_name": "Test Client",
+        "start_date": "2026-07-01",
+        "end_date": "2026-12-31",
+    }

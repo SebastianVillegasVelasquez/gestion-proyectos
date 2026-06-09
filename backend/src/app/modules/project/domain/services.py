@@ -34,10 +34,11 @@ class ProjectService:
 
     async def get_project_by_id(self, project_id: UUID) -> ProjectResponse:
         project = await self.repo.get_by_id(project_id)
-        if not project:
+        if not project or project.is_deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado"
             )
+
         return self._to_response(project)
 
     async def update_project(

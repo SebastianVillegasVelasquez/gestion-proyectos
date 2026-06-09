@@ -41,10 +41,6 @@ async def setup_test_database():
         capture_output=True,
         text=True,
     )
-
-    print(result.stdout)
-    print(result.stderr)
-
     result.check_returncode()
 
     yield

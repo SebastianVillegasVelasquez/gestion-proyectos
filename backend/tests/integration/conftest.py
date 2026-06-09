@@ -4,4 +4,5 @@ pytest_plugins = [
     "tests.fixtures.integration.database",
     "tests.fixtures.integration.security",
     "tests.fixtures.integration.identity",
+    "tests.fixtures.unit.project",
 ]

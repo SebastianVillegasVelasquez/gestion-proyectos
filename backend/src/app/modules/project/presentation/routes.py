@@ -17,6 +17,10 @@ from app.modules.project.application.use_cases import (
     UpdateProjectUseCase,
     CreateProjectUseCase,
 )
+from app.modules.project.infrastructure.repository import (
+    ProjectNodeRepository,
+    ProjectRepository,
+)
 from app.modules.project.presentation.schemas import (
     CreateProjectRequest,
     ProjectResponse,
@@ -91,8 +95,12 @@ async def delete_project(
 @router.post("/nodes", status_code=status.HTTP_201_CREATED)
 async def create_project_node(
     data: Union[List[CreateProjectNodeRequest], CreateProjectNodeRequest],
-    repo=Depends(project_node_repo_dependency),
+    project_node_repo: ProjectNodeRepository = Depends(project_node_repo_dependency),
+    project_repo: ProjectRepository = Depends(project_repo_dependency),
     current_user=Depends(require_role("admin", "super_admin")),
 ):
-    use_case = CreateProjectNodeUseCase(repo=repo)
+    use_case = CreateProjectNodeUseCase(
+        project_repo=project_repo,
+        node_repo=project_node_repo,
+    )
     return await use_case.execute(data)
