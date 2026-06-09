@@ -32,6 +32,9 @@ class Repository(Generic[T], ABC):
     @abstractmethod
     async def add(self, entity: T) -> T: ...
 
+    @abstractmethod
+    async def patch(self, entity: T, data: dict[str, Any]) -> T: ...
+
 
 class BaseRepository(Repository[T], Generic[T]):
     def __init__(self, model: type[T], session: AsyncSession) -> None:
@@ -42,10 +45,8 @@ class BaseRepository(Repository[T], Generic[T]):
         return await self._session.get(self._model, entity_id)
 
     async def get_all(self) -> list[T]:
-        query = select(self._model)
-
+        query = select(self._model).where(self._model.deleted_at.is_(None))
         result = await self._session.execute(query)
-
         return list(result.scalars().all())
 
     async def save(self, entity: T) -> T:

@@ -3,7 +3,11 @@ from uuid import UUID
 from fastapi import Depends
 from fastapi.routing import APIRouter
 
-from app.core.dependencies import get_current_user, identity_repo_dependency, require_role
+from app.core.dependencies import (
+    get_current_user,
+    identity_repo_dependency,
+    require_role,
+)
 from app.modules.identity.application.use_cases import (
     CreateUserUseCase,
     DeleteUserUseCase,

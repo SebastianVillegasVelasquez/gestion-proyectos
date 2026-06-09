@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Enum, UUID
 from sqlalchemy import (
@@ -14,10 +14,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Date
 
-from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import NodeType
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from app.modules.identity.infrastructure.models import User
 
 
 class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -50,7 +52,7 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "project_nodes"
 
-    name: Mapped[str] = mapped_column(String(300), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     node_type: Mapped[NodeType] = mapped_column(Enum(NodeType), nullable=False)
 
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -64,6 +66,8 @@ class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         ForeignKey("project_nodes.id", ondelete="CASCADE"),
         nullable=True,
     )
+
+    # Relaciones
 
     children: Mapped[list[ProjectNode]] = relationship(
         "ProjectNode",
@@ -95,7 +99,8 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Relacion
     user: Mapped[User] = relationship("User", back_populates="project_members")
     project: Mapped[Project] = relationship("Project", back_populates="members")
-
-    role: Mapped[str] = mapped_column(String(20), nullable=False)
