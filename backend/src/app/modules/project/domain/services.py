@@ -10,6 +10,7 @@ from app.modules.project.presentation.schemas import (
     CreateProjectNodeRequest,
     ProjectResponse,
     UpdateProjectRequest,
+    ProjectNodeResponse,
 )
 from app.shared.base_repository import Repository
 
@@ -87,7 +88,7 @@ class ProjectNodeService:
 
     async def create_project_node(
         self, data: Union[List["CreateProjectNodeRequest"], "CreateProjectNodeRequest"]
-    ) -> Union[List["ProjectNode"], "ProjectNode"]:
+    ) -> Union[List["ProjectNodeResponse"], "ProjectNodeResponse"]:
         if isinstance(data, list):
             return await self._create_node_chain(data)
 
@@ -95,14 +96,14 @@ class ProjectNodeService:
 
     async def _create_single_node(
         self, data: "CreateProjectNodeRequest"
-    ) -> "ProjectNode":
+    ) -> "ProjectNodeResponse":
         node_orm = ProjectNode(**data.model_dump())
         saved_node = await self.repo.add(node_orm)
-        return saved_node
+        return self._to_response(saved_node)
 
     async def _create_node_chain(
         self, data_list: List["CreateProjectNodeRequest"]
-    ) -> List["ProjectNode"]:
+    ) -> List["ProjectNodeResponse"]:
         created_nodes = []
         current_parent_id = None
 
@@ -119,4 +120,14 @@ class ProjectNodeService:
 
             current_parent_id = saved_node.id
 
-        return created_nodes
+        return [self._to_response(node) for node in created_nodes]
+
+    @staticmethod
+    def _to_response(saved_node: "ProjectNode") -> "ProjectNodeResponse":
+        return ProjectNodeResponse(
+            id=saved_node.id,
+            name=saved_node.name,
+            node_type=saved_node.node_type,
+            project_id=saved_node.project_id,
+            parent_id=saved_node.parent_id,
+        )

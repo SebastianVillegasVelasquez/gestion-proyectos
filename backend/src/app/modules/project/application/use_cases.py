@@ -1,10 +1,10 @@
 from typing import List
 from uuid import UUID
 
+from fastapi import HTTPException
 from mypy.nodes import Union
 
 from app.modules.project.domain.services import ProjectService, ProjectNodeService
-from app.modules.project.infrastructure.repository import ProjectRepository
 from app.modules.project.presentation.schemas import (
     CreateProjectRequest,
     CreateProjectNodeRequest,
@@ -15,7 +15,7 @@ from app.shared.base_repository import Repository
 
 
 class CreateProjectUseCase:
-    def __init__(self, repo: ProjectRepository):
+    def __init__(self, repo: Repository):
         self.repo = repo
         self.service = ProjectService(repo)
 
@@ -58,18 +58,24 @@ class DeleteProjectUseCase:
 
 
 class CreateProjectNodeUseCase:
-    def __init__(self, repo: "Repository"):
-        self.service = ProjectNodeService(repo)
-        self.project_service = ProjectService(repo)
+    def __init__(self, project_repo: "Repository", node_repo: "Repository"):
+        self.service = ProjectNodeService(node_repo)
+        self.project_service = ProjectService(project_repo)
 
     async def execute(
         self, data: Union[List["CreateProjectNodeRequest"], "CreateProjectNodeRequest"]
     ):
         project_id = data[0].project_id if isinstance(data, list) else data.project_id
 
+        if not project_id:
+            raise HTTPException(
+                status_code=400,
+                detail="El ID del proyecto es obligatorio para crear un nodo",
+            )
+
         exists = await self.project_service.project_exists(project_id)
 
-        if exists:
-            return await self.service.create_project_node(data)
+        if exists is None:
+            raise HTTPException(status_code=404, detail="El proyecto no existe")
 
-        return None
+        return await self.service.create_project_node(data)

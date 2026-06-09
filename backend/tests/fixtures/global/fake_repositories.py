@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from app.modules.project.infrastructure.models import Project
+from app.modules.project.infrastructure.models import Project, ProjectNode
 from app.shared.base_repository import Repository
 
 T = TypeVar("T")
@@ -50,3 +50,8 @@ class FakeRepository(Repository[T]):
 @pytest.fixture
 def fake_project_repository() -> FakeRepository[Project]:
     return FakeRepository(model_cls=Project)
+
+
+@pytest.fixture
+def fake_project_node_repository():
+    return FakeRepository(model_cls=ProjectNode)

@@ -70,8 +70,12 @@ class CreateProjectNodeRequest(BaseModelConfig):
     parent_id: Optional[UUID] = None
 
 
-class CreateProjectNodeResponse(BaseModelConfig):
-    name: list[Annotated[str, StringConstraints(min_length=2, max_length=100)]]
+class ProjectNodeResponse(BaseModelConfig):
+    id: UUID
+    name: Annotated[str, StringConstraints(min_length=2, max_length=100)]
+    node_type: NodeType
+    project_id: UUID
+    parent_id: Optional[UUID] = None
 
 
 class ResponseProjectMember(BaseModelConfig):
