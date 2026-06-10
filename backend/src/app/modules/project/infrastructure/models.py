@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Date
 
+from app.modules.identity.infrastructure.enums import UserRole
 from app.modules.project.infrastructure.enums import NodeType
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
@@ -99,7 +100,9 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
-    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole), nullable=False, default=UserRole.INTEGRANTE
+    )
 
     # Relacion
     user: Mapped[User] = relationship("User", back_populates="project_members")

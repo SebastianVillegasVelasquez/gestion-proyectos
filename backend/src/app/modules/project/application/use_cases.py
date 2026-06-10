@@ -4,12 +4,19 @@ from uuid import UUID
 from fastapi import HTTPException
 from mypy.nodes import Union
 
-from app.modules.project.domain.services import ProjectService, ProjectNodeService
+from app.modules.project.domain.services import (
+    ProjectService,
+    ProjectNodeService,
+    ProjectMemberService,
+)
+from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.modules.project.presentation.schemas import (
     CreateProjectRequest,
     CreateProjectNodeRequest,
     ProjectResponse,
     UpdateProjectRequest,
+    ProjectMemberRequest,
+    ProjectMemberResponse,
 )
 from app.shared.base_repository import Repository
 
@@ -57,6 +64,9 @@ class DeleteProjectUseCase:
         await self.service.delete_project(project_id)
 
 
+# ProjectNode use cases
+
+
 class CreateProjectNodeUseCase:
     def __init__(self, project_repo: "Repository", node_repo: "Repository"):
         self.service = ProjectNodeService(node_repo)
@@ -79,3 +89,40 @@ class CreateProjectNodeUseCase:
             raise HTTPException(status_code=404, detail="El proyecto no existe")
 
         return await self.service.create_project_node(data)
+
+
+# ProjectMember use cases
+
+
+class AddMemberToProjectUseCase:
+    def __init__(
+        self,
+        user_repo: "Repository",
+        member_repo: "ProjectMemberRepository",
+        project_repo: "Repository",
+    ):
+        self.member_service = ProjectMemberService(
+            project_repo=project_repo,
+            user_repo=user_repo,
+            project_member_repo=member_repo,
+        )
+
+    async def execute(self, data: "ProjectMemberRequest") -> "ProjectMemberResponse":
+        return await self.member_service.add_member_to_project(data)
+
+
+class GetProjectMembersUseCase:
+    def __init__(
+        self,
+        project_repo: "Repository",
+        user_repo: "Repository",
+        member_repo: "ProjectMemberRepository",
+    ):
+        self.service = ProjectMemberService(
+            project_repo=project_repo,
+            user_repo=user_repo,
+            project_member_repo=member_repo,
+        )
+
+    async def execute(self, project_id: UUID) -> List["ProjectMemberResponse"]:
+        return await self.service.get_project_members(project_id)

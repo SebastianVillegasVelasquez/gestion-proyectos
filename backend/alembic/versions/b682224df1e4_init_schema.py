@@ -1,8 +1,8 @@
-"""Init tables
+"""Init schema
 
-Revision ID: 6a725bff8293
+Revision ID: b682224df1e4
 Revises:
-Create Date: 2026-06-07 15:11:35.025075
+Create Date: 2026-06-10 15:26:58.694216
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "6a725bff8293"
+revision: str = "b682224df1e4"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -74,6 +74,7 @@ def upgrade() -> None:
                 "DESARROLLADOR",
                 "EXPERTO_MULTIMEDIA",
                 "PROJECT_MANAGER",
+                "SIN_CARGO",
                 name="user_position",
             ),
             nullable=False,
@@ -102,7 +103,19 @@ def upgrade() -> None:
         "project_members",
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("user_id", sa.UUID(), nullable=False),
-        sa.Column("role", sa.String(length=20), nullable=False),
+        sa.Column(
+            "role",
+            sa.Enum(
+                "SUPER_ADMIN",
+                "ADMIN",
+                "COORDINADOR",
+                "COLABORADOR",
+                "INTEGRANTE",
+                "CLIENTE",
+                name="userrole",
+            ),
+            nullable=False,
+        ),
         sa.Column(
             "id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False
         ),
@@ -131,7 +144,7 @@ def upgrade() -> None:
     )
     op.create_table(
         "project_nodes",
-        sa.Column("name", sa.String(length=300), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
         sa.Column(
             "node_type",
             sa.Enum("PROGRAMA", "CURSO", "MODULO", name="nodetype"),

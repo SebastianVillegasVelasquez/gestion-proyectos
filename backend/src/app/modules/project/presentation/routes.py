@@ -8,6 +8,8 @@ from app.core.dependencies import (
     require_role,
     project_repo_dependency,
     project_node_repo_dependency,
+    user_repo_dependency,
+    project_members_repo_dependency,
 )
 from app.modules.project.application.use_cases import (
     CreateProjectNodeUseCase,
@@ -16,6 +18,8 @@ from app.modules.project.application.use_cases import (
     GetProjectsUseCase,
     UpdateProjectUseCase,
     CreateProjectUseCase,
+    AddMemberToProjectUseCase,
+    GetProjectMembersUseCase,
 )
 from app.modules.project.infrastructure.repository import (
     ProjectNodeRepository,
@@ -26,6 +30,8 @@ from app.modules.project.presentation.schemas import (
     ProjectResponse,
     UpdateProjectRequest,
     CreateProjectNodeRequest,
+    ProjectMemberRequest,
+    ProjectMemberResponse,
 )
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -104,3 +110,44 @@ async def create_project_node(
         node_repo=project_node_repo,
     )
     return await use_case.execute(data)
+
+
+# --- ENDPOINTS PARA PROJECT MEMBERS ---
+
+
+@router.post("/members/", status_code=status.HTTP_201_CREATED)
+async def add_project_member(
+    payload: ProjectMemberRequest,
+    project_repo=Depends(project_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_member_repo=Depends(project_members_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin")),
+):
+    return await AddMemberToProjectUseCase(
+        user_repo=user_repo,
+        member_repo=project_member_repo,
+        project_repo=project_repo,
+    ).execute(payload)
+
+
+@router.get(
+    "/{project_id}/members",
+    response_model=List[ProjectMemberResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_project_members(
+    project_id: UUID,
+    project_repo=Depends(project_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_member_repo=Depends(project_members_repo_dependency),
+    current_user=Depends(
+        require_role("admin", "super_admin", "coordinador", "integrante")
+    ),
+):
+    use_case = GetProjectMembersUseCase(
+        project_repo=project_repo,
+        user_repo=user_repo,
+        member_repo=project_member_repo,
+    )
+
+    return await use_case.execute(project_id)

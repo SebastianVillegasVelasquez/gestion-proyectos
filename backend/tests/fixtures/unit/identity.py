@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List
 from uuid import UUID
 
 import pytest
@@ -65,4 +66,50 @@ def fake_users() -> list[CreateUserRequest]:
     return [
         CreateUserRequest(email="", password="", name="Test", last_name="User"),
         CreateUserRequest(email="", password="", name="Test2", last_name="User2"),
+    ]
+
+
+@pytest.fixture
+def fake_user() -> CreateUserRequest:
+    return CreateUserRequest(
+        email="existing@test.com",
+        password="secret123",
+        name="Ana",
+        last_name="García",
+    )
+
+
+@pytest.fixture
+def fake_members_payload() -> List[CreateUserRequest]:
+    return [
+        CreateUserRequest(
+            email="ana.garcia@test.com",
+            password="secret123",
+            name="Ana",
+            last_name="García",
+        ),
+        CreateUserRequest(
+            email="juan.perez@test.com",
+            password="secret123",
+            name="Juan",
+            last_name="Pérez",
+        ),
+        CreateUserRequest(
+            email="maria.lopez@test.com",
+            password="secret123",
+            name="María",
+            last_name="López",
+        ),
+        CreateUserRequest(
+            email="carlos.rodriguez@test.com",
+            password="secret123",
+            name="Carlos",
+            last_name="Rodríguez",
+        ),
+        CreateUserRequest(
+            email="laura.martinez@test.com",
+            password="secret123",
+            name="Laura",
+            last_name="Martínez",
+        ),
     ]

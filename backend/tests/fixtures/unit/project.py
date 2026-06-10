@@ -4,15 +4,17 @@ from uuid import UUID
 
 import pytest
 
+from app.modules.identity.infrastructure.enums import UserRole
 from app.modules.project.infrastructure.enums import NodeType
 from app.modules.project.presentation.schemas import (
     CreateProjectRequest,
     CreateProjectNodeRequest,
+    ProjectMemberRequest,
 )
 
 
 @pytest.fixture
-def fake_create_project_request():
+def fake_create_project_request() -> CreateProjectRequest:
     return CreateProjectRequest(
         name="Sistema de Gestión de Proyectos",
         description="Aplicación para administrar proyectos, tareas y miembros del equipo.",
@@ -57,3 +59,10 @@ def valid_project_payload() -> dict:
         "start_date": "2026-07-01",
         "end_date": "2026-12-31",
     }
+
+
+@pytest.fixture
+def member_project_payload() -> ProjectMemberRequest:
+    return ProjectMemberRequest(
+        user_id=UUID(int=1), project_id=UUID(int=1), role=UserRole.INTEGRANTE
+    )

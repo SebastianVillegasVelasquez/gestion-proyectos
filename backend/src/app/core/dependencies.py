@@ -12,6 +12,7 @@ from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.project.infrastructure.repository import (
     ProjectRepository,
     ProjectNodeRepository,
+    ProjectMemberRepository,
 )
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
@@ -20,7 +21,7 @@ def project_repo_dependency(db: AsyncSession = Depends(get_db)) -> ProjectReposi
     return ProjectRepository(db)
 
 
-def identity_repo_dependency(db: AsyncSession = Depends(get_db)) -> UserRepository:
+def user_repo_dependency(db: AsyncSession = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
 
 
@@ -28,6 +29,12 @@ def project_node_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> ProjectNodeRepository:
     return ProjectNodeRepository(db)
+
+
+def project_members_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> ProjectMemberRepository:
+    return ProjectMemberRepository(db)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

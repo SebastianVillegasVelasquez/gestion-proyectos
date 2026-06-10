@@ -4,8 +4,13 @@ from typing import TypeVar, Any, List, Optional, Dict
 from uuid import UUID
 
 import pytest
+from sqlalchemy import Identity
 
-from app.modules.project.infrastructure.models import Project, ProjectNode
+from app.modules.project.infrastructure.models import (
+    Project,
+    ProjectNode,
+    ProjectMember,
+)
 from app.shared.base_repository import Repository
 
 T = TypeVar("T")
@@ -47,6 +52,17 @@ class FakeRepository(Repository[T]):
         return await self.save(entity)
 
 
+class FakeProjectMemberRepository(FakeRepository[ProjectMember]):
+    async def get_all_members_by_project_id(
+        self, project_id: UUID
+    ) -> list[ProjectMember]:
+        return [
+            member
+            for member in self._storage.values()
+            if member.project_id == project_id
+        ]
+
+
 @pytest.fixture
 def fake_project_repository() -> FakeRepository[Project]:
     return FakeRepository(model_cls=Project)
@@ -55,3 +71,13 @@ def fake_project_repository() -> FakeRepository[Project]:
 @pytest.fixture
 def fake_project_node_repository():
     return FakeRepository(model_cls=ProjectNode)
+
+
+@pytest.fixture
+def fake_project_members_repo():
+    return FakeProjectMemberRepository(model_cls=ProjectMember)
+
+
+@pytest.fixture
+def fake_user_repo():
+    return FakeRepository(model_cls=Identity)
