@@ -11,7 +11,7 @@ from .enums import SystemRole, UserPosition
 
 if TYPE_CHECKING:
     from app.modules.project.infrastructure.models import ProjectMember
-    from app.modules.tasks.infrastructure.models import Task
+    from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -40,6 +40,10 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Relaciones
 
     tasks: Mapped[list[Task]] = relationship("Task", back_populates="assignee")
+
+    task_history: Mapped[list[TaskHistory]] = relationship(
+        "TaskHistory", back_populates="user"
+    )
 
     project_members: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember", back_populates="user"
