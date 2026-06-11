@@ -8,7 +8,7 @@ from app.modules.project.infrastructure.models import (
     ProjectNode,
 )
 
-from app.modules.tasks.infrastructure.models import Task
+from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
 __all__ = [
     # Identity
@@ -19,4 +19,5 @@ __all__ = [
     "ProjectNode",
     # Task
     "Task",
+    "TaskHistory",
 ]

@@ -28,12 +28,14 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus, name="user_position"),
+        Enum(TaskStatus, name="task_status"),
         nullable=False,
-        default=TaskStatus.PENDIENTE_POR_INICIAR
+        default=TaskStatus.PENDIENTE_POR_INICIAR,
     )
     priority: Mapped[TaskPriority] = mapped_column(
-        Enum(TaskPriority), default=TaskPriority.NO_DEFINIDA, nullable=False
+        Enum(TaskPriority, name="task_priority"),
+        default=TaskPriority.NO_DEFINIDA,
+        nullable=False,
     )
 
     node_id: Mapped[uuid.UUID] = mapped_column(
@@ -68,15 +70,16 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
 
-    action: Mapped[HistoryAction] = mapped_column(Enum(HistoryAction, name="history_action"),
-                                                  nullable=False)
+    action: Mapped[HistoryAction] = mapped_column(
+        Enum(HistoryAction, name="history_action"), nullable=False
+    )
 
     # Deltas de estado (Para medir tiempos entre fases)
     old_status: Mapped[Optional[TaskStatus]] = mapped_column(
-        Enum(TaskStatus), nullable=True
+        Enum(TaskStatus, name="task_status"), nullable=True
     )
     new_status: Mapped[Optional[TaskStatus]] = mapped_column(
-        Enum(TaskStatus), nullable=True
+        Enum(TaskStatus, name="task_status"), nullable=True
     )
 
     # El campo más importante para devoluciones: ¿Por qué se rechazó o reasignó?
@@ -84,4 +87,4 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
 
     # Navegación
     task: Mapped["Task"] = relationship("Task", back_populates="history")
-    changed_by: Mapped["User"] = relationship("User")
+    changed_by: Mapped["User"] = relationship("User", back_populates="task_history")

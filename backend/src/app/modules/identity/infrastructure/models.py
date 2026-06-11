@@ -42,7 +42,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     tasks: Mapped[list[Task]] = relationship("Task", back_populates="assignee")
 
     task_history: Mapped[list[TaskHistory]] = relationship(
-        "TaskHistory", back_populates="user"
+        "TaskHistory", back_populates="changed_by"
     )
 
     project_members: Mapped[list[ProjectMember]] = relationship(
@@ -50,4 +50,8 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email} role={self.role}>"
+        return (
+            f"<User id={self.id} email={self.email} role={self.role}>"
+            f"name={self.name} last_name={self.last_name}"
+            f"position={self.position}"
+        )

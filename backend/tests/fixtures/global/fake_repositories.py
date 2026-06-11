@@ -11,6 +11,7 @@ from app.modules.project.infrastructure.models import (
     ProjectNode,
     ProjectMember,
 )
+from app.modules.tasks.infrastructure.models import Task
 from app.shared.base_repository import Repository
 
 T = TypeVar("T")
@@ -81,3 +82,8 @@ def fake_project_members_repo():
 @pytest.fixture
 def fake_user_repo():
     return FakeRepository(model_cls=Identity)
+
+
+@pytest.fixture
+def fake_task_repo():
+    return FakeRepository(model_cls=Task)
