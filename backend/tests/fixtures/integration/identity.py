@@ -34,7 +34,7 @@ async def created_user(db_session):
         password=hash_password("User123*"),
         name="Juan",
         last_name="García",
-        role=SystemRole.INTEGRANTE,
+        role=SystemRole.USER,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
@@ -54,7 +54,7 @@ async def second_user(db_session):
         password=hash_password("User123*"),
         name="Pedro",
         last_name="Lopez",
-        role=SystemRole.INTEGRANTE,
+        role=SystemRole.USER,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
