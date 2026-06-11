@@ -1,19 +1,22 @@
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Path
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.infrastructure.repository import UserRepository
 from app.modules.identity.presentation.schemas import UserResponse
+from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.repository import (
     ProjectRepository,
     ProjectNodeRepository,
     ProjectMemberRepository,
 )
+from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
@@ -35,6 +38,10 @@ def project_members_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> ProjectMemberRepository:
     return ProjectMemberRepository(db)
+
+
+def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:
+    return TaskRepository(db)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -77,3 +84,38 @@ def require_role(*roles: str):
         return current_user
 
     return _check
+
+
+def require_project_permission(*allowed_project_roles: ProjectRole):
+    """
+    Permite el acceso si el usuario tiene un SystemRole de acceso total (ADMIN/SUPER_ADMIN)
+    O si posee un ProjectRole autorizado dentro del proyecto específico.
+    """
+
+    async def _auth_check(
+        project_id: UUID = Path(...),  # Captura automáticamente el project_id de la URL
+        current_user: UserResponse = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ):
+        # Regla 1: Si es Admin o Super Admin global, pasa directo (Poder absoluto)
+        if current_user.role in [SystemRole.SUPER_ADMIN, SystemRole.ADMIN]:
+            return current_user
+
+        # Regla 2: Si es usuario estándar, verificamos su rol contextual en este proyecto
+        member_repo = ProjectMemberRepository(db)
+        # Buscamos la fila en la tabla intermedia project_members
+        member = await member_repo.get_member_by_project_id_and_user_id(
+            project_id=project_id, user_id=current_user.id
+        )
+
+        if not member or member.is_deleted:
+            raise ForbiddenError("No formas parte de este proyecto")
+
+        if member.project_role not in allowed_project_roles:
+            raise ForbiddenError(
+                "No tienes el rol requerido dentro de este proyecto para realizar esta acción"
+            )
+
+        return current_user
+
+    return _auth_check

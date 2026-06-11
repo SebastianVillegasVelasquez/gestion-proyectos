@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import select, UUID
 from sqlalchemy.orm import selectinload
 
@@ -31,3 +33,14 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
         result = await self._session.execute(query)
 
         return list(result.scalars().all())
+
+    async def get_member_by_project_id_and_user_id(
+        self, project_id: UUID, user_id: UUID
+    ) -> Optional[ProjectMember]:
+        query = select(ProjectMember).where(
+            ProjectMember.project_id == project_id, ProjectMember.user_id == user_id
+        )
+        result = await self._session.execute(query)
+        if result is None:
+            raise ModuleNotFoundError("Integrante del proyecto no encontrado")
+        return result.scalars().first()

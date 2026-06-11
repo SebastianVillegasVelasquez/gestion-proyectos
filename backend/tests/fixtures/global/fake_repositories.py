@@ -4,8 +4,8 @@ from typing import TypeVar, Any, List, Optional, Dict
 from uuid import UUID
 
 import pytest
-from sqlalchemy import Identity
 
+from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.models import (
     Project,
     ProjectNode,
@@ -81,7 +81,7 @@ def fake_project_members_repo():
 
 @pytest.fixture
 def fake_user_repo():
-    return FakeRepository(model_cls=Identity)
+    return FakeRepository(model_cls=User)
 
 
 @pytest.fixture

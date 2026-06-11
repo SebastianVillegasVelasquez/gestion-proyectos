@@ -16,7 +16,6 @@ class TaskBase(BaseModelConfig):
     title: Annotated[str, StringConstraints(min_length=2, max_length=200)]
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
-    node_id: UUID
     assignee_id: Optional[UUID] = None
     start_date: date
     due_date: date
@@ -44,7 +43,7 @@ class TaskResponse(TaskBase):
     id: UUID
     status: TaskStatus
     completed_at: Optional[datetime] = None
-    created_at: datetime
+    created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
 
 

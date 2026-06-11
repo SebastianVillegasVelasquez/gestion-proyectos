@@ -3,4 +3,5 @@ from app.shared.base_repository import BaseRepository
 
 
 class TaskRepository(BaseRepository[Task]):
-    pass
+    def __init__(self, session):
+        super().__init__(session=session, model=Task)

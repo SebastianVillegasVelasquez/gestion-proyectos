@@ -13,6 +13,7 @@ from app.core.models_registry import *  # noqa: F401, F403
 from app.core.models_registry import *  # noqa: F401, F403
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.project.presentation.routes import router as projects_router
+from app.modules.tasks.presentation.routes import router as tasks_router
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
@@ -50,7 +51,7 @@ app = FastAPI(
 # ── CORS ───────────────────────────────────────────────────────────────────────
 
 app.add_middleware(
-    CORSMiddleware,
+    type(CORSMiddleware),
     allow_origins=get_settings().CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
@@ -98,3 +99,4 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
