@@ -2,7 +2,7 @@ from sqlalchemy.sql.sqltypes import Enum
 
 
 class TaskStatus(str, Enum):
-    PENDIENTE = "pendiente"
+    PENDIENTE_POR_INICIAR = "pendiente_por_iniciar"
     EN_PROGRESO = "en_progreso"
     EN_REVISION = "en_revision"  # Cuando el integrante termina y espera aprobación
     DEVUELTA = "devuelta"  # Cuando el revisor rechaza el trabajo
@@ -11,6 +11,7 @@ class TaskStatus(str, Enum):
 
 
 class TaskPriority(str, Enum):
+    NO_DEFINIDA = "no_definida"
     BAJA = "baja"
     MEDIA = "media"
     ALTA = "alta"

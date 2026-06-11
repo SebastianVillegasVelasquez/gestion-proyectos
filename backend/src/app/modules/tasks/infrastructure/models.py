@@ -28,10 +28,12 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus), default=TaskStatus.PENDIENTE, nullable=False
+        Enum(TaskStatus, name="user_position"),
+        nullable=False,
+        default=TaskStatus.PENDIENTE_POR_INICIAR
     )
     priority: Mapped[TaskPriority] = mapped_column(
-        Enum(TaskPriority), default=TaskPriority.MEDIA, nullable=False
+        Enum(TaskPriority), default=TaskPriority.NO_DEFINIDA, nullable=False
     )
 
     node_id: Mapped[uuid.UUID] = mapped_column(
@@ -66,7 +68,8 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
 
-    action: Mapped[HistoryAction] = mapped_column(Enum(HistoryAction), nullable=False)
+    action: Mapped[HistoryAction] = mapped_column(Enum(HistoryAction, name="history_action"),
+                                                  nullable=False)
 
     # Deltas de estado (Para medir tiempos entre fases)
     old_status: Mapped[Optional[TaskStatus]] = mapped_column(
