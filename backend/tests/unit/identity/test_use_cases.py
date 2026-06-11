@@ -3,7 +3,7 @@ from uuid import UUID
 import pytest
 
 from app.modules.identity.application.use_cases import CreateUserUseCase
-from app.modules.identity.infrastructure.enums import UserRole
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.presentation.schemas import CreateUserRequest
 from app.shared.exceptions import ConflictError
 
@@ -23,7 +23,7 @@ class TestIdentityUseCases:
                     password="password1",
                     name="Carlos",
                     last_name="López",
-                    role=UserRole.COLABORADOR,
+                    role=SystemRole.USER,
                 )
             )
 
@@ -36,10 +36,10 @@ class TestIdentityUseCases:
                 password="password1",
                 name="Carlos",
                 last_name="López",
-                role=UserRole.INTEGRANTE,
+                role=SystemRole.USER,
             )
         )
         assert response.id is not None
         assert isinstance(response.id, UUID)
         assert not hasattr(response, "password")
-        assert response.role == UserRole.INTEGRANTE
+        assert response.role == SystemRole.USER

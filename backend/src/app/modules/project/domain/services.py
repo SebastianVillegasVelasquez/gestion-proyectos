@@ -154,11 +154,15 @@ class ProjectMemberService:
         self.project_member_repo = project_member_repo
 
     async def add_member_to_project(self, data: ProjectMemberRequest):
+        assert self.project_repo is not None, "project_repo must be provided"
+
         project = await self.project_repo.get_by_id(data.project_id)
         if not project or project.is_deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado"
             )
+
+        assert self.user_repo is not None, "user_repo must be provided"
 
         user = await self.user_repo.get_by_id(data.user_id)
         if not user or user.is_deleted:
@@ -194,5 +198,5 @@ class ProjectMemberService:
             name=data.user.name,
             last_name=data.user.last_name,
             position=data.user.position,
-            project_role=data.role,
+            project_role=data.project_role,
         )

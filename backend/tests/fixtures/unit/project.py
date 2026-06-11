@@ -4,8 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from app.modules.identity.infrastructure.enums import UserRole
-from app.modules.project.infrastructure.enums import NodeType
+from app.modules.project.infrastructure.enums import NodeType, ProjectRole
 from app.modules.project.presentation.schemas import (
     CreateProjectRequest,
     CreateProjectNodeRequest,
@@ -64,5 +63,5 @@ def valid_project_payload() -> dict:
 @pytest.fixture
 def member_project_payload() -> ProjectMemberRequest:
     return ProjectMemberRequest(
-        user_id=UUID(int=1), project_id=UUID(int=1), role=UserRole.INTEGRANTE
+        user_id=UUID(int=1), project_id=UUID(int=1), project_role=ProjectRole.INTEGRANTE
     )

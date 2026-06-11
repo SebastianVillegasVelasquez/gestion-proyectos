@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from app.modules.identity.infrastructure.enums import UserRole
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.infrastructure.models import User
 from app.modules.identity.presentation.schemas import CreateUserRequest
 from app.modules.project.domain.services import ProjectMemberService
@@ -40,7 +40,7 @@ class TestProjectMemberServices:
         project_member = ProjectMemberRequest(
             user_id=persisted_user.id,
             project_id=persisted_project.id,
-            role=UserRole.INTEGRANTE,
+            role=SystemRole.USER,
         )
 
         persisted_data = await service.add_member_to_project(project_member)

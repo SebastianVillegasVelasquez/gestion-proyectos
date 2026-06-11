@@ -73,6 +73,7 @@ async def unauthorized_handler(request: Request, exc: UnauthorizedError):
     return JSONResponse(status_code=401, content={"detail": exc.message})
 
 
+@app.exception_handler(ForbiddenError)
 async def forbidden_handler(request: Request, exc: ForbiddenError):
     return JSONResponse(status_code=403, content={"detail": exc.message})
 

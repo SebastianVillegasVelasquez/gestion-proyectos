@@ -1,4 +1,4 @@
-from app.modules.identity.infrastructure.enums import UserRole
+from app.modules.project.infrastructure.enums import ProjectRole
 
 
 class TestRoutesProjectMember:
@@ -38,7 +38,7 @@ class TestRoutesProjectMember:
             json={
                 "user_id": user["id"],
                 "project_id": project["id"],
-                "role": UserRole.INTEGRANTE.value,
+                "project_role": ProjectRole.INTEGRANTE.value,
             },
             headers=admin_headers,
         )
@@ -72,7 +72,7 @@ class TestRoutesProjectMember:
                 "password": "password123",
                 "name": "Ana",
                 "last_name": "Gomez",
-                "role": "integrante",
+                "role": "user",
                 "position": "desarrollador",
             },
         )
@@ -83,7 +83,7 @@ class TestRoutesProjectMember:
                 "password": "password123",
                 "name": "Carlos",
                 "last_name": "Perez",
-                "role": "integrante",
+                "role": "user",
                 "position": "desarrollador",
             },
         )
@@ -98,7 +98,7 @@ class TestRoutesProjectMember:
             json={
                 "user_id": user1["id"],
                 "project_id": project["id"],
-                "role": "integrante",
+                "project_role": ProjectRole.INTEGRANTE.value,
             },
             headers=admin_headers,
         )
@@ -107,7 +107,7 @@ class TestRoutesProjectMember:
             json={
                 "user_id": user2["id"],
                 "project_id": project["id"],
-                "role": "integrante",
+                "project_role": ProjectRole.COORDINADOR.value,
             },
             headers=admin_headers,
         )
@@ -129,3 +129,4 @@ class TestRoutesProjectMember:
         assert "Ana" in retrieved_names
         assert "Carlos" in retrieved_names
         assert "integrante" in retrieved_roles
+        assert "coordinador" in retrieved_roles

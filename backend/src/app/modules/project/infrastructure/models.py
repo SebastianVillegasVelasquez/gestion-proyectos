@@ -14,8 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Date
 
-from app.modules.identity.infrastructure.enums import UserRole
-from app.modules.project.infrastructure.enums import NodeType
+from app.modules.project.infrastructure.enums import NodeType, ProjectRole
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 
@@ -100,8 +99,10 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole), nullable=False, default=UserRole.INTEGRANTE
+    # Este rol es diferente al rol del sistema.
+    # Sirve para dividir la autorizacion dentro del proyecto mas no dentro del sistema.
+    project_role: Mapped[ProjectRole] = mapped_column(
+        Enum(ProjectRole), nullable=False, default=ProjectRole.INTEGRANTE
     )
 
     # Relacion

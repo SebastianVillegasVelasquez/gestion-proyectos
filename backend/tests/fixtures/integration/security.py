@@ -2,7 +2,7 @@ import pytest
 
 from app.core.security import create_access_token, hash_password
 from app.modules.identity.infrastructure.enums import UserPosition
-from app.modules.identity.infrastructure.models import User, UserRole
+from app.modules.identity.infrastructure.models import User, SystemRole
 
 
 @pytest.fixture
@@ -12,7 +12,7 @@ async def admin_user(db_session):
         password=hash_password("Admin123*"),
         name="Admin",
         last_name="Test",
-        role=UserRole.ADMIN,
+        role=SystemRole.ADMIN,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
@@ -42,7 +42,7 @@ async def member_user(db_session):
         password=hash_password("Member123*"),
         name="Member",
         last_name="Test",
-        role=UserRole.INTEGRANTE,
+        role=SystemRole.INTEGRANTE,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
@@ -70,7 +70,7 @@ async def super_admin_user(db_session):
         password=hash_password("SuperAdmin123*"),
         name="Super",
         last_name="Admin",
-        role=UserRole.SUPER_ADMIN,
+        role=SystemRole.SUPER_ADMIN,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )

@@ -50,9 +50,7 @@ async def create_project(
 @router.get("/", response_model=List[ProjectResponse], status_code=status.HTTP_200_OK)
 async def get_all_projects(
     repo=Depends(project_repo_dependency),
-    current_user=Depends(
-        require_role("admin", "super_admin", "coordinador", "integrante")
-    ),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
 ):
     use_case = GetProjectsUseCase(repo=repo)
     return await use_case.execute()
@@ -64,9 +62,7 @@ async def get_all_projects(
 async def get_project_by_id(
     project_id: UUID,
     repo=Depends(project_repo_dependency),
-    current_user=Depends(
-        require_role("admin", "super_admin", "coordinador", "integrante")
-    ),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
 ):
     use_case = GetProjectByIdUseCase(repo=repo)
     return await use_case.execute(project_id)
@@ -140,9 +136,7 @@ async def get_project_members(
     project_repo=Depends(project_repo_dependency),
     user_repo=Depends(user_repo_dependency),
     project_member_repo=Depends(project_members_repo_dependency),
-    current_user=Depends(
-        require_role("admin", "super_admin", "coordinador", "integrante")
-    ),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
 ):
     use_case = GetProjectMembersUseCase(
         project_repo=project_repo,

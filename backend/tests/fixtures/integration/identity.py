@@ -4,7 +4,7 @@ import pytest_asyncio
 
 from app.core.security import hash_password
 from app.modules.identity.infrastructure.enums import UserPosition
-from app.modules.identity.infrastructure.models import User, UserRole
+from app.modules.identity.infrastructure.models import User, SystemRole
 
 
 @pytest_asyncio.fixture
@@ -14,7 +14,7 @@ async def admin_user(db_session):
         password=hash_password("Admin123*"),
         name="Admin",
         last_name="Test",
-        role=UserRole.ADMIN,
+        role=SystemRole.ADMIN,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
@@ -34,7 +34,7 @@ async def created_user(db_session):
         password=hash_password("User123*"),
         name="Juan",
         last_name="García",
-        role=UserRole.INTEGRANTE,
+        role=SystemRole.INTEGRANTE,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )
@@ -54,7 +54,7 @@ async def second_user(db_session):
         password=hash_password("User123*"),
         name="Pedro",
         last_name="Lopez",
-        role=UserRole.INTEGRANTE,
+        role=SystemRole.INTEGRANTE,
         position=UserPosition.DESARROLLADOR,
         is_active=True,
     )

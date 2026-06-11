@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from app.modules.identity.infrastructure.enums import UserRole
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.presentation.schemas import CreateUserRequest
 
 
@@ -14,7 +14,7 @@ class FakeUser:
     email: str
     name: str
     last_name: str
-    role: UserRole
+    role: SystemRole
     is_active: bool
 
 

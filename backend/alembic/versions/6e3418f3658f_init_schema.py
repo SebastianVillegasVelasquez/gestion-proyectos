@@ -1,8 +1,8 @@
 """Init schema
 
-Revision ID: b682224df1e4
+Revision ID: 6e3418f3658f
 Revises:
-Create Date: 2026-06-10 15:26:58.694216
+Create Date: 2026-06-11 08:14:03.835840
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "b682224df1e4"
+revision: str = "6e3418f3658f"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -57,15 +57,7 @@ def upgrade() -> None:
         sa.Column("avatar_url", sa.String(length=500), nullable=True),
         sa.Column(
             "role",
-            sa.Enum(
-                "SUPER_ADMIN",
-                "ADMIN",
-                "COORDINADOR",
-                "COLABORADOR",
-                "INTEGRANTE",
-                "CLIENTE",
-                name="user_role",
-            ),
+            sa.Enum("SUPER_ADMIN", "ADMIN", "USER", name="user_role"),
             nullable=False,
         ),
         sa.Column(
@@ -75,6 +67,11 @@ def upgrade() -> None:
                 "EXPERTO_MULTIMEDIA",
                 "PROJECT_MANAGER",
                 "SIN_CARGO",
+                "DISENADOR_INSTRUCCIONAL",
+                "EXPERTO_TEMATICO",
+                "CORRECTOR_ESTILO",
+                "DISENADOR_GRAFICO",
+                "ADMINISTRADOR_MOODLE",
                 name="user_position",
             ),
             nullable=False,
@@ -104,15 +101,14 @@ def upgrade() -> None:
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column(
-            "role",
+            "project_role",
             sa.Enum(
-                "SUPER_ADMIN",
-                "ADMIN",
+                "SUPERVISOR",
                 "COORDINADOR",
-                "COLABORADOR",
+                "REVISOR",
                 "INTEGRANTE",
                 "CLIENTE",
-                name="userrole",
+                name="projectrole",
             ),
             nullable=False,
         ),

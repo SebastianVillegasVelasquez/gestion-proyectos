@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.enums import UserRole, UserPosition
+from app.modules.identity.infrastructure.enums import UserPosition, SystemRole
 from app.shared.base_model import BaseModelConfig
 
 
@@ -34,7 +34,7 @@ class CreateUserRequest(BaseModelConfig):
         StringConstraints(min_length=2, max_length=200),
     ]
 
-    role: UserRole = UserRole.INTEGRANTE
+    role: SystemRole = SystemRole.USER
 
     position: UserPosition = UserPosition.SIN_CARGO
 
@@ -59,7 +59,7 @@ class UpdateUserRequest(BaseModelConfig):
         StringConstraints(min_length=2, max_length=200),
     ]
 
-    role: UserRole | None = None
+    role: SystemRole | None = None
     is_active: bool | None = None
 
 
@@ -81,7 +81,7 @@ class UserResponse(BaseModelConfig):
         StringConstraints(min_length=2, max_length=200),
     ]
 
-    role: UserRole
+    role: SystemRole
     is_active: bool
 
 
