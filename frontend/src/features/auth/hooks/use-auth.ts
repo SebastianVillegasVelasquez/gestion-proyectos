@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { authService } from "@/features/auth/services/auth-service";
-import { type LoginRequest, type RegisterRequest } from "@/features/auth/types";
+import type { LoginRequest, RegisterRequest } from "@/features/auth/types";
 import { getErrorMessage } from "@/utils/get-error-message";
 
 export function useLogin() {

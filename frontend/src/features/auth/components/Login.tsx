@@ -38,8 +38,8 @@ export default function LoginPage() {
 
     useEffect(() => {
         const stored = localStorage.getItem("obj-theme");
-        if (stored) setDark(stored === "dark");
-        else setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (stored) {setDark(stored === "dark");}
+        else {setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);}
         setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     }, []);
 
@@ -48,13 +48,13 @@ export default function LoginPage() {
     }, [dark]);
 
     useEffect((): void => {
-        if (!animating) firstFieldRef.current?.focus();
+        if (!animating) {firstFieldRef.current?.focus();}
     }, [mode, animating]);
 
     const transitionMs = reduceMotion ? 0 : 300;
 
     const switchMode = (next: Mode): void => {
-        if (animating || mode === next) return;
+        if (animating || mode === next) {return;}
         setErrors({});
         setTouched({});
         loginMutation.reset();
@@ -73,8 +73,8 @@ export default function LoginPage() {
     const currentForm = isRegister ? registerForm : loginForm;
 
     const setField = (name: FieldName, value: string):void => {
-        if (isRegister) setRegisterForm((f) => ({...f, [name]: value}));
-        else setLoginForm((f) => ({...f, [name]: value}));
+        if (isRegister) {setRegisterForm((f) => ({...f, [name]: value}));}
+        else {setLoginForm((f) => ({...f, [name]: value}));}
         setErrors((e) => ({...e, [name]: undefined}));
     };
 
@@ -91,9 +91,9 @@ export default function LoginPage() {
         const next: Errors = {};
         for (const f of fields) {
             const msg = validateField(f, (currentForm as unknown as Record<string, string>)[f] ?? "", isRegister);
-            if (msg) next[f] = msg;
+            if (msg) {next[f] = msg;}
         }
-        if (isRegister && !accepted) next.accepted = "Debes aceptar el tratamiento de datos.";
+        if (isRegister && !accepted) {next.accepted = "Debes aceptar el tratamiento de datos.";}
         setErrors(next);
         setTouched(Object.fromEntries(fields.map((f) => [f, true])));
         return Object.keys(next).length === 0;
@@ -101,9 +101,9 @@ export default function LoginPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateAll()) return;
-        if (isRegister) registerMutation.mutate(registerForm);
-        else loginMutation.mutate(loginForm);
+        if (!validateAll()) {return;}
+        if (isRegister) {registerMutation.mutate(registerForm);}
+        else {loginMutation.mutate(loginForm);}
     };
 
     const pwStrength = useMemo(
@@ -126,7 +126,7 @@ export default function LoginPage() {
                 {/* Toggle dark mode */}
                 <button
                     type="button"
-                    onClick={() => setDark((d) => !d)}
+                    onClick={() => { setDark((d) => !d); }}
                     aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
                     className="absolute top-5 right-5 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/80 text-slate-600 backdrop-blur transition hover:bg-white hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                 >
@@ -149,7 +149,7 @@ export default function LoginPage() {
                 {/* Panel informativo */}
                 <AuthPanel
                     isRegister={isRegister}
-                    onSwitch={() => switchMode(isRegister ? "login" : "register")}
+                    onSwitch={() => { switchMode(isRegister ? "login" : "register"); }}
                 />
 
                 {/* Panel formulario */}
@@ -206,15 +206,15 @@ export default function LoginPage() {
                                         id="name" label="Nombre" placeholder="Juan"
                                         value={registerForm.name}
                                         error={touched.name ? errors.name : undefined}
-                                        onChange={(e) => setField("name", e.target.value)}
-                                        onBlur={() => handleBlur("name")}
+                                        onChange={(e) => { setField("name", e.target.value); }}
+                                        onBlur={() => { handleBlur("name"); }}
                                     />
                                     <Field
                                         id="last_name" label="Apellido" placeholder="Pérez"
                                         value={registerForm.last_name}
                                         error={touched.last_name ? errors.last_name : undefined}
-                                        onChange={(e) => setField("last_name", e.target.value)}
-                                        onBlur={() => handleBlur("last_name")}
+                                        onChange={(e) => { setField("last_name", e.target.value); }}
+                                        onBlur={() => { handleBlur("last_name"); }}
                                     />
                                 </div>
                             )}
@@ -239,11 +239,11 @@ export default function LoginPage() {
                                         id="email" name="email" type="email" inputMode="email"
                                         placeholder="nombre@empresa.com"
                                         value={isRegister ? registerForm.email : loginForm.email}
-                                        onChange={(e) => setField("email", e.target.value)}
-                                        onBlur={() => handleBlur("email")}
-                                        aria-invalid={touched.email && !!errors.email}
+                                        onChange={(e) => { setField("email", e.target.value); }}
+                                        onBlur={() => { handleBlur("email"); }}
+                                        aria-invalid={touched.email && Boolean(errors.email)}
                                         aria-describedby={errors.email ? "email-error" : undefined}
-                                        className={fieldClasses(!!(touched.email && errors.email)).replace("px-4", "pl-10 pr-4")}
+                                        className={fieldClasses(Boolean(touched.email && errors.email)).replace("px-4", "pl-10 pr-4")}
                                     />
                                 </div>
                                 {touched.email && errors.email && (
@@ -272,19 +272,19 @@ export default function LoginPage() {
                                         type={showPassword ? "text" : "password"}
                                         placeholder="••••••••"
                                         value={isRegister ? registerForm.password : loginForm.password}
-                                        onChange={(e) => setField("password", e.target.value)}
+                                        onChange={(e) => { setField("password", e.target.value); }}
                                         onBlur={() => {
                                             handleBlur("password");
                                             setCapsLock(false);
                                         }}
-                                        onKeyUp={(e) => setCapsLock(e.getModifierState?.("CapsLock") ?? false)}
-                                        aria-invalid={touched.password && !!errors.password}
+                                        onKeyUp={(e) => { setCapsLock(e.getModifierState?.("CapsLock") ?? false); }}
+                                        aria-invalid={touched.password && Boolean(errors.password)}
                                         aria-describedby={errors.password ? "password-error" : undefined}
-                                        className={fieldClasses(!!(touched.password && errors.password)).replace("px-4", "pl-10 pr-11")}
+                                        className={fieldClasses(Boolean(touched.password && errors.password)).replace("px-4", "pl-10 pr-11")}
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => setShowPassword((s) => !s)}
+                                        onClick={() => { setShowPassword((s) => !s); }}
                                         aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-300"
                                     >
@@ -417,7 +417,7 @@ export default function LoginPage() {
                             {isRegister ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}{" "}
                             <button
                                 type="button"
-                                onClick={() => switchMode(isRegister ? "login" : "register")}
+                                onClick={() => { switchMode(isRegister ? "login" : "register"); }}
                                 className="font-semibold text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                             >
                                 {isRegister ? "Inicia sesión" : "Regístrate"}

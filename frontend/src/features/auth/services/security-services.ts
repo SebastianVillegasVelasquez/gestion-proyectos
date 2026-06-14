@@ -7,18 +7,18 @@ export function validateField(name: FieldName, value: string, isRegister: boolea
     const v = value.trim();
     switch (name) {
         case "name":
-            if (isRegister && !v) return "Ingresa tu nombre.";
+            if (isRegister && !v) {return "Ingresa tu nombre.";}
             return;
         case "last_name":
-            if (isRegister && !v) return "Ingresa tu apellido.";
+            if (isRegister && !v) {return "Ingresa tu apellido.";}
             return;
         case "email":
-            if (!v) return "El correo es obligatorio.";
-            if (!EMAIL_RE.test(v)) return "Formato de correo no válido.";
+            if (!v) {return "El correo es obligatorio.";}
+            if (!EMAIL_RE.test(v)) {return "Formato de correo no válido.";}
             return;
         case "password":
-            if (!v) return "La contraseña es obligatoria.";
-            if (isRegister && v.length < 8) return "Mínimo 8 caracteres.";
+            if (!v) {return "La contraseña es obligatoria.";}
+            if (isRegister && v.length < 8) {return "Mínimo 8 caracteres.";}
             return;
     }
 }
@@ -26,10 +26,10 @@ export function validateField(name: FieldName, value: string, isRegister: boolea
 // ── Fuerza de contraseña (0–4) ──
 export function passwordStrength(pw: string): {score: number; label: string; color: string} {
     let score = 0;
-    if (pw.length >= 8) score++;
-    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
-    if (/\d/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    if (pw.length >= 8) {score++;}
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) {score++;}
+    if (/\d/.test(pw)) {score++;}
+    if (/[^A-Za-z0-9]/.test(pw)) {score++;}
     const map = [
         {label: "Muy débil", color: "bg-red-500"},
         {label: "Débil", color: "bg-orange-500"},

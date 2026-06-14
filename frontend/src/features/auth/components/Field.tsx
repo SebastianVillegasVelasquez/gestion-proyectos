@@ -29,7 +29,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(
                     value={value}
                     onChange={onChange}
                     onBlur={onBlur}
-                    aria-invalid={!!error}
+                    aria-invalid={Boolean(error)}
                     aria-describedby={error ? `${id}-error` : undefined}
                     className={`w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 ${
                         error

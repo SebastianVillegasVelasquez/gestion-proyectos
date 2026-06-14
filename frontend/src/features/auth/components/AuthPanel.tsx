@@ -1,7 +1,7 @@
-type AuthPanelProps = {
+interface AuthPanelProps {
     isRegister: boolean;
     onSwitch: () => void;
-};
+}
 
 const LOGIN_FEATURES = [
     {

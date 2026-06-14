@@ -40,8 +40,11 @@ repos:
 
 
   # Frontend
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v9.0.0
+  - repo: local
     hooks:
       - id: eslint
-        files: ^frontend/
+        name: eslint
+        entry: bash -c 'cd frontend && npx eslint --max-warnings=0 src'
+        language: system
+        pass_filenames: false
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$

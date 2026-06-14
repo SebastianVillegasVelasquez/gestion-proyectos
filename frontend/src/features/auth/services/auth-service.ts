@@ -1,5 +1,5 @@
 import http from "./http";
-import {type LoginRequest, type LoginResponse, type RegisterRequest} from "@/features/auth/types.ts";
+import type {LoginRequest, LoginResponse, RegisterRequest} from "@/features/auth/types.ts";
 import type {AxiosResponse} from "axios";
 
 

@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+/* Class-based dark mode: applies dark: utilities when an ancestor has class="dark" */
+@variant dark (&:where(.dark, .dark *));
+
+/* Timeline entrance animation used by AuditTimeline */
+@keyframes tl-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
