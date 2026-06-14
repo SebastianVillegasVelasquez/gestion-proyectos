@@ -64,7 +64,7 @@ function PreviewNode({
         <span
           className={cn(
             "shrink-0 text-slate-300 dark:text-slate-600",
-            !hasChildren && "invisible pointer-events-none"
+            !hasChildren && "invisible pointer-events-none",
           )}
         >
           {isExpanded ? (
@@ -81,7 +81,7 @@ function PreviewNode({
         <span
           className={cn(
             "flex-1 truncate text-[13px] text-slate-700 dark:text-slate-300",
-            !node.name && "italic opacity-50"
+            !node.name && "italic opacity-50",
           )}
         >
           {node.name || `${NODE_TYPE_LABELS[node.node_type]} sin nombre`}
@@ -95,16 +95,17 @@ function PreviewNode({
         )}
       </div>
 
-      {isExpanded && children.map((child) => (
-        <PreviewNode
-          key={child.id}
-          node={child}
-          nodes={nodes}
-          depth={depth + 1}
-          expanded={expanded}
-          onToggle={onToggle}
-        />
-      ))}
+      {isExpanded &&
+        children.map((child) => (
+          <PreviewNode
+            key={child.id}
+            node={child}
+            nodes={nodes}
+            depth={depth + 1}
+            expanded={expanded}
+            onToggle={onToggle}
+          />
+        ))}
     </div>
   );
 }

@@ -23,9 +23,7 @@ function DeadlineRow({ deadline }: { deadline: Deadline }) {
         <p className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
           {deadline.title}
         </p>
-        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
-          {deadline.project}
-        </p>
+        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{deadline.project}</p>
       </div>
 
       <StatusBadge variant={deadline.priority} className="shrink-0" />

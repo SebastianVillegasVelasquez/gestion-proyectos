@@ -3,10 +3,10 @@ import { Card } from "@/components/ui/card";
 import type { AccentColor, KpiCard } from "../types";
 
 const accentBorderMap: Record<AccentColor, string> = {
-  amber:   "border-b-amber-400   dark:border-b-amber-500",
+  amber: "border-b-amber-400   dark:border-b-amber-500",
   emerald: "border-b-emerald-500 dark:border-b-emerald-500",
-  blue:    "border-b-blue-500    dark:border-b-blue-500",
-  red:     "border-b-red-500     dark:border-b-red-500",
+  blue: "border-b-blue-500    dark:border-b-blue-500",
+  red: "border-b-red-500     dark:border-b-red-500",
 };
 
 function KpiCardItem({ card }: { card: KpiCard }) {
@@ -15,7 +15,7 @@ function KpiCardItem({ card }: { card: KpiCard }) {
       className={cn(
         "border border-b-2 p-5 transition-colors duration-150",
         "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700",
-        accentBorderMap[card.accentColor]
+        accentBorderMap[card.accentColor],
       )}
     >
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -48,7 +48,10 @@ interface KpiCardsGridProps {
 export function KpiCardsGrid({ cards, isLoading, isError }: KpiCardsGridProps) {
   if (isError) {
     return (
-      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+      <div
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"
+      >
         No se pudieron cargar los indicadores. Intenta recargar la página.
       </div>
     );
@@ -57,7 +60,9 @@ export function KpiCardsGrid({ cards, isLoading, isError }: KpiCardsGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => <KpiCardSkeleton key={i} />)}
+        {[0, 1, 2, 3].map((i) => (
+          <KpiCardSkeleton key={i} />
+        ))}
       </div>
     );
   }

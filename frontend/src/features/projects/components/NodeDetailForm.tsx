@@ -19,9 +19,7 @@ function getNodePath(nodes: BuilderNode[], nodeId: string): BuilderNode[] {
   let current: BuilderNode | undefined = nodes.find((n) => n.id === nodeId);
   while (current) {
     path.unshift(current);
-    current = current.parent_id
-      ? nodes.find((n) => n.id === current!.parent_id)
-      : undefined;
+    current = current.parent_id ? nodes.find((n) => n.id === current!.parent_id) : undefined;
   }
   return path;
 }
@@ -54,7 +52,9 @@ function ProjectFields({
         <input
           type="text"
           value={project.name}
-          onChange={(e) => { onChange({ name: e.target.value }); }}
+          onChange={(e) => {
+            onChange({ name: e.target.value });
+          }}
           placeholder="Ej: Programa Educativo 2025"
           className={inputCls}
           autoFocus
@@ -67,7 +67,9 @@ function ProjectFields({
           <input
             type="date"
             value={project.start_date}
-            onChange={(e) => { onChange({ start_date: e.target.value }); }}
+            onChange={(e) => {
+              onChange({ start_date: e.target.value });
+            }}
             className={inputCls}
           />
         </div>
@@ -76,7 +78,9 @@ function ProjectFields({
           <input
             type="date"
             value={project.end_date}
-            onChange={(e) => { onChange({ end_date: e.target.value }); }}
+            onChange={(e) => {
+              onChange({ end_date: e.target.value });
+            }}
             className={inputCls}
           />
         </div>
@@ -86,8 +90,8 @@ function ProjectFields({
         <p className="text-[12px] leading-relaxed text-blue-700 dark:text-blue-400">
           <span className="font-semibold">Tip:</span> Usa el árbol de la izquierda para añadir
           Programas, Cursos y Módulos. Al terminar, haz clic en{" "}
-          <span className="font-semibold">"Guardar proyecto"</span> para enviar toda la
-          estructura al servidor en un único POST.
+          <span className="font-semibold">"Guardar proyecto"</span> para enviar toda la estructura
+          al servidor en un único POST.
         </p>
       </div>
     </div>
@@ -126,7 +130,7 @@ function NodeFields({
                     "text-[11px]",
                     i === path.length - 1
                       ? "font-medium text-slate-700 dark:text-slate-300"
-                      : "text-slate-400 dark:text-slate-500"
+                      : "text-slate-400 dark:text-slate-500",
                   )}
                 >
                   {n.name || `${NODE_TYPE_LABELS[n.node_type]} sin nombre`}
@@ -155,7 +159,9 @@ function NodeFields({
         <input
           type="text"
           value={node.name}
-          onChange={(e) => { onChange({ name: e.target.value }); }}
+          onChange={(e) => {
+            onChange({ name: e.target.value });
+          }}
           placeholder={PLACEHOLDER[node.node_type]}
           className={inputCls}
           autoFocus
@@ -167,7 +173,9 @@ function NodeFields({
         <label className={labelCls}>Tipo de nodo</label>
         <select
           value={node.node_type}
-          onChange={(e) => { onChange({ node_type: e.target.value as NodeType }); }}
+          onChange={(e) => {
+            onChange({ node_type: e.target.value as NodeType });
+          }}
           className={inputCls}
         >
           {NODE_TYPE_OPTIONS.map((opt) => (
@@ -251,7 +259,9 @@ export function NodeDetailForm({
           <NodeFields
             node={selectedNode}
             nodes={nodes}
-            onChange={(patch) => { onNodeChange(selectedNode.id, patch); }}
+            onChange={(patch) => {
+              onNodeChange(selectedNode.id, patch);
+            }}
           />
         ) : (
           <EmptyPanel />

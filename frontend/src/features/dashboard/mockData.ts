@@ -1,11 +1,4 @@
-import type {
-  Comment,
-  DashboardHeaderData,
-  Deadline,
-  KpiCard,
-  Project,
-  Task,
-} from "./types";
+import type { Comment, DashboardHeaderData, Deadline, KpiCard, Project, Task } from "./types";
 
 export const mockHeaderData: DashboardHeaderData = {
   name: "Ana García",

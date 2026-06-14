@@ -1,10 +1,6 @@
 // ── Deliverable status ─────────────────────────────────────────────────────
 
-export type DeliverableStatus =
-  | "borrador"
-  | "en_revision"
-  | "aprobado"
-  | "cambios_solicitados";
+export type DeliverableStatus = "borrador" | "en_revision" | "aprobado" | "cambios_solicitados";
 
 export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
   borrador: "Borrador",

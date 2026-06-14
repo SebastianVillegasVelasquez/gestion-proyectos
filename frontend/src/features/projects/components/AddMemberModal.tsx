@@ -45,10 +45,14 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {onClose();}
+      if (e.key === "Escape") {
+        onClose();
+      }
     };
     document.addEventListener("keydown", handler);
-    return () => { document.removeEventListener("keydown", handler); };
+    return () => {
+      document.removeEventListener("keydown", handler);
+    };
   }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,7 +75,11 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) {onClose();} }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       role="presentation"
     >
       {/* Dialog */}
@@ -85,7 +93,10 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <UserPlus className="size-4 text-blue-600 dark:text-blue-400" />
-            <h2 id="add-member-title" className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            <h2
+              id="add-member-title"
+              className="text-sm font-semibold text-slate-900 dark:text-slate-50"
+            >
               Añadir miembro
             </h2>
           </div>
@@ -108,9 +119,15 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
               ref={nameRef}
               type="text"
               value={name}
-              onChange={(e) => { setName(e.target.value); setError(""); }}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError("");
+              }}
               placeholder="Ej: Laura Gómez"
-              className={cn(inputCls, error && "border-red-400 focus:border-red-500 focus:ring-red-500/30")}
+              className={cn(
+                inputCls,
+                error && "border-red-400 focus:border-red-500 focus:ring-red-500/30",
+              )}
             />
             {error && <p className="mt-1 text-[11px] text-red-500">{error}</p>}
           </div>
@@ -122,7 +139,9 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
               <input
                 type="text"
                 value={initials}
-                onChange={(e) => { setInitials(e.target.value.slice(0, 3).toUpperCase()); }}
+                onChange={(e) => {
+                  setInitials(e.target.value.slice(0, 3).toUpperCase());
+                }}
                 placeholder="LG"
                 maxLength={3}
                 className={inputCls}
@@ -132,11 +151,15 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
               <label className={labelCls}>Rol</label>
               <select
                 value={role}
-                onChange={(e) => { setRole(e.target.value as ProjectRole); }}
+                onChange={(e) => {
+                  setRole(e.target.value as ProjectRole);
+                }}
                 className={inputCls}
               >
                 {PROJECT_ROLE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -150,14 +173,16 @@ export function AddMemberModal({ existingCount, onAdd, onClose }: AddMemberModal
                 <button
                   key={c}
                   type="button"
-                  onClick={() => { setColor(c); }}
+                  onClick={() => {
+                    setColor(c);
+                  }}
                   aria-label={c}
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-lg text-[10px] font-bold text-white transition-transform duration-150",
                     c,
                     color === c
                       ? "ring-2 ring-blue-500 ring-offset-2 scale-110 dark:ring-offset-slate-900"
-                      : "hover:scale-105"
+                      : "hover:scale-105",
                   )}
                 >
                   {initials || "?"}

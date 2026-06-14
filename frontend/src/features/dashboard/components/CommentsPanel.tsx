@@ -7,7 +7,9 @@ import type { Comment } from "../types";
 const MAX_VISIBLE = 3;
 
 function renderWithMentions(text: string, mentions: string[]): ReactNode[] {
-  if (mentions.length === 0) {return [text];}
+  if (mentions.length === 0) {
+    return [text];
+  }
 
   let parts: (string | ReactNode)[] = [text];
 
@@ -24,10 +26,12 @@ function renderWithMentions(text: string, mentions: string[]): ReactNode[] {
           next.push(
             <span key={`${mention}-${i}`} className="font-medium text-blue-600 dark:text-blue-400">
               @{mention}
-            </span>
+            </span>,
           );
         }
-        if (seg) {next.push(seg);}
+        if (seg) {
+          next.push(seg);
+        }
       });
     }
     parts = next;
@@ -47,7 +51,7 @@ function CommentItem({ comment }: { comment: Comment }) {
       <div
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold text-white",
-          comment.authorColor
+          comment.authorColor,
         )}
       >
         {comment.authorInitials}

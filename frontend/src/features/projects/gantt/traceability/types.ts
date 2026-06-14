@@ -1,10 +1,6 @@
 import type { TaskStatus } from "../types";
 
-export type HistoryAction =
-  | "creacion"
-  | "cambio_estado"
-  | "reasignacion"
-  | "comentario";
+export type HistoryAction = "creacion" | "cambio_estado" | "reasignacion" | "comentario";
 
 export const HISTORY_ACTION_LABELS: Record<HistoryAction, string> = {
   creacion: "Creación",
@@ -13,11 +9,12 @@ export const HISTORY_ACTION_LABELS: Record<HistoryAction, string> = {
   comentario: "Comentario",
 };
 
-export const HISTORY_ACTION_OPTIONS: { value: HistoryAction; label: string }[] =
-  (Object.keys(HISTORY_ACTION_LABELS) as HistoryAction[]).map((v) => ({
-    value: v,
-    label: HISTORY_ACTION_LABELS[v],
-  }));
+export const HISTORY_ACTION_OPTIONS: { value: HistoryAction; label: string }[] = (
+  Object.keys(HISTORY_ACTION_LABELS) as HistoryAction[]
+).map((v) => ({
+  value: v,
+  label: HISTORY_ACTION_LABELS[v],
+}));
 
 export interface TaskHistory {
   id: string;

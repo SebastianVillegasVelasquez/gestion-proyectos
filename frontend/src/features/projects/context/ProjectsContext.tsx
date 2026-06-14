@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { BuilderNode, ProjectFormData, ProjectMember } from "../types";
 import type { Task } from "../gantt/types";
 import type { TaskHistory } from "../gantt/traceability/types";
@@ -44,7 +38,12 @@ function loadFromStorage(): StoredProject[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     const data = raw ? (JSON.parse(raw) as StoredProject[]) : [];
     // Backward-compat: fill fields added in later iterations
-    return data.map((p) => ({ members: [], tasks: [], history: [], ...p }));
+    return data.map((p) => ({
+      ...p,
+      members: p.members ?? [],
+      tasks: p.tasks ?? [],
+      history: p.history ?? [],
+    }));
   } catch {
     return [];
   }
@@ -71,9 +70,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     setProjects((prev) => {
       const exists = prev.find((p) => p.id === id);
       if (exists) {
-        return prev.map((p) =>
-          p.id === id ? { ...p, project, nodes, updatedAt: now } : p
-        );
+        return prev.map((p) => (p.id === id ? { ...p, project, nodes, updatedAt: now } : p));
       }
       return [
         ...prev,
@@ -84,17 +81,17 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const deleteProject = (id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
-    if (activeProjectId === id) {setActiveProjectId(null);}
+    if (activeProjectId === id) {
+      setActiveProjectId(null);
+    }
   };
 
   const addMember = (projectId: string, member: ProjectMember) => {
     const now = stamp();
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === projectId
-          ? { ...p, members: [...p.members, member], updatedAt: now }
-          : p
-      )
+        p.id === projectId ? { ...p, members: [...p.members, member], updatedAt: now } : p,
+      ),
     );
   };
 
@@ -104,17 +101,15 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       prev.map((p) =>
         p.id === projectId
           ? { ...p, members: p.members.filter((m) => m.id !== memberId), updatedAt: now }
-          : p
-      )
+          : p,
+      ),
     );
   };
 
   const setTasks = (projectId: string, tasks: Task[]) => {
     const now = stamp();
     setProjects((prev) =>
-      prev.map((p) =>
-        p.id === projectId ? { ...p, tasks, updatedAt: now } : p
-      )
+      prev.map((p) => (p.id === projectId ? { ...p, tasks, updatedAt: now } : p)),
     );
   };
 
@@ -122,10 +117,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     const now = stamp();
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === projectId
-          ? { ...p, history: [entry, ...p.history], updatedAt: now }
-          : p
-      )
+        p.id === projectId ? { ...p, history: [entry, ...p.history], updatedAt: now } : p,
+      ),
     );
   };
 
@@ -152,6 +145,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
 export function useProjectsContext(): ProjectsContextValue {
   const ctx = useContext(ProjectsContext);
-  if (!ctx) {throw new Error("useProjectsContext must be used inside ProjectsProvider");}
+  if (!ctx) {
+    throw new Error("useProjectsContext must be used inside ProjectsProvider");
+  }
   return ctx;
 }

@@ -36,8 +36,7 @@ const columns: ColumnConfig[] = [
 const tagVariantClasses = {
   project:
     "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  date:
-    "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700",
+  date: "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700",
 };
 
 function TaskCard({ task }: { task: Task }) {
@@ -48,22 +47,22 @@ function TaskCard({ task }: { task: Task }) {
         "rounded-md border p-3 transition-colors duration-150",
         "border-slate-200 bg-slate-50 hover:border-slate-300",
         "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
-        isCompleted && "opacity-50"
+        isCompleted && "opacity-50",
       )}
     >
       <div className="flex items-start gap-2">
         <span
           className={cn(
             "mt-0.5 size-2 shrink-0 rounded-full",
-            task.status === "pending"     && "bg-amber-400",
+            task.status === "pending" && "bg-amber-400",
             task.status === "in-progress" && "bg-blue-500",
-            task.status === "completed"   && "bg-emerald-500"
+            task.status === "completed" && "bg-emerald-500",
           )}
         />
         <p
           className={cn(
             "text-[13px] leading-snug text-slate-700 dark:text-slate-200",
-            isCompleted && "line-through decoration-slate-400 dark:decoration-slate-500"
+            isCompleted && "line-through decoration-slate-400 dark:decoration-slate-500",
           )}
         >
           {task.title}
@@ -77,7 +76,7 @@ function TaskCard({ task }: { task: Task }) {
               key={i}
               className={cn(
                 "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none",
-                tagVariantClasses[tag.variant]
+                tagVariantClasses[tag.variant],
               )}
             >
               {tag.label}
@@ -102,7 +101,7 @@ function Column({ config, tasks }: { config: ColumnConfig; tasks: Task[] }) {
         <span
           className={cn(
             "ml-auto inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
-            config.countClass
+            config.countClass,
           )}
         >
           {tasks.length}

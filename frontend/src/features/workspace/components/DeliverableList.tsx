@@ -8,7 +8,7 @@ function StatusBadge({ status }: { status: DeliverableStatus }) {
     <span
       className={cn(
         "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-        DELIVERABLE_STATUS_BADGE[status]
+        DELIVERABLE_STATUS_BADGE[status],
       )}
     >
       {DELIVERABLE_STATUS_LABELS[status]}
@@ -18,10 +18,16 @@ function StatusBadge({ status }: { status: DeliverableStatus }) {
 
 function DeliverableIcon({ d }: { d: Deliverable }) {
   const latest = d.versions.at(-1);
-  if (!latest) return <Package className="size-4 text-slate-400" />;
-  if (latest.type === "enlace") return <Link className="size-4 text-blue-500" />;
+  if (!latest) {
+    return <Package className="size-4 text-slate-400" />;
+  }
+  if (latest.type === "enlace") {
+    return <Link className="size-4 text-blue-500" />;
+  }
   const mime = latest.mimeType ?? "";
-  if (mime.includes("image")) return <FileText className="size-4 text-purple-500" />;
+  if (mime.includes("image")) {
+    return <FileText className="size-4 text-purple-500" />;
+  }
   return <FileText className="size-4 text-rose-500" />;
 }
 
@@ -66,12 +72,14 @@ export function DeliverableList({
               <button
                 key={d.id}
                 type="button"
-                onClick={() => onSelect(d.id)}
+                onClick={() => {
+                  onSelect(d.id);
+                }}
                 className={cn(
                   "group w-full border-l-2 px-4 py-3.5 text-left transition-colors duration-100",
                   isSelected
                     ? "border-l-blue-500 bg-blue-50 dark:border-l-blue-400 dark:bg-blue-950/20"
-                    : "border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    : "border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40",
                 )}
               >
                 {/* Title row */}
@@ -81,7 +89,7 @@ export function DeliverableList({
                       "mt-0.5 shrink-0 rounded-md p-1",
                       isSelected
                         ? "bg-blue-100 dark:bg-blue-900/30"
-                        : "bg-slate-100 dark:bg-slate-800"
+                        : "bg-slate-100 dark:bg-slate-800",
                     )}
                   >
                     <DeliverableIcon d={d} />
@@ -92,7 +100,7 @@ export function DeliverableList({
                         "text-[13px] font-medium leading-snug",
                         isSelected
                           ? "text-blue-800 dark:text-blue-200"
-                          : "text-slate-700 dark:text-slate-200"
+                          : "text-slate-700 dark:text-slate-200",
                       )}
                     >
                       {d.taskTitle}
@@ -104,7 +112,7 @@ export function DeliverableList({
                         <span
                           className={cn(
                             "flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white",
-                            assignee.avatarColor
+                            assignee.avatarColor,
                           )}
                         >
                           {assignee.initials}

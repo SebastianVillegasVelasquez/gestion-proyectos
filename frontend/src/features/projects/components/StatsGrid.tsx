@@ -4,21 +4,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { BuilderNode, ProjectFormData, ProjectMember } from "../types";
 
 function daysRemaining(endDate: string): number | null {
-  if (!endDate) {return null;}
+  if (!endDate) {
+    return null;
+  }
   const diff = new Date(endDate).getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 function DaysLabel({ days }: { days: number | null }) {
-  if (days === null) {return <span className="text-slate-400 dark:text-slate-500">Sin fecha</span>;}
-  if (days < 0)
-    {return <span className="text-red-600 dark:text-red-400">Vencido ({Math.abs(days)}d)</span>;}
-  if (days === 0) {return <span className="text-red-600 dark:text-red-400">Vence hoy</span>;}
+  if (days === null) {
+    return <span className="text-slate-400 dark:text-slate-500">Sin fecha</span>;
+  }
+  if (days < 0) {
+    return <span className="text-red-600 dark:text-red-400">Vencido ({Math.abs(days)}d)</span>;
+  }
+  if (days === 0) {
+    return <span className="text-red-600 dark:text-red-400">Vence hoy</span>;
+  }
   return <span>{days}</span>;
 }
 
 function DaysUnit({ days }: { days: number | null }) {
-  if (days === null || days < 0 || days === 0) {return null;}
+  if (days === null || days < 0 || days === 0) {
+    return null;
+  }
   return <span>días</span>;
 }
 

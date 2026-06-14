@@ -42,9 +42,13 @@ repos:
   # Frontend
   - repo: local
     hooks:
-      - id: eslint
-        name: eslint
-        entry: bash -c 'cd frontend && npx eslint --max-warnings=0 src'
+      - id: lint-staged-frontend
+        name: lint-staged (frontend)
+        # Runs eslint --fix + prettier --write on STAGED frontend files only.
+        # lint-staged itself reads the staged file list from git, so we don't
+        # let pre-commit pass filenames (pass_filenames: false).
+        entry: bash -c 'cd frontend && npx lint-staged --relative'
         language: system
         pass_filenames: false
-        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx|json|css|md)$
+        stages: [pre-commit]

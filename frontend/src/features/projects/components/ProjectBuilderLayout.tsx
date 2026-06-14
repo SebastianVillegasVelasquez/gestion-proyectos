@@ -1,14 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import {
-  Save,
-  CheckCircle,
-  AlertCircle,
-  Moon,
-  Sun,
-  Plus,
-  ChevronLeft,
-} from "lucide-react";
+import { Save, CheckCircle, AlertCircle, Moon, Sun, Plus, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuilderNode, NodeType, ProjectFormData } from "../types";
 import { useProjectsContext } from "../context/ProjectsContext";
@@ -36,7 +28,7 @@ function ProjectSwitcher({
   const selectCls = cn(
     "min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900",
     "outline-none transition-colors duration-150 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30",
-    "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500"
+    "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500",
   );
 
   return (
@@ -50,13 +42,13 @@ function ProjectSwitcher({
           value={activeId ?? ""}
           onChange={(e) => {
             const val = e.target.value;
-            if (val) {onSwitch(val);}
+            if (val) {
+              onSwitch(val);
+            }
           }}
           className={selectCls}
         >
-          {activeId === null && (
-            <option value="">Nuevo proyecto (sin guardar)</option>
-          )}
+          {activeId === null && <option value="">Nuevo proyecto (sin guardar)</option>}
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name || "Sin nombre"}
@@ -87,8 +79,7 @@ export interface ProjectBuilderLayoutProps {
 
 export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayoutProps) {
   const navigate = useNavigate();
-  const { projects, activeProjectId, setActiveProjectId, saveProject } =
-    useProjectsContext();
+  const { projects, activeProjectId, setActiveProjectId, saveProject } = useProjectsContext();
 
   // Local form state (edits are local; committed to context on save)
   const [project, setProject] = useState<ProjectFormData>({
@@ -127,7 +118,9 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
       parent_id: parentId,
     };
     setNodes((prev) => [...prev, newNode]);
-    if (parentId) {setExpanded((prev) => new Set([...prev, parentId]));}
+    if (parentId) {
+      setExpanded((prev) => new Set([...prev, parentId]));
+    }
     setSelectedId(newNode.id);
   };
 
@@ -142,10 +135,7 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
     setProject((prev) => ({ ...prev, ...patch }));
   };
 
-  const updateNode = (
-    id: string,
-    patch: Partial<Pick<BuilderNode, "name" | "node_type">>
-  ) => {
+  const updateNode = (id: string, patch: Partial<Pick<BuilderNode, "name" | "node_type">>) => {
     setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
   };
 
@@ -163,7 +153,9 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
     if (project.name.trim()) {
       const id = activeProjectId ?? localId;
       saveProject(id, project, nodes);
-      if (!activeProjectId) {setActiveProjectId(id);}
+      if (!activeProjectId) {
+        setActiveProjectId(id);
+      }
     }
   };
 
@@ -183,7 +175,9 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
     if (!project.name.trim()) {
       setErrorMsg("Nombre del proyecto requerido");
       setSaveStatus("error");
-      setTimeout(() => { setSaveStatus("idle"); }, 3000);
+      setTimeout(() => {
+        setSaveStatus("idle");
+      }, 3000);
       return;
     }
 
@@ -191,7 +185,9 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
 
     const id = activeProjectId ?? localId;
     saveProject(id, project, nodes);
-    if (!activeProjectId) {setActiveProjectId(id);}
+    if (!activeProjectId) {
+      setActiveProjectId(id);
+    }
 
     console.log("Proyecto guardado →", {
       id,
@@ -201,7 +197,9 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
 
     setTimeout(() => {
       setSaveStatus("success");
-      setTimeout(() => { setSaveStatus("idle"); }, 2500);
+      setTimeout(() => {
+        setSaveStatus("idle");
+      }, 2500);
     }, 400);
   };
 
@@ -221,7 +219,10 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => { commitCurrent(); navigate("/projects"); }}
+            onClick={() => {
+              commitCurrent();
+              navigate("/projects");
+            }}
             title="Ver todos los proyectos"
             aria-label="Volver a todos los proyectos"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
@@ -258,15 +259,22 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400"
                 : saveStatus === "error"
                   ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-400"
-                  : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
+                  : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500",
             )}
           >
             {saveStatus === "success" ? (
-              <><CheckCircle className="size-4" /> Guardado</>
+              <>
+                <CheckCircle className="size-4" /> Guardado
+              </>
             ) : saveStatus === "error" ? (
-              <><AlertCircle className="size-4" /><span className="max-w-[140px] truncate">{errorMsg}</span></>
+              <>
+                <AlertCircle className="size-4" />
+                <span className="max-w-[140px] truncate">{errorMsg}</span>
+              </>
             ) : (
-              <><Save className="size-4" /> Guardar proyecto</>
+              <>
+                <Save className="size-4" /> Guardar proyecto
+              </>
             )}
           </button>
         </div>
@@ -288,10 +296,14 @@ export function ProjectBuilderLayout({ dark, onToggleDark }: ProjectBuilderLayou
               nodes={nodes}
               selectedId={selectedId}
               expanded={expanded}
-              onSelectProject={() => { setSelectedId(null); }}
+              onSelectProject={() => {
+                setSelectedId(null);
+              }}
               onSelectNode={setSelectedId}
               onToggleExpand={toggleExpand}
-              onAddRootNode={() => { addNode(null, "programa"); }}
+              onAddRootNode={() => {
+                addNode(null, "programa");
+              }}
               onAddChild={addNode}
               onDelete={deleteNode}
             />

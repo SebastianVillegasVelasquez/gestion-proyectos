@@ -95,7 +95,9 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 
   const handleNavClick = (item: NavItem) => {
-    if (item.href) {navigate(item.href);}
+    if (item.href) {
+      navigate(item.href);
+    }
     onClose();
   };
 
@@ -110,7 +112,7 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
         "transition-transform duration-300 ease-in-out",
         // Desktop: always visible as sticky column; mobile: controlled by isOpen
         "md:sticky md:top-0 md:translate-x-0",
-        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}
     >
       {/* Logo + mobile close button */}
@@ -153,17 +155,21 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
                   <li key={item.id}>
                     <button
                       type="button"
-                      onClick={() => { handleNavClick(item); }}
+                      onClick={() => {
+                        handleNavClick(item);
+                      }}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
                         isActive
                           ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-600/15 dark:text-blue-300"
-                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200",
                       )}
                     >
                       {item.dot ? (
-                        <span className={cn("h-2 w-2 shrink-0 rounded-full", DOT_COLORS[item.dot])} />
+                        <span
+                          className={cn("h-2 w-2 shrink-0 rounded-full", DOT_COLORS[item.dot])}
+                        />
                       ) : (
                         <Icon className="size-4 shrink-0" />
                       )}

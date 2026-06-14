@@ -17,7 +17,9 @@ const GROUP_H = 30; // px for node group header rows
 // ── date helpers ───────────────────────────────────────────────────────────
 
 function parseDate(s: string): Date | null {
-  if (!s) {return null;}
+  if (!s) {
+    return null;
+  }
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
@@ -37,24 +39,25 @@ function isoWeekNum(d: Date): number {
   tmp.setHours(0, 0, 0, 0);
   tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
   const yearStart = new Date(tmp.getFullYear(), 0, 4);
-  return Math.round(
-    ((tmp.getTime() - yearStart.getTime()) / 86_400_000 -
-      3 +
-      ((yearStart.getDay() + 6) % 7)) /
-      7
-  ) + 1;
+  return (
+    Math.round(
+      ((tmp.getTime() - yearStart.getTime()) / 86_400_000 - 3 + ((yearStart.getDay() + 6) % 7)) / 7,
+    ) + 1
+  );
 }
 
 // ── grouping ───────────────────────────────────────────────────────────────
 
 function groupTasks(
   tasks: Task[],
-  nodes: BuilderNode[]
+  nodes: BuilderNode[],
 ): { id: string; name: string; tasks: Task[] }[] {
   const byNode = new Map<string, Task[]>();
   for (const task of tasks) {
     const key = task.node_id || "__none__";
-    if (!byNode.has(key)) {byNode.set(key, []);}
+    if (!byNode.has(key)) {
+      byNode.set(key, []);
+    }
     byNode.get(key)!.push(task);
   }
 
@@ -86,9 +89,7 @@ function EmptyState() {
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
         <CalendarOff className="size-5 text-slate-400 dark:text-slate-500" />
       </div>
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-        No hay tareas aún
-      </p>
+      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No hay tareas aún</p>
       <p className="text-xs text-slate-400 dark:text-slate-500">
         Crea la primera tarea con el botón "Nueva tarea".
       </p>
@@ -105,13 +106,10 @@ interface CustomGanttViewerProps {
   onClickTask: (task: Task) => void;
 }
 
-export function CustomGanttViewer({
-  tasks,
-  nodes,
-  members,
-  onClickTask,
-}: CustomGanttViewerProps) {
-  if (tasks.length === 0) {return <EmptyState />;}
+export function CustomGanttViewer({ tasks, nodes, members, onClickTask }: CustomGanttViewerProps) {
+  if (tasks.length === 0) {
+    return <EmptyState />;
+  }
 
   // ── chart range ──────────────────────────────────────────────────────────
   const datedTasks = tasks.filter((t) => t.start_date && t.due_date);
@@ -168,7 +166,9 @@ export function CustomGanttViewer({
 
   // ── bar helper ────────────────────────────────────────────────────────────
   const getBar = (task: Task) => {
-    if (!task.start_date || !task.due_date) {return null;}
+    if (!task.start_date || !task.due_date) {
+      return null;
+    }
     const start = parseDate(task.start_date)!;
     const end = parseDate(task.due_date)!;
     const startOffset = daysBetween(chartStart, start);
@@ -183,7 +183,6 @@ export function CustomGanttViewer({
     <div className="relative h-full overflow-auto">
       {/* Inner canvas — wider than viewport when needed */}
       <div style={{ width: LABEL_W + chartW, minWidth: "100%", position: "relative" }}>
-
         {/* ─ Header row (sticky top) ─ */}
         <div
           className="sticky top-0 z-20 flex border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
@@ -198,7 +197,10 @@ export function CustomGanttViewer({
           </div>
 
           {/* Time column headers */}
-          <div className="relative flex shrink-0 bg-white dark:bg-slate-900" style={{ width: chartW }}>
+          <div
+            className="relative flex shrink-0 bg-white dark:bg-slate-900"
+            style={{ width: chartW }}
+          >
             {columns.map((col, i) => (
               <div
                 key={i}
@@ -268,9 +270,7 @@ export function CustomGanttViewer({
                   key={task.id}
                   className={cn(
                     "group flex border-b border-slate-100 transition-colors duration-75 hover:bg-blue-50/50 dark:border-slate-800/60 dark:hover:bg-blue-950/10",
-                    isEven
-                      ? "bg-white dark:bg-slate-900"
-                      : "bg-slate-50/60 dark:bg-slate-900/60"
+                    isEven ? "bg-white dark:bg-slate-900" : "bg-slate-50/60 dark:bg-slate-900/60",
                   )}
                   style={{ height: ROW_H }}
                 >
@@ -278,16 +278,16 @@ export function CustomGanttViewer({
                   <div
                     className={cn(
                       "sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-slate-100 px-3 transition-colors duration-75 dark:border-slate-800/60",
-                      isEven
-                        ? "bg-white dark:bg-slate-900"
-                        : "bg-slate-50/60 dark:bg-slate-900/60",
-                      "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/10"
+                      isEven ? "bg-white dark:bg-slate-900" : "bg-slate-50/60 dark:bg-slate-900/60",
+                      "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/10",
                     )}
                     style={{ width: LABEL_W }}
                   >
                     <button
                       type="button"
-                      onClick={() => { onClickTask(task); }}
+                      onClick={() => {
+                        onClickTask(task);
+                      }}
                       className="min-w-0 flex-1 truncate text-left text-[13px] text-slate-700 transition-colors hover:text-blue-600 dark:text-slate-200 dark:hover:text-blue-400"
                       title={task.title}
                     >
@@ -297,7 +297,7 @@ export function CustomGanttViewer({
                       <span
                         className={cn(
                           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white",
-                          member.avatarColor
+                          member.avatarColor,
                         )}
                         title={member.name}
                       >
@@ -307,17 +307,16 @@ export function CustomGanttViewer({
                   </div>
 
                   {/* Time cell */}
-                  <div
-                    className="relative shrink-0"
-                    style={{ width: chartW, height: ROW_H }}
-                  >
+                  <div className="relative shrink-0" style={{ width: chartW, height: ROW_H }}>
                     {bar ? (
                       <button
                         type="button"
-                        onClick={() => { onClickTask(task); }}
+                        onClick={() => {
+                          onClickTask(task);
+                        }}
                         className={cn(
                           "absolute rounded transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
-                          STATUS_BAR_COLOR[task.status]
+                          STATUS_BAR_COLOR[task.status],
                         )}
                         style={{
                           left: bar.left,

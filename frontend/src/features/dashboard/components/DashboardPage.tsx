@@ -8,13 +8,7 @@ import { UpcomingDeadlines } from "./UpcomingDeadlines";
 import { CommentsPanel } from "./CommentsPanel";
 import { useDashboardSummary } from "../hooks/use-dashboard-summary";
 import { buildKpiCards } from "../utils/build-kpi-cards";
-import {
-  mockHeaderData,
-  mockTasks,
-  mockProjects,
-  mockDeadlines,
-  mockComments,
-} from "../mockData";
+import { mockHeaderData, mockTasks, mockProjects, mockDeadlines, mockComments } from "../mockData";
 
 export function DashboardPage() {
   const { dark, toggleDark } = useOutletContext<AppOutletContext>();

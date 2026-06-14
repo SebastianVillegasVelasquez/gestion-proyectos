@@ -40,7 +40,15 @@ const PRIORITY_ICON: Record<TaskPriority, LucideIcon> = {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function FieldGroup({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function FieldGroup({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+}) {
   return (
     <div>
       <label className={labelCls}>{label}</label>
@@ -51,9 +59,7 @@ function FieldGroup({ label, children, error }: { label: string; children: React
 }
 
 function StatusIndicator({ status }: { status: TaskStatus }) {
-  return (
-    <div className={cn("mt-1.5 h-1 w-full rounded-full", STATUS_BAR_COLOR[status])} />
-  );
+  return <div className={cn("mt-1.5 h-1 w-full rounded-full", STATUS_BAR_COLOR[status])} />;
 }
 
 // ── component ─────────────────────────────────────────────────────────────
@@ -75,22 +81,26 @@ export function TaskDetailForm({
   onDelete,
   onCancel,
 }: TaskDetailFormProps) {
-  const [form, setForm] = useState<Task>(
-    () => initialTask ?? createEmptyTask(nodes[0]?.id ?? "")
-  );
+  const [form, setForm] = useState<Task>(() => initialTask ?? createEmptyTask(nodes[0]?.id ?? ""));
   const [errors, setErrors] = useState<Partial<Record<keyof Task, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changeReason, setChangeReason] = useState("");
 
   const set = <K extends keyof Task>(key: K, value: Task[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (errors[key]) {setErrors((prev) => ({ ...prev, [key]: undefined }));}
+    if (errors[key]) {
+      setErrors((prev) => ({ ...prev, [key]: undefined }));
+    }
   };
 
   const validate = (): boolean => {
     const errs: Partial<Record<keyof Task, string>> = {};
-    if (!form.title.trim()) {errs.title = "El título es obligatorio.";}
-    if (!form.node_id) {errs.node_id = "Debes asignar un nodo.";}
+    if (!form.title.trim()) {
+      errs.title = "El título es obligatorio.";
+    }
+    if (!form.node_id) {
+      errs.node_id = "Debes asignar un nodo.";
+    }
     if (form.start_date && form.due_date && form.due_date < form.start_date) {
       errs.due_date = "La fecha fin no puede ser anterior a la de inicio.";
     }
@@ -100,7 +110,9 @@ export function TaskDetailForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {onSave({ ...form, title: form.title.trim() }, changeReason);}
+    if (validate()) {
+      onSave({ ...form, title: form.title.trim() }, changeReason);
+    }
   };
 
   const PriorityIcon = PRIORITY_ICON[form.priority];
@@ -112,7 +124,9 @@ export function TaskDetailForm({
         <input
           type="text"
           value={form.title}
-          onChange={(e) => { set("title", e.target.value); }}
+          onChange={(e) => {
+            set("title", e.target.value);
+          }}
           placeholder="Ej: Diseñar pantalla de login"
           className={cn(inputCls, errors.title && "border-rose-400")}
           autoFocus
@@ -123,7 +137,9 @@ export function TaskDetailForm({
       <FieldGroup label="Descripción">
         <textarea
           value={form.description}
-          onChange={(e) => { set("description", e.target.value); }}
+          onChange={(e) => {
+            set("description", e.target.value);
+          }}
           placeholder="Descripción detallada de la tarea..."
           rows={3}
           className={cn(inputCls, "resize-none leading-relaxed")}
@@ -135,11 +151,15 @@ export function TaskDetailForm({
         <FieldGroup label="Estado">
           <select
             value={form.status}
-            onChange={(e) => { set("status", e.target.value as TaskStatus); }}
+            onChange={(e) => {
+              set("status", e.target.value as TaskStatus);
+            }}
             className={inputCls}
           >
             {TASK_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
           <StatusIndicator status={form.status} />
@@ -149,17 +169,21 @@ export function TaskDetailForm({
           <div className="relative">
             <select
               value={form.priority}
-              onChange={(e) => { set("priority", e.target.value as TaskPriority); }}
+              onChange={(e) => {
+                set("priority", e.target.value as TaskPriority);
+              }}
               className={cn(inputCls, "pl-8")}
             >
               {TASK_PRIORITY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
             <PriorityIcon
               className={cn(
                 "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5",
-                PRIORITY_COLOR[form.priority]
+                PRIORITY_COLOR[form.priority],
               )}
             />
           </div>
@@ -172,7 +196,9 @@ export function TaskDetailForm({
           <FieldGroup label="Motivo de devolución *">
             <textarea
               value={changeReason}
-              onChange={(e) => { setChangeReason(e.target.value); }}
+              onChange={(e) => {
+                setChangeReason(e.target.value);
+              }}
               placeholder="Describe el motivo por el que se devuelve la tarea..."
               rows={3}
               className={cn(inputCls, "resize-none leading-relaxed")}
@@ -188,7 +214,9 @@ export function TaskDetailForm({
       <FieldGroup label="Nodo *" error={errors.node_id}>
         <select
           value={form.node_id}
-          onChange={(e) => { set("node_id", e.target.value); }}
+          onChange={(e) => {
+            set("node_id", e.target.value);
+          }}
           className={cn(inputCls, errors.node_id && "border-rose-400")}
         >
           <option value="">— Seleccionar nodo —</option>
@@ -204,7 +232,9 @@ export function TaskDetailForm({
       <FieldGroup label="Responsable">
         <select
           value={form.assignee_id ?? ""}
-          onChange={(e) => { set("assignee_id", e.target.value || null); }}
+          onChange={(e) => {
+            set("assignee_id", e.target.value || null);
+          }}
           className={inputCls}
         >
           <option value="">— Sin asignar —</option>
@@ -222,7 +252,9 @@ export function TaskDetailForm({
           <input
             type="date"
             value={form.start_date}
-            onChange={(e) => { set("start_date", e.target.value); }}
+            onChange={(e) => {
+              set("start_date", e.target.value);
+            }}
             className={inputCls}
           />
         </FieldGroup>
@@ -231,7 +263,9 @@ export function TaskDetailForm({
             type="date"
             value={form.due_date}
             min={form.start_date || undefined}
-            onChange={(e) => { set("due_date", e.target.value); }}
+            onChange={(e) => {
+              set("due_date", e.target.value);
+            }}
             className={cn(inputCls, errors.due_date && "border-rose-400")}
           />
         </FieldGroup>
@@ -240,8 +274,8 @@ export function TaskDetailForm({
       {/* Actions */}
       <div className="flex items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
         {/* Delete */}
-        {onDelete && (
-          confirmDelete ? (
+        {onDelete &&
+          (confirmDelete ? (
             <div className="flex items-center gap-1.5">
               <span className="text-[12px] text-rose-600 dark:text-rose-400">¿Confirmar?</span>
               <button
@@ -253,7 +287,9 @@ export function TaskDetailForm({
               </button>
               <button
                 type="button"
-                onClick={() => { setConfirmDelete(false); }}
+                onClick={() => {
+                  setConfirmDelete(false);
+                }}
                 className="text-[12px] text-slate-400 hover:text-slate-600"
               >
                 Cancelar
@@ -262,14 +298,15 @@ export function TaskDetailForm({
           ) : (
             <button
               type="button"
-              onClick={() => { setConfirmDelete(true); }}
+              onClick={() => {
+                setConfirmDelete(true);
+              }}
               className="flex items-center gap-1 text-[12px] text-slate-400 transition-colors hover:text-rose-500 dark:hover:text-rose-400"
             >
               <Trash2 className="size-3.5" />
               Eliminar
             </button>
-          )
-        )}
+          ))}
 
         <div className="flex-1" />
 

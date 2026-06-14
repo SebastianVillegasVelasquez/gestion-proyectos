@@ -49,7 +49,7 @@ function ActionBtn({
         "flex h-5 w-5 items-center justify-center rounded transition-colors duration-150",
         variant === "add"
           ? "text-slate-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
-          : "text-slate-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+          : "text-slate-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400",
       )}
     >
       {children}
@@ -89,51 +89,56 @@ function TreeNode({
   const childType = NODE_CHILD_TYPE[node.node_type];
 
   const OpenIcon =
-    node.node_type === "programa"
-      ? FolderOpen
-      : node.node_type === "curso"
-        ? BookOpen
-        : FileText;
+    node.node_type === "programa" ? FolderOpen : node.node_type === "curso" ? BookOpen : FileText;
   const ClosedIcon =
-    node.node_type === "programa"
-      ? Folder
-      : node.node_type === "curso"
-        ? BookOpen
-        : FileText;
+    node.node_type === "programa" ? Folder : node.node_type === "curso" ? BookOpen : FileText;
   const Icon = isExpanded ? OpenIcon : ClosedIcon;
 
   return (
-    <div role="treeitem" aria-selected={isSelected} aria-expanded={hasChildren ? isExpanded : undefined}>
+    <div
+      role="treeitem"
+      aria-selected={isSelected}
+      aria-expanded={hasChildren ? isExpanded : undefined}
+    >
       <div
         className={cn(
           "group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors duration-150",
           isSelected
             ? "bg-blue-50 dark:bg-blue-600/15"
-            : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
+            : "hover:bg-slate-100 dark:hover:bg-slate-800/50",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={() => { onSelect(node.id); }}
+        onClick={() => {
+          onSelect(node.id);
+        }}
       >
         {/* Expand/collapse */}
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpand(node.id);
+          }}
           aria-label={isExpanded ? "Colapsar" : "Expandir"}
           className={cn(
             "shrink-0 transition-colors duration-150",
             hasChildren
               ? "text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400"
-              : "invisible pointer-events-none"
+              : "invisible pointer-events-none",
           )}
         >
-          {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          {isExpanded ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronRight className="size-3.5" />
+          )}
         </button>
 
         {/* Type icon */}
         <Icon
           className={cn(
             "size-3.5 shrink-0",
-            isSelected ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+            isSelected ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400",
           )}
         />
 
@@ -144,7 +149,7 @@ function TreeNode({
             isSelected
               ? "font-medium text-blue-700 dark:text-blue-300"
               : "text-slate-700 dark:text-slate-300",
-            !node.name && "italic opacity-60"
+            !node.name && "italic opacity-60",
           )}
         >
           {node.name || `${NODE_TYPE_LABELS[node.node_type]} sin nombre`}
@@ -155,7 +160,10 @@ function TreeNode({
           {childType && (
             <ActionBtn
               variant="add"
-              onClick={(e) => { e.stopPropagation(); onAddChild(node.id, childType); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddChild(node.id, childType);
+              }}
               title={`Añadir ${NODE_TYPE_LABELS[childType]}`}
             >
               <Plus className="size-3" />
@@ -163,7 +171,10 @@ function TreeNode({
           )}
           <ActionBtn
             variant="delete"
-            onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(node.id);
+            }}
             title="Eliminar nodo"
           >
             <Trash2 className="size-3" />
@@ -232,7 +243,6 @@ export function TreeViewSidebar({
 
       <CardContent className="flex flex-1 flex-col overflow-hidden p-2">
         <div role="tree" className="flex flex-1 flex-col overflow-y-auto">
-
           {/* Project root row */}
           <div
             role="treeitem"
@@ -241,7 +251,7 @@ export function TreeViewSidebar({
               "group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors duration-150",
               isProjectSelected
                 ? "bg-blue-50 dark:bg-blue-600/15"
-                : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                : "hover:bg-slate-100 dark:hover:bg-slate-800/50",
             )}
             onClick={onSelectProject}
           >
@@ -251,7 +261,9 @@ export function TreeViewSidebar({
             <Briefcase
               className={cn(
                 "size-3.5 shrink-0",
-                isProjectSelected ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                isProjectSelected
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-500 dark:text-slate-400",
               )}
             />
 
@@ -261,7 +273,7 @@ export function TreeViewSidebar({
                 isProjectSelected
                   ? "font-semibold text-blue-700 dark:text-blue-300"
                   : "font-medium text-slate-800 dark:text-slate-200",
-                !project.name && "italic opacity-60"
+                !project.name && "italic opacity-60",
               )}
             >
               {project.name || "Proyecto sin nombre"}
@@ -270,7 +282,10 @@ export function TreeViewSidebar({
             <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
               <ActionBtn
                 variant="add"
-                onClick={(e) => { e.stopPropagation(); onAddRootNode(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddRootNode();
+                }}
                 title="Añadir Programa"
               >
                 <Plus className="size-3" />
@@ -300,9 +315,7 @@ export function TreeViewSidebar({
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
                 <FolderOpen className="size-5 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-[12px] text-slate-400 dark:text-slate-500">
-                Sin nodos todavía
-              </p>
+              <p className="text-[12px] text-slate-400 dark:text-slate-500">Sin nodos todavía</p>
               <button
                 type="button"
                 onClick={onAddRootNode}

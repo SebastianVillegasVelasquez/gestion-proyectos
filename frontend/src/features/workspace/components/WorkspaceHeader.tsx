@@ -36,7 +36,7 @@ export function WorkspaceHeader({ group, onNewTask }: WorkspaceHeaderProps) {
               <span
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-white dark:ring-slate-900",
-                  leader.avatarColor
+                  leader.avatarColor,
                 )}
               >
                 {leader.initials}
@@ -52,7 +52,7 @@ export function WorkspaceHeader({ group, onNewTask }: WorkspaceHeaderProps) {
               key={m.id}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900",
-                m.avatarColor
+                m.avatarColor,
               )}
               style={{ marginLeft: i === 0 ? "-4px" : "-10px" }}
               title={m.name}

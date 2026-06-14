@@ -33,7 +33,9 @@ const RETURN_REASONS = [
 
 function generateDemoHistory(stored: StoredProject): TaskHistory[] {
   const { tasks, members } = stored;
-  if (tasks.length === 0 || members.length === 0) {return [];}
+  if (tasks.length === 0 || members.length === 0) {
+    return [];
+  }
 
   const entries: TaskHistory[] = [];
   let offsetMs = 6 * 24 * 60 * 60 * 1000; // start 6 days back
@@ -126,7 +128,7 @@ function generateDemoHistory(stored: StoredProject): TaskHistory[] {
   });
 
   return entries.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 }
 
@@ -145,19 +147,14 @@ function KpiCard({ label, value, sub, accentClass, icon }: KpiCardProps) {
     <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {/* Gradient left accent bar */}
       <div
-        className={cn(
-          "absolute inset-y-0 left-0 w-1 rounded-l-xl bg-gradient-to-b",
-          accentClass
-        )}
+        className={cn("absolute inset-y-0 left-0 w-1 rounded-l-xl bg-gradient-to-b", accentClass)}
       />
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             {label}
           </p>
-          <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{sub}</p>
         </div>
         <div className="rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800">{icon}</div>
@@ -200,7 +197,9 @@ function FilterBar({
         <input
           type="text"
           value={search}
-          onChange={(e) => { onSearch(e.target.value); }}
+          onChange={(e) => {
+            onSearch(e.target.value);
+          }}
           placeholder="Buscar por tarea o usuario..."
           className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-3 text-[13px] text-slate-700 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500 dark:focus:border-blue-500"
         />
@@ -210,7 +209,9 @@ function FilterBar({
       <div className="relative">
         <select
           value={filterAction}
-          onChange={(e) => { onFilterAction(e.target.value as HistoryAction | ""); }}
+          onChange={(e) => {
+            onFilterAction(e.target.value as HistoryAction | "");
+          }}
           className={selectCls}
         >
           <option value="">Todas las acciones</option>
@@ -227,7 +228,9 @@ function FilterBar({
       <div className="relative">
         <select
           value={filterStatus}
-          onChange={(e) => { onFilterStatus(e.target.value as TaskStatus | ""); }}
+          onChange={(e) => {
+            onFilterStatus(e.target.value as TaskStatus | "");
+          }}
           className={selectCls}
         >
           <option value="">Todos los estados</option>
@@ -257,10 +260,7 @@ function FilterBar({
 
 // ── timeline node icons ────────────────────────────────────────────────────
 
-const ACTION_NODE: Record<
-  HistoryAction,
-  { Icon: React.ElementType; bg: string; ring: string }
-> = {
+const ACTION_NODE: Record<HistoryAction, { Icon: React.ElementType; bg: string; ring: string }> = {
   creacion: {
     Icon: Plus,
     bg: "bg-emerald-500",
@@ -321,11 +321,7 @@ interface TimelineItemProps {
   index: number;
 }
 
-function buildDescription(
-  entry: TaskHistory,
-  memberName: string,
-  taskName: string
-): string {
+function buildDescription(entry: TaskHistory, memberName: string, taskName: string): string {
   switch (entry.action) {
     case "creacion":
       return `${memberName} creó la tarea "${taskName}"`;
@@ -351,8 +347,7 @@ function TimelineItem({
   memberColor,
   index,
 }: TimelineItemProps) {
-  const isAlert =
-    entry.new_status === "devuelta" || Boolean(entry.change_reason);
+  const isAlert = entry.new_status === "devuelta" || Boolean(entry.change_reason);
   const node =
     isAlert && entry.action === "cambio_estado"
       ? { Icon: AlertTriangle, bg: "bg-rose-500", ring: "ring-rose-100 dark:ring-rose-900/30" }
@@ -386,7 +381,7 @@ function TimelineItem({
           className={cn(
             "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-4",
             node.bg,
-            node.ring
+            node.ring,
           )}
         >
           <Icon className="size-4 text-white" />
@@ -401,7 +396,7 @@ function TimelineItem({
             "rounded-xl border p-4 shadow-sm transition-colors",
             isAlert
               ? "border-rose-200 bg-rose-50 dark:border-rose-800/50 dark:bg-rose-950/20"
-              : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
           )}
         >
           {/* Card header */}
@@ -410,7 +405,7 @@ function TimelineItem({
             <span
               className={cn(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white",
-                memberColor
+                memberColor,
               )}
               title={memberName}
             >
@@ -423,7 +418,7 @@ function TimelineItem({
                   "text-[13px] font-medium leading-snug",
                   isAlert
                     ? "text-rose-800 dark:text-rose-200"
-                    : "text-slate-700 dark:text-slate-200"
+                    : "text-slate-700 dark:text-slate-200",
                 )}
               >
                 {buildDescription(entry, memberName, taskName)}
@@ -435,7 +430,7 @@ function TimelineItem({
                   <span
                     className={cn(
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      STATUS_BADGE[entry.old_status]
+                      STATUS_BADGE[entry.old_status],
                     )}
                   >
                     {TASK_STATUS_LABELS[entry.old_status]}
@@ -444,7 +439,7 @@ function TimelineItem({
                   <span
                     className={cn(
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      STATUS_BADGE[entry.new_status]
+                      STATUS_BADGE[entry.new_status],
                     )}
                   >
                     {TASK_STATUS_LABELS[entry.new_status]}
@@ -485,9 +480,7 @@ function AuditTimeline({ entries, stored }: AuditTimelineProps) {
   const getMemberData = (id: string) => {
     const m = stored.members.find((m) => m.id === id);
     return {
-      name: m
-        ? `${m.name} (${PROJECT_ROLE_LABELS[m.role]})`
-        : "Sistema",
+      name: m ? `${m.name} (${PROJECT_ROLE_LABELS[m.role]})` : "Sistema",
       initials: m?.initials ?? "S",
       color: m?.avatarColor ?? "bg-slate-400",
     };
@@ -502,9 +495,7 @@ function AuditTimeline({ entries, stored }: AuditTimelineProps) {
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
           <Activity className="size-5 text-slate-400 dark:text-slate-500" />
         </div>
-        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-          Sin resultados
-        </p>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Sin resultados</p>
         <p className="text-xs text-slate-400 dark:text-slate-500">
           Ajusta los filtros para ver más registros.
         </p>
@@ -552,7 +543,7 @@ export function TraceabilityDashboard({ stored }: TraceabilityDashboardProps) {
   const allEntries = useMemo(
     () => (isDemo ? generateDemoHistory(stored) : stored.history),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stored.history, isDemo]
+    [stored.history, isDemo],
   );
 
   // Filters
@@ -572,14 +563,19 @@ export function TraceabilityDashboard({ stored }: TraceabilityDashboardProps) {
   const filteredEntries = useMemo(() => {
     const s = search.toLowerCase();
     return allEntries.filter((e) => {
-      if (filterAction && e.action !== filterAction) {return false;}
-      if (filterStatus && e.new_status !== filterStatus) {return false;}
+      if (filterAction && e.action !== filterAction) {
+        return false;
+      }
+      if (filterStatus && e.new_status !== filterStatus) {
+        return false;
+      }
       if (s) {
-        const taskName =
-          stored.tasks.find((t) => t.id === e.task_id)?.title?.toLowerCase() ?? "";
+        const taskName = stored.tasks.find((t) => t.id === e.task_id)?.title?.toLowerCase() ?? "";
         const member =
           stored.members.find((m) => m.id === e.changed_by_id)?.name?.toLowerCase() ?? "";
-        if (!taskName.includes(s) && !member.includes(s)) {return false;}
+        if (!taskName.includes(s) && !member.includes(s)) {
+          return false;
+        }
       }
       return true;
     });
@@ -590,13 +586,8 @@ export function TraceabilityDashboard({ stored }: TraceabilityDashboardProps) {
     const totalAcciones = allEntries.length;
     const devueltas = allEntries.filter((e) => e.new_status === "devuelta").length;
     const completadas = stored.tasks.filter((t) => t.status === "completada").length;
-    const pct =
-      stored.tasks.length > 0
-        ? Math.round((completadas / stored.tasks.length) * 100)
-        : 0;
-    const last = allEntries[0]
-      ? formatDateTime(allEntries[0].created_at).relative
-      : "—";
+    const pct = stored.tasks.length > 0 ? Math.round((completadas / stored.tasks.length) * 100) : 0;
+    const last = allEntries[0] ? formatDateTime(allEntries[0].created_at).relative : "—";
 
     return { totalAcciones, devueltas, last, pct, completadas };
   }, [allEntries, stored.tasks]);
@@ -613,8 +604,8 @@ export function TraceabilityDashboard({ stored }: TraceabilityDashboardProps) {
           Aún no hay historial de cambios
         </p>
         <p className="max-w-xs text-sm text-slate-400 dark:text-slate-500">
-          Las acciones realizadas en las tareas (crear, cambiar estado, reasignar)
-          aparecerán aquí automáticamente.
+          Las acciones realizadas en las tareas (crear, cambiar estado, reasignar) aparecerán aquí
+          automáticamente.
         </p>
       </div>
     );
@@ -627,8 +618,8 @@ export function TraceabilityDashboard({ stored }: TraceabilityDashboardProps) {
         <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-2 dark:border-amber-800/40 dark:bg-amber-950/30">
           <Zap className="size-3.5 shrink-0 text-amber-500" />
           <p className="text-[11px] text-amber-700 dark:text-amber-400">
-            <strong>Vista previa con datos demo.</strong> El historial real se
-            genera automáticamente al crear y modificar tareas.
+            <strong>Vista previa con datos demo.</strong> El historial real se genera
+            automáticamente al crear y modificar tareas.
           </p>
         </div>
       )}

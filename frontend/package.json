@@ -9,7 +9,20 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:fix": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "typecheck": "tsc -b --noEmit",
+    "lint-staged": "lint-staged --relative"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
@@ -44,6 +57,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.7",
     "msw": "^2.14.6",
     "postcss": "^8.5.14",
     "prettier": "^3.8.3",

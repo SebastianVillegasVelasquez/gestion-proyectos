@@ -21,7 +21,9 @@ import { NODE_TYPE_LABELS } from "../types";
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
-  if (!iso) {return "—";}
+  if (!iso) {
+    return "—";
+  }
   const [year, month, day] = iso.split("-");
   return `${day}/${month}/${year}`;
 }
@@ -29,10 +31,16 @@ function formatDate(iso: string): string {
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) {return "justo ahora";}
-  if (mins < 60) {return `hace ${mins} min`;}
+  if (mins < 1) {
+    return "justo ahora";
+  }
+  if (mins < 60) {
+    return `hace ${mins} min`;
+  }
   const hours = Math.floor(mins / 60);
-  if (hours < 24) {return `hace ${hours} h`;}
+  if (hours < 24) {
+    return `hace ${hours} h`;
+  }
   const days = Math.floor(hours / 24);
   return `hace ${days} d`;
 }
@@ -67,7 +75,11 @@ function ProjectCard({
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") {onOpen();} }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          onOpen();
+        }
+      }}
       aria-label={`Abrir proyecto ${stored.project.name || "sin nombre"}`}
     >
       <CardContent className="flex flex-1 flex-col gap-4 pt-5">
@@ -77,7 +89,7 @@ function ProjectCard({
             <p
               className={cn(
                 "truncate font-semibold text-slate-900 dark:text-slate-50",
-                !stored.project.name && "italic opacity-50"
+                !stored.project.name && "italic opacity-50",
               )}
             >
               {stored.project.name || "Proyecto sin nombre"}
@@ -90,7 +102,10 @@ function ProjectCard({
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
               title="Editar en el constructor"
               className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
             >
@@ -98,7 +113,10 @@ function ProjectCard({
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
               title="Eliminar proyecto"
               className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
             >
@@ -171,11 +189,12 @@ function StatPill({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
-        color
+        color,
       )}
     >
       {icon}
-      {count} {label.toLowerCase()}{count !== 1 ? "s" : ""}
+      {count} {label.toLowerCase()}
+      {count !== 1 ? "s" : ""}
     </span>
   );
 }
@@ -189,9 +208,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         <Layers className="size-8 text-slate-400 dark:text-slate-500" />
       </div>
       <div className="text-center">
-        <p className="font-medium text-slate-700 dark:text-slate-300">
-          Aún no tienes proyectos
-        </p>
+        <p className="font-medium text-slate-700 dark:text-slate-300">Aún no tienes proyectos</p>
         <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
           Crea tu primer proyecto educativo y define su estructura
         </p>
@@ -284,9 +301,15 @@ export function AllProjectsPage() {
               <ProjectCard
                 key={stored.id}
                 stored={stored}
-                onOpen={() => { handleOpen(stored.id); }}
-                onEdit={() => { handleEdit(stored.id); }}
-                onDelete={() => { handleDelete(stored.id, stored.project.name); }}
+                onOpen={() => {
+                  handleOpen(stored.id);
+                }}
+                onEdit={() => {
+                  handleEdit(stored.id);
+                }}
+                onDelete={() => {
+                  handleDelete(stored.id, stored.project.name);
+                }}
               />
             ))}
           </div>

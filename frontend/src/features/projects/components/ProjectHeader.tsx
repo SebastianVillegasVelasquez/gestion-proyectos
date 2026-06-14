@@ -4,21 +4,44 @@ import { cn } from "@/lib/utils";
 import type { ProjectFormData } from "../types";
 
 function formatDate(iso: string): string {
-  if (!iso) {return "—";}
+  if (!iso) {
+    return "—";
+  }
   const [year, month, day] = iso.split("-");
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
 }
 
 function getProgressColor(pct: number): string {
-  if (pct >= 70) {return "bg-emerald-500";}
-  if (pct >= 40) {return "bg-amber-400";}
+  if (pct >= 70) {
+    return "bg-emerald-500";
+  }
+  if (pct >= 40) {
+    return "bg-amber-400";
+  }
   return "bg-blue-500";
 }
 
 function getProgressTextColor(pct: number): string {
-  if (pct >= 70) {return "text-emerald-600 dark:text-emerald-400";}
-  if (pct >= 40) {return "text-amber-600 dark:text-amber-400";}
+  if (pct >= 70) {
+    return "text-emerald-600 dark:text-emerald-400";
+  }
+  if (pct >= 40) {
+    return "text-amber-600 dark:text-amber-400";
+  }
   return "text-blue-600 dark:text-blue-400";
 }
 
@@ -49,7 +72,7 @@ export function ProjectHeader({ project, dark, onToggleDark }: ProjectHeaderProp
           <h1
             className={cn(
               "truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl",
-              !project.name && "italic opacity-50"
+              !project.name && "italic opacity-50",
             )}
           >
             {project.name || "Proyecto sin nombre"}

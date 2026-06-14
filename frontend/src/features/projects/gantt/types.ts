@@ -78,7 +78,7 @@ export interface Task {
   node_id: string;
   assignee_id: string | null;
   start_date: string; // YYYY-MM-DD
-  due_date: string;   // YYYY-MM-DD
+  due_date: string; // YYYY-MM-DD
 }
 
 export function createEmptyTask(nodeId = ""): Task {

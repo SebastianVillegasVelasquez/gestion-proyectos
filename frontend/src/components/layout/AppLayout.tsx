@@ -35,13 +35,17 @@ export const AppLayout = () => {
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
-          onClick={() => { setSidebarOpen(false); }}
+          onClick={() => {
+            setSidebarOpen(false);
+          }}
         />
       )}
 
       <Sidebar
         isOpen={sidebarOpen}
-        onClose={() => { setSidebarOpen(false); }}
+        onClose={() => {
+          setSidebarOpen(false);
+        }}
         dark={dark}
         onToggleDark={toggleDark}
       />
@@ -52,7 +56,9 @@ export const AppLayout = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => { setSidebarOpen(true); }}
+              onClick={() => {
+                setSidebarOpen(true);
+              }}
               aria-label="Abrir menú de navegación"
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >

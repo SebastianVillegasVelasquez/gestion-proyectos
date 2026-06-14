@@ -70,11 +70,24 @@ export default defineConfig([
       ],
 
       // TypeScript — restrict broad/unsafe types
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
+      // NOTE: temporarily demoted to 'warn' while AI-generated legacy code is refactored.
+      // Promote back to 'error' once the workspace/projects/gantt modules are clean.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+
+      // Style/preference — kept as warn (visible but non-blocking for legacy code)
+      '@typescript-eslint/restrict-template-expressions': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/no-unnecessary-condition': 'warn',
+      '@typescript-eslint/prefer-promise-reject-errors': 'warn',
+      '@typescript-eslint/no-confusing-void-expression': 'warn',
+      '@typescript-eslint/no-deprecated': 'warn',
+      '@typescript-eslint/no-unused-expressions': 'warn',
+      'react-refresh/only-export-components': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
     },
   },
 

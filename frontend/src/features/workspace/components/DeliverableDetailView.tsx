@@ -33,14 +33,18 @@ function detectService(url: string): {
   color: string;
 } {
   const u = url.toLowerCase();
-  if (u.includes("figma.com"))
+  if (u.includes("figma.com")) {
     return { label: "Figma", Icon: Link, color: "text-pink-500" };
-  if (u.includes("github.com"))
+  }
+  if (u.includes("github.com")) {
     return { label: "GitHub", Icon: GitBranch, color: "text-slate-700 dark:text-slate-300" };
-  if (u.includes("drive.google"))
+  }
+  if (u.includes("drive.google")) {
     return { label: "Google Drive", Icon: Link, color: "text-blue-500" };
-  if (u.includes("notion.so"))
+  }
+  if (u.includes("notion.so")) {
     return { label: "Notion", Icon: Link, color: "text-slate-800 dark:text-slate-200" };
+  }
   return { label: "Enlace externo", Icon: ExternalLink, color: "text-blue-500" };
 }
 
@@ -50,10 +54,15 @@ function fileIcon(version: DeliverableVersion) {
     return { Icon: svc.Icon, color: svc.color };
   }
   const mime = version.mimeType ?? "";
-  if (mime.includes("image")) return { Icon: ImageIcon, color: "text-purple-500" };
-  if (mime.includes("pdf")) return { Icon: FileText, color: "text-rose-500" };
-  if (mime.includes("word") || mime.includes("document"))
+  if (mime.includes("image")) {
+    return { Icon: ImageIcon, color: "text-purple-500" };
+  }
+  if (mime.includes("pdf")) {
+    return { Icon: FileText, color: "text-rose-500" };
+  }
+  if (mime.includes("word") || mime.includes("document")) {
     return { Icon: FileText, color: "text-blue-500" };
+  }
   return { Icon: File, color: "text-slate-500" };
 }
 
@@ -68,7 +77,9 @@ function VersionHistory({
 }) {
   const [expanded, setExpanded] = useState(true);
 
-  if (versions.length === 0) return null;
+  if (versions.length === 0) {
+    return null;
+  }
 
   const sorted = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
 
@@ -76,7 +87,9 @@ function VersionHistory({
     <div>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => {
+          setExpanded((v) => !v);
+        }}
         className="flex w-full items-center gap-1.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
       >
         {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
@@ -103,7 +116,7 @@ function VersionHistory({
                       "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                       isLatest
                         ? "bg-blue-600 text-white"
-                        : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                        : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
                     )}
                   >
                     V{v.versionNumber}
@@ -115,7 +128,7 @@ function VersionHistory({
                       "flex-1 rounded-lg border p-3",
                       isLatest
                         ? "border-blue-200 bg-blue-50/70 dark:border-blue-800/50 dark:bg-blue-950/20"
-                        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60"
+                        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -156,7 +169,7 @@ function VersionHistory({
                         <span
                           className={cn(
                             "flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white",
-                            uploader.avatarColor
+                            uploader.avatarColor,
                           )}
                         >
                           {uploader.initials}
@@ -196,7 +209,9 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     onAddVersion({
       type: "archivo",
       url: "#",
@@ -210,7 +225,9 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     onAddVersion({
       type: "archivo",
       url: "#",
@@ -218,13 +235,15 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
       mimeType: file.type,
       uploadedBy,
       uploadedAt: new Date().toISOString(),
-      note: `${file.name}`,
+      note: file.name,
     });
     e.target.value = "";
   };
 
   const handleAddUrl = () => {
-    if (!url.trim()) return;
+    if (!url.trim()) {
+      return;
+    }
     const svc = detectService(url);
     onAddVersion({
       type: "enlace",
@@ -246,18 +265,28 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
 
       {/* Drag & Drop zone */}
       <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => {
+          setIsDragging(false);
+        }}
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
         className={cn(
           "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
           isDragging
             ? "border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/20"
-            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-700 dark:hover:border-slate-600 dark:hover:bg-slate-800/30"
+            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-700 dark:hover:border-slate-600 dark:hover:bg-slate-800/30",
         )}
       >
-        <Upload className={cn("size-7", isDragging ? "text-blue-500" : "text-slate-300 dark:text-slate-600")} />
+        <Upload
+          className={cn(
+            "size-7",
+            isDragging ? "text-blue-500" : "text-slate-300 dark:text-slate-600",
+          )}
+        />
         <div>
           <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
             {isDragging ? "Suelta el archivo aquí" : "Arrastra un archivo"}
@@ -281,7 +310,9 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
           <input
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+            }}
             placeholder="https://figma.com/proto/..."
             autoFocus
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -289,7 +320,9 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
           <input
             type="text"
             value={urlNote}
-            onChange={(e) => setUrlNote(e.target.value)}
+            onChange={(e) => {
+              setUrlNote(e.target.value);
+            }}
             placeholder="Nota opcional (ej: prototipo mobile actualizado)"
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           />
@@ -304,7 +337,11 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
             </button>
             <button
               type="button"
-              onClick={() => { setShowUrlForm(false); setUrl(""); setUrlNote(""); }}
+              onClick={() => {
+                setShowUrlForm(false);
+                setUrl("");
+                setUrlNote("");
+              }}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
             >
               Cancelar
@@ -314,7 +351,9 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
       ) : (
         <button
           type="button"
-          onClick={() => setShowUrlForm(true)}
+          onClick={() => {
+            setShowUrlForm(true);
+          }}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 py-2.5 text-[12px] text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-600 dark:hover:text-blue-400"
         >
           <Plus className="size-3.5" />
@@ -358,7 +397,7 @@ export function DeliverableDetailView({
               <span
                 className={cn(
                   "flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white",
-                  assignee.avatarColor
+                  assignee.avatarColor,
                 )}
               >
                 {assignee.initials}
@@ -372,7 +411,7 @@ export function DeliverableDetailView({
         <span
           className={cn(
             "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-            DELIVERABLE_STATUS_BADGE[deliverable.status]
+            DELIVERABLE_STATUS_BADGE[deliverable.status],
           )}
         >
           {DELIVERABLE_STATUS_LABELS[deliverable.status]}

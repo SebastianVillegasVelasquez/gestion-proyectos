@@ -27,10 +27,18 @@ export function TaskSlideoverPanel({
 }: TaskSlideoverPanelProps) {
   // Close on Escape
   useEffect(() => {
-    if (!isOpen) {return;}
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") {onClose();} };
+    if (!isOpen) {
+      return;
+    }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
     document.addEventListener("keydown", handler);
-    return () => { document.removeEventListener("keydown", handler); };
+    return () => {
+      document.removeEventListener("keydown", handler);
+    };
   }, [isOpen, onClose]);
 
   return (
@@ -39,7 +47,7 @@ export function TaskSlideoverPanel({
       <div
         className={cn(
           "fixed inset-0 z-30 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300",
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         )}
         onClick={onClose}
         aria-hidden="true"
@@ -54,7 +62,7 @@ export function TaskSlideoverPanel({
           "fixed inset-y-0 right-0 z-40 flex w-full flex-col sm:w-[420px]",
           "border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
           "shadow-2xl transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "translate-x-full"
+          isOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* Header */}
@@ -84,7 +92,13 @@ export function TaskSlideoverPanel({
               nodes={nodes}
               members={members}
               onSave={onSave}
-              onDelete={task ? () => { onDelete(task.id); } : undefined}
+              onDelete={
+                task
+                  ? () => {
+                      onDelete(task.id);
+                    }
+                  : undefined
+              }
               onCancel={onClose}
             />
           )}

@@ -42,25 +42,19 @@ export function ProjectDetailDashboard({
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
       {/* Encabezado del proyecto */}
-      <ProjectHeader
-        project={stored.project}
-        dark={dark}
-        onToggleDark={onToggleDark}
-      />
+      <ProjectHeader project={stored.project} dark={dark} onToggleDark={onToggleDark} />
 
       {/* Barra de acciones */}
       <ActionBar
         onEdit={handleEdit}
-        onAddMembers={() => { setShowAddMember(true); }}
+        onAddMembers={() => {
+          setShowAddMember(true);
+        }}
         onManageTasks={handleManageTasks}
       />
 
       {/* KPI cards */}
-      <StatsGrid
-        project={stored.project}
-        nodes={stored.nodes}
-        members={stored.members}
-      />
+      <StatsGrid project={stored.project} nodes={stored.nodes} members={stored.members} />
 
       {/* Split: estructura (60%) + equipo (40%) */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
@@ -70,7 +64,9 @@ export function ProjectDetailDashboard({
         <div className="flex min-h-64 min-w-0 flex-col lg:flex-[2]">
           <TeamList
             members={stored.members}
-            onRemove={(id) => { removeMember(stored.id, id); }}
+            onRemove={(id) => {
+              removeMember(stored.id, id);
+            }}
           />
         </div>
       </div>
@@ -80,7 +76,9 @@ export function ProjectDetailDashboard({
         <AddMemberModal
           existingCount={stored.members.length}
           onAdd={handleAddMember}
-          onClose={() => { setShowAddMember(false); }}
+          onClose={() => {
+            setShowAddMember(false);
+          }}
         />
       )}
     </div>

@@ -9,9 +9,15 @@ function relativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const h = ms / 3_600_000;
   const d = ms / 86_400_000;
-  if (h < 1) return "Hace unos momentos";
-  if (h < 24) return `Hace ${Math.floor(h)} h`;
-  if (d < 7) return `Hace ${Math.floor(d)} días`;
+  if (h < 1) {
+    return "Hace unos momentos";
+  }
+  if (h < 24) {
+    return `Hace ${Math.floor(h)} h`;
+  }
+  if (d < 7) {
+    return `Hace ${Math.floor(d)} días`;
+  }
   return new Date(iso).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
 }
 
@@ -46,12 +52,15 @@ const COMMENT_TYPE_CONFIG: Record<
 function highlightMentions(text: string, members: WorkspaceMember[]) {
   const parts = text.split(/(@\w[\w\s]*)/g);
   return parts.map((part, i) => {
-    const isMention = members.some(
-      (m) => part.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase())
+    const isMention = members.some((m) =>
+      part.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase()),
     );
     if (isMention && part.startsWith("@")) {
       return (
-        <mark key={i} className="rounded bg-blue-100 px-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+        <mark
+          key={i}
+          className="rounded bg-blue-100 px-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+        >
           {part}
         </mark>
       );
@@ -74,17 +83,19 @@ function CommentItem({ comment, members }: CommentItemProps) {
 
   return (
     <div
-      className={cn(
-        "rounded-xl border p-4",
-        cfg.cardCls
-      )}
+      className={cn("rounded-xl border p-4", cfg.cardCls)}
       style={{
         animation: "tl-enter 0.3s ease-out both",
       }}
     >
       {/* Top: type label */}
       {cfg.label && (
-        <div className={cn("mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider", cfg.labelCls)}>
+        <div
+          className={cn(
+            "mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider",
+            cfg.labelCls,
+          )}
+        >
           <Icon className="size-3.5" />
           {cfg.label}
         </div>
@@ -96,7 +107,7 @@ function CommentItem({ comment, members }: CommentItemProps) {
           <span
             className={cn(
               "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white",
-              author.avatarColor
+              author.avatarColor,
             )}
           >
             {author.initials}
@@ -147,11 +158,15 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
 
   const extractMentions = (content: string): string[] =>
     members
-      .filter((m) => content.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase()))
+      .filter((m) =>
+        content.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase()),
+      )
       .map((m) => m.id);
 
   const handleSend = (type: CommentType) => {
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      return;
+    }
     onSubmit(text.trim(), type, extractMentions(text));
     setText("");
   };
@@ -169,10 +184,12 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
             <button
               key={m.id}
               type="button"
-              onClick={() => addMention(m)}
+              onClick={() => {
+                addMention(m);
+              }}
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white transition-opacity hover:opacity-80",
-                m.avatarColor
+                m.avatarColor,
               )}
               title={m.name}
             >
@@ -186,9 +203,13 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
       <textarea
         ref={textareaRef}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+        }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSend("comentario");
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            handleSend("comentario");
+          }
         }}
         rows={3}
         placeholder="Escribe tu comentario… (Ctrl+Enter para enviar)"
@@ -202,7 +223,9 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
           <>
             <button
               type="button"
-              onClick={() => handleSend("solicitud_cambio")}
+              onClick={() => {
+                handleSend("solicitud_cambio");
+              }}
               disabled={!text.trim()}
               className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
             >
@@ -211,7 +234,9 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
             </button>
             <button
               type="button"
-              onClick={() => handleSend("aprobacion")}
+              onClick={() => {
+                handleSend("aprobacion");
+              }}
               disabled={!text.trim()}
               className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
             >
@@ -225,7 +250,9 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
 
         <button
           type="button"
-          onClick={() => handleSend("comentario")}
+          onClick={() => {
+            handleSend("comentario");
+          }}
           disabled={!text.trim()}
           className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-40 dark:hover:bg-blue-500"
         >

@@ -13,9 +13,7 @@ function NotFound() {
         <AlertTriangle className="size-7 text-amber-500" />
       </div>
       <div>
-        <p className="font-semibold text-slate-800 dark:text-slate-200">
-          Proyecto no encontrado
-        </p>
+        <p className="font-semibold text-slate-800 dark:text-slate-200">Proyecto no encontrado</p>
         <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
           Es posible que haya sido eliminado.
         </p>
@@ -37,9 +35,9 @@ export function TaskDashboardPage() {
   const { projects } = useProjectsContext();
 
   const stored = projects.find((p) => p.id === projectId);
-  if (!stored) {return <NotFound />;}
+  if (!stored) {
+    return <NotFound />;
+  }
 
-  return (
-    <TaskDashboardLayout stored={stored} dark={dark} onToggleDark={toggleDark} />
-  );
+  return <TaskDashboardLayout stored={stored} dark={dark} onToggleDark={toggleDark} />;
 }

@@ -7,14 +7,22 @@ import type { Project } from "../types";
 const MAX_VISIBLE = 3;
 
 function getBarColor(pct: number): string {
-  if (pct >= 70) {return "bg-emerald-500";}
-  if (pct >= 40) {return "bg-amber-400";}
+  if (pct >= 70) {
+    return "bg-emerald-500";
+  }
+  if (pct >= 40) {
+    return "bg-amber-400";
+  }
   return "bg-red-500";
 }
 
 function getTextColor(pct: number): string {
-  if (pct >= 70) {return "text-emerald-600 dark:text-emerald-400";}
-  if (pct >= 40) {return "text-amber-600 dark:text-amber-400";}
+  if (pct >= 70) {
+    return "text-emerald-600 dark:text-emerald-400";
+  }
+  if (pct >= 40) {
+    return "text-amber-600 dark:text-amber-400";
+  }
   return "text-red-600 dark:text-red-400";
 }
 
@@ -24,7 +32,7 @@ function ProjectRow({ project }: { project: Project }) {
       className={cn(
         "flex flex-col gap-1.5 rounded-md border p-2.5 transition-colors duration-150",
         "border-slate-200 bg-slate-50 hover:border-slate-300",
-        "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600"
+        "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
       )}
     >
       {/* Name + tech badge */}
@@ -52,11 +60,19 @@ function ProjectRow({ project }: { project: Project }) {
       <div className="flex items-center gap-2">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
-            className={cn("h-full transition-all duration-300", getBarColor(project.progressPercent))}
+            className={cn(
+              "h-full transition-all duration-300",
+              getBarColor(project.progressPercent),
+            )}
             style={{ width: `${project.progressPercent}%` }}
           />
         </div>
-        <span className={cn("text-[10px] font-medium tabular-nums", getTextColor(project.progressPercent))}>
+        <span
+          className={cn(
+            "text-[10px] font-medium tabular-nums",
+            getTextColor(project.progressPercent),
+          )}
+        >
           {project.progressPercent}%
         </span>
       </div>

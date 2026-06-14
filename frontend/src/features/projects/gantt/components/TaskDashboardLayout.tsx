@@ -32,10 +32,13 @@ const STATUS_ORDER: TaskStatus[] = [
 ];
 
 function StatsStrip({ tasks }: { tasks: Task[] }) {
-  const counts = STATUS_ORDER.reduce<Record<TaskStatus, number>>((acc, s) => {
-    acc[s] = tasks.filter((t) => t.status === s).length;
-    return acc;
-  }, {} as Record<TaskStatus, number>);
+  const counts = STATUS_ORDER.reduce<Record<TaskStatus, number>>(
+    (acc, s) => {
+      acc[s] = tasks.filter((t) => t.status === s).length;
+      return acc;
+    },
+    {} as Record<TaskStatus, number>,
+  );
 
   const nonZero = STATUS_ORDER.filter((s) => counts[s] > 0);
 
@@ -56,7 +59,7 @@ function StatsStrip({ tasks }: { tasks: Task[] }) {
               key={s}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                STATUS_BADGE[s]
+                STATUS_BADGE[s],
               )}
             >
               {TASK_STATUS_LABELS[s]}
@@ -80,7 +83,7 @@ function buildHistoryEntry(
   task: Task,
   prevTask: Task | undefined,
   actorId: string,
-  changeReason: string
+  changeReason: string,
 ): TaskHistory {
   let action: TaskHistory["action"] = "comentario";
   if (!prevTask) {
@@ -111,11 +114,7 @@ interface TaskDashboardLayoutProps {
   onToggleDark: () => void;
 }
 
-export function TaskDashboardLayout({
-  stored,
-  dark,
-  onToggleDark,
-}: TaskDashboardLayoutProps) {
+export function TaskDashboardLayout({ stored, dark, onToggleDark }: TaskDashboardLayoutProps) {
   const navigate = useNavigate();
   const { setTasks, addHistoryEntry } = useProjectsContext();
 
@@ -140,16 +139,16 @@ export function TaskDashboardLayout({
 
   const closePanel = useCallback(() => {
     setPanelOpen(false);
-    setTimeout(() => { setEditingTask(null); }, 320);
+    setTimeout(() => {
+      setEditingTask(null);
+    }, 320);
   }, []);
 
   const handleSaveTask = useCallback(
     (task: Task, changeReason: string) => {
       const prevTask = tasks.find((t) => t.id === task.id);
       const isNew = !prevTask;
-      const next = isNew
-        ? [...tasks, task]
-        : tasks.map((t) => (t.id === task.id ? task : t));
+      const next = isNew ? [...tasks, task] : tasks.map((t) => (t.id === task.id ? task : t));
 
       // Determine if this mutation is worth recording
       const shouldLog =
@@ -168,7 +167,7 @@ export function TaskDashboardLayout({
       setTasks(stored.id, next);
       closePanel();
     },
-    [tasks, stored.id, stored.members, setTasks, addHistoryEntry, closePanel]
+    [tasks, stored.id, stored.members, setTasks, addHistoryEntry, closePanel],
   );
 
   const handleDeleteTask = useCallback(
@@ -178,7 +177,7 @@ export function TaskDashboardLayout({
       setTasks(stored.id, next);
       closePanel();
     },
-    [tasks, stored.id, setTasks, closePanel]
+    [tasks, stored.id, setTasks, closePanel],
   );
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -239,12 +238,14 @@ export function TaskDashboardLayout({
           <button
             key={id}
             type="button"
-            onClick={() => { setActiveTab(id); }}
+            onClick={() => {
+              setActiveTab(id);
+            }}
             className={cn(
               "flex items-center gap-1.5 rounded-t-md px-3 py-2.5 text-[13px] font-medium transition-colors",
               activeTab === id
                 ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
             )}
           >
             <Icon className="size-3.5" />

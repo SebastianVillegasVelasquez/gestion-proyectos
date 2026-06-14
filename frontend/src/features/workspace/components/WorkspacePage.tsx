@@ -7,17 +7,11 @@ import type {
   WorkspaceGroup,
   Deliverable,
   DeliverableVersion,
-  FeedbackComment,
   CommentType,
   DeliverableStatus,
   GroupTask,
 } from "../types";
-import {
-  GROUP_TASK_STATUS_LABELS,
-  GROUP_TASK_PRIORITY_COLOR,
-  DELIVERABLE_STATUS_BADGE,
-  DELIVERABLE_STATUS_LABELS,
-} from "../types";
+import { GROUP_TASK_STATUS_LABELS, GROUP_TASK_PRIORITY_COLOR } from "../types";
 import { MOCK_GROUPS } from "../mockData";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { DeliverableList } from "./DeliverableList";
@@ -54,7 +48,7 @@ function KanbanBoard({ group }: { group: WorkspaceGroup }) {
             key={col}
             className={cn(
               "flex h-full w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-t-4 border-slate-200 bg-white dark:border-slate-800",
-              KANBAN_COL_CLS[col]
+              KANBAN_COL_CLS[col],
             )}
           >
             <div className="flex items-center justify-between px-4 py-3">
@@ -85,7 +79,7 @@ function KanbanBoard({ group }: { group: WorkspaceGroup }) {
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                          GROUP_TASK_PRIORITY_COLOR[task.priority]
+                          GROUP_TASK_PRIORITY_COLOR[task.priority],
                         )}
                       >
                         {task.priority}
@@ -94,7 +88,7 @@ function KanbanBoard({ group }: { group: WorkspaceGroup }) {
                         <span
                           className={cn(
                             "ml-auto flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold text-white",
-                            assignee.avatarColor
+                            assignee.avatarColor,
                           )}
                           title={assignee.name}
                         >
@@ -153,7 +147,7 @@ function GroupSettings({ group }: { group: WorkspaceGroup }) {
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white",
-                  m.avatarColor
+                  m.avatarColor,
                 )}
               >
                 {m.initials}
@@ -192,7 +186,9 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      return;
+    }
     onSave({
       id: crypto.randomUUID(),
       title: title.trim(),
@@ -209,7 +205,11 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
             Nueva tarea de grupo
           </h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -222,7 +222,9 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+              }}
               placeholder="Ej: Revisar guión del módulo 3"
               autoFocus
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -234,11 +236,15 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
             </label>
             <select
               value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
+              onChange={(e) => {
+                setAssigneeId(e.target.value);
+              }}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               {group.members.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
               ))}
             </select>
           </div>
@@ -251,12 +257,14 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setPriority(p)}
+                  onClick={() => {
+                    setPriority(p);
+                  }}
                   className={cn(
                     "flex-1 rounded-lg border px-3 py-2 text-[12px] font-medium capitalize transition-colors",
                     priority === p
                       ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/30 dark:text-blue-400"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400",
                   )}
                 >
                   {p}
@@ -294,11 +302,10 @@ function NoDeliverableSelected() {
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
         <Package className="size-6 text-slate-400 dark:text-slate-500" />
       </div>
-      <p className="font-semibold text-slate-600 dark:text-slate-300">
-        Selecciona un entregable
-      </p>
+      <p className="font-semibold text-slate-600 dark:text-slate-300">Selecciona un entregable</p>
       <p className="max-w-xs text-sm text-slate-400 dark:text-slate-500">
-        Haz clic en un entregable de la izquierda para ver sus versiones y el hilo de retroalimentación.
+        Haz clic en un entregable de la izquierda para ver sus versiones y el hilo de
+        retroalimentación.
       </p>
     </div>
   );
@@ -312,7 +319,7 @@ export function WorkspacePage() {
   const [groups, setGroups] = useState<WorkspaceGroup[]>(MOCK_GROUPS);
   const [selectedGroupId, setSelectedGroupId] = useState(MOCK_GROUPS[0].id);
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(
-    MOCK_GROUPS[0].deliverables[0]?.id ?? null
+    MOCK_GROUPS[0].deliverables[0]?.id ?? null,
   );
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("entregables");
   const [showNewTask, setShowNewTask] = useState(false);
@@ -320,19 +327,16 @@ export function WorkspacePage() {
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)!;
   const currentUserId = selectedGroup.leaderId; // simulate current user = leader
 
-  const selectedDeliverable = selectedGroup.deliverables.find(
-    (d) => d.id === selectedDeliverableId
-  ) ?? null;
+  const selectedDeliverable =
+    selectedGroup.deliverables.find((d) => d.id === selectedDeliverableId) ?? null;
 
   // ── mutations ─────────────────────────────────────────────────────────
 
   const updateGroup = useCallback(
     (updater: (g: WorkspaceGroup) => WorkspaceGroup) => {
-      setGroups((prev) =>
-        prev.map((g) => (g.id === selectedGroupId ? updater(g) : g))
-      );
+      setGroups((prev) => prev.map((g) => (g.id === selectedGroupId ? updater(g) : g)));
     },
-    [selectedGroupId]
+    [selectedGroupId],
   );
 
   const updateDeliverable = useCallback(
@@ -342,15 +346,17 @@ export function WorkspacePage() {
         deliverables: g.deliverables.map((d) => (d.id === delId ? updater(d) : d)),
       }));
     },
-    [updateGroup]
+    [updateGroup],
   );
 
   const handleAddVersion = useCallback(
     (version: Omit<DeliverableVersion, "id" | "versionNumber">) => {
-      if (!selectedDeliverableId) return;
+      if (!selectedDeliverableId) {
+        return;
+      }
       updateDeliverable(selectedDeliverableId, (d) => ({
         ...d,
-        status: "en_revision" as DeliverableStatus,
+        status: "en_revision",
         versions: [
           ...d.versions,
           { ...version, id: crypto.randomUUID(), versionNumber: d.versions.length + 1 },
@@ -358,12 +364,14 @@ export function WorkspacePage() {
         updatedAt: new Date().toISOString(),
       }));
     },
-    [selectedDeliverableId, updateDeliverable]
+    [selectedDeliverableId, updateDeliverable],
   );
 
   const handleAddComment = useCallback(
     (content: string, type: CommentType, mentions: string[]) => {
-      if (!selectedDeliverableId) return;
+      if (!selectedDeliverableId) {
+        return;
+      }
       const statusChange: Partial<Record<CommentType, DeliverableStatus>> = {
         aprobacion: "aprobado",
         solicitud_cambio: "cambios_solicitados",
@@ -385,7 +393,7 @@ export function WorkspacePage() {
         updatedAt: new Date().toISOString(),
       }));
     },
-    [selectedDeliverableId, currentUserId, updateDeliverable]
+    [selectedDeliverableId, currentUserId, updateDeliverable],
   );
 
   const handleAddTask = useCallback(
@@ -393,7 +401,7 @@ export function WorkspacePage() {
       updateGroup((g) => ({ ...g, tasks: [...g.tasks, task] }));
       setShowNewTask(false);
     },
-    [updateGroup]
+    [updateGroup],
   );
 
   const handleSwitchGroup = (id: string) => {
@@ -413,18 +421,20 @@ export function WorkspacePage() {
           <button
             key={g.id}
             type="button"
-            onClick={() => handleSwitchGroup(g.id)}
+            onClick={() => {
+              handleSwitchGroup(g.id);
+            }}
             className={cn(
               "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-md px-4 py-3 text-[13px] font-medium transition-colors",
               g.id === selectedGroupId
                 ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
             )}
           >
             <span
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold text-white",
-                g.members.find((m) => m.id === g.leaderId)?.avatarColor ?? "bg-slate-400"
+                g.members.find((m) => m.id === g.leaderId)?.avatarColor ?? "bg-slate-400",
               )}
             >
               {g.members.find((m) => m.id === g.leaderId)?.initials ?? "?"}
@@ -437,7 +447,12 @@ export function WorkspacePage() {
       {/* Workspace area */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900">
         {/* Header */}
-        <WorkspaceHeader group={selectedGroup} onNewTask={() => setShowNewTask(true)} />
+        <WorkspaceHeader
+          group={selectedGroup}
+          onNewTask={() => {
+            setShowNewTask(true);
+          }}
+        />
 
         {/* Tab bar */}
         <div className="flex shrink-0 items-end gap-1 border-b border-slate-200 bg-white px-5 dark:border-slate-800 dark:bg-slate-900">
@@ -445,12 +460,14 @@ export function WorkspacePage() {
             <button
               key={id}
               type="button"
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+              }}
               className={cn(
                 "flex items-center gap-1.5 rounded-t-md px-3 py-2.5 text-[13px] font-medium transition-colors",
                 activeTab === id
                   ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
               <Icon className="size-3.5" />
@@ -526,7 +543,9 @@ export function WorkspacePage() {
         <NewTaskModal
           group={selectedGroup}
           onSave={handleAddTask}
-          onClose={() => setShowNewTask(false)}
+          onClose={() => {
+            setShowNewTask(false);
+          }}
         />
       )}
     </div>

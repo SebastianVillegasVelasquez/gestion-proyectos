@@ -36,9 +36,9 @@ export function ProjectDetailPage() {
 
   const stored = projects.find((p) => p.id === projectId);
 
-  if (!stored) {return <NotFound />;}
+  if (!stored) {
+    return <NotFound />;
+  }
 
-  return (
-    <ProjectDetailDashboard stored={stored} dark={dark} onToggleDark={toggleDark} />
-  );
+  return <ProjectDetailDashboard stored={stored} dark={dark} onToggleDark={toggleDark} />;
 }

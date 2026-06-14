@@ -29,7 +29,7 @@ function MemberRow({
       <div
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white",
-          member.avatarColor
+          member.avatarColor,
         )}
         aria-hidden="true"
       >
@@ -47,7 +47,7 @@ function MemberRow({
       <span
         className={cn(
           "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-          ROLE_BADGE[member.role]
+          ROLE_BADGE[member.role],
         )}
       >
         {PROJECT_ROLE_LABELS[member.role]}
@@ -57,7 +57,9 @@ function MemberRow({
       {onRemove && (
         <button
           type="button"
-          onClick={() => { onRemove(member.id); }}
+          onClick={() => {
+            onRemove(member.id);
+          }}
           title={`Eliminar a ${member.name}`}
           aria-label={`Eliminar a ${member.name}`}
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-300 opacity-0 transition-all duration-150 hover:bg-red-100 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
@@ -99,9 +101,7 @@ export function TeamList({ members, onRemove }: TeamListProps) {
         {groups.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
             <Users className="size-8 text-slate-300 dark:text-slate-700" />
-            <p className="text-[12px] text-slate-400 dark:text-slate-500">
-              Sin miembros asignados
-            </p>
+            <p className="text-[12px] text-slate-400 dark:text-slate-500">Sin miembros asignados</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
