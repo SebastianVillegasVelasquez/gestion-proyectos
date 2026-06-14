@@ -16,6 +16,10 @@ from app.modules.project.infrastructure.repository import (
     ProjectNodeRepository,
     ProjectMemberRepository,
 )
+from app.modules.dashboard.infrastructure.repository import (
+    DashboardRepository,
+    SqlAlchemyDashboardRepository,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
@@ -42,6 +46,12 @@ def project_members_repo_dependency(
 
 def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:
     return TaskRepository(db)
+
+
+def dashboard_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> DashboardRepository:
+    return SqlAlchemyDashboardRepository(db)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

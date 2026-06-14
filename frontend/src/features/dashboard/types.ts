@@ -21,6 +21,16 @@ export interface KpiCard {
   accentColor: AccentColor;
 }
 
+// ─── Dashboard summary (API contract) ─────────────────────────────────────────
+
+export interface DashboardSummary {
+  active_projects: number;
+  total_tasks: number;
+  completed_tasks: number;
+  in_review_tasks: number;
+  overdue_tasks: number;
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export type TaskStatus = "pending" | "in-progress" | "completed";

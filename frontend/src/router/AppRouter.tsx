@@ -7,19 +7,24 @@ import {AllProjectsPage} from "@/features/projects/components/AllProjectsPage.ts
 import {ProjectDetailPage} from "@/features/projects/components/ProjectDetailPage.tsx";
 import {TaskDashboardPage} from "@/features/projects/gantt/components/TaskDashboardPage.tsx";
 import {WorkspacePage} from "@/features/workspace/components/WorkspacePage.tsx";
+import {ProtectedRoute} from "@/router/ProtectedRoute.tsx";
 
 export const AppRouter = () => (
     <Routes>
         {/* Rutas públicas */}
-        {<Route path={"/login"} element={<LoginPage/>}/>}
+        <Route path="/login" element={<LoginPage/>}/>
 
-        <Route element={<AppLayout/>}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<AllProjectsPage />} />
-            <Route path="/projects/builder" element={<ProjectBuilderPage />} />
-            <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-            <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-            <Route path="/workspace" element={<WorkspacePage />} />
+        {/* Rutas protegidas — requieren sesión */}
+        <Route element={<ProtectedRoute/>}>
+            <Route element={<AppLayout/>}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/projects" element={<AllProjectsPage />} />
+                <Route path="/projects/builder" element={<ProjectBuilderPage />} />
+                <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+                <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
+                <Route path="/workspace" element={<WorkspacePage />} />
+            </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace/>}/>

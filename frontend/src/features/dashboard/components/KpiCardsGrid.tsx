@@ -29,11 +29,39 @@ function KpiCardItem({ card }: { card: KpiCard }) {
   );
 }
 
-interface KpiCardsGridProps {
-  cards: KpiCard[];
+function KpiCardSkeleton() {
+  return (
+    <Card className="border border-b-2 border-slate-200 p-5 dark:border-slate-800">
+      <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+      <div className="mt-3 h-9 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+      <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+    </Card>
+  );
 }
 
-export function KpiCardsGrid({ cards }: KpiCardsGridProps) {
+interface KpiCardsGridProps {
+  cards: KpiCard[];
+  isLoading?: boolean;
+  isError?: boolean;
+}
+
+export function KpiCardsGrid({ cards, isLoading, isError }: KpiCardsGridProps) {
+  if (isError) {
+    return (
+      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        No se pudieron cargar los indicadores. Intenta recargar la página.
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <KpiCardSkeleton key={i} />)}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (

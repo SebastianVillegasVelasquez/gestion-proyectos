@@ -1,6 +1,7 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {type FormEvent, useEffect, useMemo, useRef, useState} from "react";
+import {useLocation} from "react-router-dom";
 import {type LoginRequest, type RegisterRequest, Role} from "@/features/auth/types";
-import {type FieldName, passwordStrength, validateField} from "@/features/auth/services/security-services";
+import {type FieldName, passwordStrength, validateField} from "@/features/auth/utils/security.utils.ts";
 import {useLogin, useRegister} from "@/features/auth/hooks/use-auth";
 import {getErrorMessage} from "@/utils/get-error-message";
 import {AuthPanel} from "./AuthPanel";
@@ -12,12 +13,18 @@ type Errors = Partial<Record<FieldName | "accepted", string>>;
 export default function LoginPage() {
     const [mode, setMode] = useState<Mode>("login");
     const [animating, setAnimating] = useState(false);
-    const [dark, setDark] = useState(false);
-    const [reduceMotion, setReduceMotion] = useState(false);
+    const [dark, setDark] = useState(() => {
+        const stored = localStorage.getItem("obj-theme");
+        if (stored) {return stored === "dark";}
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    });
+    const [reduceMotion] = useState(() =>
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
     const [loginForm, setLoginForm] = useState<LoginRequest>({email: "", password: ""});
 
     const [registerForm, setRegisterForm] = useState<RegisterRequest>({
-        name: "", last_name: "", email: "", password: "", role: Role.COLLABORATOR,
+        name: "", last_name: "", email: "", password: "", role: Role.USER,
     });
     const [showPassword, setShowPassword] = useState(false);
     const [capsLock, setCapsLock] = useState(false);
@@ -28,20 +35,17 @@ export default function LoginPage() {
     const firstFieldRef = useRef<HTMLInputElement>(null);
     const isRegister = mode === "register";
 
-    const loginMutation = useLogin();
-    const registerMutation = useRegister();
+    const location = useLocation();
+    const fromState = location.state as { from?: { pathname?: string } } | null;
+    const redirectTo = fromState?.from?.pathname ?? "/dashboard";
+
+    const loginMutation = useLogin(redirectTo);
+    const registerMutation = useRegister(redirectTo);
 
     const isPending = loginMutation.isPending || registerMutation.isPending;
     const isSuccess = isRegister ? registerMutation.isSuccess : loginMutation.isSuccess;
     const activeError = isRegister ? registerMutation.error : loginMutation.error;
     const formError = activeError ? getErrorMessage(activeError, "Ocurrió un error, intenta de nuevo.") : null;
-
-    useEffect(() => {
-        const stored = localStorage.getItem("obj-theme");
-        if (stored) {setDark(stored === "dark");}
-        else {setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);}
-        setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    }, []);
 
     useEffect((): void => {
         localStorage.setItem("obj-theme", dark ? "dark" : "light");
@@ -99,7 +103,8 @@ export default function LoginPage() {
         return Object.keys(next).length === 0;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!validateAll()) {return;}
         if (isRegister) {registerMutation.mutate(registerForm);}
@@ -277,7 +282,7 @@ export default function LoginPage() {
                                             handleBlur("password");
                                             setCapsLock(false);
                                         }}
-                                        onKeyUp={(e) => { setCapsLock(e.getModifierState?.("CapsLock") ?? false); }}
+                                        onKeyUp={(e) => { setCapsLock(e.getModifierState("CapsLock")); }}
                                         aria-invalid={touched.password && Boolean(errors.password)}
                                         aria-describedby={errors.password ? "password-error" : undefined}
                                         className={fieldClasses(Boolean(touched.password && errors.password)).replace("px-4", "pl-10 pr-11")}
