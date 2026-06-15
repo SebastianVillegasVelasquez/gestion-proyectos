@@ -15,6 +15,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { Role } from "@/features/auth/types";
+import { initialsFromName } from "@/features/dashboard/utils/greeting";
+
+const ROLE_LABELS: Record<Role, string> = {
+  [Role.SUPER_ADMIN]: "Super administrador",
+  [Role.ADMIN]: "Administrador",
+  [Role.USER]: "Usuario",
+};
 
 interface NavItem {
   id: string;
@@ -91,6 +100,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 
@@ -192,13 +202,15 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
       <div className="border-t border-slate-200 px-4 py-4 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-sm font-semibold text-blue-600 dark:bg-blue-600/20 dark:text-blue-300">
-            RS
+            {user ? initialsFromName(user.name) : "?"}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-              Rodrigo Salinas
+              {user?.name ?? "Invitado"}
             </p>
-            <p className="truncate text-xs text-slate-400 dark:text-slate-500">Administrador</p>
+            <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+              {user ? ROLE_LABELS[user.role] : ""}
+            </p>
           </div>
           {/* Dark toggle — visible only on desktop (mobile has one in the topbar) */}
           <button

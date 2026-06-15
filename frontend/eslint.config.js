@@ -110,6 +110,8 @@ export default defineConfig([
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // Referenciar métodos (p. ej. vi.mocked(axios.post)) es normal en tests.
+      '@typescript-eslint/unbound-method': 'off',
       'no-console': 'off',
     },
   },

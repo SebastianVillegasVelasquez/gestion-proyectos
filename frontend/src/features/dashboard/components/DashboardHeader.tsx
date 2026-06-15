@@ -1,5 +1,6 @@
 import { Moon, Sun } from "lucide-react";
 import type { DashboardHeaderData } from "../types";
+import { greetingForHour } from "../utils/greeting";
 
 interface DashboardHeaderProps extends DashboardHeaderData {
   dark: boolean;
@@ -15,13 +16,14 @@ export function DashboardHeader({
   onToggleDark,
 }: DashboardHeaderProps) {
   const progressPercent = Math.round((tasksToday / tasksTodayTotal) * 100);
+  const greeting = greetingForHour(new Date().getHours());
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-4">
       {/* Greeting */}
       <div className="min-w-0">
         <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
-          Buen día, <span className="text-blue-600 dark:text-blue-400">{name}</span>
+          {greeting}, <span className="text-blue-600 dark:text-blue-400">{name}</span>
         </h1>
         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{date}</p>
       </div>

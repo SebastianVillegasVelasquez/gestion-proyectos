@@ -7,6 +7,7 @@ import {
   type Session,
 } from "@/features/auth/utils/session.utils";
 import { decodeJwt, isTokenExpired } from "@/features/auth/utils/jwt.utils";
+import { SESSION_REFRESHED_EVENT } from "@/features/auth/api/refresh";
 
 export { AuthContext } from "./auth-context";
 
@@ -29,9 +30,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(readSession());
       }
     };
+    // El interceptor renueva el token de forma silenciosa (misma pestaña);
+    // re-leemos la sesión para reiniciar el temporizador de expiración.
+    const onRefreshed = () => {
+      setSession(readSession());
+    };
     window.addEventListener("storage", onStorage);
+    window.addEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
     return () => {
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
     };
   }, []);
 

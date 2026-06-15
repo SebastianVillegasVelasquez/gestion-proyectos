@@ -9,15 +9,30 @@ import { CommentsPanel } from "./CommentsPanel";
 import { useDashboardSummary } from "../hooks/use-dashboard-summary";
 import { buildKpiCards } from "../utils/build-kpi-cards";
 import { mockHeaderData, mockTasks, mockProjects, mockDeadlines, mockComments } from "../mockData";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+
+const TODAY_FORMATTER = new Intl.DateTimeFormat("es-CO", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
 
 export function DashboardPage() {
   const { dark, toggleDark } = useOutletContext<AppOutletContext>();
+  const { user } = useAuth();
   const summaryQuery = useDashboardSummary();
   const kpiCards = summaryQuery.data ? buildKpiCards(summaryQuery.data) : [];
 
+  const headerData = {
+    ...mockHeaderData,
+    name: user?.name ?? "Usuario",
+    date: TODAY_FORMATTER.format(new Date()),
+  };
+
   return (
     <div className="flex flex-col gap-3 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
-      <DashboardHeader {...mockHeaderData} dark={dark} onToggleDark={toggleDark} />
+      <DashboardHeader {...headerData} dark={dark} onToggleDark={toggleDark} />
 
       <KpiCardsGrid
         cards={kpiCards}

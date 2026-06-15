@@ -13,12 +13,14 @@ from app.modules.identity.application.use_cases import (
     DeleteUserUseCase,
     GetUserByIdUseCase,
     LoginUseCase,
+    RefreshTokenUseCase,
     UpdateUserUseCase,
 )
 from app.modules.identity.infrastructure.repository import UserRepository
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     LoginRequest,
+    RefreshRequest,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
@@ -41,6 +43,14 @@ async def login(
     repo: UserRepository = Depends(user_repo_dependency),
 ):
     return await LoginUseCase(repo).execute(data.email, data.password)
+
+
+@router.post("/auth/refresh", response_model=TokenResponse)
+async def refresh(
+    data: RefreshRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+):
+    return await RefreshTokenUseCase(repo).execute(data.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)

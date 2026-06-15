@@ -1,5 +1,6 @@
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 import { clearSession } from "@/features/auth/utils/session.utils";
+import { refreshAccessToken } from "./refresh";
 
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -17,11 +18,27 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const original = error.config as
+      | (InternalAxiosRequestConfig & { _retry?: boolean })
+      | undefined;
+    const status = error.response?.status as number | undefined;
+    const url = original?.url ?? "";
+    const isAuthEndpoint = url.includes("/auth/refresh") || url.includes("/auth/login");
+
+    // Token de acceso vencido: intentamos renovarlo con el refresh token y
+    // reintentamos la petición original una sola vez.
+    if (status === 401 && original && !original._retry && !isAuthEndpoint) {
+      original._retry = true;
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return http(original);
+      }
       clearSession();
       window.location.href = "/login";
     }
+
     return Promise.reject(error);
   },
 );

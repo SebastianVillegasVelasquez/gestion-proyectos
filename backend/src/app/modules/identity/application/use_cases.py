@@ -1,6 +1,13 @@
 from uuid import UUID
 
-from app.core.security import create_access_token, create_refresh_token, verify_password
+from jose import JWTError
+
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_password,
+)
 from app.modules.identity.domain.services import UserService
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
@@ -10,6 +17,21 @@ from app.modules.identity.presentation.schemas import (
 )
 from app.modules.identity.infrastructure.repository import UserRepository
 from app.shared.exceptions import ConflictError, UnauthorizedError
+
+
+def _token_response(user) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.role.value),
+        refresh_token=create_refresh_token(user.id),
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            last_name=user.last_name,
+            role=user.role,
+            is_active=user.is_active,
+        ),
+    )
 
 
 class CreateUserUseCase:
@@ -39,18 +61,27 @@ class LoginUseCase:
         if not user.is_active:
             raise UnauthorizedError("Usuario inactivo")
 
-        return TokenResponse(
-            access_token=create_access_token(user.id, user.role.value),
-            refresh_token=create_refresh_token(user.id),
-            user=UserResponse(
-                id=user.id,
-                email=user.email,
-                name=user.name,
-                last_name=user.last_name,
-                role=user.role,
-                is_active=user.is_active,
-            ),
-        )
+        return _token_response(user)
+
+
+class RefreshTokenUseCase:
+    def __init__(self, user_repo: UserRepository):
+        self._repo = user_repo
+
+    async def execute(self, refresh_token: str) -> TokenResponse:
+        try:
+            payload = decode_token(refresh_token)
+        except JWTError:
+            raise UnauthorizedError("Token de refresco inválido o expirado")
+
+        if payload.get("type") != "refresh":
+            raise UnauthorizedError("Token de refresco inválido")
+
+        user = await self._repo.get_by_id(UUID(payload["sub"]))
+        if not user or not user.is_active:
+            raise UnauthorizedError("Usuario no encontrado o inactivo")
+
+        return _token_response(user)
 
 
 class GetUserByIdUseCase:
