@@ -3,12 +3,17 @@ from app.modules.identity.infrastructure.models import User
 
 # ── Project models ────────────────────────────────────────────────────────────
 from app.modules.project.infrastructure.models import (
+    Phase,
     Project,
     ProjectMember,
     ProjectNode,
 )
 
-from app.modules.tasks.infrastructure.models import Task, TaskHistory
+from app.modules.tasks.infrastructure.models import (
+    Task,
+    TaskDependency,
+    TaskHistory,
+)
 
 __all__ = [
     # Identity
@@ -17,7 +22,9 @@ __all__ = [
     "Project",
     "ProjectMember",
     "ProjectNode",
+    "Phase",
     # Task
     "Task",
     "TaskHistory",
+    "TaskDependency",
 ]

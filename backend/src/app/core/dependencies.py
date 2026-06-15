@@ -12,6 +12,7 @@ from app.modules.identity.infrastructure.repository import UserRepository
 from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.repository import (
+    PhaseRepository,
     ProjectRepository,
     ProjectNodeRepository,
     ProjectMemberRepository,
@@ -42,6 +43,10 @@ def project_members_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> ProjectMemberRepository:
     return ProjectMemberRepository(db)
+
+
+def phase_repo_dependency(db: AsyncSession = Depends(get_db)) -> PhaseRepository:
+    return PhaseRepository(db)
 
 
 def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:

@@ -5,15 +5,23 @@ from fastapi import HTTPException
 from mypy.nodes import Union
 
 from app.modules.project.domain.services import (
+    PhaseService,
     ProjectService,
     ProjectNodeService,
     ProjectMemberService,
 )
-from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.modules.project.infrastructure.repository import (
+    PhaseRepository,
+    ProjectMemberRepository,
+)
 from app.modules.project.presentation.schemas import (
+    CreatePhaseRequest,
     CreateProjectRequest,
     CreateProjectNodeRequest,
+    PhaseResponse,
     ProjectResponse,
+    UpdatePhaseRequest,
+    UpdateProjectNodeRequest,
     UpdateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
@@ -68,8 +76,13 @@ class DeleteProjectUseCase:
 
 
 class CreateProjectNodeUseCase:
-    def __init__(self, project_repo: "Repository", node_repo: "Repository"):
-        self.service = ProjectNodeService(node_repo)
+    def __init__(
+        self,
+        project_repo: "Repository",
+        node_repo: "Repository",
+        phase_repo: "PhaseRepository | None" = None,
+    ):
+        self.service = ProjectNodeService(node_repo, phase_repo=phase_repo)
         self.project_service = ProjectService(project_repo)
 
     async def execute(
@@ -89,6 +102,70 @@ class CreateProjectNodeUseCase:
             raise HTTPException(status_code=404, detail="El proyecto no existe")
 
         return await self.service.create_project_node(data)
+
+
+class GetProjectNodesUseCase:
+    def __init__(self, project_repo: "Repository", node_repo: "Repository"):
+        self.service = ProjectNodeService(node_repo)
+        self.project_service = ProjectService(project_repo)
+
+    async def execute(self, project_id: UUID):
+        if not await self.project_service.project_exists(project_id):
+            raise HTTPException(status_code=404, detail="El proyecto no existe")
+        return await self.service.get_nodes_by_project(project_id)
+
+
+class UpdateProjectNodeUseCase:
+    def __init__(
+        self,
+        node_repo: "Repository",
+        phase_repo: "PhaseRepository | None" = None,
+    ):
+        self.service = ProjectNodeService(node_repo, phase_repo=phase_repo)
+
+    async def execute(
+        self, project_id: UUID, node_id: UUID, data: "UpdateProjectNodeRequest"
+    ):
+        return await self.service.update_node(project_id, node_id, data)
+
+
+# Phase use cases
+
+
+class CreatePhaseUseCase:
+    def __init__(self, phase_repo: "PhaseRepository", project_repo: "Repository"):
+        self.service = PhaseService(phase_repo=phase_repo, project_repo=project_repo)
+
+    async def execute(
+        self, project_id: UUID, data: "CreatePhaseRequest"
+    ) -> "PhaseResponse":
+        return await self.service.create_phase(project_id, data)
+
+
+class GetPhasesUseCase:
+    def __init__(self, phase_repo: "PhaseRepository", project_repo: "Repository"):
+        self.service = PhaseService(phase_repo=phase_repo, project_repo=project_repo)
+
+    async def execute(self, project_id: UUID) -> List["PhaseResponse"]:
+        return await self.service.get_phases(project_id)
+
+
+class UpdatePhaseUseCase:
+    def __init__(self, phase_repo: "PhaseRepository", project_repo: "Repository"):
+        self.service = PhaseService(phase_repo=phase_repo, project_repo=project_repo)
+
+    async def execute(
+        self, project_id: UUID, phase_id: UUID, data: "UpdatePhaseRequest"
+    ) -> "PhaseResponse":
+        return await self.service.update_phase(project_id, phase_id, data)
+
+
+class DeletePhaseUseCase:
+    def __init__(self, phase_repo: "PhaseRepository", project_repo: "Repository"):
+        self.service = PhaseService(phase_repo=phase_repo, project_repo=project_repo)
+
+    async def execute(self, project_id: UUID, phase_id: UUID) -> None:
+        await self.service.delete_phase(project_id, phase_id)
 
 
 # ProjectMember use cases

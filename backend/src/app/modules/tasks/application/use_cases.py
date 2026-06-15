@@ -6,12 +6,18 @@ from starlette import status
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.models import ProjectNode, Project
-from app.modules.tasks.domain.services import TaskService
+from app.modules.tasks.domain.services import (
+    TaskDependencyService,
+    TaskService,
+    TaskStatusService,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
+    TaskDependencyResponse,
     TaskResponse,
     UpdateTaskRequest,
+    UpdateTaskStatusRequest,
 )
 from app.shared.base_repository import Repository
 
@@ -231,3 +237,31 @@ class DeleteTaskUseCase:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="La tarea no existe"
             )
+
+
+class AddTaskDependencyUseCase:
+    def __init__(self, task_repo: "TaskRepository"):
+        self.service = TaskDependencyService(task_repo)
+
+    async def execute(
+        self, task_id: UUID, depends_on_id: UUID
+    ) -> "TaskDependencyResponse":
+        return await self.service.add_dependency(task_id, depends_on_id)
+
+
+class GetTaskDependenciesUseCase:
+    def __init__(self, task_repo: "TaskRepository"):
+        self.service = TaskDependencyService(task_repo)
+
+    async def execute(self, task_id: UUID) -> list["TaskDependencyResponse"]:
+        return await self.service.list_dependencies(task_id)
+
+
+class ChangeTaskStatusUseCase:
+    def __init__(self, task_repo, node_repo, phase_repo):
+        self.service = TaskStatusService(task_repo, node_repo, phase_repo)
+
+    async def execute(
+        self, task_id: UUID, data: "UpdateTaskStatusRequest"
+    ) -> "TaskResponse":
+        return await self.service.change_status(task_id, data)

@@ -24,6 +24,11 @@ class TaskBase(BaseModelConfig):
 
 
 class CreateTaskRequest(TaskBase):
+    # node_id lo fija la ruta a partir del path param.
+    node_id: Optional[UUID] = None
+    # Subtarea opcional: el coordinador crea hijas apuntando a la tarea global.
+    parent_task_id: Optional[UUID] = None
+
     @model_validator(mode="after")
     def validate_task_dates(self) -> "CreateTaskRequest":
         # 1. Validar orden cronológico de la tarea
@@ -41,10 +46,22 @@ class CreateTaskRequest(TaskBase):
 
 class TaskResponse(TaskBase):
     id: UUID
+    node_id: Optional[UUID] = None
+    parent_task_id: Optional[UUID] = None
     status: TaskStatus
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
+
+
+class CreateTaskDependencyRequest(BaseModelConfig):
+    depends_on_id: UUID
+
+
+class TaskDependencyResponse(BaseModelConfig):
+    id: UUID
+    task_id: UUID
+    depends_on_id: UUID
 
 
 class UpdateTaskStatusRequest(BaseModelConfig):

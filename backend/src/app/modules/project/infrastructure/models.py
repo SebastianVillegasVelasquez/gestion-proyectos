@@ -7,6 +7,7 @@ from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Enum, UUID
 from sqlalchemy import (
     Float,
+    Integer,
     String,
     Text,
     ForeignKey,
@@ -48,12 +49,30 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         cascade="all, delete-orphan",
     )
 
+    # Fases ordenadas del proyecto. Delimitan qué tareas pueden empezar antes
+    # que otras (la fase N+1 no arranca hasta cerrar la fase N).
+    phases: Mapped[list["Phase"]] = relationship(
+        "Phase",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="Phase.order_index",
+    )
 
-class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
-    __tablename__ = "project_nodes"
 
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    node_type: Mapped[NodeType] = mapped_column(Enum(NodeType), nullable=False)
+class Phase(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    __tablename__ = "phases"
+
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+
+    # Posición de la fase dentro del proyecto (0-based). Define el orden de bloqueo.
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # Parametrización opcional por duración (en días) en lugar de fechas fijas.
+    duration_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Fechas opcionales y editables.
+    start_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -61,11 +80,41 @@ class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
+    project: Mapped[Project] = relationship("Project", back_populates="phases")
+
+
+class ProjectNode(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    __tablename__ = "project_nodes"
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    node_type: Mapped[NodeType] = mapped_column(Enum(NodeType), nullable=False)
+
+    # Etiqueta flexible que el admin puede definir para el nivel del nodo.
+    # Permite mostrar "Corte" o "Unidad" en lugar del nombre del enum (MODULO).
+    type_label: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id"),
+        nullable=False,
+    )
+
+    # Fase a la que pertenece la jerarquía. La fijan los nodos raíz; los hijos
+    # la heredan a través del parent. Opcional para compatibilidad hacia atrás.
+    phase_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("phases.id"),
+        nullable=True,
+    )
+
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_nodes.id", ondelete="CASCADE"),
         nullable=True,
     )
+
+    # Fecha de entrega opcional y editable para este nodo (módulo/curso/etc).
+    end_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
 
     # Relaciones
 

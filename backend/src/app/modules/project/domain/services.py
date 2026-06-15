@@ -5,15 +5,22 @@ from fastapi import HTTPException
 from starlette import status
 
 from app.modules.project.infrastructure.models import (
+    Phase,
     Project,
     ProjectNode,
     ProjectMember,
 )
-from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.modules.project.infrastructure.repository import (
+    PhaseRepository,
+    ProjectMemberRepository,
+)
 from app.modules.project.presentation.schemas import (
+    CreatePhaseRequest,
     CreateProjectRequest,
     CreateProjectNodeRequest,
+    PhaseResponse,
     ProjectResponse,
+    UpdatePhaseRequest,
     UpdateProjectRequest,
     ProjectNodeResponse,
     ProjectMemberRequest,
@@ -92,16 +99,53 @@ class ProjectService:
 
 
 class ProjectNodeService:
-    def __init__(self, repo: "Repository"):
+    def __init__(
+        self, repo: "Repository", phase_repo: Optional["PhaseRepository"] = None
+    ):
         self.repo = repo
+        self.phase_repo = phase_repo
 
     async def create_project_node(
         self, data: Union[List["CreateProjectNodeRequest"], "CreateProjectNodeRequest"]
     ) -> Union[List["ProjectNodeResponse"], "ProjectNodeResponse"]:
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            await self._validate_phase(item.project_id, item.phase_id)
+
         if isinstance(data, list):
             return await self._create_node_chain(data)
 
         return await self._create_single_node(data)
+
+    async def get_nodes_by_project(
+        self, project_id: UUID
+    ) -> List["ProjectNodeResponse"]:
+        nodes = await self.repo.get_all_by_project_id(project_id)
+        return [self._to_response(node) for node in nodes]
+
+    async def update_node(
+        self, project_id: UUID, node_id: UUID, data
+    ) -> "ProjectNodeResponse":
+        node = await self.repo.get_by_id(node_id)
+        if not node or node.is_deleted or node.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Nodo no encontrado")
+
+        payload = data.model_dump(exclude_unset=True)
+        if payload.get("phase_id") is not None:
+            await self._validate_phase(project_id, payload["phase_id"])
+
+        updated = await self.repo.patch(node, payload)
+        return self._to_response(updated)
+
+    async def _validate_phase(self, project_id: UUID, phase_id) -> None:
+        if phase_id is None or self.phase_repo is None:
+            return
+        phase = await self.phase_repo.get_by_id(phase_id)
+        if not phase or phase.is_deleted or phase.project_id != project_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="La fase indicada no existe en este proyecto",
+            )
 
     async def _create_single_node(
         self, data: "CreateProjectNodeRequest"
@@ -139,6 +183,89 @@ class ProjectNodeService:
             node_type=saved_node.node_type,
             project_id=saved_node.project_id,
             parent_id=saved_node.parent_id,
+            phase_id=saved_node.phase_id,
+            type_label=saved_node.type_label,
+            end_date=saved_node.end_date,
+        )
+
+
+class PhaseService:
+    """Gestiona las fases de un proyecto.
+
+    Las fases están ordenadas (order_index) y delimitan el flujo de trabajo:
+    la fase N+1 no puede iniciar hasta cerrar la fase N. Aquí solo manejamos
+    el CRUD; la regla de bloqueo entre fases vive en el módulo de tareas.
+    """
+
+    def __init__(self, phase_repo: "PhaseRepository", project_repo: "Repository"):
+        self.phase_repo = phase_repo
+        self.project_repo = project_repo
+
+    async def create_phase(
+        self, project_id: UUID, data: "CreatePhaseRequest"
+    ) -> "PhaseResponse":
+        await self._ensure_project_exists(project_id)
+
+        order_index = data.order_index
+        if order_index is None:
+            existing = await self.phase_repo.get_all_by_project_id(project_id)
+            order_index = len(existing)
+
+        phase = Phase(
+            name=data.name,
+            order_index=order_index,
+            duration_days=data.duration_days,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            project_id=project_id,
+        )
+        saved = await self.phase_repo.add(phase)
+        return self._to_response(saved)
+
+    async def get_phases(self, project_id: UUID) -> List["PhaseResponse"]:
+        await self._ensure_project_exists(project_id)
+        phases = await self.phase_repo.get_all_by_project_id(project_id)
+        return [self._to_response(p) for p in phases]
+
+    async def update_phase(
+        self, project_id: UUID, phase_id: UUID, data: "UpdatePhaseRequest"
+    ) -> "PhaseResponse":
+        phase = await self._get_owned_phase(project_id, phase_id)
+        updated = await self.phase_repo.patch(
+            phase, data.model_dump(exclude_unset=True)
+        )
+        return self._to_response(updated)
+
+    async def delete_phase(self, project_id: UUID, phase_id: UUID) -> None:
+        phase = await self._get_owned_phase(project_id, phase_id)
+        phase.soft_delete()
+        await self.phase_repo.update(phase)
+
+    async def _ensure_project_exists(self, project_id: UUID) -> None:
+        project = await self.project_repo.get_by_id(project_id)
+        if not project or project.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado"
+            )
+
+    async def _get_owned_phase(self, project_id: UUID, phase_id: UUID) -> "Phase":
+        phase = await self.phase_repo.get_by_id(phase_id)
+        if not phase or phase.is_deleted or phase.project_id != project_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Fase no encontrada"
+            )
+        return phase
+
+    @staticmethod
+    def _to_response(phase: "Phase") -> "PhaseResponse":
+        return PhaseResponse(
+            id=phase.id,
+            name=phase.name,
+            order_index=phase.order_index,
+            duration_days=phase.duration_days,
+            start_date=phase.start_date,
+            end_date=phase.end_date,
+            project_id=phase.project_id,
         )
 
 
