@@ -130,3 +130,31 @@ export interface TaskDependency {
   task_id: string;
   depends_on_id: string;
 }
+
+// ── Members / team ───────────────────────────────────────────────────────────
+
+export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante" | "cliente";
+
+export interface ProjectMember {
+  user_id: string;
+  name: string;
+  last_name: string;
+  position: string;
+  project_role: ProjectRole;
+}
+
+export interface AddMemberPayload {
+  user_id: string;
+  project_id: string;
+  project_role: ProjectRole;
+}
+
+// Usuario del sistema (para elegir a quién agregar al equipo).
+export interface IdentityUser {
+  id: string;
+  email: string;
+  name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+}

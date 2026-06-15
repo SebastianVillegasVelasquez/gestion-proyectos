@@ -1,4 +1,30 @@
-import type { NodeType, TaskPriority, TaskStatus } from "./api.types";
+import type { NodeType, ProjectRole, TaskPriority, TaskStatus } from "./api.types";
+
+// "Líder" del proyecto = coordinador en el backend. El orden define el orden de
+// las secciones del equipo (líder primero).
+export const PROJECT_ROLE_ORDER: ProjectRole[] = [
+  "coordinador",
+  "supervisor",
+  "revisor",
+  "integrante",
+  "cliente",
+];
+
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  coordinador: "Líder",
+  supervisor: "Supervisor",
+  revisor: "Revisor",
+  integrante: "Integrante",
+  cliente: "Cliente",
+};
+
+export const PROJECT_ROLE_ACCENT: Record<ProjectRole, string> = {
+  coordinador: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+  supervisor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  revisor: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  integrante: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  cliente: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
 
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
   PROGRAMA: "Programa",
