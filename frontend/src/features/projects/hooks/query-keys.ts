@@ -18,8 +18,12 @@ export const userKeys = {
 
 export const taskKeys = {
   all: ["tasks"] as const,
-  byNode: (projectId: string, nodeId: string) =>
-    [...taskKeys.all, "node", projectId, nodeId] as const,
+  byProject: (projectId: string) => [...taskKeys.all, "project", projectId] as const,
   dependencies: (projectId: string, taskId: string) =>
     [...taskKeys.all, "deps", projectId, taskId] as const,
+};
+
+export const directoryKeys = {
+  all: ["directory"] as const,
+  list: (position?: string) => [...directoryKeys.all, position ?? "todos"] as const,
 };

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { membersApi, usersApi } from "@/features/projects/api/members.api";
-import { projectKeys, userKeys } from "./query-keys";
-import type { ProjectRole } from "@/features/projects/types/api.types";
+import { directoryApi, membersApi, usersApi } from "@/features/projects/api/members.api";
+import { directoryKeys, projectKeys, userKeys } from "./query-keys";
+import type { ProjectRole, UserPosition } from "@/features/projects/types/api.types";
 
 export function useProjectMembers(projectId: string | undefined) {
   return useQuery({
@@ -29,6 +29,15 @@ export function useUsers(enabled = true) {
     queryKey: userKeys.list(),
     queryFn: usersApi.list,
     enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** Directorio de usuarios asignables, opcionalmente filtrado por cargo. */
+export function useDirectory(position?: UserPosition) {
+  return useQuery({
+    queryKey: directoryKeys.list(position),
+    queryFn: () => directoryApi.list(position),
     staleTime: 60_000,
   });
 }

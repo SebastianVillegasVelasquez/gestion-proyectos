@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeRange, barMetrics, toDayNumber } from "./timeline";
+import { computeRange, barMetrics, toDayNumber, dayOffsetPct } from "./timeline";
 
 describe("toDayNumber", () => {
   it("produces consecutive integers for consecutive days", () => {
@@ -46,5 +46,18 @@ describe("barMetrics", () => {
   it("gives a single-day task a minimum visible width", () => {
     const { widthPct } = barMetrics({ start_date: "2026-06-01", due_date: "2026-06-01" }, range);
     expect(widthPct).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("dayOffsetPct", () => {
+  const range = computeRange([{ start_date: "2026-06-01", due_date: "2026-06-11" }])!;
+
+  it("returns the proportional position for a date inside the range", () => {
+    expect(dayOffsetPct("2026-06-06", range)).toBeCloseTo(50, 0);
+  });
+
+  it("returns null for a date outside the range", () => {
+    expect(dayOffsetPct("2026-05-01", range)).toBeNull();
+    expect(dayOffsetPct("2026-07-01", range)).toBeNull();
   });
 });

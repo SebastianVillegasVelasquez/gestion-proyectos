@@ -48,7 +48,7 @@ export function ProjectActions({ projectId }: { projectId: string }) {
         subtitle="Crea, asigna y da seguimiento"
         icon={<ListChecks className="size-6" />}
         gradient="bg-gradient-to-br from-emerald-600 to-teal-600"
-        onClick={() => void navigate(`/projects/${projectId}/gantt`)}
+        onClick={() => void navigate(`/projects/${projectId}/tareas`)}
       />
     </div>
   );

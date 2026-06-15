@@ -1,4 +1,18 @@
-import type { NodeType, ProjectRole, TaskPriority, TaskStatus } from "./api.types";
+import type { NodeType, ProjectRole, TaskPriority, TaskStatus, UserPosition } from "./api.types";
+
+export const USER_POSITION_LABELS: Record<UserPosition, string> = {
+  desarrollador: "Desarrollador",
+  experto_multimedia: "Experto multimedia",
+  project_manager: "Project manager",
+  sin_cargo: "Sin cargo",
+  diseñador_instruccional: "Diseñador instruccional",
+  experto_tematico: "Experto temático",
+  corrector_estilo: "Corrector de estilo",
+  diseñador_grafico: "Diseñador gráfico",
+  administrador_moodle: "Administrador Moodle",
+};
+
+export const USER_POSITIONS: UserPosition[] = Object.keys(USER_POSITION_LABELS) as UserPosition[];
 
 // "Líder" del proyecto = coordinador en el backend. El orden define el orden de
 // las secciones del equipo (líder primero).

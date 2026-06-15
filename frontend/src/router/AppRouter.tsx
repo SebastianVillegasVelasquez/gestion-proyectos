@@ -6,6 +6,7 @@ import { ProjectBuilderPage } from "@/features/projects/components/ProjectBuilde
 import { AllProjectsPage } from "@/features/projects/components/AllProjectsPage.tsx";
 import { ProjectDetailPage } from "@/features/projects/components/ProjectDetailPage.tsx";
 import { TaskDashboardPage } from "@/features/projects/gantt/components/TaskDashboardPage.tsx";
+import { TasksPage } from "@/features/projects/tasks/TasksPage.tsx";
 import { WorkspacePage } from "@/features/workspace/components/WorkspacePage.tsx";
 import { ProtectedRoute } from "@/router/ProtectedRoute.tsx";
 
@@ -22,6 +23,7 @@ export const AppRouter = () => (
         <Route path="/projects" element={<AllProjectsPage />} />
         <Route path="/projects/builder" element={<ProjectBuilderPage />} />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
         <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
         <Route path="/workspace" element={<WorkspacePage />} />
       </Route>

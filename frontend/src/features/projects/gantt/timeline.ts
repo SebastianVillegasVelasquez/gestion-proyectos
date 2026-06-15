@@ -38,6 +38,15 @@ export function computeRange(
   return { startDay, endDay, totalDays: Math.max(1, endDay - startDay) };
 }
 
+/** Posición en % de una fecha dentro del rango, o null si cae fuera. */
+export function dayOffsetPct(iso: string, range: TimelineRange): number | null {
+  const day = toDayNumber(iso);
+  if (day < range.startDay || day > range.startDay + range.totalDays) {
+    return null;
+  }
+  return ((day - range.startDay) / range.totalDays) * 100;
+}
+
 /** Posición (offset) y ancho de la barra de una tarea, en porcentaje [0..100]. */
 export function barMetrics(
   task: { start_date: string; due_date: string },

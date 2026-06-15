@@ -21,8 +21,7 @@ export function TaskDetailPanel({
   task: Task;
   onClose: () => void;
 }) {
-  const nodeId = task.node_id ?? "";
-  const changeStatus = useChangeTaskStatus(projectId, nodeId);
+  const changeStatus = useChangeTaskStatus(projectId);
   const depsQuery = useTaskDependencies(projectId, task.id);
 
   return (

@@ -21,7 +21,8 @@ services:
     environment:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME}
+      # La suite de tests se conecta a una base llamada "db_test" (ver fixtures).
+      POSTGRES_DB: db_test
     tmpfs:
       - /var/lib/postgresql/data
 

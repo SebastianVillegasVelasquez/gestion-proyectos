@@ -93,6 +93,7 @@ export interface UpdateNodePayload {
 export interface Task {
   id: string;
   node_id: string | null;
+  phase_id: string | null;
   parent_task_id: string | null;
   title: string;
   description: string | null;
@@ -111,8 +112,15 @@ export interface CreateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
+  // Pertenece a un nodo (módulo/curso) O a una fase — exactamente uno.
+  node_id?: string | null;
+  phase_id?: string | null;
   start_date: string;
-  due_date: string;
+  // Fecha de fin O duración en días (el backend calcula la fecha de fin).
+  due_date?: string | null;
+  duration_days?: number | null;
+  // Dependencia opcional al crear (finish-to-start).
+  depends_on_id?: string | null;
   parent_task_id?: string | null;
 }
 
@@ -147,6 +155,26 @@ export interface AddMemberPayload {
   user_id: string;
   project_id: string;
   project_role: ProjectRole;
+}
+
+// Cargo operativo del usuario (para filtrar responsables de tareas).
+export type UserPosition =
+  | "desarrollador"
+  | "experto_multimedia"
+  | "project_manager"
+  | "sin_cargo"
+  | "diseñador_instruccional"
+  | "experto_tematico"
+  | "corrector_estilo"
+  | "diseñador_grafico"
+  | "administrador_moodle";
+
+// Usuario del directorio (para asignar tareas, filtrable por cargo).
+export interface DirectoryUser {
+  id: string;
+  name: string;
+  last_name: string;
+  position: UserPosition;
 }
 
 // Usuario del sistema (para elegir a quién agregar al equipo).

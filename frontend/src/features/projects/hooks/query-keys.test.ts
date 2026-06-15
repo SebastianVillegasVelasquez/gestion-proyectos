@@ -19,8 +19,8 @@ describe("projectKeys", () => {
 });
 
 describe("taskKeys", () => {
-  it("keys tasks by project and node", () => {
-    expect(taskKeys.byNode("p1", "n1")).toEqual(["tasks", "node", "p1", "n1"]);
+  it("keys tasks by project", () => {
+    expect(taskKeys.byProject("p1")).toEqual(["tasks", "project", "p1"]);
   });
 
   it("keys dependencies by project and task", () => {

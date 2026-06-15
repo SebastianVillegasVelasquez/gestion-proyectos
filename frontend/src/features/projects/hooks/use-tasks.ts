@@ -1,38 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/features/projects/api/tasks.api";
 import { taskKeys } from "./query-keys";
-import type {
-  CreateTaskPayload,
-  TaskStatus,
-  UpdateTaskPayload,
-} from "@/features/projects/types/api.types";
+import type { CreateTaskPayload, TaskStatus } from "@/features/projects/types/api.types";
 
-export function useNodeTasks(projectId: string, nodeId: string | undefined) {
+/** Todas las tareas del proyecto (las de nodo y las de fase). */
+export function useProjectTasks(projectId: string | undefined) {
   return useQuery({
-    queryKey: taskKeys.byNode(projectId, nodeId ?? ""),
-    queryFn: () => tasksApi.listByNode(projectId, nodeId!),
-    enabled: Boolean(projectId && nodeId),
+    queryKey: taskKeys.byProject(projectId ?? ""),
+    queryFn: () => tasksApi.listByProject(projectId!),
+    enabled: Boolean(projectId),
   });
 }
 
-export function useCreateTask(projectId: string, nodeId: string) {
+export function useCreateTask(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateTaskPayload) => tasksApi.create(projectId, nodeId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byNode(projectId, nodeId) }),
+    mutationFn: (payload: CreateTaskPayload) => tasksApi.create(projectId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) }),
   });
 }
 
-export function useUpdateTask(projectId: string, nodeId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateTaskPayload }) =>
-      tasksApi.update(projectId, nodeId, taskId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byNode(projectId, nodeId) }),
-  });
-}
-
-export function useChangeTaskStatus(projectId: string, nodeId: string) {
+export function useChangeTaskStatus(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -44,7 +32,7 @@ export function useChangeTaskStatus(projectId: string, nodeId: string) {
       status: TaskStatus;
       reason?: string;
     }) => tasksApi.changeStatus(projectId, taskId, status, reason),
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byNode(projectId, nodeId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) }),
   });
 }
 

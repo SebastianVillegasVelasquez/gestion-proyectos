@@ -1,0 +1,313 @@
+import { useMemo, useState } from "react";
+import { X, ListPlus } from "lucide-react";
+import { getErrorMessage } from "@/utils/get-error-message";
+import { useCreateTask } from "../hooks/use-tasks";
+import { usePhases } from "../hooks/use-phases";
+import { useNodes } from "../hooks/use-nodes";
+import { useDirectory } from "../hooks/use-members";
+import {
+  TASK_PRIORITY_LABELS,
+  USER_POSITION_LABELS,
+  USER_POSITIONS,
+  nodeDisplayType,
+} from "../types/labels";
+import type { Task, TaskPriority, UserPosition } from "../types/api.types";
+import {
+  buildTaskPayload,
+  emptyTaskForm,
+  validateTaskForm,
+  type TaskFormState,
+} from "./build-task-payload";
+
+const inputCls =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20";
+
+const PRIORITIES: TaskPriority[] = ["no_definida", "baja", "media", "alta", "urgente"];
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+export function CreateTaskModal({
+  projectId,
+  tasks,
+  onClose,
+}: {
+  projectId: string;
+  tasks: Task[];
+  onClose: () => void;
+}) {
+  const phasesQuery = usePhases(projectId);
+  const nodesQuery = useNodes(projectId);
+  const createTask = useCreateTask(projectId);
+
+  const [form, setForm] = useState<TaskFormState>(emptyTaskForm);
+  const [position, setPosition] = useState<UserPosition | "">("");
+  const [clientError, setClientError] = useState<string | null>(null);
+
+  const directoryQuery = useDirectory(position || undefined);
+
+  const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const leafNodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data]);
+
+  const handleSubmit = () => {
+    const error = validateTaskForm(form);
+    if (error) {
+      setClientError(error);
+      return;
+    }
+    setClientError(null);
+    createTask.mutate(buildTaskPayload(form), { onSuccess: onClose });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+            <ListPlus className="size-4 text-blue-600" /> Nueva tarea
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+          <Field label="Título *">
+            <input
+              className={inputCls}
+              value={form.title}
+              onChange={(e) => {
+                set("title", e.target.value);
+              }}
+              placeholder="Diseñar unidad 1"
+            />
+          </Field>
+          <Field label="Descripción">
+            <textarea
+              className={inputCls}
+              rows={2}
+              value={form.description}
+              onChange={(e) => {
+                set("description", e.target.value);
+              }}
+            />
+          </Field>
+
+          {/* Pertenece a: fase o módulo/curso */}
+          <Field label="Pertenece a">
+            <div className="mb-2 flex gap-2">
+              {(["phase", "node"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    set("target", t);
+                  }}
+                  className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    form.target === t
+                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                      : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  {t === "phase" ? "Fase (general)" : "Módulo / Curso"}
+                </button>
+              ))}
+            </div>
+            {form.target === "phase" ? (
+              <select
+                className={inputCls}
+                value={form.phaseId}
+                onChange={(e) => {
+                  set("phaseId", e.target.value);
+                }}
+              >
+                <option value="">Selecciona la fase…</option>
+                {phasesQuery.data?.map((ph) => (
+                  <option key={ph.id} value={ph.id}>
+                    Fase {ph.order_index + 1}: {ph.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                className={inputCls}
+                value={form.nodeId}
+                onChange={(e) => {
+                  set("nodeId", e.target.value);
+                }}
+              >
+                <option value="">Selecciona el contenido…</option>
+                {leafNodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {nodeDisplayType(n)} · {n.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          {/* Responsable: filtro por cargo + persona */}
+          <Field label="Responsable">
+            <div className="flex gap-2">
+              <select
+                className={`${inputCls} w-1/2`}
+                value={position}
+                onChange={(e) => {
+                  setPosition(e.target.value as UserPosition | "");
+                  set("assigneeId", "");
+                }}
+              >
+                <option value="">Todos los cargos</option>
+                {USER_POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {USER_POSITION_LABELS[p]}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`${inputCls} w-1/2`}
+                value={form.assigneeId}
+                onChange={(e) => {
+                  set("assigneeId", e.target.value);
+                }}
+              >
+                <option value="">Sin asignar</option>
+                {directoryQuery.data?.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {u.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </Field>
+
+          {/* Dependencia */}
+          <Field label="Depende de (opcional)">
+            <select
+              className={inputCls}
+              value={form.dependsOnId}
+              onChange={(e) => {
+                set("dependsOnId", e.target.value);
+              }}
+            >
+              <option value="">Sin dependencia</option>
+              {tasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Prioridad */}
+          <Field label="Prioridad">
+            <select
+              className={inputCls}
+              value={form.priority}
+              onChange={(e) => {
+                set("priority", e.target.value as TaskPriority);
+              }}
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {TASK_PRIORITY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Fechas: inicio + (fin o duración) */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Inicio *">
+              <input
+                type="date"
+                className={inputCls}
+                value={form.startDate}
+                onChange={(e) => {
+                  set("startDate", e.target.value);
+                }}
+              />
+            </Field>
+            <Field label={form.dateMode === "duration" ? "Duración (días)" : "Fin"}>
+              <div className="flex gap-1">
+                {form.dateMode === "duration" ? (
+                  <input
+                    type="number"
+                    min={1}
+                    className={inputCls}
+                    value={form.durationDays}
+                    onChange={(e) => {
+                      set("durationDays", e.target.value);
+                    }}
+                  />
+                ) : (
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.dueDate}
+                    onChange={(e) => {
+                      set("dueDate", e.target.value);
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  title="Cambiar entre duración y fecha de fin"
+                  onClick={() => {
+                    set("dateMode", form.dateMode === "duration" ? "end" : "duration");
+                  }}
+                  className="shrink-0 rounded-lg border border-slate-200 px-2 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  {form.dateMode === "duration" ? "📅" : "⏱"}
+                </button>
+              </div>
+            </Field>
+          </div>
+
+          {(clientError ?? createTask.isError) && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              {clientError ?? getErrorMessage(createTask.error, "No se pudo crear la tarea")}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={createTask.isPending}
+            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {createTask.isPending ? "Creando…" : "Crear tarea"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

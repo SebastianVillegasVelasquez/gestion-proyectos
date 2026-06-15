@@ -8,11 +8,16 @@ import type {
 } from "@/features/projects/types/api.types";
 
 export const tasksApi = {
+  // Todas las tareas del proyecto (las de nodo y las de fase).
+  listByProject: (projectId: string) =>
+    http.get<Task[]>(`/tasks/${projectId}/tasks`).then((r) => r.data),
+
+  // Crea una tarea que cuelga de un nodo o de una fase (según el payload).
+  create: (projectId: string, payload: CreateTaskPayload) =>
+    http.post<Task>(`/tasks/${projectId}/tasks`, payload).then((r) => r.data),
+
   listByNode: (projectId: string, nodeId: string) =>
     http.get<Task[]>(`/tasks/${projectId}/nodes/${nodeId}/tasks`).then((r) => r.data),
-
-  create: (projectId: string, nodeId: string, payload: CreateTaskPayload) =>
-    http.post<Task>(`/tasks/${projectId}/nodes/${nodeId}/tasks`, payload).then((r) => r.data),
 
   update: (projectId: string, nodeId: string, taskId: string, payload: UpdateTaskPayload) =>
     http
