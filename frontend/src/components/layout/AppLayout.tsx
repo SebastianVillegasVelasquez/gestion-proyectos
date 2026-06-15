@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
-import { ProjectsProvider } from "@/features/projects/context/ProjectsContext";
 
 export interface AppOutletContext {
   dark: boolean;
@@ -85,9 +84,7 @@ export const AppLayout = () => {
 
         {/* Page content — scrollable on mobile, fixed on desktop */}
         <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
-          <ProjectsProvider>
-            <Outlet context={context} />
-          </ProjectsProvider>
+          <Outlet context={context} />
         </main>
       </div>
     </div>

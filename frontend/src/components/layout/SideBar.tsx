@@ -96,7 +96,7 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
 
   const handleNavClick = (item: NavItem) => {
     if (item.href) {
-      navigate(item.href);
+      void navigate(item.href);
     }
     onClose();
   };
