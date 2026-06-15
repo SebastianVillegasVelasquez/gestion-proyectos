@@ -9,8 +9,9 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
-    tmpfs:
-      - /var/lib/postgresql/data
+    # Volumen nombrado: la data de desarrollo persiste entre reinicios.
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
   db_test:
     container_name: db_test

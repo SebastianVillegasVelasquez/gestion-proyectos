@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
+    # ── Super admin sembrado al iniciar ─────────
+    SUPERADMIN_EMAIL: str = "superadmin@objdigital.com"
+    SUPERADMIN_PASSWORD: str = "SuperAdmin123*"
+    SUPERADMIN_NAME: str = "Super"
+    SUPERADMIN_LAST_NAME: str = "Admin"
+
     # ── Email ───────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
