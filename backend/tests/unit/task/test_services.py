@@ -40,7 +40,6 @@ class TestTaskServices:
             start_date=valid_start_date,
             due_date=valid_due_date,
             status=TaskStatus.PENDIENTE_POR_INICIAR,
-            created_at=datetime.today(),
         )
 
         response = await service.add_task(valid_request)
@@ -70,21 +69,27 @@ class TestTaskServices:
             exc_info.value
         )
 
-    async def test_should_fail_when_start_date_is_in_the_past(self):
+    async def test_should_allow_past_start_date(self):
+        # La regla de "no iniciar en el pasado" se eliminó para dar flexibilidad
+        # (registrar trabajo ya iniciado, sembrar tareas vencidas, etc.).
         past_start_date = date.today() - timedelta(days=3)
         valid_due_date = date.today() + timedelta(days=5)
 
-        with pytest.raises(ValidationError) as exc_info:
-            CreateTaskRequest(
-                title="Tarea del pasado",
-                start_date=past_start_date,
-                due_date=valid_due_date,
-            )
-
-        assert (
-            "La fecha de inicio de la tarea no puede ser menor a la fecha actual"
-            in str(exc_info.value)
+        request = CreateTaskRequest(
+            title="Tarea del pasado",
+            start_date=past_start_date,
+            due_date=valid_due_date,
         )
+        assert request.start_date == past_start_date
+
+    async def test_should_compute_due_date_from_duration(self):
+        start = date.today()
+        request = CreateTaskRequest(
+            title="Tarea por duración",
+            start_date=start,
+            duration_days=10,
+        )
+        assert request.due_date == start + timedelta(days=10)
 
     async def test_should_create_task_via_use_case(
         self,
@@ -92,6 +97,7 @@ class TestTaskServices:
         fake_project_repository,
         fake_project_node_repository,
         fake_user_repo,
+        fake_phase_repository,
     ):
         project_orm = Project(id=uuid4(), name="Proyecto Prueba")
         persisted_project = await fake_project_repository.save(project_orm)
@@ -119,19 +125,18 @@ class TestTaskServices:
             project_repo=fake_project_repository,
             project_node_repo=fake_project_node_repository,
             task_repo=fake_task_repo,
+            phase_repo=fake_phase_repository,
         )
 
         request = CreateTaskRequest(
             title="Integración de DB",
+            node_id=persisted_node.id,
             assignee_id=persisted_user.id,
             start_date=date.today(),
-            created_at=datetime.today(),
             due_date=date.today() + timedelta(days=2),
         )
 
-        response = await use_case.execute(
-            project_id=persisted_project.id, node_id=persisted_node.id, data=request
-        )
+        response = await use_case.execute(project_id=persisted_project.id, data=request)
 
         assert response.title == "Integración de DB"
         assert response.assignee_id == persisted_user.id
@@ -142,6 +147,7 @@ class TestTaskServices:
         fake_project_repository,
         fake_project_node_repository,
         fake_user_repo,
+        fake_phase_repository,
     ):
         project_orm = Project(id=uuid4(), name="Proyecto Prueba")
         persisted_project = await fake_project_repository.save(project_orm)
@@ -151,23 +157,18 @@ class TestTaskServices:
             project_repo=fake_project_repository,
             project_node_repo=fake_project_node_repository,
             task_repo=fake_task_repo,
+            phase_repo=fake_phase_repository,
         )
 
         request = CreateTaskRequest(
             title="Tarea sin nodo",
+            node_id=uuid4(),
             start_date=date.today(),
-            created_at=datetime.today(),
             due_date=date.today() + timedelta(days=2),
         )
 
-        invalid_node_id = uuid4()
-
-        with pytest.raises(
-            HTTPException, match=f"404: El nodo con el id {invalid_node_id} no existe"
-        ):
-            await use_case.execute(
-                project_id=persisted_project.id, node_id=invalid_node_id, data=request
-            )
+        with pytest.raises(HTTPException, match="El nodo no existe en este proyecto"):
+            await use_case.execute(project_id=persisted_project.id, data=request)
 
     async def test_should_update_task(
         self,

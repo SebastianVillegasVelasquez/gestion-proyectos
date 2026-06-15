@@ -7,6 +7,7 @@ import pytest
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.models import (
+    Phase,
     Project,
     ProjectNode,
     ProjectMember,
@@ -87,3 +88,8 @@ def fake_user_repo():
 @pytest.fixture
 def fake_task_repo():
     return FakeRepository(model_cls=Task)
+
+
+@pytest.fixture
+def fake_phase_repository():
+    return FakeRepository(model_cls=Phase)

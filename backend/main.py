@@ -35,8 +35,10 @@ async def lifespan(app: FastAPI):
         debug=get_settings().DEBUG,
     )
     from app.core.seed import ensure_super_admin
+    from app.core.seed_demo import ensure_demo_data
 
     await ensure_super_admin()
+    await ensure_demo_data()
     yield
     logger.info("Cerrando OBJ Digital PM")
 

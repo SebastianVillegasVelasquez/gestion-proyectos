@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.modules.project.infrastructure.models import Phase, ProjectNode
@@ -43,6 +43,22 @@ class TaskRepository(BaseRepository[Task]):
         )
         result = await self._session.execute(query)
         return result.first() is not None
+
+    async def get_all_by_project(self, project_id: UUID) -> list[Task]:
+        """Todas las tareas del proyecto: las que cuelgan de un nodo del proyecto
+        y las que cuelgan directamente de una fase del proyecto."""
+        node_ids = select(ProjectNode.id).where(ProjectNode.project_id == project_id)
+        phase_ids = select(Phase.id).where(Phase.project_id == project_id)
+        query = (
+            select(Task)
+            .where(
+                Task.deleted_at.is_(None),
+                or_(Task.node_id.in_(node_ids), Task.phase_id.in_(phase_ids)),
+            )
+            .order_by(Task.start_date)
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
 
     async def get_tasks_in_earlier_phases(
         self, project_id: UUID, phase_order: int

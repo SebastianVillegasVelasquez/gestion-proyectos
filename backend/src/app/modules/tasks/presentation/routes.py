@@ -19,6 +19,7 @@ from app.modules.tasks.application.use_cases import (
     CreateTaskUseCase,
     GetTaskDependenciesUseCase,
     GetTasksByNodeUseCase,
+    GetTasksByProjectUseCase,
     GetTaskByIdUseCase,
     UpdateTaskUseCase,
     DeleteTaskUseCase,
@@ -36,6 +37,49 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
 @router.post(
+    "/{project_id}/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_task_general(
+    project_id: UUID,
+    payload: CreateTaskRequest,
+    current_user=Depends(require_project_permission(ProjectRole.COORDINADOR)),
+    task_repo=Depends(task_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_node_repo=Depends(project_node_repo_dependency),
+    phase_repo=Depends(phase_repo_dependency),
+):
+    use_case = CreateTaskUseCase(
+        task_repo, project_repo, user_repo, project_node_repo, phase_repo
+    )
+    return await use_case.execute(project_id=project_id, data=payload)
+
+
+@router.get(
+    "/{project_id}/tasks",
+    response_model=List[TaskResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_project_tasks(
+    project_id: UUID,
+    current_user=Depends(
+        require_project_permission(
+            ProjectRole.COORDINADOR,
+            ProjectRole.INTEGRANTE,
+            ProjectRole.SUPERVISOR,
+            ProjectRole.REVISOR,
+        )
+    ),
+    task_repo=Depends(task_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+):
+    use_case = GetTasksByProjectUseCase(task_repo, project_repo)
+    return await use_case.execute(project_id=project_id)
+
+
+@router.post(
     "/{project_id}/nodes/{node_id}/tasks",
     response_model=TaskResponse,
     status_code=status.HTTP_201_CREATED,
@@ -49,10 +93,14 @@ async def create_task(
     project_repo=Depends(project_repo_dependency),
     user_repo=Depends(user_repo_dependency),
     project_node_repo=Depends(project_node_repo_dependency),
+    phase_repo=Depends(phase_repo_dependency),
 ):
     payload.node_id = node_id
-    use_case = CreateTaskUseCase(task_repo, project_repo, user_repo, project_node_repo)
-    return await use_case.execute(project_id=project_id, node_id=node_id, data=payload)
+    payload.phase_id = None
+    use_case = CreateTaskUseCase(
+        task_repo, project_repo, user_repo, project_node_repo, phase_repo
+    )
+    return await use_case.execute(project_id=project_id, data=payload)
 
 
 @router.get(

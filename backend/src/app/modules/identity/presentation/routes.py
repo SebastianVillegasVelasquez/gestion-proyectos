@@ -17,8 +17,10 @@ from app.modules.identity.application.use_cases import (
     UpdateUserUseCase,
 )
 from app.modules.identity.infrastructure.repository import UserRepository
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
+    DirectoryUserResponse,
     LoginRequest,
     RefreshRequest,
     TokenResponse,
@@ -56,6 +58,23 @@ async def refresh(
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/directory", response_model=list[DirectoryUserResponse])
+async def directory(
+    position: UserPosition | None = None,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Lista de usuarios activos para asignar tareas, filtrable por cargo."""
+    users = await repo.get_all()
+    return [
+        u
+        for u in users
+        if u.is_active
+        and not u.is_deleted
+        and (position is None or u.position == position)
+    ]
 
 
 @router.get("/users", response_model=list[UserResponse])

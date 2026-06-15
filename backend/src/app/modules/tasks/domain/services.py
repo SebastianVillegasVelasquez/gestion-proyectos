@@ -45,6 +45,10 @@ class TaskService:
         filtered_tasks = [t for t in tasks if t.node_id == node_id and not t.is_deleted]
         return [self._to_response(task) for task in filtered_tasks]
 
+    async def get_tasks_by_project(self, project_id: UUID) -> list["TaskResponse"]:
+        tasks = await self.repo.get_all_by_project(project_id)
+        return [self._to_response(task) for task in tasks]
+
     async def update_task(
         self, task_id: UUID, data: "UpdateTaskRequest"
     ) -> "TaskResponse":
@@ -73,7 +77,9 @@ class TaskService:
     def _to_orm(data: "CreateTaskRequest") -> "Task":
         # exclude_none deja que la BD aplique server_default (status, created_at).
         payload = data.model_dump(exclude_none=True)
-        payload.pop("created_at", None)
+        # Campos del request que NO son columnas del modelo Task.
+        for field in ("duration_days", "depends_on_id"):
+            payload.pop(field, None)
         return Task(**payload)
 
     @staticmethod
@@ -81,6 +87,7 @@ class TaskService:
         return TaskResponse(
             id=task.id,
             node_id=task.node_id,
+            phase_id=task.phase_id,
             parent_task_id=task.parent_task_id,
             title=task.title,
             description=task.description,

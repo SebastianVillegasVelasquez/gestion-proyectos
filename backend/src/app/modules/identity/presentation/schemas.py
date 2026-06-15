@@ -85,6 +85,15 @@ class UserResponse(BaseModelConfig):
     is_active: bool
 
 
+class DirectoryUserResponse(BaseModelConfig):
+    """Vista ligera para elegir responsables de tareas (filtrable por cargo)."""
+
+    id: UUID
+    name: str
+    last_name: str
+    position: UserPosition
+
+
 class TokenResponse(BaseModelConfig):
     access_token: str
     refresh_token: str

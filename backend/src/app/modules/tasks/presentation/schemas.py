@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Annotated, Optional
 from uuid import UUID
 
-from pydantic import StringConstraints, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from app.modules.tasks.infrastructure.enums import (
     TaskPriority,
@@ -17,37 +17,41 @@ class TaskBase(BaseModelConfig):
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
     assignee_id: Optional[UUID] = None
-    start_date: date
-    due_date: date
     status: Optional[TaskStatus] = None
-    created_at: Optional[datetime] = None
 
 
 class CreateTaskRequest(TaskBase):
-    # node_id lo fija la ruta a partir del path param.
+    # La tarea cuelga de un nodo (módulo/curso) O de una fase. El caso de uso
+    # valida que venga exactamente uno (la ruta anidada fija node_id).
     node_id: Optional[UUID] = None
-    # Subtarea opcional: el coordinador crea hijas apuntando a la tarea global.
+    phase_id: Optional[UUID] = None
+    # Subtarea opcional y dependencia opcional al crear.
     parent_task_id: Optional[UUID] = None
+    depends_on_id: Optional[UUID] = None
+
+    start_date: date
+    # Se puede dar la fecha de fin o la duración en días (se calcula el fin).
+    due_date: Optional[date] = None
+    duration_days: Optional[int] = Field(default=None, gt=0)
 
     @model_validator(mode="after")
-    def validate_task_dates(self) -> "CreateTaskRequest":
-        # 1. Validar orden cronológico de la tarea
+    def resolve_dates(self) -> "CreateTaskRequest":
+        if self.due_date is None and self.duration_days is not None:
+            self.due_date = self.start_date + timedelta(days=self.duration_days)
+        if self.due_date is None:
+            raise ValueError("Indica una fecha de fin o una duración en días")
         if self.due_date < self.start_date:
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
-
-        # 2. Validar que no inicie en el pasado
-        if self.start_date < date.today():
-            raise ValueError(
-                "La fecha de inicio de la tarea no puede ser menor a la fecha actual"
-            )
-
         return self
 
 
 class TaskResponse(TaskBase):
     id: UUID
     node_id: Optional[UUID] = None
+    phase_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
+    start_date: date
+    due_date: date
     status: TaskStatus
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
