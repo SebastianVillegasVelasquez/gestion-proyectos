@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import List
 from uuid import UUID
 
@@ -14,12 +14,14 @@ from app.modules.project.presentation.schemas import (
 
 @pytest.fixture
 def fake_create_project_request() -> CreateProjectRequest:
+    # Fechas relativas a hoy: la regla "inicio no puede ser pasado" rechazaba un
+    # date() hardcodeado en cuanto la fecha real lo superaba.
     return CreateProjectRequest(
         name="Sistema de Gestión de Proyectos",
         description="Aplicación para administrar proyectos, tareas y miembros del equipo.",
         client_name="Acme Corporation",
-        start_date=date(2026, 6, 15),
-        end_date=date(2026, 12, 31),
+        start_date=date.today() + timedelta(days=1),
+        end_date=date.today() + timedelta(days=180),
     )
 
 

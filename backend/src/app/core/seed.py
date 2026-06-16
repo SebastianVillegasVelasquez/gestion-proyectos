@@ -19,6 +19,15 @@ async def ensure_super_admin() -> None:
     No interrumpe el arranque si la BD no está lista; solo deja un log.
     """
     settings = get_settings()
+
+    # Sin contraseña configurada no creamos un admin (evita credenciales débiles
+    # o un admin sin clave usable). Debe definirse SUPERADMIN_PASSWORD en el .env.
+    if not settings.SUPERADMIN_PASSWORD:
+        logger.warning(
+            "SUPERADMIN_PASSWORD no está configurada; se omite el seed del super admin"
+        )
+        return
+
     try:
         async with AsyncSessionLocal() as session:
             repo = UserRepository(session)
