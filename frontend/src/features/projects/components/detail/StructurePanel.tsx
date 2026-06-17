@@ -50,7 +50,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   }, [phasesQuery.data]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
       <section>
         <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
           <Layers className="size-4 text-amber-500" /> Fases

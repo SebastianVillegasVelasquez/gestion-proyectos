@@ -1,10 +1,11 @@
-import { useNavigate, useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
   CalendarDays,
   FolderKanban,
   Layers,
   LayoutDashboard,
+  type LucideIcon,
   Moon,
   Settings,
   Sun,
@@ -12,7 +13,6 @@ import {
   Users,
   Users2,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -52,9 +52,6 @@ const SECTIONS: NavSection[] = [
     items: [
       { id: "project-builder", label: "Constructor", icon: Layers, href: "/projects/builder" },
       { id: "all-projects", label: "Todos los proyectos", icon: FolderKanban, href: "/projects" },
-      { id: "ecommerce", label: "Rediseño e-commerce", icon: FolderKanban, dot: "emerald" },
-      { id: "mobile", label: "App móvil inventario", icon: FolderKanban, dot: "amber" },
-      { id: "bi", label: "Automatización BI", icon: FolderKanban, dot: "blue" },
     ],
   },
   {

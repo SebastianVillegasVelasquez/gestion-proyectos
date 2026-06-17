@@ -169,12 +169,27 @@ export type UserPosition =
   | "diseñador_grafico"
   | "administrador_moodle";
 
-// Usuario del directorio (para asignar tareas, filtrable por cargo).
+// Usuario del directorio (para asignar tareas / agregar al equipo).
 export interface DirectoryUser {
   id: string;
   name: string;
   last_name: string;
+  email: string;
   position: UserPosition;
+}
+
+export interface PaginatedDirectory {
+  items: DirectoryUser[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface DirectorySearchParams {
+  search?: string;
+  position?: UserPosition;
+  page?: number;
+  pageSize?: number;
 }
 
 // Usuario del sistema (para elegir a quién agregar al equipo).

@@ -26,4 +26,13 @@ export const taskKeys = {
 export const directoryKeys = {
   all: ["directory"] as const,
   list: (position?: string) => [...directoryKeys.all, position ?? "todos"] as const,
+  search: (params: { search?: string; position?: string; page?: number; pageSize?: number }) =>
+    [
+      ...directoryKeys.all,
+      "search",
+      params.search ?? "",
+      params.position ?? "",
+      params.page ?? 1,
+      params.pageSize ?? 8,
+    ] as const,
 };

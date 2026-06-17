@@ -91,7 +91,17 @@ class DirectoryUserResponse(BaseModelConfig):
     id: UUID
     name: str
     last_name: str
+    email: str
     position: UserPosition
+
+
+class PaginatedDirectoryResponse(BaseModelConfig):
+    """Página de usuarios para los selectores (evita traer toda la tabla)."""
+
+    items: list[DirectoryUserResponse]
+    total: int
+    page: int
+    page_size: int
 
 
 class TokenResponse(BaseModelConfig):

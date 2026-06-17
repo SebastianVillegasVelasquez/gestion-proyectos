@@ -1,9 +1,9 @@
+import os
 from functools import lru_cache
 from typing import Literal
 
 from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
 
 
 class Settings(BaseSettings):
@@ -34,8 +34,6 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # ── Super admin sembrado al iniciar ─────────
-    # La contraseña NO tiene valor por defecto a propósito: debe venir del
-    # entorno (.env, gitignored). Si está vacía, el seed no crea el super admin.
     SUPERADMIN_EMAIL: str = "superadmin@objdigital.com"
     SUPERADMIN_PASSWORD: str = ""
     SUPERADMIN_NAME: str = "Super"

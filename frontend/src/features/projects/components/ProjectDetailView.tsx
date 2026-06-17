@@ -32,9 +32,9 @@ export function ProjectDetailView({
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
-    <div className="flex flex-col gap-5 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
+    <div className="flex h-full flex-col gap-4 overflow-hidden p-4 sm:p-5">
       {/* Encabezado */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <button
             type="button"
@@ -68,7 +68,7 @@ export function ProjectDetailView({
       <ProjectActions projectId={project.id} />
 
       {/* Progreso */}
-      <Card>
+      <Card className="shrink-0">
         <CardContent className="pt-5">
           <div className="mb-1.5 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
             <span>Progreso general</span>
@@ -84,7 +84,7 @@ export function ProjectDetailView({
       </Card>
 
       {/* Tabs: Estructura | Equipo */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex shrink-0 gap-1 border-b border-slate-200 dark:border-slate-800">
         {(
           [
             { id: "estructura", label: "Estructura", icon: FolderTree },
@@ -110,7 +110,7 @@ export function ProjectDetailView({
         ))}
       </div>
 
-      <div className="pb-4">
+      <div className="flex min-h-0 flex-1 flex-col">
         {tab === "estructura" ? (
           <StructurePanel projectId={project.id} />
         ) : (

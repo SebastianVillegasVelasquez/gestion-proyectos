@@ -9,14 +9,18 @@ from app.core.security import (
     verify_password,
 )
 from app.modules.identity.domain.services import UserService
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
+    DirectoryUserResponse,
+    PaginatedDirectoryResponse,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
 )
 from app.modules.identity.infrastructure.repository import UserRepository
 from app.shared.exceptions import ConflictError, UnauthorizedError
+from app.shared.pagination import Pagination
 
 
 def _token_response(user) -> TokenResponse:
@@ -91,6 +95,36 @@ class GetUserByIdUseCase:
 
     async def execute(self, user_id: UUID) -> UserResponse:
         return await self.user_service.get_by_id(user_id)
+
+
+class SearchUsersUseCase:
+    """Búsqueda paginada de usuarios para los selectores.
+
+    Toma los filtros + la paginación (ya validada) y arma la respuesta paginada.
+    La ruta solo delega; el offset/limit los aporta el value object Pagination.
+    """
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(
+        self,
+        search: str | None,
+        position: UserPosition | None,
+        pagination: Pagination,
+    ) -> PaginatedDirectoryResponse:
+        items, total = await self.user_repo.search_directory(
+            search=search,
+            position=position,
+            limit=pagination.limit,
+            offset=pagination.offset,
+        )
+        return PaginatedDirectoryResponse(
+            items=[DirectoryUserResponse.model_validate(u) for u in items],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
 
 class UpdateUserUseCase:

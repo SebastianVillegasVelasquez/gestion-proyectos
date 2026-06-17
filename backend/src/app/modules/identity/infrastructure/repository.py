@@ -1,6 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.infrastructure.models import User
 from app.shared.base_repository import BaseRepository
 
@@ -15,6 +16,49 @@ class UserRepository(BaseRepository[User]):
         result = await self._session.execute(query)
 
         return result.scalars().first()
+
+    async def search_directory(
+        self,
+        search: str | None,
+        position: UserPosition | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        """Búsqueda paginada de usuarios activos por nombre/apellido/correo y cargo.
+
+        Devuelve (página de usuarios, total que cumple el filtro) para no traer
+        toda la tabla al cliente.
+        """
+        conditions = [User.is_active.is_(True), User.deleted_at.is_(None)]
+        if position is not None:
+            conditions.append(User.position == position)
+        if search:
+            like = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    User.name.ilike(like),
+                    User.last_name.ilike(like),
+                    User.email.ilike(like),
+                )
+            )
+
+        total = await self._session.scalar(
+            select(func.count()).select_from(User).where(*conditions)
+        )
+        rows = (
+            (
+                await self._session.execute(
+                    select(User)
+                    .where(*conditions)
+                    .order_by(User.name, User.last_name)
+                    .limit(limit)
+                    .offset(offset)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return list(rows), int(total or 0)
 
     async def is_email_available(self, email: str) -> bool:
         user = await self.get_by_email(email)
