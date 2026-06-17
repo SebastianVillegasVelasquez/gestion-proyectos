@@ -1,15 +1,9 @@
 import { Plus, Copy, ClipboardPaste, Trash2, Layers, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NODE_TYPE_LABELS, nodeDisplayType } from "../../types/labels";
+import { NODE_TYPE_LABELS, NODE_TYPE_DOT, nodeDisplayType } from "../../types/labels";
 import { childrenOf } from "../../builder/tree-ops";
 import type { BuilderState } from "../../builder/use-builder-state";
 import type { DraftNode } from "../../builder/draft.types";
-
-const TYPE_DOT: Record<string, string> = {
-  PROGRAMA: "bg-violet-500",
-  CURSO: "bg-blue-500",
-  MODULO: "bg-emerald-500",
-};
 
 function IconButton({
   title,
@@ -72,7 +66,7 @@ function NodeRow({ node, builder }: { node: DraftNode; builder: BuilderState }) 
           "pl-2",
         )}
       >
-        <span className={cn("h-2 w-2 shrink-0 rounded-full", TYPE_DOT[node.node_type])} />
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", NODE_TYPE_DOT[node.node_type])} />
         <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-slate-400">
           {nodeDisplayType(node)}
         </span>

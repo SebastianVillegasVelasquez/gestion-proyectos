@@ -1,4 +1,11 @@
-import type { NodeType, ProjectRole, TaskPriority, TaskStatus, UserPosition } from "./api.types";
+import type {
+  NodeType,
+  ProjectRole,
+  TaskPriority,
+  TaskStatus,
+  TeamRole,
+  UserPosition,
+} from "./api.types";
 
 export const USER_POSITION_LABELS: Record<UserPosition, string> = {
   desarrollador: "Desarrollador",
@@ -13,6 +20,11 @@ export const USER_POSITION_LABELS: Record<UserPosition, string> = {
 };
 
 export const USER_POSITIONS: UserPosition[] = Object.keys(USER_POSITION_LABELS) as UserPosition[];
+
+/** Etiqueta legible de un cargo crudo (cae al texto con guiones bajos sustituidos). */
+export function positionLabel(position: string): string {
+  return USER_POSITION_LABELS[position as UserPosition] ?? position.replace(/_/g, " ");
+}
 
 // "Líder" del proyecto = coordinador en el backend. El orden define el orden de
 // las secciones del equipo (líder primero).
@@ -40,10 +52,40 @@ export const PROJECT_ROLE_ACCENT: Record<ProjectRole, string> = {
   cliente: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
 
+// Roles dentro de un equipo de trabajo. El orden define cómo se agrupan los
+// integrantes (líder primero) en la vista de detalle.
+export const TEAM_ROLE_ORDER: TeamRole[] = ["lider", "supervisor", "integrante"];
+
+export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
+  lider: "Líder",
+  supervisor: "Supervisor",
+  integrante: "Integrante",
+};
+
+export const TEAM_ROLE_ACCENT: Record<TeamRole, string> = {
+  lider: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+  supervisor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  integrante: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+};
+
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
   PROGRAMA: "Programa",
   CURSO: "Curso",
   MODULO: "Módulo",
+};
+
+// Punto de color por tipo de nodo (consistente con el constructor de proyectos).
+export const NODE_TYPE_DOT: Record<NodeType, string> = {
+  PROGRAMA: "bg-violet-500",
+  CURSO: "bg-blue-500",
+  MODULO: "bg-emerald-500",
+};
+
+// Badge con relleno por tipo de nodo, para dar color a la estructura.
+export const NODE_TYPE_ACCENT: Record<NodeType, string> = {
+  PROGRAMA: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+  CURSO: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  MODULO: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
 };
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {

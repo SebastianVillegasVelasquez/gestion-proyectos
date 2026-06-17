@@ -21,7 +21,13 @@ from app.modules.dashboard.infrastructure.repository import (
     DashboardRepository,
     SqlAlchemyDashboardRepository,
 )
+from app.modules.collaborators.infrastructure.repository import (
+    CollaboratorRepository,
+    SqlAlchemyCollaboratorRepository,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
+from app.modules.teams.domain.repository import TeamRepository
+from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
@@ -49,6 +55,11 @@ def phase_repo_dependency(db: AsyncSession = Depends(get_db)) -> PhaseRepository
     return PhaseRepository(db)
 
 
+def team_repo_dependency(db: AsyncSession = Depends(get_db)) -> TeamRepository:
+    # Devuelve la abstracción; la implementación concreta es intercambiable (DIP).
+    return SqlAlchemyTeamRepository(db)
+
+
 def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:
     return TaskRepository(db)
 
@@ -57,6 +68,12 @@ def dashboard_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> DashboardRepository:
     return SqlAlchemyDashboardRepository(db)
+
+
+def collaborator_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> CollaboratorRepository:
+    return SqlAlchemyCollaboratorRepository(db)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

@@ -59,7 +59,7 @@ const SECTIONS: NavSection[] = [
     title: "Colaboradores",
     items: [
       { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
-      { id: "collab-individual", label: "Individual", icon: User },
+      { id: "collab-individual", label: "Individual", icon: User, href: "/collaborators" },
       { id: "collab-area", label: "Por área", icon: Users },
     ],
   },
@@ -79,6 +79,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/projects": "all-projects",
   "/projects/builder": "project-builder",
   "/workspace": "workspace",
+  "/collaborators": "collab-individual",
 };
 
 const DOT_COLORS: Record<NonNullable<NavItem["dot"]>, string> = {

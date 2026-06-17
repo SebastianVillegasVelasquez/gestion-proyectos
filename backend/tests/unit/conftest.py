@@ -5,5 +5,6 @@ pytest_plugins = [
     "tests.fixtures.unit.identity",
     "tests.fixtures.unit.project",
     "tests.fixtures.unit.dashboard",
+    "tests.fixtures.unit.collaborators",
     "tests.fixtures.global.fake_repositories",
 ]

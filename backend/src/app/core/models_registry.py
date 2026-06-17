@@ -15,6 +15,9 @@ from app.modules.tasks.infrastructure.models import (
     TaskHistory,
 )
 
+# ── Teams models ──────────────────────────────────────────────────────────────
+from app.modules.teams.infrastructure.models import Team, TeamMember
+
 __all__ = [
     # Identity
     "User",
@@ -27,4 +30,7 @@ __all__ = [
     "Task",
     "TaskHistory",
     "TaskDependency",
+    # Teams
+    "Team",
+    "TeamMember",
 ]

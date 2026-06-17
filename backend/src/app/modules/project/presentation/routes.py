@@ -9,10 +9,12 @@ from app.core.dependencies import (
     phase_repo_dependency,
     project_repo_dependency,
     project_node_repo_dependency,
+    team_repo_dependency,
     user_repo_dependency,
     project_members_repo_dependency,
 )
 from app.modules.project.application.use_cases import (
+    AssignTeamToProjectUseCase,
     CreatePhaseUseCase,
     CreateProjectNodeUseCase,
     DeletePhaseUseCase,
@@ -44,6 +46,7 @@ from app.modules.project.presentation.schemas import (
     CreateProjectNodeRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
+    AssignTeamResponse,
 )
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -261,3 +264,25 @@ async def get_project_members(
     )
 
     return await use_case.execute(project_id)
+
+
+@router.post(
+    "/{project_id}/teams/{team_id}",
+    response_model=AssignTeamResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_team_to_project(
+    project_id: UUID,
+    team_id: UUID,
+    project_repo=Depends(project_repo_dependency),
+    member_repo=Depends(project_members_repo_dependency),
+    team_repo=Depends(team_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin")),
+):
+    """Asigna un equipo al proyecto copiando sus integrantes (Opción A, snapshot)."""
+    use_case = AssignTeamToProjectUseCase(
+        project_repo=project_repo,
+        member_repo=member_repo,
+        team_repo=team_repo,
+    )
+    return await use_case.execute(project_id, team_id)

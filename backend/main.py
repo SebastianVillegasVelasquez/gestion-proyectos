@@ -11,10 +11,14 @@ from app.core.logger import get_logger
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
 from app.core.models_registry import *  # noqa: F401, F403
+from app.modules.collaborators.presentation.routes import (
+    router as collaborators_router,
+)
 from app.modules.dashboard.presentation.routes import router as dashboard_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.tasks.presentation.routes import router as tasks_router
+from app.modules.teams.presentation.routes import router as teams_router
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
@@ -107,3 +111,5 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(teams_router, prefix="/api/v1")
+app.include_router(collaborators_router, prefix="/api/v1")

@@ -154,6 +154,14 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         Enum(ProjectRole), nullable=False, default=ProjectRole.INTEGRANTE
     )
 
+    # Opción A (snapshot): de qué equipo se copió este integrante (si aplica).
+    # Permite re-sincronizar o auditar el origen sin acoplar contextos en vivo.
+    source_team_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id"),
+        nullable=True,
+    )
+
     # Relacion
     user: Mapped[User] = relationship("User", back_populates="project_members")
     project: Mapped[Project] = relationship("Project", back_populates="members")

@@ -1,8 +1,8 @@
 import http from "@/features/auth/api/http";
 import type {
   AddMemberPayload,
-  DirectoryUser,
   DirectorySearchParams,
+  DirectoryUser,
   IdentityUser,
   PaginatedDirectory,
   ProjectMember,
@@ -31,7 +31,7 @@ export const directoryApi = {
       .then((r) => r.data),
 
   // Búsqueda paginada por nombre/correo/cargo (para selectores con muchos usuarios).
-  search: ({ search, position, page = 1, pageSize = 8 }: DirectorySearchParams) => {
+  search: async ({ search, position, page = 1, pageSize = 8 }: DirectorySearchParams) => {
     // Solo enviamos los filtros que tienen valor (evita ?search=&position=).
     const params: Record<string, string | number> = { page, page_size: pageSize };
     if (search) {
@@ -40,6 +40,7 @@ export const directoryApi = {
     if (position) {
       params.position = position;
     }
-    return http.get<PaginatedDirectory>("/identity/users/search", { params }).then((r) => r.data);
+    const r = await http.get<PaginatedDirectory>("/identity/users/search", { params });
+    return r.data;
   },
 };

@@ -147,6 +147,7 @@ export interface ProjectMember {
   user_id: string;
   name: string;
   last_name: string;
+  email: string;
   position: string;
   project_role: ProjectRole;
 }
@@ -200,4 +201,39 @@ export interface IdentityUser {
   last_name: string;
   role: string;
   is_active: boolean;
+}
+
+// ── Teams (equipos de trabajo reutilizables) ─────────────────────────────────
+// Los equipos viven en su propio bounded context: son plantillas reutilizables
+// (ej. "Equipo de Desarrollo") que pueden asignarse a varios proyectos.
+
+// Rol del integrante DENTRO del equipo (distinto del rol en un proyecto).
+export type TeamRole = "lider" | "supervisor" | "integrante";
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string | null;
+  member_count: number;
+}
+
+export interface PaginatedTeams {
+  items: Team[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface TeamMember {
+  user_id: string;
+  name: string;
+  last_name: string;
+  position: string;
+  team_role: TeamRole;
+}
+
+export interface TeamSearchParams {
+  search?: string;
+  page?: number;
+  pageSize?: number;
 }

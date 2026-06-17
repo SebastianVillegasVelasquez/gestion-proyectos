@@ -23,6 +23,20 @@ export const taskKeys = {
     [...taskKeys.all, "deps", projectId, taskId] as const,
 };
 
+export const teamKeys = {
+  all: ["teams"] as const,
+  list: (params: { search?: string; page?: number; pageSize?: number }) =>
+    [
+      ...teamKeys.all,
+      "list",
+      params.search ?? "",
+      params.page ?? 1,
+      params.pageSize ?? 50,
+    ] as const,
+  detail: (id: string) => [...teamKeys.all, "detail", id] as const,
+  members: (id: string) => [...teamKeys.detail(id), "members"] as const,
+};
+
 export const directoryKeys = {
   all: ["directory"] as const,
   list: (position?: string) => [...directoryKeys.all, position ?? "todos"] as const,

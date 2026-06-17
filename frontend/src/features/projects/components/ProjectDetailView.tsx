@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Moon, Sun, Calendar, FolderTree, Users } from "lucide-react";
+import { Moon, Sun, Calendar, FolderTree, Users, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import type { Project } from "../types/api.types";
 import { ProjectActions } from "./detail/ProjectActions";
 import { StructurePanel } from "./detail/StructurePanel";
-import { TeamPanel } from "./detail/TeamPanel";
+import { MembersPanel } from "./detail/MembersPanel";
+import { WorkTeamsPanel } from "./detail/WorkTeamsPanel";
 
-type Tab = "estructura" | "equipo";
+type Tab = "estructura" | "integrantes" | "equipos";
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -83,12 +85,13 @@ export function ProjectDetailView({
         </CardContent>
       </Card>
 
-      {/* Tabs: Estructura | Equipo */}
+      {/* Tabs: Estructura | Integrantes | Equipos de trabajo */}
       <div className="flex shrink-0 gap-1 border-b border-slate-200 dark:border-slate-800">
         {(
           [
             { id: "estructura", label: "Estructura", icon: FolderTree },
-            { id: "equipo", label: "Equipo", icon: Users },
+            { id: "integrantes", label: "Integrantes", icon: Users },
+            { id: "equipos", label: "Equipos de trabajo", icon: UsersRound },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
           <button
@@ -111,10 +114,15 @@ export function ProjectDetailView({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {tab === "estructura" ? (
-          <StructurePanel projectId={project.id} />
-        ) : (
-          <TeamPanel projectId={project.id} />
+        {tab === "estructura" && <StructurePanel projectId={project.id} />}
+        {tab === "integrantes" && <MembersPanel projectId={project.id} />}
+        {tab === "equipos" && (
+          <ErrorBoundary
+            fallbackTitle="No se pudo mostrar el apartado de equipos"
+            fallbackHint="Ocurrió un error al renderizar los equipos de trabajo. Intenta recargar."
+          >
+            <WorkTeamsPanel />
+          </ErrorBoundary>
         )}
       </div>
     </div>

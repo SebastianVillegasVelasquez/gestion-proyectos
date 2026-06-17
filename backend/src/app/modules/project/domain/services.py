@@ -324,6 +324,7 @@ class ProjectMemberService:
             user_id=data.user_id,
             name=data.user.name,
             last_name=data.user.last_name,
+            email=data.user.email,
             position=data.user.position,
             project_role=data.project_role,
         )

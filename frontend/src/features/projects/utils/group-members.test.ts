@@ -7,6 +7,7 @@ function member(name: string, last: string, role: ProjectRole): ProjectMember {
     user_id: `${name}-${role}`,
     name,
     last_name: last,
+    email: `${name.toLowerCase()}@acme.com`,
     position: "sin_cargo",
     project_role: role,
   };

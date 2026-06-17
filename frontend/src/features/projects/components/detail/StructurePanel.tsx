@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { usePhases } from "../../hooks/use-phases";
 import { useNodes } from "../../hooks/use-nodes";
 import { buildNodeTree, flattenTree } from "../../utils/node-tree";
-import { nodeDisplayType } from "../../types/labels";
+import { nodeDisplayType, NODE_TYPE_DOT, NODE_TYPE_ACCENT } from "../../types/labels";
 import type { Phase } from "../../types/api.types";
 
 function formatDate(iso: string | null): string {
@@ -72,7 +72,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
 
       <section>
         <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <FolderTree className="size-4 text-slate-400" /> Estructura de contenidos
+          <FolderTree className="size-4 text-blue-500" /> Estructura de contenidos
         </h2>
         {nodesQuery.isLoading ? (
           <div className="h-24 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
@@ -86,20 +86,26 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               {flatNodes.map((node) => (
                 <div
                   key={node.id}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
                 >
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  <span
+                    className={cn("h-2 w-2 shrink-0 rounded-full", NODE_TYPE_DOT[node.node_type])}
+                  />
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                      NODE_TYPE_ACCENT[node.node_type],
+                    )}
+                  >
                     {nodeDisplayType(node)}
                   </span>
-                  <span className="truncate text-slate-700 dark:text-slate-200">{node.name}</span>
+                  <span className="truncate font-medium text-slate-700 dark:text-slate-200">
+                    {node.name}
+                  </span>
                   {node.phase_id && phasesById.has(node.phase_id) && (
-                    <span
-                      className={cn(
-                        "ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px]",
-                        "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300",
-                      )}
-                    >
+                    <span className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      <Layers className="size-2.5" />
                       {phasesById.get(node.phase_id)!.name}
                     </span>
                   )}

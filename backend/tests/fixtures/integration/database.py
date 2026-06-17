@@ -91,7 +91,7 @@ async def client(db_session):
 async def clean_database(db_session):
     yield
 
-    tables = ["users", "projects", "phases"]
+    tables = ["users", "projects", "phases", "teams"]
 
     for table in tables:
         await db_session.execute(

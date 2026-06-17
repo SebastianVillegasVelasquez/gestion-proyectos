@@ -150,9 +150,17 @@ class ProjectMemberResponse(BaseModelConfig):
     user_id: UUID
     name: str
     last_name: str
+    email: str
     position: UserPosition
     project_role: ProjectRole
 
 
 class ResponseProjectMember(BaseModelConfig):
     users: list[UserResponse] = []
+
+
+class AssignTeamResponse(BaseModelConfig):
+    """Resultado de asignar un equipo a un proyecto (Opción A, snapshot)."""
+
+    assigned: int
+    skipped: int
