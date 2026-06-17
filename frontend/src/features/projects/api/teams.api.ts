@@ -4,6 +4,7 @@ import type {
   Team,
   TeamMember,
   TeamSearchParams,
+  UpdateTeamPayload,
 } from "@/features/projects/types/api.types";
 
 // Cliente HTTP del bounded context `teams`. Solo traduce parámetros a la API;
@@ -19,6 +20,11 @@ export const teamsApi = {
   },
 
   get: (teamId: string) => http.get<Team>(`/teams/${teamId}`).then((r) => r.data),
+
+  update: (teamId: string, payload: UpdateTeamPayload) =>
+    http.patch<Team>(`/teams/${teamId}`, payload).then((r) => r.data),
+
+  remove: (teamId: string): Promise<void> => http.delete(`/teams/${teamId}`).then(() => undefined),
 
   members: (teamId: string) =>
     http.get<TeamMember[]>(`/teams/${teamId}/members`).then((r) => r.data),

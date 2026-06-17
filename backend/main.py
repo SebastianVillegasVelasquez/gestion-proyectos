@@ -10,7 +10,6 @@ from app.core.logger import get_logger
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
-from app.core.models_registry import *  # noqa: F401, F403
 from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )

@@ -224,6 +224,11 @@ export interface PaginatedTeams {
   page_size: number;
 }
 
+export interface UpdateTeamPayload {
+  name?: string;
+  description?: string | null;
+}
+
 export interface TeamMember {
   user_id: string;
   name: string;

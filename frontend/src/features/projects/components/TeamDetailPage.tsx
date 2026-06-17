@@ -1,13 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, UsersRound, Briefcase, Users2 } from "lucide-react";
+import { ArrowLeft, UsersRound, Briefcase, Users2, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/AsyncStates";
-import { useTeam, useTeamMembers } from "../hooks/use-teams";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { getErrorMessage } from "@/utils/get-error-message";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { Role } from "@/features/auth/types";
+import { useTeam, useTeamMembers, useDeleteTeam } from "../hooks/use-teams";
 import { groupTeamMembersByRole, teamMemberInitials } from "../utils/group-team-members";
 import { TEAM_ROLE_LABELS, TEAM_ROLE_ACCENT, positionLabel } from "../types/labels";
 import type { TeamMember } from "../types/api.types";
+import { EditTeamModal } from "./detail/EditTeamModal";
 
 function MemberRow({ member }: { member: TeamMember }) {
   return (
@@ -89,7 +94,30 @@ function TeamMembersList({ teamId }: { teamId: string }) {
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
   const teamQuery = useTeam(teamId);
+  const deleteTeam = useDeleteTeam();
+
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
+  // Solo administración global gestiona equipos predefinidos. El backend además
+  // lo refuerza (403), pero ocultar las acciones evita intentos inútiles.
+  const canManage = hasRole([Role.ADMIN, Role.SUPER_ADMIN]);
+
+  const team = teamQuery.data;
+
+  const handleDelete = () => {
+    if (!team) {
+      return;
+    }
+    deleteTeam.mutate(team.id, {
+      onSuccess: () => {
+        setShowDelete(false);
+        void navigate(-1);
+      },
+    });
+  };
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 overflow-y-auto p-4 sm:p-6">
@@ -103,7 +131,7 @@ export function TeamDetailPage() {
 
       {teamQuery.isLoading ? (
         <LoadingSkeleton rows={2} />
-      ) : teamQuery.isError || !teamQuery.data ? (
+      ) : teamQuery.isError || !team ? (
         <ErrorState
           title="Equipo no encontrado"
           hint="Es posible que haya sido eliminado o que no tengas acceso."
@@ -115,21 +143,43 @@ export function TeamDetailPage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
               <UsersRound className="size-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                {teamQuery.data.name}
+                {team.name}
               </h1>
-              {teamQuery.data.description && (
+              {team.description && (
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                  {teamQuery.data.description}
+                  {team.description}
                 </p>
               )}
               <p className="mt-1 flex items-center gap-1 text-xs font-medium text-violet-600 dark:text-violet-300">
                 <Users2 className="size-3.5" />
-                {teamQuery.data.member_count}{" "}
-                {teamQuery.data.member_count === 1 ? "integrante" : "integrantes"}
+                {team.member_count} {team.member_count === 1 ? "integrante" : "integrantes"}
               </p>
             </div>
+
+            {canManage && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEdit(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <Pencil className="size-3.5" /> Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDelete(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
+                >
+                  <Trash2 className="size-3.5" /> Eliminar
+                </button>
+              </div>
+            )}
           </header>
 
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Integrantes</h2>
@@ -142,6 +192,34 @@ export function TeamDetailPage() {
           >
             <TeamMembersList teamId={teamId!} />
           </ErrorBoundary>
+
+          {showEdit && (
+            <EditTeamModal
+              team={team}
+              onClose={() => {
+                setShowEdit(false);
+              }}
+            />
+          )}
+
+          {showDelete && (
+            <ConfirmDialog
+              destructive
+              title="Eliminar equipo"
+              message={`¿Seguro que quieres eliminar «${team.name}»? Los proyectos que ya lo usaron conservan sus integrantes; el equipo dejará de estar disponible para nuevas asignaciones.`}
+              confirmLabel="Eliminar"
+              loading={deleteTeam.isPending}
+              errorMessage={
+                deleteTeam.isError
+                  ? getErrorMessage(deleteTeam.error, "No se pudo eliminar el equipo")
+                  : null
+              }
+              onConfirm={handleDelete}
+              onCancel={() => {
+                setShowDelete(false);
+              }}
+            />
+          )}
         </>
       )}
     </div>
