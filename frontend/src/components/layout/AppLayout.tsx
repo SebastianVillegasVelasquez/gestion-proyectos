@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Menu, Moon, PanelLeftOpen, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 
 export interface AppOutletContext {
@@ -10,6 +10,8 @@ export interface AppOutletContext {
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Colapso del menú lateral en escritorio (se desliza para abrir/cerrar).
+  const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(true);
 
   useEffect(() => {
@@ -17,6 +19,8 @@ export const AppLayout = () => {
     const isDark = stored ? stored === "dark" : true;
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
+
+    setCollapsed(localStorage.getItem("obj-sidebar-collapsed") === "true");
   }, []);
 
   const toggleDark = () => {
@@ -24,6 +28,14 @@ export const AppLayout = () => {
     setDark(next);
     localStorage.setItem("obj-theme", next ? "dark" : "light");
     document.documentElement.classList.toggle("dark", next);
+  };
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("obj-sidebar-collapsed", String(next));
+      return next;
+    });
   };
 
   const context: AppOutletContext = { dark, toggleDark };
@@ -45,9 +57,23 @@ export const AppLayout = () => {
         onClose={() => {
           setSidebarOpen(false);
         }}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
         dark={dark}
         onToggleDark={toggleDark}
       />
+
+      {/* Botón flotante para reabrir el menú en escritorio cuando está colapsado */}
+      {collapsed && (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label="Abrir menú lateral"
+          className="fixed left-3 top-3 z-50 hidden h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 md:flex"
+        >
+          <PanelLeftOpen className="size-5" />
+        </button>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile-only topbar */}

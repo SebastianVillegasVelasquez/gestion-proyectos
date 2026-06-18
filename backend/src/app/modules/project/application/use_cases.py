@@ -29,7 +29,11 @@ from app.modules.project.presentation.schemas import (
     ProjectMemberRequest,
     ProjectMemberResponse,
 )
+from app.modules.project.domain.events import MemberAssigned
 from app.shared.base_repository import Repository
+from app.shared.events import EventBus
+
+from datetime import datetime, timezone
 
 
 class CreateProjectUseCase:
@@ -180,15 +184,37 @@ class AddMemberToProjectUseCase:
         user_repo: "Repository",
         member_repo: "ProjectMemberRepository",
         project_repo: "Repository",
+        event_bus: EventBus | None = None,
     ):
         self.member_service = ProjectMemberService(
             project_repo=project_repo,
             user_repo=user_repo,
             project_member_repo=member_repo,
         )
+        self.event_bus = event_bus
 
-    async def execute(self, data: "ProjectMemberRequest") -> "ProjectMemberResponse":
-        return await self.member_service.add_member_to_project(data)
+    async def execute(
+        self,
+        data: "ProjectMemberRequest",
+        assigned_by: UUID | None = None,
+    ) -> "ProjectMemberResponse":
+        response = await self.member_service.add_member_to_project(data)
+
+        # Publicar el hecho ya consumado. Si la persistencia falló arriba habría
+        # lanzado excepción y nunca llegamos aquí — el evento solo se emite
+        # cuando el cambio efectivamente ocurrió.
+        if self.event_bus is not None:
+            await self.event_bus.publish(
+                MemberAssigned(
+                    occurred_at=datetime.now(timezone.utc),
+                    project_id=data.project_id,
+                    user_id=data.user_id,
+                    project_role=data.project_role,
+                    assigned_by=assigned_by,
+                )
+            )
+
+        return response
 
 
 class GetProjectMembersUseCase:

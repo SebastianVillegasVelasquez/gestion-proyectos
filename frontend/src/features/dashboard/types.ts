@@ -31,6 +31,42 @@ export interface DashboardSummary {
   overdue_tasks: number;
 }
 
+// ─── Dashboard panels (API contract) ──────────────────────────────────────────
+// Datos ya filtrados/ordenados/acotados por el backend (SQL). El frontend solo
+// los transforma a los view-models de presentación.
+
+export interface DashboardTaskItem {
+  id: string;
+  title: string;
+  status: string; // value del enum de tareas del backend (ej. "en_progreso")
+  project_name: string | null;
+  due_date: string; // YYYY-MM-DD
+}
+
+export interface DashboardProjectItem {
+  id: string;
+  name: string;
+  client_name: string | null;
+  coordinator: string | null;
+  tasks_total: number;
+  tasks_completed: number;
+  progress_pct: number;
+  status: ProjectStatus;
+}
+
+export interface DashboardDeadlineItem {
+  id: string;
+  title: string;
+  project_name: string | null;
+  due_date: string; // YYYY-MM-DD
+}
+
+export interface DashboardPanels {
+  task_board: DashboardTaskItem[];
+  projects: DashboardProjectItem[];
+  upcoming_deadlines: DashboardDeadlineItem[];
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export type TaskStatus = "pending" | "in-progress" | "completed";

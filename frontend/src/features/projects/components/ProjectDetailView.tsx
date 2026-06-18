@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Moon, Sun, Calendar, FolderTree, Users, UsersRound } from "lucide-react";
+import { Moon, Sun, Calendar, FolderTree, Users, UsersRound, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
@@ -9,8 +9,9 @@ import { ProjectActions } from "./detail/ProjectActions";
 import { StructurePanel } from "./detail/StructurePanel";
 import { MembersPanel } from "./detail/MembersPanel";
 import { WorkTeamsPanel } from "./detail/WorkTeamsPanel";
+import { TraceabilityPanel } from "./detail/TraceabilityPanel";
 
-type Tab = "estructura" | "integrantes" | "equipos";
+type Tab = "estructura" | "integrantes" | "equipos" | "trazabilidad";
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -92,6 +93,7 @@ export function ProjectDetailView({
             { id: "estructura", label: "Estructura", icon: FolderTree },
             { id: "integrantes", label: "Integrantes", icon: Users },
             { id: "equipos", label: "Equipos de trabajo", icon: UsersRound },
+            { id: "trazabilidad", label: "Trazabilidad", icon: History },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
           <button
@@ -124,6 +126,7 @@ export function ProjectDetailView({
             <WorkTeamsPanel />
           </ErrorBoundary>
         )}
+        {tab === "trazabilidad" && <TraceabilityPanel projectId={project.id} />}
       </div>
     </div>
   );

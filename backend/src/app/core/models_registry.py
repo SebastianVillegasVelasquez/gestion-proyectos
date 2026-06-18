@@ -18,6 +18,9 @@ from app.modules.tasks.infrastructure.models import (
 # ── Teams models ──────────────────────────────────────────────────────────────
 from app.modules.teams.infrastructure.models import Team, TeamMember
 
+# ── Notifications models ──────────────────────────────────────────────────────
+from app.modules.notifications.infrastructure.models import Notification
+
 __all__ = [
     # Identity
     "User",
@@ -33,4 +36,6 @@ __all__ = [
     # Teams
     "Team",
     "TeamMember",
+    # Notifications
+    "Notification",
 ]

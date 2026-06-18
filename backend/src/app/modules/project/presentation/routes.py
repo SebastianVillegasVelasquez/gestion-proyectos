@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.core.dependencies import (
+    event_bus_dependency,
     require_role,
     phase_repo_dependency,
     project_repo_dependency,
@@ -236,13 +237,15 @@ async def add_project_member(
     project_repo=Depends(project_repo_dependency),
     user_repo=Depends(user_repo_dependency),
     project_member_repo=Depends(project_members_repo_dependency),
+    event_bus=Depends(event_bus_dependency),
     current_user=Depends(require_role("admin", "super_admin")),
 ):
     return await AddMemberToProjectUseCase(
         user_repo=user_repo,
         member_repo=project_member_repo,
         project_repo=project_repo,
-    ).execute(payload)
+        event_bus=event_bus,
+    ).execute(payload, assigned_by=current_user.id)
 
 
 @router.get(

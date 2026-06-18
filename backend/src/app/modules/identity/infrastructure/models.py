@@ -10,6 +10,7 @@ from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from .enums import SystemRole, UserPosition
 
 if TYPE_CHECKING:
+    from app.modules.notifications.infrastructure.models import Notification
     from app.modules.project.infrastructure.models import ProjectMember
     from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
@@ -47,6 +48,13 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     project_members: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember", back_populates="user"
+    )
+
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification",
+        foreign_keys="Notification.user_to_id",
+        back_populates="recipient",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

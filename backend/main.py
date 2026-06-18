@@ -13,8 +13,14 @@ from app.core.models_registry import *  # noqa: F401, F403
 from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )
+from app.modules.traceability.presentation.routes import (
+    router as traceability_router,
+)
 from app.modules.dashboard.presentation.routes import router as dashboard_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
+from app.modules.notifications.presentation.routes import (
+    router as notifications_router,
+)
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.tasks.presentation.routes import router as tasks_router
 from app.modules.teams.presentation.routes import router as teams_router
@@ -38,10 +44,11 @@ async def lifespan(app: FastAPI):
         debug=get_settings().DEBUG,
     )
     from app.core.seed import ensure_super_admin
-    from app.core.seed_demo import ensure_demo_data
+    from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
 
     await ensure_super_admin()
     await ensure_demo_data()
+    await ensure_demo_traceability()
     yield
     logger.info("Cerrando OBJ Digital PM")
 
@@ -112,3 +119,5 @@ app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
+app.include_router(traceability_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")

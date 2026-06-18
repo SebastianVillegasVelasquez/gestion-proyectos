@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Moon,
+  PanelLeftClose,
   Settings,
   Sun,
   User,
@@ -91,11 +92,20 @@ const DOT_COLORS: Record<NonNullable<NavItem["dot"]>, string> = {
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   dark: boolean;
   onToggleDark: () => void;
 }
 
-export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onClose,
+  collapsed,
+  onToggleCollapsed,
+  dark,
+  onToggleDark,
+}: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -116,11 +126,14 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
         "fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col",
         // Colors: light / dark
         "border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
-        // Transition for mobile slide-in
-        "transition-transform duration-300 ease-in-out",
-        // Desktop: always visible as sticky column; mobile: controlled by isOpen
-        "md:sticky md:top-0 md:translate-x-0",
-        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        // Animación del deslizamiento (posición y margen para liberar espacio)
+        "transition-[transform,margin] duration-300 ease-in-out",
+        "md:sticky md:top-0",
+        // Móvil: panel deslizante controlado por isOpen
+        isOpen ? "translate-x-0" : "-translate-x-full",
+        // Escritorio: al colapsar se desliza fuera y libera su columna
+        // (margen negativo); si no, visible en su sitio.
+        collapsed ? "md:-ml-64 md:-translate-x-full" : "md:ml-0 md:translate-x-0",
       )}
     >
       {/* Logo + mobile close button */}
@@ -138,6 +151,7 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
             </p>
           </div>
         </div>
+        {/* Móvil: cerrar el panel deslizante */}
         <button
           type="button"
           onClick={onClose}
@@ -145,6 +159,15 @@ export function Sidebar({ isOpen, onClose, dark, onToggleDark }: SidebarProps) {
           className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:hidden"
         >
           <X className="size-4" />
+        </button>
+        {/* Escritorio: colapsar/deslizar el menú para ganar espacio */}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Cerrar menú lateral"
+          className="hidden h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:flex"
+        >
+          <PanelLeftClose className="size-4" />
         </button>
       </div>
 

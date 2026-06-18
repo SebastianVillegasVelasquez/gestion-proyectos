@@ -242,3 +242,45 @@ export interface TeamSearchParams {
   page?: number;
   pageSize?: number;
 }
+
+// ── Trazabilidad (historial de eventos de un proyecto) ───────────────────────
+export type HistoryAction = "creacion" | "cambio_estado" | "reasignacion" | "comentario";
+
+// Tipo de evento clasificado por el backend (espejo del dominio).
+export type TraceabilityEventKind =
+  | "creacion"
+  | "asignacion"
+  | "inicio"
+  | "entrega"
+  | "aprobacion"
+  | "devolucion"
+  | "cancelacion"
+  | "comentario"
+  | "cambio_estado";
+
+export interface TraceabilityEvent {
+  id: string;
+  task_id: string;
+  task_title: string;
+  actor_name: string | null;
+  action: HistoryAction;
+  old_status: TaskStatus | null;
+  new_status: TaskStatus | null;
+  change_reason: string | null;
+  created_at: string;
+  kind: TraceabilityEventKind;
+  is_delay: boolean;
+}
+
+export interface TraceabilitySummary {
+  total_events: number;
+  delays: number;
+  deliveries: number;
+  returns: number;
+}
+
+export interface ProjectTraceability {
+  project_id: string;
+  summary: TraceabilitySummary;
+  events: TraceabilityEvent[];
+}

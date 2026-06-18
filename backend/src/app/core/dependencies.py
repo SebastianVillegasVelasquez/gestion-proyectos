@@ -25,9 +25,21 @@ from app.modules.collaborators.infrastructure.repository import (
     CollaboratorRepository,
     SqlAlchemyCollaboratorRepository,
 )
+from app.modules.traceability.infrastructure.repository import (
+    SqlAlchemyTraceabilityRepository,
+    TraceabilityRepository,
+)
+from app.modules.notifications.application.registry import (
+    register_notification_handlers,
+)
+from app.modules.notifications.domain.repository import NotificationRepository
+from app.modules.notifications.infrastructure.repository import (
+    SqlAlchemyNotificationRepository,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
 from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
+from app.shared.events import EventBus
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
@@ -74,6 +86,35 @@ def collaborator_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> CollaboratorRepository:
     return SqlAlchemyCollaboratorRepository(db)
+
+
+def traceability_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> TraceabilityRepository:
+    return SqlAlchemyTraceabilityRepository(db)
+
+
+def notification_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> NotificationRepository:
+    return SqlAlchemyNotificationRepository(db)
+
+
+def event_bus_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> EventBus:
+    """Construye un EventBus por-request con sus handlers ya suscritos.
+
+    Cada handler se crea con repos que comparten la misma `AsyncSession` del
+    request, así toda la transacción (cambio de dominio + notificación) viaja
+    en el mismo commit. Trade-off: el bus no es singleton — se rearma por
+    request — pero el costo es despreciable y la consistencia transaccional
+    sale gratis.
+    """
+    bus = EventBus()
+    notification_repo = SqlAlchemyNotificationRepository(db)
+    register_notification_handlers(bus, notification_repo)
+    return bus
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

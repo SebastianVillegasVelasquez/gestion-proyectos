@@ -1,0 +1,83 @@
+"""Clasificación pura de los eventos de trazabilidad.
+
+Traduce una entrada cruda del historial (`TaskHistory`) a un *tipo de evento*
+semántico y a una señal de retraso. Es lógica de negocio pura (sin BD ni
+FastAPI): una única fuente de verdad, fácil de testear y de reutilizar.
+"""
+
+import datetime
+from dataclasses import dataclass
+
+from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
+
+# Tipos de evento que entiende la línea de tiempo. El color lo decide la capa de
+# presentación (frontend); aquí solo damos el significado.
+EVENT_CREACION = "creacion"
+EVENT_ASIGNACION = "asignacion"
+EVENT_INICIO = "inicio"
+EVENT_ENTREGA = "entrega"  # enviada a revisión
+EVENT_APROBACION = "aprobacion"  # entrega final aceptada
+EVENT_DEVOLUCION = "devolucion"  # rechazo / retrabajo
+EVENT_CANCELACION = "cancelacion"
+EVENT_COMENTARIO = "comentario"
+EVENT_CAMBIO_ESTADO = "cambio_estado"  # cambio genérico sin un significado especial
+
+# Estados que "cierran" la tarea: un evento posterior a la fecha límite con uno
+# de estos NO cuenta como retraso (ya está resuelta).
+_TERMINAL = {TaskStatus.COMPLETADA, TaskStatus.CANCELADA}
+
+_STATUS_TO_KIND = {
+    TaskStatus.EN_PROGRESO: EVENT_INICIO,
+    TaskStatus.EN_REVISION: EVENT_ENTREGA,
+    TaskStatus.COMPLETADA: EVENT_APROBACION,
+    TaskStatus.DEVUELTA: EVENT_DEVOLUCION,
+    TaskStatus.CANCELADA: EVENT_CANCELACION,
+}
+
+
+@dataclass(frozen=True)
+class EventClassification:
+    kind: str
+    is_delay: bool
+
+
+def classify_event(
+    action: HistoryAction,
+    new_status: TaskStatus | None,
+    due_date: datetime.date | None,
+    occurred_on: datetime.datetime | None,
+) -> EventClassification:
+    """Devuelve el tipo de evento y si representa un retraso.
+
+    Un evento es "retraso" cuando un cambio de estado ocurre después de la fecha
+    límite de la tarea y la tarea aún no está cerrada (sigue pendiente de avanzar
+    pese a haber vencido el plazo).
+    """
+    if action == HistoryAction.CREACION:
+        kind = EVENT_CREACION
+    elif action == HistoryAction.REASIGNACION:
+        kind = EVENT_ASIGNACION
+    elif action == HistoryAction.COMENTARIO:
+        kind = EVENT_COMENTARIO
+    elif action == HistoryAction.CAMBIO_ESTADO:
+        kind = _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)
+    else:
+        kind = EVENT_CAMBIO_ESTADO
+
+    is_delay = _is_delay(action, new_status, due_date, occurred_on)
+    return EventClassification(kind=kind, is_delay=is_delay)
+
+
+def _is_delay(
+    action: HistoryAction,
+    new_status: TaskStatus | None,
+    due_date: datetime.date | None,
+    occurred_on: datetime.datetime | None,
+) -> bool:
+    if action != HistoryAction.CAMBIO_ESTADO:
+        return False
+    if due_date is None or occurred_on is None:
+        return False
+    if new_status in _TERMINAL or new_status is None:
+        return False
+    return occurred_on.date() > due_date

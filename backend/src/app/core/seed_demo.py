@@ -22,8 +22,12 @@ from app.modules.project.infrastructure.models import (
     ProjectMember,
     ProjectNode,
 )
-from app.modules.tasks.infrastructure.enums import TaskPriority, TaskStatus
-from app.modules.tasks.infrastructure.models import Task, TaskDependency
+from app.modules.tasks.infrastructure.enums import (
+    HistoryAction,
+    TaskPriority,
+    TaskStatus,
+)
+from app.modules.tasks.infrastructure.models import Task, TaskDependency, TaskHistory
 
 logger = get_logger(__name__)
 
@@ -284,3 +288,206 @@ async def ensure_demo_data() -> None:
             logger.info("Datos demo creados", project=DEMO_PROJECT_NAME)
     except Exception as exc:  # noqa: BLE001
         logger.warning("No se pudo sembrar la data demo", error=str(exc))
+
+
+def _at(day: datetime.date, hour: int = 9) -> datetime.datetime:
+    """Marca de tiempo aware (UTC) a partir de una fecha, para backfechar eventos."""
+    return datetime.datetime.combine(
+        day, datetime.time(hour), tzinfo=datetime.timezone.utc
+    )
+
+
+async def ensure_demo_traceability() -> None:
+    """Siembra historial de trazabilidad para el proyecto demo.
+
+    Idempotente y desacoplado de `ensure_demo_data`: aunque el proyecto ya
+    exista, crea los eventos si todavía no hay ninguno. Genera una secuencia
+    coherente por tarea (creación, asignación, inicio, entrega, aprobación,
+    devolución) y eventos de retraso para las tareas vencidas.
+    """
+    settings = get_settings()
+    if not settings.IS_DEV:
+        return
+    try:
+        from sqlalchemy import or_, select
+
+        async with AsyncSessionLocal() as session:
+            project_id = (
+                await session.execute(
+                    select(Project.id).where(Project.name == DEMO_PROJECT_NAME)
+                )
+            ).scalar_one_or_none()
+            if not project_id:
+                return
+
+            # Tareas del proyecto (vía nodo o fase).
+            tasks = (
+                (
+                    await session.execute(
+                        select(Task)
+                        .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
+                        .outerjoin(Phase, Task.phase_id == Phase.id)
+                        .where(
+                            Task.deleted_at.is_(None),
+                            or_(
+                                ProjectNode.project_id == project_id,
+                                Phase.project_id == project_id,
+                            ),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if not tasks:
+                return
+
+            task_ids = [t.id for t in tasks]
+            already = (
+                await session.execute(
+                    select(TaskHistory.id)
+                    .where(TaskHistory.task_id.in_(task_ids))
+                    .limit(1)
+                )
+            ).first()
+            if already:
+                logger.info("Historial demo ya presente; no se recrea")
+                return
+
+            lead = (
+                (
+                    await session.execute(
+                        select(User).where(User.email == settings.SUPERADMIN_EMAIL)
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            lead_id = lead.id if lead else None
+            today = datetime.date.today()
+
+            def evt(task, action, old, new, when, actor_id, reason=None):
+                session.add(
+                    TaskHistory(
+                        id=uuid.uuid4(),
+                        task_id=task.id,
+                        changed_by_id=actor_id,
+                        action=action,
+                        old_status=old,
+                        new_status=new,
+                        change_reason=reason,
+                        created_at=when,
+                    )
+                )
+
+            for t in tasks:
+                actor = t.assignee_id or lead_id
+                start = t.start_date
+                due = t.due_date
+
+                # Creación y asignación (al inicio de la tarea).
+                evt(
+                    t,
+                    HistoryAction.CREACION,
+                    None,
+                    None,
+                    _at(start, 8),
+                    lead_id,
+                    "Tarea creada",
+                )
+                if t.assignee_id:
+                    evt(
+                        t,
+                        HistoryAction.REASIGNACION,
+                        None,
+                        None,
+                        _at(start, 9),
+                        lead_id,
+                        "Asignación inicial del responsable",
+                    )
+
+                # Progresión de estado según el estado actual de la tarea.
+                if t.status in (
+                    TaskStatus.EN_PROGRESO,
+                    TaskStatus.EN_REVISION,
+                    TaskStatus.COMPLETADA,
+                ):
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.PENDIENTE_POR_INICIAR,
+                        TaskStatus.EN_PROGRESO,
+                        _at(start, 10),
+                        actor,
+                        "Inicia ejecución",
+                    )
+
+                if t.status in (TaskStatus.EN_REVISION, TaskStatus.COMPLETADA):
+                    # Una entrega rechazada y reenviada (muestra una devolución roja).
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.EN_PROGRESO,
+                        TaskStatus.EN_REVISION,
+                        _at(due - datetime.timedelta(days=3)),
+                        actor,
+                        "Primera entrega para revisión",
+                    )
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.EN_REVISION,
+                        TaskStatus.DEVUELTA,
+                        _at(due - datetime.timedelta(days=2)),
+                        lead_id,
+                        "Devuelta: faltan objetivos de aprendizaje",
+                    )
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.DEVUELTA,
+                        TaskStatus.EN_REVISION,
+                        _at(due - datetime.timedelta(days=1)),
+                        actor,
+                        "Reenvía con correcciones",
+                    )
+
+                if t.status == TaskStatus.COMPLETADA:
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.EN_REVISION,
+                        TaskStatus.COMPLETADA,
+                        _at(due),
+                        lead_id,
+                        "Entrega aprobada",
+                    )
+
+                # Retraso: tarea vencida que sigue abierta → evento tardío + comentario.
+                if due < today and t.status not in (
+                    TaskStatus.COMPLETADA,
+                    TaskStatus.CANCELADA,
+                ):
+                    evt(
+                        t,
+                        HistoryAction.CAMBIO_ESTADO,
+                        TaskStatus.EN_PROGRESO,
+                        TaskStatus.EN_PROGRESO,
+                        _at(today, 11),
+                        actor,
+                        "Sigue en progreso tras la fecha límite",
+                    )
+                    evt(
+                        t,
+                        HistoryAction.COMENTARIO,
+                        None,
+                        None,
+                        _at(today, 12),
+                        actor,
+                        "Reporta retraso por dependencia pendiente",
+                    )
+
+            await session.commit()
+            logger.info("Historial demo creado", project=DEMO_PROJECT_NAME)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo sembrar el historial demo", error=str(exc))

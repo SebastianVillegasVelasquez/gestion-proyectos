@@ -1,17 +1,26 @@
 import pytest
 
 from app.modules.dashboard.infrastructure.repository import (
+    DashboardPanels,
     DashboardRepository,
     DashboardSummary,
 )
 
 
 class FakeDashboardRepository(DashboardRepository):
-    def __init__(self, summary: DashboardSummary) -> None:
+    def __init__(
+        self, summary: DashboardSummary, panels: DashboardPanels | None = None
+    ) -> None:
         self._summary = summary
+        self._panels = panels or DashboardPanels()
 
     async def get_summary(self) -> DashboardSummary:
         return self._summary
+
+    async def get_panels(
+        self, board_limit: int, projects_limit: int, deadlines_limit: int
+    ) -> DashboardPanels:
+        return self._panels
 
 
 @pytest.fixture
