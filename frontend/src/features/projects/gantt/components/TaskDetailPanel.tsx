@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_PRIORITY_LABELS } from "../../types/labels";
 import type { Task, TaskStatus } from "../../types/api.types";
-import { useChangeTaskStatus, useTaskDependencies } from "../../hooks/use-tasks";
+import { useChangeTaskStatus, useProjectTasks, useTaskDependencies } from "../../hooks/use-tasks";
 import { getErrorMessage } from "@/utils/get-error-message";
 
 const STATUS_FLOW: TaskStatus[] = [
@@ -23,6 +24,15 @@ export function TaskDetailPanel({
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
   const depsQuery = useTaskDependencies(projectId, task.id);
+  const tasksQuery = useProjectTasks(projectId);
+
+  // depends_on_id → título de la tarea, para mostrar dependencias legibles
+  // (no UUIDs). Reutiliza la lista de tareas ya cacheada del proyecto.
+  const titleById = useMemo(() => {
+    const map = new Map<string, string>();
+    (tasksQuery.data ?? []).forEach((t) => map.set(t.id, t.title));
+    return map;
+  }, [tasksQuery.data]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -111,9 +121,17 @@ export function TaskDetailPanel({
           ) : (depsQuery.data?.length ?? 0) === 0 ? (
             <p className="text-sm italic text-slate-400">Sin dependencias.</p>
           ) : (
-            <ul className="list-inside list-disc text-sm text-slate-600 dark:text-slate-300">
+            <ul className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
               {depsQuery.data?.map((dep) => (
-                <li key={dep.id}>Depende de {dep.depends_on_id.slice(0, 8)}…</li>
+                <li
+                  key={dep.id}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 dark:border-slate-700"
+                >
+                  <span className="text-slate-400">Depende de</span>
+                  <span className="truncate font-medium text-slate-700 dark:text-slate-200">
+                    {titleById.get(dep.depends_on_id) ?? "otra tarea"}
+                  </span>
+                </li>
               ))}
             </ul>
           )}

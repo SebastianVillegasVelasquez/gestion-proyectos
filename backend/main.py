@@ -16,6 +16,7 @@ from app.modules.collaborators.presentation.routes import (
 from app.modules.traceability.presentation.routes import (
     router as traceability_router,
 )
+from app.modules.areas.presentation.routes import router as areas_router
 from app.modules.dashboard.presentation.routes import router as dashboard_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.notifications.presentation.routes import (
@@ -120,4 +121,5 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")
+app.include_router(areas_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

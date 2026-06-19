@@ -7,5 +7,6 @@ pytest_plugins = [
     "tests.fixtures.unit.dashboard",
     "tests.fixtures.unit.collaborators",
     "tests.fixtures.unit.traceability",
+    "tests.fixtures.unit.areas",
     "tests.fixtures.global.fake_repositories",
 ]

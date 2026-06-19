@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu, Moon, PanelLeftOpen, Sun } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Sidebar } from "@/components/layout/SideBar";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 
 export interface AppOutletContext {
   dark: boolean;
@@ -98,18 +100,28 @@ export const AppLayout = () => {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={toggleDark}
-            aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          >
-            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell placement="down" />
+            <button
+              type="button"
+              onClick={toggleDark}
+              aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
+          </div>
         </header>
 
-        {/* Page content — scrollable on mobile, fixed on desktop */}
-        <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
+        {/* Page content — scrollable on mobile, fixed on desktop.
+            Cuando el menú está colapsado dejamos un hueco a la izquierda en
+            escritorio para que el botón flotante no tape el contenido. */}
+        <main
+          className={cn(
+            "flex flex-1 flex-col overflow-y-auto lg:overflow-hidden",
+            collapsed && "md:pl-14",
+          )}
+        >
           <Outlet context={context} />
         </main>
       </div>

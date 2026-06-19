@@ -6,7 +6,10 @@ from app.modules.collaborators.application.use_cases import (
     GetCollaboratorActivityUseCase,
     ListCollaboratorsUseCase,
 )
-from app.modules.collaborators.infrastructure.repository import CollaboratorActivity
+from app.modules.collaborators.domain.models import (
+    CollaboratorCounts,
+    CollaboratorIdentity,
+)
 from app.modules.collaborators.presentation.schemas import (
     CollaboratorActivityResponse,
     PaginatedCollaboratorsResponse,
@@ -60,7 +63,8 @@ class TestGetCollaboratorActivityUseCase:
     async def test_should_raise_not_found_when_missing(
         self, build_fake_collaborator_repo
     ):
-        repo = build_fake_collaborator_repo(activity=None)
+        # Sin identidad cargada, el repo no encuentra al colaborador.
+        repo = build_fake_collaborator_repo()
 
         with pytest.raises(NotFoundError):
             await GetCollaboratorActivityUseCase(repo).execute(uuid4())
@@ -68,26 +72,25 @@ class TestGetCollaboratorActivityUseCase:
     async def test_should_return_activity_with_completion_pct(
         self, build_fake_collaborator_repo
     ):
-        activity = CollaboratorActivity(
+        identity = CollaboratorIdentity(
             user_id=uuid4(),
             name="Ana",
             last_name="García",
             email="ana@acme.com",
             position="desarrollador",
-            assigned_tasks=8,
-            completed_tasks=2,
-            in_progress_tasks=3,
+        )
+        repo = build_fake_collaborator_repo(
+            identity=identity,
+            counts=CollaboratorCounts(assigned=8, completed=2, in_progress=3),
             project_count=2,
             team_count=1,
-            tasks=[],
-            history=[],
         )
-        repo = build_fake_collaborator_repo(activity=activity)
 
-        response = await GetCollaboratorActivityUseCase(repo).execute(activity.user_id)
+        response = await GetCollaboratorActivityUseCase(repo).execute(identity.user_id)
 
         assert isinstance(response, CollaboratorActivityResponse)
         assert response.completion_pct == 25  # 2/8
+        assert response.in_progress_tasks == 3
         assert response.project_count == 2
         assert response.team_count == 1
         assert response.tasks == []

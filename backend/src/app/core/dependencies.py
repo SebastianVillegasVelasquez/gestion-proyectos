@@ -7,28 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
-from app.modules.identity.infrastructure.enums import SystemRole
-from app.modules.identity.infrastructure.repository import UserRepository
-from app.modules.identity.presentation.schemas import UserResponse
-from app.modules.project.infrastructure.enums import ProjectRole
-from app.modules.project.infrastructure.repository import (
-    PhaseRepository,
-    ProjectRepository,
-    ProjectNodeRepository,
-    ProjectMemberRepository,
+from app.modules.collaborators.domain.repository import CollaboratorRepository
+from app.modules.collaborators.infrastructure.repository import (
+    SqlAlchemyCollaboratorRepository,
 )
 from app.modules.dashboard.infrastructure.repository import (
     DashboardRepository,
     SqlAlchemyDashboardRepository,
 )
-from app.modules.collaborators.infrastructure.repository import (
-    CollaboratorRepository,
-    SqlAlchemyCollaboratorRepository,
-)
-from app.modules.traceability.infrastructure.repository import (
-    SqlAlchemyTraceabilityRepository,
-    TraceabilityRepository,
-)
+from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.repository import UserRepository
+from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.notifications.application.registry import (
     register_notification_handlers,
 )
@@ -36,9 +25,24 @@ from app.modules.notifications.domain.repository import NotificationRepository
 from app.modules.notifications.infrastructure.repository import (
     SqlAlchemyNotificationRepository,
 )
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.repository import (
+    PhaseRepository,
+    ProjectRepository,
+    ProjectNodeRepository,
+    ProjectMemberRepository,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
 from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
+from app.modules.traceability.infrastructure.repository import (
+    SqlAlchemyTraceabilityRepository,
+    TraceabilityRepository,
+)
+from app.modules.areas.infrastructure.repository import (
+    AreaRepository,
+    SqlAlchemyAreaRepository,
+)
 from app.shared.events import EventBus
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
@@ -92,6 +96,10 @@ def traceability_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> TraceabilityRepository:
     return SqlAlchemyTraceabilityRepository(db)
+
+
+def area_repo_dependency(db: AsyncSession = Depends(get_db)) -> AreaRepository:
+    return SqlAlchemyAreaRepository(db)
 
 
 def notification_repo_dependency(

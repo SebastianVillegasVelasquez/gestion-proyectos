@@ -44,6 +44,27 @@ export const STATUS_BAR_COLOR: Record<TaskStatus, string> = {
   cancelada: "bg-slate-300 dark:bg-slate-700 opacity-50",
 };
 
+// Versión tenue del color de estado: es la "pista" de la barra (duración
+// planificada) sobre la que se rellena el avance con el color sólido.
+export const STATUS_BAR_SOFT: Record<TaskStatus, string> = {
+  pendiente_por_iniciar: "bg-slate-400/25 dark:bg-slate-500/25",
+  en_progreso: "bg-blue-500/25",
+  en_revision: "bg-amber-400/25",
+  devuelta: "bg-rose-500/25",
+  completada: "bg-emerald-500/25",
+  cancelada: "bg-slate-300/40 dark:bg-slate-700/40",
+};
+
+// Punto de color por estado (para el indicador junto al título de la fila).
+export const STATUS_DOT: Record<TaskStatus, string> = {
+  pendiente_por_iniciar: "bg-slate-400",
+  en_progreso: "bg-blue-500",
+  en_revision: "bg-amber-400",
+  devuelta: "bg-rose-500",
+  completada: "bg-emerald-500",
+  cancelada: "bg-slate-300 dark:bg-slate-600",
+};
+
 export const STATUS_BADGE: Record<TaskStatus, string> = {
   pendiente_por_iniciar:
     "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",

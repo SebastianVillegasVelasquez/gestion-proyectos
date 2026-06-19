@@ -7,7 +7,7 @@ from app.modules.collaborators.application.use_cases import (
     GetCollaboratorActivityUseCase,
     ListCollaboratorsUseCase,
 )
-from app.modules.collaborators.infrastructure.repository import CollaboratorRepository
+from app.modules.collaborators.domain.repository import CollaboratorRepository
 from app.modules.collaborators.presentation.schemas import (
     CollaboratorActivityResponse,
     PaginatedCollaboratorsResponse,

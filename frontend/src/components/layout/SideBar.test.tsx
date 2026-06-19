@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { Sidebar } from "./SideBar";
 
@@ -10,7 +11,19 @@ vi.mock("react-router", () => ({
 }));
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { name: "Ana López", role: "user" } }),
+  useAuth: () => ({ user: { name: "Ana López", role: "user" }, isAuthenticated: true }),
+}));
+
+// El pie del sidebar incluye <NotificationBell/>, que consulta el backend.
+vi.mock("@/features/notifications/api/notifications.api", () => ({
+  notificationsApi: {
+    unreadCount: vi.fn().mockResolvedValue({ unread_count: 0 }),
+    list: vi
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, unread_count: 0, page: 1, page_size: 10 }),
+    markAsRead: vi.fn(),
+    markAllAsRead: vi.fn(),
+  },
 }));
 
 function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
@@ -23,7 +36,12 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
     onToggleDark: vi.fn(),
     ...overrides,
   };
-  render(<Sidebar {...props} />);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <Sidebar {...props} />
+    </QueryClientProvider>,
+  );
   return props;
 }
 

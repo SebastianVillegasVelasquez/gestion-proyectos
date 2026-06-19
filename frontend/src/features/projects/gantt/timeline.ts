@@ -47,6 +47,73 @@ export function dayOffsetPct(iso: string, range: TimelineRange): number | null {
   return ((day - range.startDay) / range.totalDays) * 100;
 }
 
+const MONTHS_ES = [
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
+];
+
+function dayParts(day: number): { y: number; m: number; d: number } {
+  const date = new Date(day * 86_400_000);
+  return { y: date.getUTCFullYear(), m: date.getUTCMonth(), d: date.getUTCDate() };
+}
+
+export interface AxisTick {
+  key: string;
+  label: string;
+  offsetPct: number;
+}
+
+/**
+ * Marcas del eje de tiempo. Para rangos cortos (≤ 45 días) marca cada semana;
+ * para los más largos, el inicio de cada mes. Devuelve etiqueta + posición en %.
+ */
+export function axisTicks(range: TimelineRange): AxisTick[] {
+  const ticks: AxisTick[] = [];
+  const endDay = range.startDay + range.totalDays;
+
+  if (range.totalDays <= 45) {
+    for (let offset = 0; offset <= range.totalDays; offset += 7) {
+      const { d, m } = dayParts(range.startDay + offset);
+      ticks.push({
+        key: `w${range.startDay + offset}`,
+        label: `${d} ${MONTHS_ES[m]}`,
+        offsetPct: (offset / range.totalDays) * 100,
+      });
+    }
+    return ticks;
+  }
+
+  const monthLabel = (day: number) => {
+    const { y, m } = dayParts(day);
+    return `${MONTHS_ES[m]} ${String(y).slice(2)}`;
+  };
+  // Primer tick en el inicio del rango.
+  ticks.push({ key: `m${range.startDay}`, label: monthLabel(range.startDay), offsetPct: 0 });
+  // Luego, el primer día de cada mes siguiente dentro del rango.
+  let { y, m } = dayParts(range.startDay);
+  let next = Date.UTC(y, m + 1, 1) / 86_400_000;
+  while (next <= endDay) {
+    ticks.push({
+      key: `m${next}`,
+      label: monthLabel(next),
+      offsetPct: ((next - range.startDay) / range.totalDays) * 100,
+    });
+    ({ y, m } = dayParts(next));
+    next = Date.UTC(y, m + 1, 1) / 86_400_000;
+  }
+  return ticks;
+}
+
 /** Posición (offset) y ancho de la barra de una tarea, en porcentaje [0..100]. */
 export function barMetrics(
   task: { start_date: string; due_date: string },

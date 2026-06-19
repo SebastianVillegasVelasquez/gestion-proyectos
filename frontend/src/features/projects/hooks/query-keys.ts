@@ -10,6 +10,7 @@ export const projectKeys = {
   nodes: (id: string) => [...projectKeys.detail(id), "nodes"] as const,
   members: (id: string) => [...projectKeys.detail(id), "members"] as const,
   traceability: (id: string) => [...projectKeys.detail(id), "traceability"] as const,
+  areas: (id: string) => [...projectKeys.detail(id), "areas"] as const,
 };
 
 export const userKeys = {

@@ -11,7 +11,6 @@ import {
   Settings,
   Sun,
   User,
-  Users,
   Users2,
   X,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { initialsFromName } from "@/features/dashboard/utils/greeting";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.SUPER_ADMIN]: "Super administrador",
@@ -61,7 +61,6 @@ const SECTIONS: NavSection[] = [
     items: [
       { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
       { id: "collab-individual", label: "Individual", icon: User, href: "/collaborators" },
-      { id: "collab-area", label: "Por área", icon: Users },
     ],
   },
   {
@@ -233,15 +232,18 @@ export function Sidebar({
               {user ? ROLE_LABELS[user.role] : ""}
             </p>
           </div>
-          {/* Dark toggle — visible only on desktop (mobile has one in the topbar) */}
-          <button
-            type="button"
-            onClick={onToggleDark}
-            aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="hidden h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 md:flex"
-          >
-            {dark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-          </button>
+          {/* Notificaciones + tema — solo escritorio (en móvil están en la barra superior) */}
+          <div className="hidden items-center gap-0.5 md:flex">
+            <NotificationBell placement="up" />
+            <button
+              type="button"
+              onClick={onToggleDark}
+              aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              {dark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+            </button>
+          </div>
         </div>
       </div>
     </aside>

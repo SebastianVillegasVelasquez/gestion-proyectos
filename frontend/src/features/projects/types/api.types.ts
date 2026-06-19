@@ -284,3 +284,19 @@ export interface ProjectTraceability {
   summary: TraceabilitySummary;
   events: TraceabilityEvent[];
 }
+
+// ── Progreso por área/equipo (agrupado por cargo) ────────────────────────────
+export interface AreaProgress {
+  position: UserPosition;
+  member_count: number;
+  assigned_tasks: number;
+  completed_tasks: number;
+  completion_pct: number;
+}
+
+export interface ProjectAreas {
+  project_id: string;
+  total_assigned: number;
+  total_completed: number;
+  areas: AreaProgress[];
+}
