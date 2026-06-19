@@ -1,12 +1,6 @@
 import enum
 
 
-class NodeType(str, enum.Enum):
-    PROGRAMA = "PROGRAMA"
-    CURSO = "CURSO"
-    MODULO = "MODULO"
-
-
 class ProjectRole(str, enum.Enum):
     """Roles contextuales dentro de los proyectos.
 

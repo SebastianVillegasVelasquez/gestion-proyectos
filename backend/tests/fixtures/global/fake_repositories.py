@@ -1,17 +1,12 @@
 import uuid
 from copy import deepcopy
-from typing import TypeVar, Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional, TypeVar
 from uuid import UUID
 
 import pytest
 
 from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.models import (
-    Phase,
-    Project,
-    ProjectNode,
-    ProjectMember,
-)
+from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.tasks.infrastructure.models import Task
 from app.shared.base_repository import Repository
 
@@ -25,19 +20,14 @@ class FakeRepository(Repository[T]):
 
     async def get_by_id(self, entity_id: UUID) -> Optional[T]:
         entity = self._storage.get(entity_id)
-        if not entity:
-            return None
-        return deepcopy(entity)
+        return deepcopy(entity) if entity else None
 
     async def get_all(self) -> List[T]:
         return [deepcopy(entity) for entity in self._storage.values()]
 
     async def save(self, entity: T) -> T:
-        current_id = getattr(entity, "id", None)
-
-        if current_id is None:
+        if getattr(entity, "id", None) is None:
             entity.id = uuid.uuid4()
-
         self._storage[entity.id] = deepcopy(entity)
         return entity
 
@@ -58,21 +48,12 @@ class FakeProjectMemberRepository(FakeRepository[ProjectMember]):
     async def get_all_members_by_project_id(
         self, project_id: UUID
     ) -> list[ProjectMember]:
-        return [
-            member
-            for member in self._storage.values()
-            if member.project_id == project_id
-        ]
+        return [m for m in self._storage.values() if m.project_id == project_id]
 
 
 @pytest.fixture
 def fake_project_repository() -> FakeRepository[Project]:
     return FakeRepository(model_cls=Project)
-
-
-@pytest.fixture
-def fake_project_node_repository():
-    return FakeRepository(model_cls=ProjectNode)
 
 
 @pytest.fixture
@@ -88,8 +69,3 @@ def fake_user_repo():
 @pytest.fixture
 def fake_task_repo():
     return FakeRepository(model_cls=Task)
-
-
-@pytest.fixture
-def fake_phase_repository():
-    return FakeRepository(model_cls=Phase)

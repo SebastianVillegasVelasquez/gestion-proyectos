@@ -1,16 +1,15 @@
-from typing import List
+from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException
-from starlette import status
-
-from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.models import ProjectNode, Project
+from app.modules.project.structure.domain.repository import WorkTreeRepository
+from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.tasks.domain.events import TaskSubmitted
 from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
     TaskStatusService,
 )
+from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
@@ -20,280 +19,141 @@ from app.modules.tasks.presentation.schemas import (
     UpdateTaskStatusRequest,
 )
 from app.shared.base_repository import Repository
+from app.shared.events import EventBus
+from app.shared.exceptions import NotFoundError
+
+
+async def _get_work_item(repo: WorkTreeRepository, work_item_id: UUID) -> WorkItem:
+    item = await repo.get_item(work_item_id)
+    if not item or getattr(item, "is_deleted", False):
+        raise NotFoundError("El elemento del árbol de trabajo no existe")
+    return item
 
 
 class CreateTaskUseCase:
-    """Crea una tarea que cuelga de un nodo (módulo/curso) O de una fase.
-
-    Valida que venga exactamente uno de los dos y que pertenezca al proyecto.
-    Si se indica `depends_on_id`, crea también la dependencia finish-to-start.
-    """
+    """Crea una tarea que cuelga de un WorkItem (cualquier nivel del árbol)."""
 
     def __init__(
         self,
-        task_repo: "TaskRepository",
-        project_repo: "Repository",
-        user_repo: "Repository",
-        project_node_repo: "Repository",
-        phase_repo: "Repository",
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        user_repo: Repository,
     ):
         self.task_repo = task_repo
-        self.project_repo = project_repo
+        self.work_tree_repo = work_tree_repo
         self.user_repo = user_repo
-        self.project_node_repo = project_node_repo
-        self.phase_repo = phase_repo
         self.service = TaskService(task_repo)
 
-    async def execute(
-        self, project_id: UUID, data: "CreateTaskRequest"
-    ) -> "TaskResponse":
-        project: Project | None = await self.project_repo.get_by_id(project_id)
-        if not project or project.is_deleted:
-            raise HTTPException(status_code=404, detail="El proyecto no existe")
-
-        if (data.node_id is None) == (data.phase_id is None):
-            raise HTTPException(
-                status_code=422,
-                detail="La tarea debe pertenecer a un nodo o a una fase (exactamente uno)",
-            )
-
-        if data.node_id is not None:
-            node: ProjectNode | None = await self.project_node_repo.get_by_id(
-                data.node_id
-            )
-            if not node or node.is_deleted or node.project_id != project_id:
-                raise HTTPException(
-                    status_code=404, detail="El nodo no existe en este proyecto"
-                )
-        else:
-            phase = await self.phase_repo.get_by_id(data.phase_id)
-            if not phase or phase.is_deleted or phase.project_id != project_id:
-                raise HTTPException(
-                    status_code=404, detail="La fase no existe en este proyecto"
-                )
+    async def execute(self, data: CreateTaskRequest) -> TaskResponse:
+        await _get_work_item(self.work_tree_repo, data.work_item_id)
 
         if data.assignee_id:
-            user: User | None = await self.user_repo.get_by_id(data.assignee_id)
+            user = await self.user_repo.get_by_id(data.assignee_id)
             if not user or user.is_deleted:
-                raise HTTPException(
-                    status_code=404, detail="El usuario asignado no existe"
-                )
+                raise NotFoundError("El usuario asignado no existe")
 
         created = await self.service.add_task(data)
-
         if data.depends_on_id is not None:
             await TaskDependencyService(self.task_repo).add_dependency(
                 created.id, data.depends_on_id
             )
-
         return created
 
 
 class GetTasksByProjectUseCase:
-    def __init__(self, task_repo: "TaskRepository", project_repo: "Repository"):
+    def __init__(self, task_repo: TaskRepository, project_repo: Repository):
         self.project_repo = project_repo
         self.service = TaskService(task_repo)
 
-    async def execute(self, project_id: UUID) -> List["TaskResponse"]:
+    async def execute(self, project_id: UUID) -> list[TaskResponse]:
         project = await self.project_repo.get_by_id(project_id)
         if not project or project.is_deleted:
-            raise HTTPException(status_code=404, detail="El proyecto no existe")
+            raise NotFoundError("El proyecto no existe")
         return await self.service.get_tasks_by_project(project_id)
 
 
-class GetTasksByNodeUseCase:
-    def __init__(
-        self,
-        task_repo: "TaskRepository",
-        project_repo: "Repository",
-        project_node_repo: "Repository",
-    ):
-        self.project_repo = project_repo
-        self.project_node_repo = project_node_repo
+class GetTasksByWorkItemUseCase:
+    def __init__(self, task_repo: TaskRepository, work_tree_repo: WorkTreeRepository):
+        self.work_tree_repo = work_tree_repo
         self.service = TaskService(task_repo)
 
-    async def execute(self, project_id: UUID, node_id: UUID) -> List["TaskResponse"]:
-        assert project_id, "El ID del proyecto es obligatorio"
-        assert node_id, "El ID del nodo es obligatorio"
-
-        project: Project | None = await self.project_repo.get_by_id(project_id)
-
-        if not project or project.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El proyecto con el id {project_id} no existe",
-            )
-
-        node: ProjectNode | None = await self.project_node_repo.get_by_id(node_id)
-
-        if not node or node.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El nodo con el id {node_id} no existe",
-            )
-
-        return await self.service.get_tasks_by_node(node_id)
+    async def execute(self, work_item_id: UUID) -> list[TaskResponse]:
+        await _get_work_item(self.work_tree_repo, work_item_id)
+        return await self.service.get_tasks_by_work_item(work_item_id)
 
 
 class GetTaskByIdUseCase:
-    def __init__(
-        self,
-        task_repo: "TaskRepository",
-        project_repo: "Repository",
-        project_node_repo: "Repository",
-    ):
-        self.project_repo = project_repo
-        self.project_node_repo = project_node_repo
+    def __init__(self, task_repo: TaskRepository):
         self.service = TaskService(task_repo)
 
-    async def execute(
-        self, project_id: UUID, node_id: UUID, task_id: UUID
-    ) -> "TaskResponse":
-        assert project_id, "El ID del proyecto es obligatorio"
-        assert node_id, "El ID del nodo es obligatorio"
-
-        project: Project | None = await self.project_repo.get_by_id(project_id)
-
-        if not project or project.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El proyecto con el id {project_id} no existe",
-            )
-
-        node: ProjectNode | None = await self.project_node_repo.get_by_id(node_id)
-
-        if not node or node.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El nodo con el id {node_id} no existe",
-            )
-
-        task = await self.service.get_task_by_id(task_id)
-
-        if not task:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="La tarea no existe"
-            )
-
-        return task
+    async def execute(self, task_id: UUID) -> TaskResponse:
+        return await self.service.get_task_by_id(task_id)
 
 
 class UpdateTaskUseCase:
-    def __init__(
-        self,
-        task_repo: "TaskRepository",
-        project_repo: "Repository",
-        user_repo: "Repository",
-        project_node_repo: "Repository",
-    ):
-        self.project_repo = project_repo
+    def __init__(self, task_repo: TaskRepository, user_repo: Repository):
         self.user_repo = user_repo
-        self.project_node_repo = project_node_repo
         self.service = TaskService(task_repo)
 
-    async def execute(
-        self, project_id: UUID, node_id: UUID, task_id: UUID, data: "UpdateTaskRequest"
-    ) -> "TaskResponse":
-        assert project_id, "El ID del proyecto es obligatorio"
-        assert node_id, "El ID del nodo es obligatorio"
-
-        project: Project | None = await self.project_repo.get_by_id(project_id)
-
-        if not project or project.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El proyecto con el id {project_id} no existe",
-            )
-
-        node: ProjectNode | None = await self.project_node_repo.get_by_id(node_id)
-
-        if not node or node.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El nodo con el id {node_id} no existe",
-            )
-
+    async def execute(self, task_id: UUID, data: UpdateTaskRequest) -> TaskResponse:
         if data.assignee_id:
-            user: User | None = await self.user_repo.get_by_id(data.assignee_id)
-
+            user = await self.user_repo.get_by_id(data.assignee_id)
             if not user or user.is_deleted:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"El usuario con el id {data.assignee_id} no existe",
-                )
-
-        task = await self.service.update_task(task_id, data)
-
-        if not task:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="La tarea no existe"
-            )
-
-        return task
+                raise NotFoundError("El usuario asignado no existe")
+        return await self.service.update_task(task_id, data)
 
 
 class DeleteTaskUseCase:
-    def __init__(
-        self,
-        task_repo: "TaskRepository",
-        project_repo: "Repository",
-        project_node_repo: "Repository",
-    ):
-        self.project_repo = project_repo
-        self.project_node_repo = project_node_repo
+    def __init__(self, task_repo: TaskRepository):
         self.service = TaskService(task_repo)
 
-    async def execute(self, project_id: UUID, node_id: UUID, task_id: UUID) -> None:
-        assert project_id, "El ID del proyecto es obligatorio"
-        assert node_id, "El ID del nodo es obligatorio"
-
-        project: Project | None = await self.project_repo.get_by_id(project_id)
-
-        if not project or project.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El proyecto con el id {project_id} no existe",
-            )
-
-        node: ProjectNode | None = await self.project_node_repo.get_by_id(node_id)
-
-        if not node or node.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"El nodo con el id {node_id} no existe",
-            )
-
-        deleted = await self.service.delete_task(task_id)
-
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="La tarea no existe"
-            )
+    async def execute(self, task_id: UUID) -> None:
+        await self.service.delete_task(task_id)
 
 
 class AddTaskDependencyUseCase:
-    def __init__(self, task_repo: "TaskRepository"):
+    def __init__(self, task_repo: TaskRepository):
         self.service = TaskDependencyService(task_repo)
 
     async def execute(
         self, task_id: UUID, depends_on_id: UUID
-    ) -> "TaskDependencyResponse":
+    ) -> TaskDependencyResponse:
         return await self.service.add_dependency(task_id, depends_on_id)
 
 
 class GetTaskDependenciesUseCase:
-    def __init__(self, task_repo: "TaskRepository"):
+    def __init__(self, task_repo: TaskRepository):
         self.service = TaskDependencyService(task_repo)
 
-    async def execute(self, task_id: UUID) -> list["TaskDependencyResponse"]:
+    async def execute(self, task_id: UUID) -> list[TaskDependencyResponse]:
         return await self.service.list_dependencies(task_id)
 
 
 class ChangeTaskStatusUseCase:
-    def __init__(self, task_repo, node_repo, phase_repo):
-        self.service = TaskStatusService(task_repo, node_repo, phase_repo)
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        bus: EventBus | None = None,
+    ):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+        self.service = TaskStatusService(task_repo)
+        self._bus = bus
 
     async def execute(
-        self, task_id: UUID, data: "UpdateTaskStatusRequest"
-    ) -> "TaskResponse":
-        return await self.service.change_status(task_id, data)
+        self, task_id: UUID, data: UpdateTaskStatusRequest
+    ) -> TaskResponse:
+        new_status = await self.service.change_status(task_id, data)
+        assert new_status.assignee_id, "El usuario asignado debe de existir"
+        if self._bus and new_status.status == TaskStatus.EN_REVISION:
+            work_item = await self.work_tree_repo.get_item(new_status.work_item_id)
+            await self._bus.publish(
+                TaskSubmitted(
+                    task_id=new_status.id,
+                    project_id=work_item.proyecto_id,
+                    assigned_id=new_status.assignee_id,
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+        return new_status

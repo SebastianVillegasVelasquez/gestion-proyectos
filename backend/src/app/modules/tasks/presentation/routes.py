@@ -1,258 +1,146 @@
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.core.dependencies import (
-    phase_repo_dependency,
-    task_repo_dependency,
-    require_project_permission,
-    project_node_repo_dependency,
-    user_repo_dependency,
+    event_bus_dependency,
     project_repo_dependency,
+    require_role,
+    task_repo_dependency,
+    user_repo_dependency,
+    worktree_repo_dependency,
 )
-from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.tasks.application.use_cases import (
     AddTaskDependencyUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
-    GetTaskDependenciesUseCase,
-    GetTasksByNodeUseCase,
-    GetTasksByProjectUseCase,
-    GetTaskByIdUseCase,
-    UpdateTaskUseCase,
     DeleteTaskUseCase,
+    GetTaskByIdUseCase,
+    GetTaskDependenciesUseCase,
+    GetTasksByProjectUseCase,
+    GetTasksByWorkItemUseCase,
+    UpdateTaskUseCase,
 )
 from app.modules.tasks.presentation.schemas import (
     CreateTaskDependencyRequest,
+    CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
-    CreateTaskRequest,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
+from app.shared.events import EventBus
 
-router = APIRouter(prefix="/tasks", tags=["Tasks"])
+router = APIRouter(tags=["Tasks"])
 
-
-@router.post(
-    "/{project_id}/tasks",
-    response_model=TaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_task_general(
-    project_id: UUID,
-    payload: CreateTaskRequest,
-    current_user=Depends(require_project_permission(ProjectRole.COORDINADOR)),
-    task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
-    user_repo=Depends(user_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
-    phase_repo=Depends(phase_repo_dependency),
-):
-    use_case = CreateTaskUseCase(
-        task_repo, project_repo, user_repo, project_node_repo, phase_repo
-    )
-    return await use_case.execute(project_id=project_id, data=payload)
+_admin = require_role("admin", "super_admin")
+_any_user = require_role("admin", "super_admin", "user")
 
 
-@router.get(
-    "/{project_id}/tasks",
-    response_model=List[TaskResponse],
-    status_code=status.HTTP_200_OK,
-)
-async def get_project_tasks(
-    project_id: UUID,
-    current_user=Depends(
-        require_project_permission(
-            ProjectRole.COORDINADOR,
-            ProjectRole.INTEGRANTE,
-            ProjectRole.SUPERVISOR,
-            ProjectRole.REVISOR,
-        )
-    ),
-    task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
-):
-    use_case = GetTasksByProjectUseCase(task_repo, project_repo)
-    return await use_case.execute(project_id=project_id)
-
-
-@router.post(
-    "/{project_id}/nodes/{node_id}/tasks",
-    response_model=TaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+# ── Tareas ────────────────────────────────────────────────────────────────────
+@router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
-    project_id: UUID,
-    node_id: UUID,
     payload: CreateTaskRequest,
-    current_user=Depends(require_project_permission(ProjectRole.COORDINADOR)),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
-    phase_repo=Depends(phase_repo_dependency),
 ):
-    payload.node_id = node_id
-    payload.phase_id = None
-    use_case = CreateTaskUseCase(
-        task_repo, project_repo, user_repo, project_node_repo, phase_repo
+    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo).execute(
+        payload
     )
-    return await use_case.execute(project_id=project_id, data=payload)
 
 
-@router.get(
-    "/{project_id}/nodes/{node_id}/tasks",
-    response_model=List[TaskResponse],
-    status_code=status.HTTP_200_OK,
-)
-async def get_tasks_by_node(
-    project_id: UUID,
-    node_id: UUID,
-    current_user=Depends(
-        require_project_permission(
-            ProjectRole.COORDINADOR,
-            ProjectRole.INTEGRANTE,
-            ProjectRole.SUPERVISOR,
-            ProjectRole.REVISOR,
-        )
-    ),
-    task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
-):
-    use_case = GetTasksByNodeUseCase(task_repo, project_repo, project_node_repo)
-    return await use_case.execute(project_id=project_id, node_id=node_id)
-
-
-@router.get(
-    "/{project_id}/nodes/{node_id}/tasks/{task_id}",
-    response_model=TaskResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_task_by_id(
-    project_id: UUID,
-    node_id: UUID,
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
+async def get_task(
     task_id: UUID,
-    current_user=Depends(
-        require_project_permission(
-            ProjectRole.COORDINADOR,
-            ProjectRole.INTEGRANTE,
-            ProjectRole.SUPERVISOR,
-            ProjectRole.REVISOR,
-        )
-    ),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
 ):
-    use_case = GetTaskByIdUseCase(task_repo, project_repo, project_node_repo)
-    return await use_case.execute(
-        project_id=project_id, node_id=node_id, task_id=task_id
-    )
+    return await GetTaskByIdUseCase(task_repo).execute(task_id)
 
 
-@router.patch(
-    "/{project_id}/nodes/{node_id}/tasks/{task_id}",
-    response_model=TaskResponse,
-    status_code=status.HTTP_200_OK,
-)
+@router.patch("/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(
-    project_id: UUID,
-    node_id: UUID,
     task_id: UUID,
     payload: UpdateTaskRequest,
-    current_user=Depends(require_project_permission(ProjectRole.COORDINADOR)),
+    current_user=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+):
+    return await UpdateTaskUseCase(task_repo, user_repo).execute(task_id, payload)
+
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: UUID,
+    current_user=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+):
+    await DeleteTaskUseCase(task_repo).execute(task_id)
+
+
+# ── Listados ─────────────────────────────────────────────────────────────────
+@router.get("/projects/{project_id}/tasks", response_model=list[TaskResponse])
+async def get_project_tasks(
+    project_id: UUID,
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     project_repo=Depends(project_repo_dependency),
-    user_repo=Depends(user_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
 ):
-    use_case = UpdateTaskUseCase(task_repo, project_repo, user_repo, project_node_repo)
-    return await use_case.execute(
-        project_id=project_id, node_id=node_id, task_id=task_id, data=payload
+    return await GetTasksByProjectUseCase(task_repo, project_repo).execute(project_id)
+
+
+@router.get("/work-items/{work_item_id}/tasks", response_model=list[TaskResponse])
+async def get_work_item_tasks(
+    work_item_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+):
+    return await GetTasksByWorkItemUseCase(task_repo, work_tree_repo).execute(
+        work_item_id
     )
 
 
-@router.delete(
-    "/{project_id}/nodes/{node_id}/tasks/{task_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_task(
-    project_id: UUID,
-    node_id: UUID,
-    task_id: UUID,
-    current_user=Depends(require_project_permission(ProjectRole.COORDINADOR)),
-    task_repo=Depends(task_repo_dependency),
-    project_repo=Depends(project_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
-):
-    use_case = DeleteTaskUseCase(task_repo, project_repo, project_node_repo)
-    await use_case.execute(project_id=project_id, node_id=node_id, task_id=task_id)
-
-
-# --- DEPENDENCIAS Y CAMBIO DE ESTADO ---
-
-
+# ── Dependencias y estado ────────────────────────────────────────────────────
 @router.post(
-    "/{project_id}/tasks/{task_id}/dependencies",
+    "/tasks/{task_id}/dependencies",
     response_model=TaskDependencyResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def add_task_dependency(
-    project_id: UUID,
     task_id: UUID,
     payload: CreateTaskDependencyRequest,
-    current_user=Depends(
-        require_project_permission(ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR)
-    ),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
-    use_case = AddTaskDependencyUseCase(task_repo)
-    return await use_case.execute(task_id=task_id, depends_on_id=payload.depends_on_id)
+    return await AddTaskDependencyUseCase(task_repo).execute(
+        task_id, payload.depends_on_id
+    )
 
 
 @router.get(
-    "/{project_id}/tasks/{task_id}/dependencies",
-    response_model=List[TaskDependencyResponse],
-    status_code=status.HTTP_200_OK,
+    "/tasks/{task_id}/dependencies", response_model=list[TaskDependencyResponse]
 )
-async def get_task_dependencies(
-    project_id: UUID,
+async def list_task_dependencies(
     task_id: UUID,
-    current_user=Depends(
-        require_project_permission(
-            ProjectRole.COORDINADOR,
-            ProjectRole.INTEGRANTE,
-            ProjectRole.SUPERVISOR,
-            ProjectRole.REVISOR,
-        )
-    ),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
-    use_case = GetTaskDependenciesUseCase(task_repo)
-    return await use_case.execute(task_id=task_id)
+    return await GetTaskDependenciesUseCase(task_repo).execute(task_id)
 
 
-@router.patch(
-    "/{project_id}/tasks/{task_id}/status",
-    response_model=TaskResponse,
-    status_code=status.HTTP_200_OK,
-)
+@router.patch("/tasks/{task_id}/status", response_model=TaskResponse)
 async def change_task_status(
-    project_id: UUID,
     task_id: UUID,
     payload: UpdateTaskStatusRequest,
-    current_user=Depends(
-        require_project_permission(
-            ProjectRole.COORDINADOR, ProjectRole.INTEGRANTE, ProjectRole.REVISOR
-        )
-    ),
+    bus: EventBus = Depends(event_bus_dependency),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
-    project_node_repo=Depends(project_node_repo_dependency),
-    phase_repo=Depends(phase_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
 ):
-    use_case = ChangeTaskStatusUseCase(task_repo, project_node_repo, phase_repo)
-    return await use_case.execute(task_id=task_id, data=payload)
+    return await ChangeTaskStatusUseCase(task_repo, work_tree_repo, bus).execute(
+        task_id, payload
+    )

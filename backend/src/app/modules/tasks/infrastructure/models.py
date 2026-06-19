@@ -18,7 +18,7 @@ from app.shared.base_entity import UUIDMixin, TimestampMixin, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.modules.identity.infrastructure.models import User
-    from app.modules.project.infrastructure.models import Phase, ProjectNode
+    from app.modules.project.structure.infrastructure.models import WorkItem
 
 
 class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -38,13 +38,11 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
-    # Una tarea cuelga de un nodo (módulo/curso) O directamente de una fase
-    # (algo más general). El servicio garantiza que venga exactamente uno.
-    node_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_nodes.id"), nullable=True
-    )
-    phase_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("phases.id"), nullable=True
+    # Las tareas cuelgan del árbol flexible: de un WorkItem (cualquier nivel:
+    # módulo, fase, componente, actividad…). El nivel lo decide el usuario al
+    # configurar la estructura del proyecto.
+    work_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_items.id"), nullable=False, index=True
     )
     assignee_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -63,8 +61,7 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         DateTime(timezone=True), nullable=True
     )
 
-    node: Mapped[Optional["ProjectNode"]] = relationship("ProjectNode")
-    phase: Mapped[Optional["Phase"]] = relationship("Phase")
+    work_item: Mapped["WorkItem"] = relationship("WorkItem", lazy="raise")
     assignee: Mapped["User"] = relationship("User")
     history: Mapped[list["TaskHistory"]] = relationship(
         "TaskHistory", back_populates="task", cascade="all, delete-orphan"

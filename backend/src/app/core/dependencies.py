@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
+from app.modules.areas.infrastructure.repository import (
+    AreaRepository,
+    SqlAlchemyAreaRepository,
+)
 from app.modules.collaborators.domain.repository import CollaboratorRepository
 from app.modules.collaborators.infrastructure.repository import (
     SqlAlchemyCollaboratorRepository,
@@ -27,10 +31,8 @@ from app.modules.notifications.infrastructure.repository import (
 )
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.repository import (
-    PhaseRepository,
-    ProjectRepository,
-    ProjectNodeRepository,
     ProjectMemberRepository,
+    ProjectRepository,
 )
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
@@ -39,9 +41,9 @@ from app.modules.traceability.infrastructure.repository import (
     SqlAlchemyTraceabilityRepository,
     TraceabilityRepository,
 )
-from app.modules.areas.infrastructure.repository import (
-    AreaRepository,
-    SqlAlchemyAreaRepository,
+from app.modules.project.structure.domain.repository import WorkTreeRepository
+from app.modules.project.structure.infrastructure.repository import (
+    SqlAlchemyWorkTreeRepository,
 )
 from app.shared.events import EventBus
 from app.shared.exceptions import ForbiddenError, NotFoundError
@@ -55,25 +57,21 @@ def user_repo_dependency(db: AsyncSession = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
 
 
-def project_node_repo_dependency(
-    db: AsyncSession = Depends(get_db),
-) -> ProjectNodeRepository:
-    return ProjectNodeRepository(db)
-
-
 def project_members_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> ProjectMemberRepository:
     return ProjectMemberRepository(db)
 
 
-def phase_repo_dependency(db: AsyncSession = Depends(get_db)) -> PhaseRepository:
-    return PhaseRepository(db)
-
-
 def team_repo_dependency(db: AsyncSession = Depends(get_db)) -> TeamRepository:
     # Devuelve la abstracción; la implementación concreta es intercambiable (DIP).
     return SqlAlchemyTeamRepository(db)
+
+
+def worktree_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> WorkTreeRepository:
+    return SqlAlchemyWorkTreeRepository(db)
 
 
 def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:

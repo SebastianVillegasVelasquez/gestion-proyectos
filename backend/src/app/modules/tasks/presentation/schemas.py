@@ -21,11 +21,8 @@ class TaskBase(BaseModelConfig):
 
 
 class CreateTaskRequest(TaskBase):
-    # La tarea cuelga de un nodo (módulo/curso) O de una fase. El caso de uso
-    # valida que venga exactamente uno (la ruta anidada fija node_id).
-    node_id: Optional[UUID] = None
-    phase_id: Optional[UUID] = None
-    # Subtarea opcional y dependencia opcional al crear.
+    # Las tareas cuelgan del árbol flexible: de un WorkItem (cualquier nivel).
+    work_item_id: UUID
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
 
@@ -47,8 +44,7 @@ class CreateTaskRequest(TaskBase):
 
 class TaskResponse(TaskBase):
     id: UUID
-    node_id: Optional[UUID] = None
-    phase_id: Optional[UUID] = None
+    work_item_id: UUID
     parent_task_id: Optional[UUID] = None
     start_date: date
     due_date: date

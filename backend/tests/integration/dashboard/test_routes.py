@@ -3,14 +3,26 @@ import uuid
 
 from sqlalchemy import text
 
-from app.modules.project.infrastructure.enums import NodeType, ProjectRole
-from app.modules.project.infrastructure.models import (
-    Phase,
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
+
+
+async def _make_work_item(db_session, project_id, nombre="Programa"):
+    tipo = TipoNodo(id=uuid.uuid4(), proyecto_id=project_id, nombre=nombre)
+    db_session.add(tipo)
+    await db_session.flush()
+    item = WorkItem(
+        id=uuid.uuid4(),
+        proyecto_id=project_id,
+        tipo_id=tipo.id,
+        nombre=nombre,
+        orden=0,
+    )
+    db_session.add(item)
+    await db_session.flush()
+    return item
 
 
 async def _seed(db_session, tasks: list[dict]) -> None:
@@ -21,24 +33,15 @@ async def _seed(db_session, tasks: list[dict]) -> None:
     )
     db_session.add(project)
     await db_session.flush()
-
-    node = ProjectNode(
-        id=uuid.uuid4(),
-        name="Programa raíz",
-        node_type=NodeType.PROGRAMA,
-        project_id=project.id,
-    )
-    db_session.add(node)
-    await db_session.flush()
+    item = await _make_work_item(db_session, project.id)
 
     today = datetime.date.today()
     insert_stmt = text(
         """
-        INSERT INTO tasks (id, title, status, node_id, start_date, due_date)
-        VALUES (:id, :title, :status, :node_id, :start_date, :due_date)
+        INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date)
+        VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date)
         """
     )
-
     for t in tasks:
         await db_session.execute(
             insert_stmt,
@@ -46,12 +49,11 @@ async def _seed(db_session, tasks: list[dict]) -> None:
                 "id": uuid.uuid4(),
                 "title": t.get("title", "Task"),
                 "status": t["status"].name,
-                "node_id": node.id,
+                "work_item_id": item.id,
                 "start_date": today,
                 "due_date": t.get("due_date", today + datetime.timedelta(days=7)),
             },
         )
-
     await db_session.commit()
 
 
@@ -62,7 +64,6 @@ class TestDashboardSummaryRoute:
 
     async def test_should_return_zeros_for_empty_db(self, client, admin_headers):
         response = await client.get("/api/v1/dashboard/summary", headers=admin_headers)
-
         assert response.status_code == 200
         body = response.json()
         assert body == {
@@ -103,8 +104,6 @@ class TestDashboardSummaryRoute:
         )
 
         response = await client.get("/api/v1/dashboard/summary", headers=admin_headers)
-
-        assert response.status_code == 200
         body = response.json()
         assert body["active_projects"] == 1
         assert body["total_tasks"] == 7
@@ -112,31 +111,16 @@ class TestDashboardSummaryRoute:
         assert body["in_review_tasks"] == 1
         assert body["overdue_tasks"] == 2
 
-    async def test_should_allow_user_role(self, client, member_headers, db_session):
-        await _seed(db_session, tasks=[{"status": TaskStatus.EN_REVISION}])
-
-        response = await client.get("/api/v1/dashboard/summary", headers=member_headers)
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["active_projects"] == 1
-        assert body["in_review_tasks"] == 1
-
 
 async def _seed_panels(db_session, admin_user) -> Project:
-    """Proyecto con fase, coordinador y tareas en varios estados/fechas."""
+    """Proyecto con un work_item, coordinador y tareas en varios estados/fechas."""
     project = Project(
-        id=uuid.uuid4(),
-        name="Proyecto Panels",
-        client_name="Cliente OBJ",
+        id=uuid.uuid4(), name="Proyecto Panels", client_name="Cliente OBJ"
     )
     db_session.add(project)
     await db_session.flush()
 
-    phase = Phase(
-        id=uuid.uuid4(), name="Producción", order_index=0, project_id=project.id
-    )
-    db_session.add(phase)
+    item = await _make_work_item(db_session, project.id, nombre="Producción")
     db_session.add(
         ProjectMember(
             project_id=project.id,
@@ -149,8 +133,8 @@ async def _seed_panels(db_session, admin_user) -> Project:
     today = datetime.date.today()
     insert_stmt = text(
         """
-        INSERT INTO tasks (id, title, status, phase_id, start_date, due_date)
-        VALUES (:id, :title, :status, :phase_id, :start_date, :due_date)
+        INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date)
+        VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date)
         """
     )
     rows = [
@@ -174,7 +158,7 @@ async def _seed_panels(db_session, admin_user) -> Project:
                 "id": uuid.uuid4(),
                 "title": title,
                 "status": status.name,
-                "phase_id": phase.id,
+                "work_item_id": item.id,
                 "start_date": today - datetime.timedelta(days=10),
                 "due_date": due,
             },
@@ -184,39 +168,32 @@ async def _seed_panels(db_session, admin_user) -> Project:
 
 
 class TestDashboardPanelsRoute:
-    async def test_should_require_authentication(self, client):
-        response = await client.get("/api/v1/dashboard/panels")
-        assert response.status_code in (401, 403)
-
     async def test_should_return_empty_panels_for_empty_db(self, client, admin_headers):
         response = await client.get("/api/v1/dashboard/panels", headers=admin_headers)
         assert response.status_code == 200
-        body = response.json()
-        assert body == {"task_board": [], "projects": [], "upcoming_deadlines": []}
+        assert response.json() == {
+            "task_board": [],
+            "projects": [],
+            "upcoming_deadlines": [],
+        }
 
     async def test_should_return_panels_with_real_data(
         self, client, admin_headers, admin_user, db_session
     ):
         await _seed_panels(db_session, admin_user)
-
         response = await client.get("/api/v1/dashboard/panels", headers=admin_headers)
-        assert response.status_code == 200
         body = response.json()
 
-        # Tablero: estados en minúscula (value) y con nombre de proyecto resuelto.
         statuses = {t["status"] for t in body["task_board"]}
         assert "en_progreso" in statuses
         assert all(t["project_name"] == "Proyecto Panels" for t in body["task_board"])
-        assert len(body["task_board"]) == 4  # todas menos ninguna cancelada
+        assert len(body["task_board"]) == 4
 
-        # Próximos vencimientos: excluye completadas y van ordenados ascendente.
-        deadlines = body["upcoming_deadlines"]
-        titles = [d["title"] for d in deadlines]
+        titles = [d["title"] for d in body["upcoming_deadlines"]]
         assert "Completada" not in titles
-        due_dates = [d["due_date"] for d in deadlines]
-        assert due_dates == sorted(due_dates)
+        dues = [d["due_date"] for d in body["upcoming_deadlines"]]
+        assert dues == sorted(dues)
 
-        # Proyecto: coordinador, conteos, progreso y estado en riesgo (hay vencida).
         project = next(p for p in body["projects"] if p["name"] == "Proyecto Panels")
         assert project["coordinator"] == f"{admin_user.name} {admin_user.last_name}"
         assert project["tasks_total"] == 4

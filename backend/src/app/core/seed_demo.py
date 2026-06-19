@@ -1,7 +1,7 @@
 """Datos de demostración para el entorno de desarrollo.
 
-Crea un proyecto completo (fases, estructura, equipo y tareas con dependencias
-y fechas variadas, incluyendo una vencida) para ver las vistas con datos reales.
+Crea un proyecto completo (árbol de trabajo flexible, equipo y tareas con
+dependencias y fechas variadas) para ver las vistas con datos reales.
 Idempotente: si el proyecto demo ya existe, no hace nada.
 """
 
@@ -15,13 +15,9 @@ from app.core.logger import get_logger
 from app.core.security import hash_password
 from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.enums import NodeType, ProjectRole
-from app.modules.project.infrastructure.models import (
-    Phase,
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import (
     HistoryAction,
     TaskPriority,
@@ -87,8 +83,6 @@ async def ensure_demo_data() -> None:
                 return
 
             today = datetime.date.today()
-
-            # Equipo
             users = [await _ensure_user(session, *u) for u in _DEMO_USERS]
             lead = (
                 (
@@ -100,11 +94,10 @@ async def ensure_demo_data() -> None:
                 .first()
             )
 
-            # Proyecto
             project = Project(
                 id=uuid.uuid4(),
                 name=DEMO_PROJECT_NAME,
-                description="Virtualización de un diplomado en 3 fases.",
+                description="Virtualización de un diplomado, en árbol flexible.",
                 client_name="Universidad OBJ",
                 start_date=today - datetime.timedelta(days=20),
                 end_date=today + datetime.timedelta(days=60),
@@ -113,7 +106,6 @@ async def ensure_demo_data() -> None:
             session.add(project)
             await session.flush()
 
-            # Miembros (líder + equipo)
             if lead:
                 session.add(
                     ProjectMember(
@@ -122,87 +114,62 @@ async def ensure_demo_data() -> None:
                         project_role=ProjectRole.COORDINADOR,
                     )
                 )
-            roles = [
-                ProjectRole.INTEGRANTE,
-                ProjectRole.REVISOR,
-                ProjectRole.INTEGRANTE,
-            ]
-            for user, role in zip(users, roles):
+            for user, role in zip(
+                users,
+                [ProjectRole.INTEGRANTE, ProjectRole.REVISOR, ProjectRole.INTEGRANTE],
+            ):
                 session.add(
                     ProjectMember(
                         project_id=project.id, user_id=user.id, project_role=role
                     )
                 )
 
-            # Fases
-            phases = [
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Planeación",
-                    order_index=0,
-                    duration_days=15,
-                    project_id=project.id,
-                ),
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Producción",
-                    order_index=1,
-                    duration_days=30,
-                    project_id=project.id,
-                ),
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Publicación",
-                    order_index=2,
-                    duration_days=10,
-                    project_id=project.id,
-                ),
-            ]
-            session.add_all(phases)
+            # Tipos de nodo del proyecto (catálogo flexible).
+            t_fase = TipoNodo(id=uuid.uuid4(), proyecto_id=project.id, nombre="Fase")
+            t_modulo = TipoNodo(
+                id=uuid.uuid4(), proyecto_id=project.id, nombre="Módulo"
+            )
+            session.add_all([t_fase, t_modulo])
             await session.flush()
 
-            # Estructura (Programa > Curso > Módulos) en la fase de producción
-            programa = ProjectNode(
-                id=uuid.uuid4(),
-                name="Programa principal",
-                node_type=NodeType.PROGRAMA,
-                project_id=project.id,
-                phase_id=phases[1].id,
-            )
-            session.add(programa)
-            await session.flush()
-            curso = ProjectNode(
-                id=uuid.uuid4(),
-                name="Curso de Fundamentos",
-                node_type=NodeType.CURSO,
-                project_id=project.id,
-                phase_id=phases[1].id,
-                parent_id=programa.id,
-            )
-            session.add(curso)
-            await session.flush()
-            modulos = [
-                ProjectNode(
+            # Árbol: 3 fases en paralelo; la fase de Producción tiene 3 módulos.
+            def fase(nombre, orden, dur):
+                return WorkItem(
                     id=uuid.uuid4(),
-                    name=f"Unidad {i}",
-                    node_type=NodeType.MODULO,
-                    type_label="Unidad",
-                    project_id=project.id,
-                    phase_id=phases[1].id,
-                    parent_id=curso.id,
+                    proyecto_id=project.id,
+                    tipo_id=t_fase.id,
+                    nombre=nombre,
+                    orden=orden,
+                    duracion_valor=dur,
+                    duracion_unidad="dias",
+                )
+
+            f_planeacion = fase("Planeación", 0, 15)
+            f_produccion = fase("Producción", 1, 30)
+            f_publicacion = fase("Publicación", 2, 10)
+            session.add_all([f_planeacion, f_produccion, f_publicacion])
+            await session.flush()
+
+            modulos = [
+                WorkItem(
+                    id=uuid.uuid4(),
+                    proyecto_id=project.id,
+                    parent_id=f_produccion.id,
+                    tipo_id=t_modulo.id,
+                    nombre=f"Unidad {i}",
+                    orden=i - 1,
                 )
                 for i in (1, 2, 3)
             ]
             session.add_all(modulos)
             await session.flush()
 
-            # Tareas con fechas variadas (incluida una vencida) y dependencia
+            # Tareas con fechas variadas y una dependencia FtS.
             def task(
                 title,
                 *,
-                phase=None,
-                node=None,
-                assignee=None,
+                work_item_id,
+                assignee,
                 status,
                 start_offset,
                 dur,
@@ -215,8 +182,7 @@ async def ensure_demo_data() -> None:
                     title=title,
                     status=status,
                     priority=priority,
-                    phase_id=phase,
-                    node_id=node,
+                    work_item_id=work_item_id,
                     assignee_id=assignee,
                     start_date=start,
                     due_date=start + datetime.timedelta(days=dur),
@@ -229,7 +195,7 @@ async def ensure_demo_data() -> None:
 
             t_plan = task(
                 "Definir cronograma y alcance",
-                phase=phases[0].id,
+                work_item_id=f_planeacion.id,
                 assignee=users[1].id,
                 status=TaskStatus.COMPLETADA,
                 start_offset=-18,
@@ -238,17 +204,17 @@ async def ensure_demo_data() -> None:
             )
             task(
                 "Aprobar plan con el cliente",
-                phase=phases[0].id,
+                work_item_id=f_planeacion.id,
                 assignee=lead.id if lead else None,
                 status=TaskStatus.EN_REVISION,
                 start_offset=-6,
                 dur=8,
                 priority=TaskPriority.ALTA,
             )
-            # Vencida: debía terminar hace días y sigue en progreso
+            # Vencida: debía terminar hace días y sigue en progreso.
             task(
                 "Guion de la Unidad 1",
-                node=modulos[0].id,
+                work_item_id=modulos[0].id,
                 assignee=users[2].id,
                 status=TaskStatus.EN_PROGRESO,
                 start_offset=-10,
@@ -257,7 +223,7 @@ async def ensure_demo_data() -> None:
             )
             dev_task = task(
                 "Maquetar Unidad 1 en LMS",
-                node=modulos[0].id,
+                work_item_id=modulos[0].id,
                 assignee=users[0].id,
                 status=TaskStatus.PENDIENTE_POR_INICIAR,
                 start_offset=2,
@@ -265,7 +231,7 @@ async def ensure_demo_data() -> None:
             )
             task(
                 "Guion de la Unidad 2",
-                node=modulos[1].id,
+                work_item_id=modulos[1].id,
                 assignee=users[2].id,
                 status=TaskStatus.PENDIENTE_POR_INICIAR,
                 start_offset=5,
@@ -273,7 +239,7 @@ async def ensure_demo_data() -> None:
             )
             task(
                 "Publicación final",
-                phase=phases[2].id,
+                work_item_id=f_publicacion.id,
                 assignee=lead.id if lead else None,
                 status=TaskStatus.PENDIENTE_POR_INICIAR,
                 start_offset=45,
@@ -281,9 +247,7 @@ async def ensure_demo_data() -> None:
             )
 
             await session.flush()
-            # Maquetar depende del guion (finish-to-start)
             session.add(TaskDependency(task_id=dev_task.id, depends_on_id=t_plan.id))
-
             await session.commit()
             logger.info("Datos demo creados", project=DEMO_PROJECT_NAME)
     except Exception as exc:  # noqa: BLE001
@@ -291,25 +255,18 @@ async def ensure_demo_data() -> None:
 
 
 def _at(day: datetime.date, hour: int = 9) -> datetime.datetime:
-    """Marca de tiempo aware (UTC) a partir de una fecha, para backfechar eventos."""
     return datetime.datetime.combine(
         day, datetime.time(hour), tzinfo=datetime.timezone.utc
     )
 
 
 async def ensure_demo_traceability() -> None:
-    """Siembra historial de trazabilidad para el proyecto demo.
-
-    Idempotente y desacoplado de `ensure_demo_data`: aunque el proyecto ya
-    exista, crea los eventos si todavía no hay ninguno. Genera una secuencia
-    coherente por tarea (creación, asignación, inicio, entrega, aprobación,
-    devolución) y eventos de retraso para las tareas vencidas.
-    """
+    """Siembra historial de trazabilidad para el proyecto demo (idempotente)."""
     settings = get_settings()
     if not settings.IS_DEV:
         return
     try:
-        from sqlalchemy import or_, select
+        from sqlalchemy import select
 
         async with AsyncSessionLocal() as session:
             project_id = (
@@ -320,19 +277,15 @@ async def ensure_demo_traceability() -> None:
             if not project_id:
                 return
 
-            # Tareas del proyecto (vía nodo o fase).
+            # Tareas del proyecto vía su WorkItem.
             tasks = (
                 (
                     await session.execute(
                         select(Task)
-                        .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
-                        .outerjoin(Phase, Task.phase_id == Phase.id)
+                        .join(WorkItem, Task.work_item_id == WorkItem.id)
                         .where(
                             Task.deleted_at.is_(None),
-                            or_(
-                                ProjectNode.project_id == project_id,
-                                Phase.project_id == project_id,
-                            ),
+                            WorkItem.proyecto_id == project_id,
                         )
                     )
                 )
@@ -382,10 +335,8 @@ async def ensure_demo_traceability() -> None:
 
             for t in tasks:
                 actor = t.assignee_id or lead_id
-                start = t.start_date
-                due = t.due_date
+                start, due = t.start_date, t.due_date
 
-                # Creación y asignación (al inicio de la tarea).
                 evt(
                     t,
                     HistoryAction.CREACION,
@@ -406,7 +357,6 @@ async def ensure_demo_traceability() -> None:
                         "Asignación inicial del responsable",
                     )
 
-                # Progresión de estado según el estado actual de la tarea.
                 if t.status in (
                     TaskStatus.EN_PROGRESO,
                     TaskStatus.EN_REVISION,
@@ -421,9 +371,7 @@ async def ensure_demo_traceability() -> None:
                         actor,
                         "Inicia ejecución",
                     )
-
                 if t.status in (TaskStatus.EN_REVISION, TaskStatus.COMPLETADA):
-                    # Una entrega rechazada y reenviada (muestra una devolución roja).
                     evt(
                         t,
                         HistoryAction.CAMBIO_ESTADO,
@@ -451,7 +399,6 @@ async def ensure_demo_traceability() -> None:
                         actor,
                         "Reenvía con correcciones",
                     )
-
                 if t.status == TaskStatus.COMPLETADA:
                     evt(
                         t,
@@ -462,8 +409,6 @@ async def ensure_demo_traceability() -> None:
                         lead_id,
                         "Entrega aprobada",
                     )
-
-                # Retraso: tarea vencida que sigue abierta → evento tardío + comentario.
                 if due < today and t.status not in (
                     TaskStatus.COMPLETADA,
                     TaskStatus.CANCELADA,

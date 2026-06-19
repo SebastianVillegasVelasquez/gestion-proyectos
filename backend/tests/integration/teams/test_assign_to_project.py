@@ -166,8 +166,7 @@ class TestAssignTeamToProject:
         )
 
         response = await client.post(
-            "/api/v1/projects/00000000-0000-0000-0000-000000000000/"
-            f"teams/{team['id']}",
+            f"/api/v1/projects/00000000-0000-0000-0000-000000000000/teams/{team['id']}",
             headers=admin_headers,
         )
 

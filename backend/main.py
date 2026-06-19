@@ -25,6 +25,7 @@ from app.modules.notifications.presentation.routes import (
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.tasks.presentation.routes import router as tasks_router
 from app.modules.teams.presentation.routes import router as teams_router
+from app.modules.project.structure.presentation.routes import router as worktree_router
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
@@ -119,6 +120,7 @@ app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
+app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(areas_router, prefix="/api/v1")

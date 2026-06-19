@@ -3,12 +3,9 @@ import uuid
 
 import pytest_asyncio
 
-from app.modules.project.infrastructure.enums import NodeType, ProjectRole
-from app.modules.project.infrastructure.models import (
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
@@ -27,20 +24,25 @@ async def project_with_history(db_session):
     db_session.add(project)
     await db_session.flush()
 
-    node = ProjectNode(
+    tipo = TipoNodo(id=uuid.uuid4(), proyecto_id=project.id, nombre="Programa")
+    db_session.add(tipo)
+    await db_session.flush()
+    node = WorkItem(
         id=uuid.uuid4(),
-        name="Programa",
-        node_type=NodeType.PROGRAMA,
-        project_id=project.id,
+        proyecto_id=project.id,
+        tipo_id=tipo.id,
+        nombre="Programa",
+        orden=0,
     )
     db_session.add(node)
+    await db_session.flush()
 
     due = datetime.date(2026, 1, 20)
     task = Task(
         id=uuid.uuid4(),
         title="Guion Unidad 1",
         status=TaskStatus.EN_PROGRESO,
-        node_id=node.id,
+        work_item_id=node.id,
         start_date=datetime.date(2026, 1, 1),
         due_date=due,
     )

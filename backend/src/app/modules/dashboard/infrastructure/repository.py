@@ -5,16 +5,11 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import String, and_, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
-from app.modules.project.infrastructure.models import (
-    Phase,
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 
@@ -161,24 +156,14 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         )
 
     def _task_with_project(self):
-        """Base reutilizable: cada tarea con el nombre de su proyecto.
-
-        Una tarea cuelga de una fase O de un nodo; ambos apuntan a un proyecto,
-        así que resolvemos el nombre con un coalesce de los dos caminos.
-        """
-        proj_via_phase = aliased(Project)
-        proj_via_node = aliased(Project)
-        project_name = func.coalesce(proj_via_phase.name, proj_via_node.name)
-        base = (
-            select(Task, project_name.label("project_name"))
+        """Cada tarea con el nombre de su proyecto, vía el WorkItem del que cuelga."""
+        return (
+            select(Task, Project.name.label("project_name"))
             .select_from(Task)
-            .outerjoin(Phase, Task.phase_id == Phase.id)
-            .outerjoin(proj_via_phase, Phase.project_id == proj_via_phase.id)
-            .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
-            .outerjoin(proj_via_node, ProjectNode.project_id == proj_via_node.id)
+            .join(WorkItem, Task.work_item_id == WorkItem.id)
+            .join(Project, WorkItem.proyecto_id == Project.id)
             .where(Task.deleted_at.is_(None))
         )
-        return base
 
     async def _get_task_board(self, limit: int) -> list[TaskBoardItem]:
         status_str = cast(Task.status, String)
@@ -233,14 +218,10 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         today = datetime.date.today()
         status_str = cast(Task.status, String)
 
-        proj_via_phase = aliased(Project)
-        proj_via_node = aliased(Project)
-        pid = func.coalesce(proj_via_phase.id, proj_via_node.id)
-
         # Conteos de tareas por proyecto (total, completadas, vencidas, en revisión).
         counts = (
             select(
-                pid.label("pid"),
+                WorkItem.proyecto_id.label("pid"),
                 func.count(Task.id).label("total"),
                 func.coalesce(
                     func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
@@ -265,12 +246,9 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 ).label("in_review"),
             )
             .select_from(Task)
-            .outerjoin(Phase, Task.phase_id == Phase.id)
-            .outerjoin(proj_via_phase, Phase.project_id == proj_via_phase.id)
-            .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
-            .outerjoin(proj_via_node, ProjectNode.project_id == proj_via_node.id)
+            .join(WorkItem, Task.work_item_id == WorkItem.id)
             .where(Task.deleted_at.is_(None))
-            .group_by(pid)
+            .group_by(WorkItem.proyecto_id)
             .subquery()
         )
 

@@ -9,11 +9,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import String, cast, case, func, or_, select
+from sqlalchemy import String, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.models import Phase, Project, ProjectNode
+from app.modules.project.infrastructure.models import Project
+from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 
@@ -64,15 +65,11 @@ class SqlAlchemyAreaRepository(AreaRepository):
                     ).label("completed"),
                 )
                 .join(User, Task.assignee_id == User.id)
-                .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
-                .outerjoin(Phase, Task.phase_id == Phase.id)
+                .join(WorkItem, Task.work_item_id == WorkItem.id)
                 .where(
                     Task.deleted_at.is_(None),
                     Task.assignee_id.isnot(None),
-                    or_(
-                        ProjectNode.project_id == project_id,
-                        Phase.project_id == project_id,
-                    ),
+                    WorkItem.proyecto_id == project_id,
                 )
                 .group_by(User.position)
             )

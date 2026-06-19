@@ -1,10 +1,3 @@
-"""Clasificación pura de los eventos de trazabilidad.
-
-Traduce una entrada cruda del historial (`TaskHistory`) a un *tipo de evento*
-semántico y a una señal de retraso. Es lógica de negocio pura (sin BD ni
-FastAPI): una única fuente de verdad, fácil de testear y de reutilizar.
-"""
-
 import datetime
 from dataclasses import dataclass
 

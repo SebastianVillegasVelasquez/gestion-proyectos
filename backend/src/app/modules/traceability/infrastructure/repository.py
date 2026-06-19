@@ -10,11 +10,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
-from app.modules.project.infrastructure.models import Phase, Project, ProjectNode
+from app.modules.project.infrastructure.models import Project
+from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
@@ -58,8 +59,7 @@ class SqlAlchemyTraceabilityRepository(TraceabilityRepository):
         return found is not None
 
     async def list_events(self, project_id: UUID) -> list[TraceabilityEventRow]:
-        # La tarea pertenece a un proyecto vía su nodo (ProjectNode) o su fase
-        # (Phase). Hacemos outer join a ambos y filtramos por cualquiera.
+        # La tarea cuelga del árbol flexible (WorkItem), que ya conoce su proyecto.
         rows = (
             await self._session.execute(
                 select(
@@ -70,15 +70,11 @@ class SqlAlchemyTraceabilityRepository(TraceabilityRepository):
                     User.last_name,
                 )
                 .join(Task, TaskHistory.task_id == Task.id)
-                .outerjoin(ProjectNode, Task.node_id == ProjectNode.id)
-                .outerjoin(Phase, Task.phase_id == Phase.id)
+                .join(WorkItem, Task.work_item_id == WorkItem.id)
                 .outerjoin(User, TaskHistory.changed_by_id == User.id)
                 .where(
                     Task.deleted_at.is_(None),
-                    or_(
-                        ProjectNode.project_id == project_id,
-                        Phase.project_id == project_id,
-                    ),
+                    WorkItem.proyecto_id == project_id,
                 )
                 .order_by(TaskHistory.created_at.desc())
                 .limit(MAX_EVENTS)

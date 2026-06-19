@@ -6,12 +6,9 @@ import pytest_asyncio
 from app.core.security import hash_password
 from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.infrastructure.models import SystemRole, User
-from app.modules.project.infrastructure.enums import NodeType, ProjectRole
-from app.modules.project.infrastructure.models import (
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
 from app.modules.teams.infrastructure.enums import TeamRole
@@ -39,13 +36,18 @@ async def collaborator(db_session):
     db_session.add(project)
     await db_session.flush()
 
-    node = ProjectNode(
+    tipo = TipoNodo(id=uuid.uuid4(), proyecto_id=project.id, nombre="Programa")
+    db_session.add(tipo)
+    await db_session.flush()
+    node = WorkItem(
         id=uuid.uuid4(),
-        name="Programa",
-        node_type=NodeType.PROGRAMA,
-        project_id=project.id,
+        proyecto_id=project.id,
+        tipo_id=tipo.id,
+        nombre="Programa",
+        orden=0,
     )
     db_session.add(node)
+    await db_session.flush()
 
     db_session.add(
         ProjectMember(
@@ -81,7 +83,7 @@ async def collaborator(db_session):
             id=uuid.uuid4(),
             title=f"Tarea {i}",
             status=st,
-            node_id=node.id,
+            work_item_id=node.id,
             assignee_id=user.id,
             start_date=today,
             due_date=today + datetime.timedelta(days=i),
