@@ -10,6 +10,7 @@ from app.core.dependencies import (
 )
 from app.modules.project.structure.application.use_cases import (
     AddWorkItemDependencyUseCase,
+    CloneWorkItemUseCase,
     CreateTipoNodoUseCase,
     CreateWorkItemUseCase,
     DeleteTipoNodoUseCase,
@@ -23,6 +24,7 @@ from app.modules.project.structure.application.use_cases import (
     UpdateWorkItemUseCase,
 )
 from app.modules.project.structure.presentation.schemas import (
+    CloneWorkItemRequest,
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
@@ -142,6 +144,25 @@ async def delete_work_item(
     current_user=Depends(_admin),
 ):
     await DeleteWorkItemUseCase(repo).execute(item_id)
+
+
+@router.post(
+    "/work-items/{item_id}/clone",
+    response_model=WorkItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def clone_work_item(
+    item_id: UUID,
+    data: CloneWorkItemRequest,
+    repo=Depends(worktree_repo_dependency),
+    current_user=Depends(_admin),
+):
+    """Duplica el subárbol que cuelga del nodo bajo `target_parent_id`.
+
+    Spec §9: desplaza fechas plan, resetea fechas reales y avance, preserva
+    dependencias FtS internas al subárbol.
+    """
+    return await CloneWorkItemUseCase(repo).execute(item_id, data)
 
 
 # ── Dependencias Finish-to-Start ──────────────────────────────────────────────

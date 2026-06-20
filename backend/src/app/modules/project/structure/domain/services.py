@@ -1,3 +1,4 @@
+import datetime
 from uuid import UUID
 
 from app.modules.project.structure.domain.date_engine import (
@@ -12,6 +13,7 @@ from app.modules.project.structure.infrastructure.models import (
     WorkItemDependency,
 )
 from app.modules.project.structure.presentation.schemas import (
+    CloneWorkItemRequest,
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
@@ -134,6 +136,118 @@ class WorkTreeService:
         all_items = await self.repo.list_items(item.proyecto_id)
         ids = self._descendant_ids(item_id, all_items)
         await self.repo.soft_delete_many(ids)
+
+    async def clone_subtree(
+        self, source_id: UUID, data: CloneWorkItemRequest
+    ) -> WorkItemResponse:
+        """Copia el subárbol que cuelga de `source_id` y lo pega bajo el destino.
+
+        Replica con nuevos UUIDs preservando la jerarquía interna, desplaza las
+        fechas plan (`offset_days`), resetea fechas reales y avance, y preserva
+        SOLO las dependencias FtS internas al subárbol (las externas se
+        descartan). El nodo raíz puede recibir un nombre nuevo opcional.
+        """
+        source = await self._get_active_item(source_id)
+        proyecto_id = source.proyecto_id
+
+        # Validar destino: si se da, debe estar vivo y en el mismo proyecto, y
+        # NO puede pertenecer al subárbol que se clona (evita pegar dentro de sí
+        # mismo, lo que crearía un ciclo de descendencia).
+        target_parent: WorkItem | None = None
+        if data.target_parent_id is not None:
+            target_parent = await self._get_active_item(data.target_parent_id)
+            if target_parent.proyecto_id != proyecto_id:
+                raise ValidationError("El nodo destino pertenece a otro proyecto")
+
+        all_items = await self.repo.list_items(proyecto_id)
+        descendant_ids = set(self._descendant_ids(source_id, all_items))
+
+        if target_parent is not None and target_parent.id in descendant_ids:
+            raise ValidationError("No se puede pegar el subárbol dentro de sí mismo")
+
+        items_by_id = {item.id: item for item in all_items if item.id in descendant_ids}
+        offset = datetime.timedelta(days=data.offset_days)
+
+        # Primera pasada: clonar cada nodo en orden BFS desde la raíz, para que
+        # el padre del clon ya exista cuando se cree el hijo.
+        new_id_by_old: dict[UUID, UUID] = {}
+        next_orden = await self.repo.next_orden(proyecto_id, data.target_parent_id)
+        queue: list[tuple[UUID, UUID | None, int]] = [
+            (source_id, data.target_parent_id, next_orden)
+        ]
+        clone_root: WorkItem | None = None
+
+        while queue:
+            old_id, new_parent_id, orden = queue.pop(0)
+            original = items_by_id[old_id]
+            clone = self._make_clone(
+                original=original,
+                parent_id=new_parent_id,
+                orden=orden,
+                offset=offset,
+                rename_to=(
+                    data.rename_root_to
+                    if old_id == source_id and data.rename_root_to
+                    else None
+                ),
+            )
+            saved = await self.repo.add_item(clone)
+            new_id_by_old[old_id] = saved.id
+            if old_id == source_id:
+                clone_root = saved
+            children = sorted(
+                (i for i in items_by_id.values() if i.parent_id == old_id),
+                key=lambda c: c.orden,
+            )
+            for index, child in enumerate(children):
+                queue.append((child.id, saved.id, index))
+
+        assert clone_root is not None
+
+        # Segunda pasada: copiar dependencias FtS *internas* al subárbol.
+        edges = await self.repo.list_dependency_edges(proyecto_id)
+        for successor, predecessor in edges:
+            if successor in descendant_ids and predecessor in descendant_ids:
+                await self.repo.add_dependency(
+                    WorkItemDependency(
+                        work_item_id=new_id_by_old[successor],
+                        depends_on_id=new_id_by_old[predecessor],
+                    )
+                )
+
+        return await self._respond_item(clone_root)
+
+    @staticmethod
+    def _make_clone(
+        *,
+        original: WorkItem,
+        parent_id: UUID | None,
+        orden: int,
+        offset: datetime.timedelta,
+        rename_to: str | None,
+    ) -> WorkItem:
+        """Construye un WorkItem clon: nuevas fechas desplazadas, avance reseteado."""
+
+        def shift(d: datetime.date | None) -> datetime.date | None:
+            return d + offset if d is not None else None
+
+        return WorkItem(
+            proyecto_id=original.proyecto_id,
+            parent_id=parent_id,
+            tipo_id=original.tipo_id,
+            nombre=rename_to or original.nombre,
+            orden=orden,
+            prioridad=original.prioridad,
+            fecha_inicio_plan=shift(original.fecha_inicio_plan),
+            fecha_fin_plan=shift(original.fecha_fin_plan),
+            duracion_valor=original.duracion_valor,
+            duracion_unidad=original.duracion_unidad,
+            # Reseteados deliberadamente (spec §9): el clon empieza "en limpio".
+            fecha_inicio_real=None,
+            fecha_fin_real=None,
+            porcentaje_completado=None,
+            es_transversal=original.es_transversal,
+        )
 
     async def get_item(self, item_id: UUID) -> WorkItemResponse:
         item = await self._get_active_item(item_id)

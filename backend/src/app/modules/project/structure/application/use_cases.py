@@ -3,6 +3,7 @@ from uuid import UUID
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.project.structure.presentation.schemas import (
+    CloneWorkItemRequest,
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
@@ -108,6 +109,16 @@ class GetWorkTreeUseCase:
     async def execute(self, proyecto_id: UUID) -> list[WorkItemTreeResponse]:
         await _ensure_project(self.project_repo, proyecto_id)
         return await self.service.get_tree(proyecto_id)
+
+
+class CloneWorkItemUseCase:
+    def __init__(self, repo: WorkTreeRepository):
+        self.service = WorkTreeService(repo)
+
+    async def execute(
+        self, source_id: UUID, data: CloneWorkItemRequest
+    ) -> WorkItemResponse:
+        return await self.service.clone_subtree(source_id, data)
 
 
 # ── Dependencias Finish-to-Start ────────────────────────────────────────────────

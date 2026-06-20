@@ -10,7 +10,6 @@ class NotifyOnTaskSubmitted:
         self.notification_repo = notification_repo
 
     async def __call__(self, event: TaskSubmitted) -> None:
-
         notification = Notification(
             user_to_id=event.assigned_id,
             notification_type=NotificationType.TAREA_ENTREGADA,

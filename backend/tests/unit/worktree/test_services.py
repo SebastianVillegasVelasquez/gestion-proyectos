@@ -425,3 +425,169 @@ class TestDependencies:
         recomputed = await service.get_item(succ.id)
         assert recomputed.fecha_inicio_plan is None
         assert await service.list_dependencies(succ.id) == []
+
+
+class TestCloneSubtree:
+    """Clonado profundo (spec §9): copia subárbol con desplazamiento opcional.
+
+    Resetea fechas reales y avance, preserva FtS internas, descarta externas,
+    rechaza pegar dentro de sí mismo.
+    """
+
+    async def _module_with_phases(self, service):
+        # Programa → 2 módulos hermanos; cada módulo con 2 fases en duración.
+        t_prog = await _tipo(service, "Programa")
+        t_mod = await _tipo(service, "Módulo")
+        t_fase = await _tipo(service, "Fase")
+        prog = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t_prog.id,
+                nombre="Programa",
+                fecha_inicio_plan=D(2026, 6, 1),
+                fecha_fin_plan=D(2026, 8, 30),
+            ),
+        )
+        mod_a = await _item(service, t_mod.id, "Módulo A", parent_id=prog.id)
+        f1 = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t_fase.id,
+                nombre="F1",
+                parent_id=mod_a.id,
+                fecha_inicio_plan=D(2026, 6, 1),
+                duracion_valor=5,
+                duracion_unidad=DuracionUnidad.DIAS,
+            ),
+        )
+        f2 = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t_fase.id,
+                nombre="F2",
+                parent_id=mod_a.id,
+                duracion_valor=3,
+                duracion_unidad=DuracionUnidad.DIAS,
+            ),
+        )
+        mod_b = await _item(service, t_mod.id, "Módulo B", parent_id=prog.id)
+        return prog, mod_a, mod_b, f1, f2
+
+    async def test_clones_subtree_with_internal_structure(self, service):
+        from app.modules.project.structure.presentation.schemas import (
+            CloneWorkItemRequest,
+        )
+
+        _, mod_a, mod_b, *_ = await self._module_with_phases(service)
+
+        clone = await service.clone_subtree(
+            mod_a.id, CloneWorkItemRequest(target_parent_id=mod_b.id)
+        )
+
+        tree = await service.get_tree(PROYECTO)
+        prog = tree[0]
+        children_names = [c.nombre for c in prog.children]
+        assert children_names == ["Módulo A", "Módulo B"]
+        # El clon vive ahora dentro de Módulo B y trajo sus 2 fases.
+        b_children = prog.children[1].children
+        assert len(b_children) == 1
+        assert b_children[0].nombre == "Módulo A"  # nombre conservado
+        assert {c.nombre for c in b_children[0].children} == {"F1", "F2"}
+        # El clon es independiente del original (otro id).
+        assert clone.id != mod_a.id
+
+    async def test_clones_with_date_offset_and_rename(self, service):
+        from app.modules.project.structure.presentation.schemas import (
+            CloneWorkItemRequest,
+        )
+
+        _, mod_a, _, *_ = await self._module_with_phases(service)
+
+        clone = await service.clone_subtree(
+            mod_a.id,
+            CloneWorkItemRequest(
+                target_parent_id=None,
+                offset_days=14,
+                rename_root_to="Módulo A (copia)",
+            ),
+        )
+
+        assert clone.nombre == "Módulo A (copia)"
+        # El nodo raíz del clon va a la raíz del proyecto.
+        assert clone.parent_id is None
+        # F1 del original empezaba el 1 de junio; el clon, 14 días después.
+        cloned_tree = await service.get_tree(PROYECTO)
+        cloned_mod = next(n for n in cloned_tree if n.nombre == "Módulo A (copia)")
+        f1_clone = next(c for c in cloned_mod.children if c.nombre == "F1")
+        assert f1_clone.fecha_inicio_plan == D(2026, 6, 15)
+
+    async def test_resets_avance_in_clone(self, service):
+        from app.modules.project.structure.presentation.schemas import (
+            CloneWorkItemRequest,
+        )
+
+        # Marca avance real en el original y verifica que el clon nace en limpio.
+        t = await _tipo(service, "Nodo")
+        orig = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id,
+                nombre="Con avance",
+                fecha_inicio_plan=D(2026, 6, 1),
+                fecha_fin_plan=D(2026, 6, 30),
+                fecha_inicio_real=D(2026, 6, 2),
+                porcentaje_completado=0.5,
+            ),
+        )
+
+        clone = await service.clone_subtree(orig.id, CloneWorkItemRequest())
+
+        assert clone.fecha_inicio_real is None
+        assert clone.fecha_fin_real is None
+        assert clone.porcentaje_completado is None
+
+    async def test_preserves_internal_fts_drops_external(self, service):
+        """Una FtS entre dos fases del subárbol se replica entre los clones.
+        Una FtS desde una fase del subárbol hacia un nodo externo se descarta."""
+        from app.modules.project.structure.presentation.schemas import (
+            CloneWorkItemRequest,
+        )
+
+        _, mod_a, mod_b, f1, f2 = await self._module_with_phases(service)
+        # Interna: F2 depende de F1 (ambas dentro del subárbol que se clona).
+        await service.add_dependency(f2.id, f1.id)
+        # Externa: F1 depende de Módulo B (fuera del subárbol).
+        await service.add_dependency(f1.id, mod_b.id)
+
+        clone = await service.clone_subtree(
+            mod_a.id, CloneWorkItemRequest(target_parent_id=mod_b.id)
+        )
+
+        # Identificar los clones de F1 y F2.
+        cloned_root = await service.get_item(clone.id)
+        # El árbol del proyecto ahora contiene el subárbol clonado bajo mod_b.
+        proj_tree = await service.get_tree(PROYECTO)
+        mod_b_node = proj_tree[0].children[1]
+        cloned_mod_a = mod_b_node.children[0]
+        cloned_f1 = next(c for c in cloned_mod_a.children if c.nombre == "F1")
+        cloned_f2 = next(c for c in cloned_mod_a.children if c.nombre == "F2")
+
+        cloned_f2_deps = await service.list_dependencies(cloned_f2.id)
+        assert len(cloned_f2_deps) == 1
+        assert cloned_f2_deps[0].depends_on_id == cloned_f1.id
+
+        cloned_f1_deps = await service.list_dependencies(cloned_f1.id)
+        assert cloned_f1_deps == []  # la externa NO se copia
+        assert cloned_root.nombre == "Módulo A"
+
+    async def test_rejects_paste_inside_itself(self, service):
+        from app.modules.project.structure.presentation.schemas import (
+            CloneWorkItemRequest,
+        )
+
+        _, mod_a, _, f1, _ = await self._module_with_phases(service)
+        # Pegar el módulo A *dentro de su propia fase* crearía una recursión.
+        with pytest.raises(ValidationError):
+            await service.clone_subtree(
+                mod_a.id, CloneWorkItemRequest(target_parent_id=f1.id)
+            )

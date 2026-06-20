@@ -93,6 +93,25 @@ class WorkItemTreeResponse(WorkItemResponse):
     children: list["WorkItemTreeResponse"] = []
 
 
+# ── Clonado de subárbol (copiar / pegar) ──────────────────────────────────────
+class CloneWorkItemRequest(BaseModelConfig):
+    """Pega un subárbol bajo `target_parent_id` (null = raíz del proyecto).
+
+    - `offset_days`: desplazamiento (puede ser negativo) que se suma a todas las
+      fechas plan del subárbol clonado. Cero = mismas fechas que el origen.
+    - `rename_root_to`: nombre opcional para el nodo raíz del clon (los hijos
+      conservan sus nombres). Si es nulo, se mantiene el del origen.
+
+    El clonado replica solo dentro del mismo proyecto. Las dependencias FtS
+    *internas* al subárbol se preservan; las externas se descartan. Se
+    RESETEAN: fechas reales y porcentaje completado.
+    """
+
+    target_parent_id: Optional[UUID] = None
+    offset_days: int = 0
+    rename_root_to: Optional[Nombre] = None
+
+
 # ── Dependencias Finish-to-Start ──────────────────────────────────────────────
 class WorkItemDependencyRequest(BaseModelConfig):
     depends_on_id: UUID
