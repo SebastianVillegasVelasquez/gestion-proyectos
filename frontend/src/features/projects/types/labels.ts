@@ -1,11 +1,4 @@
-import type {
-  NodeType,
-  ProjectRole,
-  TaskPriority,
-  TaskStatus,
-  TeamRole,
-  UserPosition,
-} from "./api.types";
+import type { ProjectRole, TaskPriority, TaskStatus, TeamRole, UserPosition } from "./api.types";
 
 export const USER_POSITION_LABELS: Record<UserPosition, string> = {
   desarrollador: "Desarrollador",
@@ -68,26 +61,6 @@ export const TEAM_ROLE_ACCENT: Record<TeamRole, string> = {
   integrante: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
 };
 
-export const NODE_TYPE_LABELS: Record<NodeType, string> = {
-  PROGRAMA: "Programa",
-  CURSO: "Curso",
-  MODULO: "Módulo",
-};
-
-// Punto de color por tipo de nodo (consistente con el constructor de proyectos).
-export const NODE_TYPE_DOT: Record<NodeType, string> = {
-  PROGRAMA: "bg-violet-500",
-  CURSO: "bg-blue-500",
-  MODULO: "bg-emerald-500",
-};
-
-// Badge con relleno por tipo de nodo, para dar color a la estructura.
-export const NODE_TYPE_ACCENT: Record<NodeType, string> = {
-  PROGRAMA: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
-  CURSO: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  MODULO: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-};
-
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   pendiente_por_iniciar: "Pendiente",
   en_progreso: "En progreso",
@@ -113,8 +86,3 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   alta: "Alta",
   urgente: "Urgente",
 };
-
-/** Etiqueta visible del nodo: usa el label flexible si existe, si no el del tipo. */
-export function nodeDisplayType(node: { node_type: NodeType; type_label: string | null }): string {
-  return node.type_label?.trim() ? node.type_label : NODE_TYPE_LABELS[node.node_type];
-}

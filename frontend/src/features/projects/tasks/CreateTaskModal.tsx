@@ -2,22 +2,24 @@ import { useMemo, useState } from "react";
 import { X, ListPlus } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useCreateTask } from "../hooks/use-tasks";
-import { usePhases } from "../hooks/use-phases";
-import { useNodes } from "../hooks/use-nodes";
+import { useWorkTree } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
-import {
-  TASK_PRIORITY_LABELS,
-  USER_POSITION_LABELS,
-  USER_POSITIONS,
-  nodeDisplayType,
-} from "../types/labels";
-import type { Task, TaskPriority, UserPosition } from "../types/api.types";
+import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
+import type { Task, TaskPriority, UserPosition, WorkItemTree } from "../types/api.types";
 import {
   buildTaskPayload,
   emptyTaskForm,
   validateTaskForm,
   type TaskFormState,
 } from "./build-task-payload";
+
+/** Aplana el árbol a una lista con profundidad, para el selector de nodo. */
+function flatten(nodes: WorkItemTree[], depth = 0): { id: string; label: string }[] {
+  return nodes.flatMap((n) => [
+    { id: n.id, label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}` },
+    ...flatten(n.children, depth + 1),
+  ]);
+}
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20";
@@ -42,11 +44,10 @@ export function CreateTaskModal({
   tasks: Task[];
   onClose: () => void;
 }) {
-  const phasesQuery = usePhases(projectId);
-  const nodesQuery = useNodes(projectId);
+  const treeQuery = useWorkTree(projectId);
   const createTask = useCreateTask(projectId);
 
-  const [form, setForm] = useState<TaskFormState>(emptyTaskForm);
+  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm());
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
 
@@ -56,7 +57,7 @@ export function CreateTaskModal({
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const leafNodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data]);
+  const nodeOptions = useMemo(() => flatten(treeQuery.data ?? []), [treeQuery.data]);
 
   const handleSubmit = () => {
     const error = validateTaskForm(form);
@@ -112,57 +113,22 @@ export function CreateTaskModal({
             />
           </Field>
 
-          {/* Pertenece a: fase o módulo/curso */}
-          <Field label="Pertenece a">
-            <div className="mb-2 flex gap-2">
-              {(["phase", "node"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    set("target", t);
-                  }}
-                  className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                    form.target === t
-                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                      : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  {t === "phase" ? "Fase (general)" : "Módulo / Curso"}
-                </button>
+          {/* Nodo del árbol de trabajo al que cuelga la tarea */}
+          <Field label="Nodo del proyecto *">
+            <select
+              className={inputCls}
+              value={form.workItemId}
+              onChange={(e) => {
+                set("workItemId", e.target.value);
+              }}
+            >
+              <option value="">Selecciona el nodo…</option>
+              {nodeOptions.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.label}
+                </option>
               ))}
-            </div>
-            {form.target === "phase" ? (
-              <select
-                className={inputCls}
-                value={form.phaseId}
-                onChange={(e) => {
-                  set("phaseId", e.target.value);
-                }}
-              >
-                <option value="">Selecciona la fase…</option>
-                {phasesQuery.data?.map((ph) => (
-                  <option key={ph.id} value={ph.id}>
-                    Fase {ph.order_index + 1}: {ph.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <select
-                className={inputCls}
-                value={form.nodeId}
-                onChange={(e) => {
-                  set("nodeId", e.target.value);
-                }}
-              >
-                <option value="">Selecciona el contenido…</option>
-                {leafNodes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {nodeDisplayType(n)} · {n.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            </select>
           </Field>
 
           {/* Responsable: filtro por cargo + persona */}

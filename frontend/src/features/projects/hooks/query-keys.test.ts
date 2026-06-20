@@ -8,9 +8,9 @@ describe("projectKeys", () => {
     expect(projectKeys.detail("p1")).toEqual(["projects", "detail", "p1"]);
   });
 
-  it("nests phases and nodes under the project detail", () => {
-    expect(projectKeys.phases("p1")).toEqual(["projects", "detail", "p1", "phases"]);
-    expect(projectKeys.nodes("p1")).toEqual(["projects", "detail", "p1", "nodes"]);
+  it("nests the work tree and node types under the project detail", () => {
+    expect(projectKeys.tree("p1")).toEqual(["projects", "detail", "p1", "tree"]);
+    expect(projectKeys.nodeTypes("p1")).toEqual(["projects", "detail", "p1", "node-types"]);
   });
 
   it("produces distinct keys per project id", () => {
@@ -23,7 +23,7 @@ describe("taskKeys", () => {
     expect(taskKeys.byProject("p1")).toEqual(["tasks", "project", "p1"]);
   });
 
-  it("keys dependencies by project and task", () => {
-    expect(taskKeys.dependencies("p1", "t1")).toEqual(["tasks", "deps", "p1", "t1"]);
+  it("keys dependencies by task", () => {
+    expect(taskKeys.dependencies("t1")).toEqual(["tasks", "deps", "t1"]);
   });
 });

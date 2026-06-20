@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { usePhases } from "../../hooks/use-phases";
-import { useNodes } from "../../hooks/use-nodes";
+import { useWorkTree } from "../../hooks/use-structure";
 import { useProjectTasks } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { computeRange, barMetrics, dayOffsetPct, axisTicks } from "../timeline";
@@ -111,8 +110,7 @@ export function GanttView({
   onToggleDark: () => void;
 }) {
   const navigate = useNavigate();
-  const phasesQuery = usePhases(project.id);
-  const nodesQuery = useNodes(project.id);
+  const treeQuery = useWorkTree(project.id);
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
   const [selected, setSelected] = useState<Task | null>(null);
@@ -150,41 +148,37 @@ export function GanttView({
     return map;
   }, [membersQuery.data]);
 
-  const nodePhase = useMemo(() => {
-    const map = new Map<string, string | null>();
-    (nodesQuery.data ?? []).forEach((n) => map.set(n.id, n.phase_id));
+  // Mapa work_item_id → nombre, y su orden de aparición en el árbol (DFS), para
+  // agrupar las filas del Gantt por el nodo del que cuelga cada tarea.
+  const itemMeta = useMemo(() => {
+    const map = new Map<string, { name: string; order: number }>();
+    let order = 0;
+    const walk = (nodes: typeof treeQuery.data) => {
+      (nodes ?? []).forEach((n) => {
+        map.set(n.id, { name: n.nombre, order: order++ });
+        walk(n.children);
+      });
+    };
+    walk(treeQuery.data);
     return map;
-  }, [nodesQuery.data]);
+  }, [treeQuery.data]);
 
   const groups = useMemo<PhaseGroup[]>(() => {
-    const phases = phasesQuery.data ?? [];
-    const byPhase = new Map<string, Task[]>();
-    const noPhase: Task[] = [];
+    const byItem = new Map<string, Task[]>();
     for (const task of tasks) {
-      const phaseId = task.phase_id ?? (task.node_id ? nodePhase.get(task.node_id) : null);
-      if (phaseId) {
-        const arr = byPhase.get(phaseId) ?? [];
-        arr.push(task);
-        byPhase.set(phaseId, arr);
-      } else {
-        noPhase.push(task);
-      }
+      const arr = byItem.get(task.work_item_id) ?? [];
+      arr.push(task);
+      byItem.set(task.work_item_id, arr);
     }
-    const result: PhaseGroup[] = phases
-      .slice()
-      .sort((a, b) => a.order_index - b.order_index)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        order: p.order_index,
-        tasks: byPhase.get(p.id) ?? [],
+    return Array.from(byItem.entries())
+      .map(([id, items]) => ({
+        id,
+        name: itemMeta.get(id)?.name ?? "Sin nodo",
+        order: itemMeta.get(id)?.order ?? 999,
+        tasks: items,
       }))
-      .filter((g) => g.tasks.length > 0);
-    if (noPhase.length > 0) {
-      result.push({ id: "__none__", name: "Sin fase", order: 999, tasks: noPhase });
-    }
-    return result;
-  }, [phasesQuery.data, tasks, nodePhase]);
+      .sort((a, b) => a.order - b.order);
+  }, [tasks, itemMeta]);
 
   const toggleStatus = (s: TaskStatus) => {
     setStatuses((prev) => {

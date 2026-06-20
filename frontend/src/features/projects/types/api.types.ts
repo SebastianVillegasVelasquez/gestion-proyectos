@@ -1,8 +1,5 @@
 // Contratos que coinciden con las respuestas del backend FastAPI.
-// Los enums usan los VALUES que serializa Pydantic (minúscula para tareas,
-// mayúscula para node_type porque su value == name en el backend).
-
-export type NodeType = "PROGRAMA" | "CURSO" | "MODULO";
+// Los enums usan los VALUES que serializa Pydantic (minúscula para tareas).
 
 export type TaskStatus =
   | "pendiente_por_iniciar"
@@ -36,64 +33,89 @@ export interface CreateProjectPayload {
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 
-// ── Phase ────────────────────────────────────────────────────────────────────
+// ── Árbol de trabajo (estructura flexible) ───────────────────────────────────
+// La estructura de un proyecto es un árbol recursivo de WorkItems. Cada nivel
+// (programa/curso/módulo/fase, o componente/actividad…) es del mismo tipo; lo
+// que cambia es `tipo_id`, que apunta a un TipoNodo configurable por proyecto.
 
-export interface Phase {
+export type DuracionUnidad = "dias" | "semanas";
+
+export interface TipoNodo {
   id: string;
-  name: string;
-  order_index: number;
-  duration_days: number | null;
-  start_date: string | null;
-  end_date: string | null;
-  project_id: string;
+  proyecto_id: string | null;
+  nombre: string;
+  color: string | null;
+  icono: string | null;
+  reglas_anidacion: Record<string, unknown> | null;
 }
 
-export interface CreatePhasePayload {
-  name: string;
-  order_index?: number | null;
-  duration_days?: number | null;
-  start_date?: string | null;
-  end_date?: string | null;
+export interface CreateTipoNodoPayload {
+  nombre: string;
+  color?: string | null;
+  icono?: string | null;
+  reglas_anidacion?: Record<string, unknown> | null;
 }
 
-export type UpdatePhasePayload = Partial<CreatePhasePayload>;
-
-// ── Node ─────────────────────────────────────────────────────────────────────
-
-export interface ProjectNode {
+export interface WorkItem {
   id: string;
-  name: string;
-  node_type: NodeType;
-  project_id: string;
+  proyecto_id: string;
   parent_id: string | null;
-  phase_id: string | null;
-  type_label: string | null;
-  end_date: string | null;
+  tipo_id: string;
+  nombre: string;
+  orden: number;
+  prioridad: number | null;
+  // Fechas EFECTIVAS (el backend deriva las que falten con el motor de fechas).
+  fecha_inicio_plan: string | null;
+  fecha_fin_plan: string | null;
+  duracion_valor: number | null;
+  duracion_unidad: DuracionUnidad | null;
+  fecha_inicio_real: string | null;
+  fecha_fin_real: string | null;
+  porcentaje_completado: number | null;
+  es_transversal: boolean;
+  // True cuando se dieron inicio+fin+duración inconsistentes (informativo).
+  advertencia_fechas: boolean;
 }
 
-export interface CreateNodePayload {
-  name: string;
-  node_type: NodeType;
-  project_id: string;
+export interface WorkItemTree extends WorkItem {
+  children: WorkItemTree[];
+}
+
+export interface CreateWorkItemPayload {
+  tipo_id: string;
+  nombre: string;
   parent_id?: string | null;
-  phase_id?: string | null;
-  type_label?: string | null;
-  end_date?: string | null;
+  orden?: number | null;
+  prioridad?: number | null;
+  fecha_inicio_plan?: string | null;
+  fecha_fin_plan?: string | null;
+  duracion_valor?: number | null;
+  duracion_unidad?: DuracionUnidad | null;
+  es_transversal?: boolean;
 }
 
-export interface UpdateNodePayload {
-  name?: string;
-  type_label?: string | null;
-  phase_id?: string | null;
-  end_date?: string | null;
+export type UpdateWorkItemPayload = Partial<Omit<CreateWorkItemPayload, "parent_id">>;
+
+export interface CloneWorkItemPayload {
+  /** Donde pegar el subárbol; null = raíz del proyecto. */
+  target_parent_id?: string | null;
+  /** Desplazamiento (en días) de TODAS las fechas plan del clon. */
+  offset_days?: number;
+  /** Renombra solo el nodo raíz del clon; los hijos conservan su nombre. */
+  rename_root_to?: string | null;
+}
+
+export interface WorkItemDependency {
+  id: string;
+  work_item_id: string;
+  depends_on_id: string;
 }
 
 // ── Task ─────────────────────────────────────────────────────────────────────
 
 export interface Task {
   id: string;
-  node_id: string | null;
-  phase_id: string | null;
+  work_item_id: string;
   parent_task_id: string | null;
   title: string;
   description: string | null;
@@ -112,9 +134,8 @@ export interface CreateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
-  // Pertenece a un nodo (módulo/curso) O a una fase — exactamente uno.
-  node_id?: string | null;
-  phase_id?: string | null;
+  // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
+  work_item_id: string;
   start_date: string;
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;

@@ -3,7 +3,7 @@ import { tasksApi } from "@/features/projects/api/tasks.api";
 import { taskKeys } from "./query-keys";
 import type { CreateTaskPayload, TaskStatus } from "@/features/projects/types/api.types";
 
-/** Todas las tareas del proyecto (las de nodo y las de fase). */
+/** Todas las tareas del proyecto (resueltas vía su WorkItem). */
 export function useProjectTasks(projectId: string | undefined) {
   return useQuery({
     queryKey: taskKeys.byProject(projectId ?? ""),
@@ -12,11 +12,23 @@ export function useProjectTasks(projectId: string | undefined) {
   });
 }
 
+/** Tareas que cuelgan de un nodo concreto del árbol. */
+export function useWorkItemTasks(workItemId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.byWorkItem(workItemId ?? ""),
+    queryFn: () => tasksApi.listByWorkItem(workItemId!),
+    enabled: Boolean(workItemId),
+  });
+}
+
 export function useCreateTask(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateTaskPayload) => tasksApi.create(projectId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) }),
+    mutationFn: (payload: CreateTaskPayload) => tasksApi.create(payload),
+    onSuccess: (task) => {
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+    },
   });
 }
 
@@ -31,25 +43,25 @@ export function useChangeTaskStatus(projectId: string) {
       taskId: string;
       status: TaskStatus;
       reason?: string;
-    }) => tasksApi.changeStatus(projectId, taskId, status, reason),
+    }) => tasksApi.changeStatus(taskId, status, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) }),
   });
 }
 
-export function useTaskDependencies(projectId: string, taskId: string | undefined) {
+export function useTaskDependencies(taskId: string | undefined) {
   return useQuery({
-    queryKey: taskKeys.dependencies(projectId, taskId ?? ""),
-    queryFn: () => tasksApi.listDependencies(projectId, taskId!),
-    enabled: Boolean(projectId && taskId),
+    queryKey: taskKeys.dependencies(taskId ?? ""),
+    queryFn: () => tasksApi.listDependencies(taskId!),
+    enabled: Boolean(taskId),
   });
 }
 
-export function useAddTaskDependency(projectId: string) {
+export function useAddTaskDependency() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, dependsOnId }: { taskId: string; dependsOnId: string }) =>
-      tasksApi.addDependency(projectId, taskId, dependsOnId),
+      tasksApi.addDependency(taskId, dependsOnId),
     onSuccess: (_data, { taskId }) =>
-      qc.invalidateQueries({ queryKey: taskKeys.dependencies(projectId, taskId) }),
+      qc.invalidateQueries({ queryKey: taskKeys.dependencies(taskId) }),
   });
 }

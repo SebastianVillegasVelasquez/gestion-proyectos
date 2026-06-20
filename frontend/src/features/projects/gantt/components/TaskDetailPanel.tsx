@@ -23,7 +23,7 @@ export function TaskDetailPanel({
   onClose: () => void;
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
-  const depsQuery = useTaskDependencies(projectId, task.id);
+  const depsQuery = useTaskDependencies(task.id);
   const tasksQuery = useProjectTasks(projectId);
 
   // depends_on_id → título de la tarea, para mostrar dependencias legibles

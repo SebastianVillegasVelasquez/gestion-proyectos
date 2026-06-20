@@ -3,9 +3,8 @@ import type { CreateTaskPayload, TaskPriority } from "@/features/projects/types/
 export interface TaskFormState {
   title: string;
   description: string;
-  target: "phase" | "node";
-  phaseId: string;
-  nodeId: string;
+  // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
+  workItemId: string;
   assigneeId: string;
   dependsOnId: string;
   priority: TaskPriority;
@@ -15,13 +14,11 @@ export interface TaskFormState {
   durationDays: string;
 }
 
-export function emptyTaskForm(): TaskFormState {
+export function emptyTaskForm(workItemId = ""): TaskFormState {
   return {
     title: "",
     description: "",
-    target: "phase",
-    phaseId: "",
-    nodeId: "",
+    workItemId,
     assigneeId: "",
     dependsOnId: "",
     priority: "media",
@@ -44,14 +41,9 @@ export function buildTaskPayload(form: TaskFormState): CreateTaskPayload {
     priority: form.priority,
     assignee_id: nullIfEmpty(form.assigneeId),
     depends_on_id: nullIfEmpty(form.dependsOnId),
+    work_item_id: form.workItemId,
     start_date: form.startDate,
   };
-
-  if (form.target === "phase") {
-    payload.phase_id = form.phaseId;
-  } else {
-    payload.node_id = form.nodeId;
-  }
 
   if (form.dateMode === "duration") {
     payload.duration_days = Number(form.durationDays);
@@ -67,11 +59,8 @@ export function validateTaskForm(form: TaskFormState): string | null {
   if (form.title.trim().length < 2) {
     return "El título debe tener al menos 2 caracteres";
   }
-  if (form.target === "phase" && !form.phaseId) {
-    return "Selecciona la fase";
-  }
-  if (form.target === "node" && !form.nodeId) {
-    return "Selecciona el módulo o curso";
+  if (!form.workItemId) {
+    return "Selecciona el nodo del proyecto";
   }
   if (!form.startDate) {
     return "Indica la fecha de inicio";

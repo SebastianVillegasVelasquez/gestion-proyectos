@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   Briefcase,
@@ -7,6 +8,7 @@ import {
   History,
   Loader2,
   Mail,
+  Sparkles,
   UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ import {
 } from "@/features/projects/types/labels";
 import { useCollaboratorActivity } from "../hooks/use-collaborators";
 import { HISTORY_ACTION_LABELS, personInitials } from "../utils/completion";
+import { MOCK_ACTIVITY } from "../utils/activity-mock";
 import type { CollaboratorActivity } from "../types";
 import { CompletionBar } from "./CompletionBar";
 
@@ -57,7 +60,13 @@ function StatCard({
   );
 }
 
-function ActivityContent({ activity }: { activity: CollaboratorActivity }) {
+function ActivityContent({
+  activity,
+  onPreview,
+}: {
+  activity: CollaboratorActivity;
+  onPreview?: () => void;
+}) {
   return (
     <>
       {/* Identidad */}
@@ -176,7 +185,18 @@ function ActivityContent({ activity }: { activity: CollaboratorActivity }) {
             </span>
           </h2>
           {activity.history.length === 0 ? (
-            <p className="text-sm italic text-slate-400">Sin actividad registrada.</p>
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm italic text-slate-400">Sin actividad registrada.</p>
+              {onPreview && (
+                <button
+                  type="button"
+                  onClick={onPreview}
+                  className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+                >
+                  <Sparkles className="size-3.5" /> Ver datos de ejemplo
+                </button>
+              )}
+            </div>
           ) : (
             <ol className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1">
               {activity.history.map((h) => (
@@ -225,18 +245,59 @@ export function CollaboratorActivityPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const query = useCollaboratorActivity(userId);
+  // Vista previa con datos de ejemplo (no reales) para mostrar la trazabilidad
+  // del colaborador antes de que haya historial real en la base de datos.
+  const [preview, setPreview] = useState(false);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden p-4 sm:p-5">
-      <button
-        type="button"
-        onClick={() => void navigate("/collaborators")}
-        className="shrink-0 self-start text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
-      >
-        ← Colaboradores
-      </button>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => void navigate("/collaborators")}
+          className="text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+        >
+          ← Colaboradores
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setPreview((p) => !p);
+          }}
+          aria-pressed={preview}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-colors",
+            preview
+              ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+              : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+          )}
+        >
+          <Sparkles className="size-3.5" /> Datos de ejemplo
+        </button>
+      </div>
 
-      {query.isLoading ? (
+      {preview && (
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <Sparkles className="size-4 shrink-0" />
+          <span className="flex-1">
+            Estás viendo <strong>datos de ejemplo</strong> (no reales) de la trazabilidad del
+            colaborador.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPreview(false);
+            }}
+            className="shrink-0 font-medium underline-offset-2 hover:underline"
+          >
+            Salir del ejemplo
+          </button>
+        </div>
+      )}
+
+      {preview ? (
+        <ActivityContent activity={MOCK_ACTIVITY} />
+      ) : query.isLoading ? (
         <LoadingSkeleton rows={5} />
       ) : query.isError ? (
         <ErrorState
@@ -247,7 +308,12 @@ export function CollaboratorActivityPage() {
       ) : !query.data ? (
         <EmptyState icon={UsersRound} title="Colaborador no encontrado" />
       ) : (
-        <ActivityContent activity={query.data} />
+        <ActivityContent
+          activity={query.data}
+          onPreview={() => {
+            setPreview(true);
+          }}
+        />
       )}
     </div>
   );
