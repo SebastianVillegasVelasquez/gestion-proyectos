@@ -3,7 +3,11 @@ from uuid import UUID
 
 from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.enums import UserPosition, SystemRole
+from app.modules.identity.infrastructure.enums import (
+    POSITION_LABELS,
+    UserPosition,
+    SystemRole,
+)
 from app.shared.base_model import BaseModelConfig
 
 
@@ -82,7 +86,23 @@ class UserResponse(BaseModelConfig):
     ]
 
     role: SystemRole
+    position: UserPosition
     is_active: bool
+
+
+class PositionOption(BaseModelConfig):
+    """Opción de cargo para poblar el selector del registro (value + etiqueta es-CO)."""
+
+    value: UserPosition
+    label: str
+
+
+def position_options() -> list[PositionOption]:
+    """Cargos disponibles, en el orden de presentación definido en POSITION_LABELS."""
+    return [
+        PositionOption(value=value, label=label)
+        for value, label in POSITION_LABELS.items()
+    ]
 
 
 class DirectoryUserResponse(BaseModelConfig):

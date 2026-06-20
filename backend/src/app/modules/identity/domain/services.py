@@ -92,5 +92,6 @@ class UserService:
             name=user.name,
             last_name=user.last_name,
             role=user.role,
+            position=user.position,
             is_active=user.is_active,
         )

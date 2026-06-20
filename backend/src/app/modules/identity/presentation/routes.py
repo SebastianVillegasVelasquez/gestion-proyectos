@@ -25,10 +25,12 @@ from app.modules.identity.presentation.schemas import (
     DirectoryUserResponse,
     LoginRequest,
     PaginatedDirectoryResponse,
+    PositionOption,
     RefreshRequest,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
+    position_options,
 )
 
 router = APIRouter(prefix="/identity", tags=["Identity"])
@@ -40,6 +42,17 @@ async def create(
     repo: UserRepository = Depends(user_repo_dependency),
 ):
     return await CreateUserUseCase(user_repo=repo).execute(data)
+
+
+@router.get("/positions", response_model=list[PositionOption])
+async def positions():
+    """Cargos disponibles para poblar el selector del registro.
+
+    Público (la pantalla de registro no está autenticada). Es la única fuente de
+    verdad de los cargos: si más adelante se migran a una tabla, este contrato
+    (value/label) no cambia y el frontend no se toca.
+    """
+    return position_options()
 
 
 @router.post("/auth/login", response_model=TokenResponse)

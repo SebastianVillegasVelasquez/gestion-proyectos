@@ -4,7 +4,7 @@ import pytest
 
 from app.core.security import create_access_token, create_refresh_token
 from app.modules.identity.application.use_cases import RefreshTokenUseCase
-from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.shared.exceptions import UnauthorizedError
 
 
@@ -15,6 +15,7 @@ class FakeUser:
         self.name = "Test"
         self.last_name = "User"
         self.role = SystemRole.ADMIN
+        self.position = UserPosition.SIN_CARGO
         self.is_active = is_active
 
 

@@ -21,18 +21,23 @@ const LOGIN_FEATURES = [
 const REGISTER_TIPS = [
   {
     d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
-    title: "Usa una contraseña segura",
-    desc: "Mínimo 8 caracteres combinando letras, números y símbolos.",
+    title: "Crea una contraseña robusta",
+    desc: "Prefiere una frase larga (12+ caracteres) con mayúsculas, números y símbolos. Evita nombres, fechas o palabras del diccionario.",
   },
   {
     d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-    title: "Guarda tus credenciales",
-    desc: "Usa un gestor de contraseñas como Bitwarden o 1Password.",
+    title: "Usa un gestor de contraseñas",
+    desc: "Bitwarden, 1Password o KeePass generan y guardan una clave única por sitio. Así no necesitas memorizarlas ni anotarlas.",
   },
   {
-    d: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-    title: "Usa tu correo corporativo",
-    desc: "Registra la cuenta con tu email empresarial.",
+    d: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z",
+    title: "No reutilices contraseñas",
+    desc: "Una clave distinta por servicio evita que la filtración de un sitio comprometa tus demás cuentas.",
+  },
+  {
+    d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    title: "Activa la verificación en dos pasos",
+    desc: "Cuando esté disponible, añade 2FA (autenticación en dos pasos) para una capa extra de protección.",
   },
 ];
 

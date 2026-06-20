@@ -7,6 +7,7 @@ import {
   validateField,
 } from "@/features/auth/utils/security.utils.ts";
 import { useLogin, useRegister } from "@/features/auth/hooks/use-auth";
+import { usePositions } from "@/features/auth/hooks/use-positions";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { AuthPanel } from "./AuthPanel";
 import { Field } from "./Field";
@@ -35,6 +36,7 @@ export default function LoginPage() {
     email: "",
     password: "",
     role: Role.USER,
+    position: "sin_cargo",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
@@ -51,6 +53,7 @@ export default function LoginPage() {
 
   const loginMutation = useLogin(redirectTo);
   const registerMutation = useRegister(redirectTo);
+  const { data: positions, isLoading: positionsLoading } = usePositions();
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
   const isSuccess = isRegister ? registerMutation.isSuccess : loginMutation.isSuccess;
@@ -521,6 +524,40 @@ export default function LoginPage() {
                   >
                     ¿Olvidaste tu contraseña?
                   </button>
+                </div>
+              )}
+
+              {isRegister && (
+                <div>
+                  <label
+                    htmlFor="position"
+                    className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  >
+                    Cargo o posición
+                  </label>
+                  <select
+                    id="position"
+                    name="position"
+                    value={registerForm.position}
+                    onChange={(e) => {
+                      setRegisterForm((f) => ({ ...f, position: e.target.value }));
+                    }}
+                    disabled={positionsLoading}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition hover:border-slate-300 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/20 disabled:cursor-wait dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-600 dark:focus:border-brand-gold dark:focus:ring-brand-gold/25"
+                  >
+                    {positionsLoading ? (
+                      <option value="sin_cargo">Cargando cargos…</option>
+                    ) : (
+                      positions?.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                    Elige el cargo que mejor te describe. Podrás actualizarlo más adelante.
+                  </p>
                 </div>
               )}
 

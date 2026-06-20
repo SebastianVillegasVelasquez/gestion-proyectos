@@ -8,6 +8,13 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
+  position?: string;
+}
+
+/** Opción de cargo servida por GET /identity/positions (fuente de verdad: backend). */
+export interface PositionOption {
+  value: string;
+  label: string;
 }
 
 export interface LoginResponse {
@@ -23,6 +30,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   role: typeof Role.USER;
+  /** Valor del cargo (UserPosition del backend), p. ej. "sin_cargo". */
+  position: string;
 }
 
 export const Role = {

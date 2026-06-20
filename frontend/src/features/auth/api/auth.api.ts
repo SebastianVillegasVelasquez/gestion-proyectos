@@ -1,5 +1,10 @@
 import http from "./http.ts";
-import type { LoginRequest, LoginResponse, RegisterRequest } from "@/features/auth/types.ts";
+import type {
+  LoginRequest,
+  LoginResponse,
+  PositionOption,
+  RegisterRequest,
+} from "@/features/auth/types.ts";
 import type { AxiosResponse } from "axios";
 
 export const authApi = {
@@ -12,4 +17,9 @@ export const authApi = {
     http.post<LoginResponse>("/identity", data).then((r: AxiosResponse<LoginResponse>) => r.data),
 
   logout: () => http.post("/identity/auth/logout").then((r) => r.data),
+
+  positions: () =>
+    http
+      .get<PositionOption[]>("/identity/positions")
+      .then((r: AxiosResponse<PositionOption[]>) => r.data),
 };
