@@ -87,31 +87,3 @@ export const PRIORITY_COLOR: Record<TaskPriority, string> = {
   alta: "text-orange-500",
   urgente: "text-rose-600",
 };
-
-// Model ─────────────────────────────────────────────────────────────────────
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  node_id: string;
-  assignee_id: string | null;
-  start_date: string; // YYYY-MM-DD
-  due_date: string; // YYYY-MM-DD
-}
-
-export function createEmptyTask(nodeId = ""): Task {
-  return {
-    id: crypto.randomUUID(),
-    title: "",
-    description: "",
-    status: "pendiente_por_iniciar",
-    priority: "no_definida",
-    node_id: nodeId,
-    assignee_id: null,
-    start_date: "",
-    due_date: "",
-  };
-}

@@ -9,6 +9,8 @@ import {
   ChevronRight,
   ChevronDown,
   Copy,
+  Pencil,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import {
 import { tipoStyle } from "../../utils/tipo-style";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
+import { DependenciesModal } from "./DependenciesModal";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
 
 function fmt(iso: string | null): string {
@@ -62,11 +65,22 @@ interface TreeNodeProps {
   depth: number;
   typeNameById: Map<string, string>;
   onAddChild: (parent: WorkItemTree) => void;
+  onEdit: (node: WorkItemTree) => void;
+  onDeps: (node: WorkItemTree) => void;
   onClone: (node: WorkItemTree) => void;
   onDelete: (node: WorkItemTree) => void;
 }
 
-function TreeNode({ node, depth, typeNameById, onAddChild, onClone, onDelete }: TreeNodeProps) {
+function TreeNode({
+  node,
+  depth,
+  typeNameById,
+  onAddChild,
+  onEdit,
+  onDeps,
+  onClone,
+  onDelete,
+}: TreeNodeProps) {
   const [open, setOpen] = useState(true);
   const style = tipoStyle(node.tipo_id);
   const hasChildren = node.children.length > 0;
@@ -136,6 +150,24 @@ function TreeNode({ node, depth, typeNameById, onAddChild, onClone, onDelete }: 
             </button>
             <button
               onClick={() => {
+                onEdit(node);
+              }}
+              title="Editar nodo"
+              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                onDeps(node);
+              }}
+              title="Dependencias (Finish-to-Start)"
+              className="rounded-md p-1 text-slate-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/30"
+            >
+              <Link2 className="size-3.5" />
+            </button>
+            <button
+              onClick={() => {
                 onClone(node);
               }}
               title="Duplicar nodo y su subárbol"
@@ -164,6 +196,8 @@ function TreeNode({ node, depth, typeNameById, onAddChild, onClone, onDelete }: 
             depth={depth + 1}
             typeNameById={typeNameById}
             onAddChild={onAddChild}
+            onEdit={onEdit}
+            onDeps={onDeps}
             onClone={onClone}
             onDelete={onDelete}
           />
@@ -238,6 +272,8 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const deleteItem = useDeleteWorkItem(projectId);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
+  const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
 
   const types = typesQuery.data ?? [];
@@ -307,6 +343,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                 onAddChild={(p) => {
                   openAdd(p);
                 }}
+                onEdit={(n) => {
+                  setEditItem(n);
+                }}
+                onDeps={(n) => {
+                  setDepsItem(n);
+                }}
                 onClone={(n) => {
                   setCloneSource(n);
                 }}
@@ -324,6 +366,29 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           nodeTypes={types}
           onClose={() => {
             setModalOpen(false);
+          }}
+        />
+      )}
+
+      {editItem && (
+        <WorkItemModal
+          projectId={projectId}
+          editItem={editItem}
+          parent={null}
+          nodeTypes={types}
+          onClose={() => {
+            setEditItem(null);
+          }}
+        />
+      )}
+
+      {depsItem && (
+        <DependenciesModal
+          projectId={projectId}
+          item={depsItem}
+          tree={tree}
+          onClose={() => {
+            setDepsItem(null);
           }}
         />
       )}

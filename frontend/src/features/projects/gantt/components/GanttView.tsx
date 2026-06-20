@@ -34,7 +34,7 @@ const ZOOM_PX = { mes: 5, semana: 14, dia: 34 } as const;
 type Zoom = keyof typeof ZOOM_PX;
 const ZOOM_LABELS: Record<Zoom, string> = { mes: "Mes", semana: "Semana", dia: "Día" };
 
-const PHASE_ACCENTS = [
+const GROUP_ACCENTS = [
   "border-l-blue-400",
   "border-l-violet-400",
   "border-l-emerald-400",
@@ -42,8 +42,8 @@ const PHASE_ACCENTS = [
   "border-l-rose-400",
 ];
 
-// Fondo tenue por fase, para agrupar visualmente las filas de cada banda.
-const PHASE_BG = [
+// Fondo tenue por nodo, para agrupar visualmente las filas de cada banda.
+const GROUP_BG = [
   "bg-blue-500/[0.04]",
   "bg-violet-500/[0.04]",
   "bg-emerald-500/[0.04]",
@@ -60,7 +60,7 @@ const LEGEND_STATUSES: TaskStatus[] = [
   "cancelada",
 ];
 
-interface PhaseGroup {
+interface NodeGroup {
   id: string;
   name: string;
   order: number;
@@ -163,7 +163,7 @@ export function GanttView({
     return map;
   }, [treeQuery.data]);
 
-  const groups = useMemo<PhaseGroup[]>(() => {
+  const groups = useMemo<NodeGroup[]>(() => {
     const byItem = new Map<string, Task[]>();
     for (const task of tasks) {
       const arr = byItem.get(task.work_item_id) ?? [];
@@ -437,15 +437,14 @@ export function GanttView({
               {groups.map((group, gi) => (
                 <section
                   key={group.id}
-                  className={cn("rounded-lg", PHASE_BG[gi % PHASE_BG.length])}
+                  className={cn("rounded-lg", GROUP_BG[gi % GROUP_BG.length])}
                 >
                   <h2
                     className={cn(
                       "sticky left-0 z-20 mb-1.5 inline-block rounded-r border-l-4 bg-white py-0.5 pl-2 pr-2 text-sm font-semibold text-slate-700 dark:bg-slate-950 dark:text-slate-200",
-                      PHASE_ACCENTS[gi % PHASE_ACCENTS.length],
+                      GROUP_ACCENTS[gi % GROUP_ACCENTS.length],
                     )}
                   >
-                    {group.order < 999 ? `Fase ${group.order + 1}: ` : ""}
                     {group.name}
                     <span className="ml-2 text-xs font-normal text-slate-400">
                       {group.tasks.length} tarea{group.tasks.length !== 1 ? "s" : ""}

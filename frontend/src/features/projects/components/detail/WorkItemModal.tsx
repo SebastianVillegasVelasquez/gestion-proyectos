@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { X, CalendarRange, Clock, Hourglass, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCreateWorkItem } from "../../hooks/use-structure";
-import type {
-  CreateWorkItemPayload,
-  DuracionUnidad,
-  TipoNodo,
-  WorkItemTree,
-} from "../../types/api.types";
+import { useCreateWorkItem, useUpdateWorkItem } from "../../hooks/use-structure";
+import type { DuracionUnidad, TipoNodo, WorkItemTree } from "../../types/api.types";
 
 type DateMode = "fechas" | "inicio_dur" | "fin_dur" | "solo_dur";
+
+interface DatePayload {
+  fecha_inicio_plan: string | null;
+  fecha_fin_plan: string | null;
+  duracion_valor: number | null;
+  duracion_unidad: DuracionUnidad | null;
+}
 
 const MODES: { id: DateMode; label: string; hint: string; icon: typeof Clock }[] = [
   { id: "inicio_dur", label: "Inicio + duración", hint: "Calcula el fin", icon: Clock },
@@ -23,51 +25,94 @@ const MODES: { id: DateMode; label: string; hint: string; icon: typeof Clock }[]
   { id: "fechas", label: "Fechas exactas", hint: "Inicio y fin", icon: CalendarRange },
 ];
 
+/** Deduce el modo de fechas inicial al editar (best-effort sobre lo guardado). */
+function inferMode(item: WorkItemTree): DateMode {
+  const hasDur = item.duracion_valor != null;
+  if (hasDur && item.fecha_inicio_plan) {
+    return "inicio_dur";
+  }
+  if (hasDur && item.fecha_fin_plan) {
+    return "fin_dur";
+  }
+  if (hasDur) {
+    return "solo_dur";
+  }
+  if (item.fecha_inicio_plan && item.fecha_fin_plan) {
+    return "fechas";
+  }
+  return "inicio_dur";
+}
+
 interface Props {
   projectId: string;
+  /** Si se pasa, el modal entra en modo edición de ese nodo. */
+  editItem?: WorkItemTree | null;
+  /** Padre al crear (ignorado en edición). */
   parent: WorkItemTree | null;
   nodeTypes: TipoNodo[];
   onClose: () => void;
 }
 
-export function WorkItemModal({ projectId, parent, nodeTypes, onClose }: Props) {
+export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose }: Props) {
   const createItem = useCreateWorkItem(projectId);
-  const [nombre, setNombre] = useState("");
-  const [tipoId, setTipoId] = useState(nodeTypes[0]?.id ?? "");
-  const [mode, setMode] = useState<DateMode>("inicio_dur");
-  const [inicio, setInicio] = useState("");
-  const [fin, setFin] = useState("");
-  const [durValor, setDurValor] = useState("");
-  const [durUnidad, setDurUnidad] = useState<DuracionUnidad>("dias");
-  const [esTransversal, setEsTransversal] = useState(false);
+  const updateItem = useUpdateWorkItem(projectId);
+  const isEdit = Boolean(editItem);
+
+  const [nombre, setNombre] = useState(editItem?.nombre ?? "");
+  const [tipoId, setTipoId] = useState(editItem?.tipo_id ?? nodeTypes[0]?.id ?? "");
+  const [mode, setMode] = useState<DateMode>(editItem ? inferMode(editItem) : "inicio_dur");
+  const [inicio, setInicio] = useState(editItem?.fecha_inicio_plan ?? "");
+  const [fin, setFin] = useState(editItem?.fecha_fin_plan ?? "");
+  const [durValor, setDurValor] = useState(
+    editItem?.duracion_valor != null ? String(editItem.duracion_valor) : "",
+  );
+  const [durUnidad, setDurUnidad] = useState<DuracionUnidad>(editItem?.duracion_unidad ?? "dias");
+  const [esTransversal, setEsTransversal] = useState(editItem?.es_transversal ?? false);
   const [error, setError] = useState<string | null>(null);
 
   const needsDur = mode !== "fechas";
+  const pending = createItem.isPending || updateItem.isPending;
 
-  function buildDates(): Partial<CreateWorkItemPayload> | null {
+  /** Devuelve las 4 columnas de fecha completas (las no usadas en null) para que
+   *  el backend re-derive y, al editar, se limpie lo del modo anterior. */
+  function buildDates(): DatePayload | null {
     const dur = durValor ? Number(durValor) : null;
     if (needsDur && (!dur || dur <= 0)) {
       setError("Indica una duración válida.");
       return null;
     }
+    const empty: DatePayload = {
+      fecha_inicio_plan: null,
+      fecha_fin_plan: null,
+      duracion_valor: null,
+      duracion_unidad: null,
+    };
     switch (mode) {
       case "fechas":
         if (!inicio || !fin) {
-          return (setError("Indica inicio y fin."), null);
+          setError("Indica inicio y fin.");
+          return null;
         }
-        return { fecha_inicio_plan: inicio, fecha_fin_plan: fin };
+        return { ...empty, fecha_inicio_plan: inicio, fecha_fin_plan: fin };
       case "inicio_dur":
         if (!inicio) {
-          return (setError("Indica la fecha de inicio."), null);
+          setError("Indica la fecha de inicio.");
+          return null;
         }
-        return { fecha_inicio_plan: inicio, duracion_valor: dur, duracion_unidad: durUnidad };
+        return {
+          ...empty,
+          fecha_inicio_plan: inicio,
+          duracion_valor: dur,
+          duracion_unidad: durUnidad,
+        };
       case "fin_dur":
         if (!fin) {
-          return (setError("Indica la fecha de fin."), null);
+          setError("Indica la fecha de fin.");
+          return null;
         }
-        return { fecha_fin_plan: fin, duracion_valor: dur, duracion_unidad: durUnidad };
+        return { ...empty, fecha_fin_plan: fin, duracion_valor: dur, duracion_unidad: durUnidad };
       case "solo_dur":
-        return { duracion_valor: dur, duracion_unidad: durUnidad };
+        return { ...empty, duracion_valor: dur, duracion_unidad: durUnidad };
     }
   }
 
@@ -85,17 +130,21 @@ export function WorkItemModal({ projectId, parent, nodeTypes, onClose }: Props) 
     if (!dates) {
       return;
     }
+    const base = {
+      nombre: nombre.trim(),
+      tipo_id: tipoId,
+      es_transversal: esTransversal,
+      ...dates,
+    };
     try {
-      await createItem.mutateAsync({
-        nombre: nombre.trim(),
-        tipo_id: tipoId,
-        parent_id: parent?.id ?? null,
-        es_transversal: esTransversal,
-        ...dates,
-      });
+      if (editItem) {
+        await updateItem.mutateAsync({ itemId: editItem.id, payload: base });
+      } else {
+        await createItem.mutateAsync({ ...base, parent_id: parent?.id ?? null });
+      }
       onClose();
     } catch {
-      setError("No se pudo crear el nodo. Revisa los datos e inténtalo de nuevo.");
+      setError("No se pudo guardar el nodo. Revisa los datos e inténtalo de nuevo.");
     }
   }
 
@@ -105,10 +154,14 @@ export function WorkItemModal({ projectId, parent, nodeTypes, onClose }: Props) 
         <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-              Nuevo nodo
+              {isEdit ? "Editar nodo" : "Nuevo nodo"}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              {parent ? `Dentro de “${parent.nombre}”` : "En la raíz del proyecto"}
+              {isEdit
+                ? `Editando “${editItem!.nombre}”`
+                : parent
+                  ? `Dentro de “${parent.nombre}”`
+                  : "En la raíz del proyecto"}
             </p>
           </div>
           <button
@@ -293,10 +346,10 @@ export function WorkItemModal({ projectId, parent, nodeTypes, onClose }: Props) 
           </button>
           <button
             onClick={submit}
-            disabled={createItem.isPending}
+            disabled={pending}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
           >
-            {createItem.isPending ? "Creando…" : "Crear nodo"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear nodo"}
           </button>
         </footer>
       </div>

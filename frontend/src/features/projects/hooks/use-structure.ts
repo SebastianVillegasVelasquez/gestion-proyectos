@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { structureApi } from "@/features/projects/api/structure.api";
-import { projectKeys } from "./query-keys";
+import { projectKeys, workItemKeys } from "./query-keys";
 import type {
   CloneWorkItemPayload,
   CreateTipoNodoPayload,
@@ -66,11 +66,34 @@ export function useDeleteWorkItem(projectId: string) {
   });
 }
 
+export function useWorkItemDependencies(itemId: string | undefined) {
+  return useQuery({
+    queryKey: workItemKeys.deps(itemId ?? ""),
+    queryFn: () => structureApi.listDependencies(itemId!),
+    enabled: Boolean(itemId),
+  });
+}
+
 export function useAddWorkItemDependency(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, dependsOnId }: { itemId: string; dependsOnId: string }) =>
       structureApi.addDependency(itemId, dependsOnId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) }),
+    onSuccess: (_data, { itemId }) => {
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: workItemKeys.deps(itemId) });
+    },
+  });
+}
+
+export function useRemoveWorkItemDependency(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, dependsOnId }: { itemId: string; dependsOnId: string }) =>
+      structureApi.removeDependency(itemId, dependsOnId),
+    onSuccess: (_data, { itemId }) => {
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: workItemKeys.deps(itemId) });
+    },
   });
 }
