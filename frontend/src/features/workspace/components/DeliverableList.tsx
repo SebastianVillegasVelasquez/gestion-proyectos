@@ -78,7 +78,7 @@ export function DeliverableList({
                 className={cn(
                   "group w-full border-l-2 px-4 py-3.5 text-left transition-colors duration-100",
                   isSelected
-                    ? "border-l-blue-500 bg-blue-50 dark:border-l-blue-400 dark:bg-blue-950/20"
+                    ? "border-l-brand-gold bg-brand-gold-light"
                     : "border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40",
                 )}
               >
@@ -87,9 +87,7 @@ export function DeliverableList({
                   <div
                     className={cn(
                       "mt-0.5 shrink-0 rounded-md p-1",
-                      isSelected
-                        ? "bg-blue-100 dark:bg-blue-900/30"
-                        : "bg-slate-100 dark:bg-slate-800",
+                      isSelected ? "bg-brand-gold-light" : "bg-slate-100 dark:bg-slate-800",
                     )}
                   >
                     <DeliverableIcon d={d} />
@@ -99,7 +97,7 @@ export function DeliverableList({
                       className={cn(
                         "text-[13px] font-medium leading-snug",
                         isSelected
-                          ? "text-blue-800 dark:text-blue-200"
+                          ? "text-brand-gold-dark dark:text-brand-gold"
                           : "text-slate-700 dark:text-slate-200",
                       )}
                     >

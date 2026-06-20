@@ -20,9 +20,9 @@ const columns: ColumnConfig[] = [
   {
     status: "in-progress",
     label: "En progreso",
-    dotClass: "bg-blue-500",
+    dotClass: "bg-brand-teal",
     countClass:
-      "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+      "bg-brand-teal-light text-brand-teal-dark border-brand-teal/30 dark:bg-brand-teal/15 dark:text-brand-teal dark:border-brand-teal/40",
   },
   {
     status: "completed",
@@ -55,7 +55,7 @@ function TaskCard({ task }: { task: Task }) {
           className={cn(
             "mt-0.5 size-2 shrink-0 rounded-full",
             task.status === "pending" && "bg-amber-400",
-            task.status === "in-progress" && "bg-blue-500",
+            task.status === "in-progress" && "bg-brand-teal",
             task.status === "completed" && "bg-emerald-500",
           )}
         />

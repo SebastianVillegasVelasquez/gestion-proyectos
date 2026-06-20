@@ -3,6 +3,180 @@
 /* Class-based dark mode: applies dark: utilities when an ancestor has class="dark" */
 @variant dark (&:where(.dark, .dark *));
 
+/* ============================================================================
+   BITÁCORA OBJ — TOKENS DE MARCA (fuente de verdad)
+   ----------------------------------------------------------------------------
+   Capa 1: variables crudas en :root / .dark (se intercambian en modo oscuro).
+   Capa 2: @theme inline mapea estas variables a utilidades de Tailwind v4
+           (bg-primary, text-brand-gold, border-border, ...).
+   Regla: los componentes NUNCA usan hex; referencian utilidades/tokens.
+   ============================================================================ */
+
+:root {
+  /* --- Paleta de marca (cruda) --- */
+  --brand-gold: #e4b54f; /* Acento principal, botones primarios */
+  --brand-gold-light: #f9f2df; /* Fondos hover, badges sutiles      */
+  --brand-gold-dark: #c49840; /* Hover y estado activo de botones   */
+
+  --brand-teal: #4da0b1; /* Links, info, estados secundarios      */
+  --brand-teal-light: #e8f4f7; /* Fondos info, badges info         */
+  --brand-teal-dark: #2d7d8c; /* Hover teal                        */
+
+  --brand-red: #c4573a; /* Destructivo, riesgo alto, alertas      */
+  --brand-red-light: #faeae6; /* Fondos danger                     */
+  --brand-red-dark: #9e3f28; /* Hover danger                       */
+
+  --brand-black: #030303; /* Texto principal, sidebar oscuro       */
+  --brand-surface: #1a1a1a; /* Superficies oscuras del sidebar     */
+  --brand-muted: #f5f5f4; /* Fondos de página, superficies suaves  */
+
+  /* --- Tokens semánticos shadcn (modo claro) --- */
+  --background: var(--brand-muted);
+  --foreground: var(--brand-black);
+
+  --card: #ffffff;
+  --card-foreground: var(--brand-black);
+
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-black);
+
+  --primary: var(--brand-gold);
+  --primary-foreground: var(--brand-black);
+
+  --secondary: var(--brand-teal);
+  --secondary-foreground: #ffffff;
+
+  --muted: var(--brand-muted);
+  --muted-foreground: #6b6862;
+
+  --accent: var(--brand-gold-light);
+  --accent-foreground: var(--brand-black);
+
+  --destructive: var(--brand-red);
+  --destructive-foreground: #ffffff;
+
+  --border: #e7e5e4;
+  --input: #e7e5e4;
+  --ring: var(--brand-gold);
+
+  /* --- Sidebar (oscuro incluso en modo claro) --- */
+  --sidebar: var(--brand-surface);
+  --sidebar-foreground: #f5f5f4;
+  --sidebar-accent: var(--brand-gold);
+  --sidebar-accent-foreground: var(--brand-black);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --radius: 0.5rem; /* rounded-lg base para cards */
+}
+
+.dark {
+  /* --- Superficies — escala carbon con tinte cálido --- */
+  --bg-page: #1c1b18;
+  --bg-surface: #252420;
+  --bg-elevated: #2e2c28;
+  --bg-sidebar: #0f0e0c;
+
+  /* --- Texto --- */
+  --text-primary: #e8e6df;
+  --text-secondary: #9a9890;
+  --text-tertiary: #5e5c58;
+
+  /* --- Marca aclarada para contraste sobre fondo oscuro --- */
+  --brand-gold-light: #2a2720; /* fondo badge dorado en dark */
+  --brand-teal: #6bb8c7; /* aclarado desde #4da0b1     */
+  --brand-teal-light: #1a2e31; /* fondo badge teal en dark   */
+  --brand-red: #d4705a; /* aclarado desde #c4573a     */
+  --brand-red-light: #2e1a16; /* fondo badge rojo en dark   */
+  /* gold y gold-dark NO cambian */
+
+  /* --- Tokens semánticos shadcn (modo oscuro) --- */
+  --background: var(--bg-page);
+  --foreground: var(--text-primary);
+
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+
+  --popover: var(--bg-elevated);
+  --popover-foreground: var(--text-primary);
+
+  --primary: var(--brand-gold);
+  --primary-foreground: var(--brand-black);
+
+  --secondary: var(--brand-teal);
+  --secondary-foreground: #0f0e0c;
+
+  --muted: var(--bg-surface);
+  --muted-foreground: var(--text-secondary);
+
+  --accent: var(--brand-gold-light);
+  --accent-foreground: var(--text-primary);
+
+  --destructive: var(--brand-red);
+  --destructive-foreground: #1c1b18;
+
+  --border: #3a3830;
+  --input: #3a3830;
+  --ring: var(--brand-gold);
+
+  --sidebar: var(--bg-sidebar);
+  --sidebar-foreground: #f5f5f4;
+  --sidebar-accent: var(--brand-gold);
+  --sidebar-accent-foreground: var(--brand-black);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+}
+
+/* ----------------------------------------------------------------------------
+   Capa 2: exposición como utilidades Tailwind v4.
+   `inline` mantiene la referencia var() para que .dark intercambie en runtime.
+   ---------------------------------------------------------------------------- */
+@theme inline {
+  /* Semánticos shadcn */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  /* Paleta de marca (para acentos puntuales: bg-brand-gold, text-brand-teal…) */
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-light: var(--brand-gold-light);
+  --color-brand-gold-dark: var(--brand-gold-dark);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-light: var(--brand-teal-light);
+  --color-brand-teal-dark: var(--brand-teal-dark);
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-light: var(--brand-red-light);
+  --color-brand-red-dark: var(--brand-red-dark);
+  --color-brand-black: var(--brand-black);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-muted: var(--brand-muted);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
 /* Timeline entrance animation used by AuditTimeline */
 @keyframes tl-enter {
   from {

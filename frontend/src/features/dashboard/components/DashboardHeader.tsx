@@ -23,7 +23,7 @@ export function DashboardHeader({
       {/* Greeting */}
       <div className="min-w-0">
         <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
-          {greeting}, <span className="text-blue-600 dark:text-blue-400">{name}</span>
+          {greeting}, <span className="text-brand-gold-dark dark:text-brand-gold">{name}</span>
         </h1>
         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{date}</p>
       </div>
@@ -48,7 +48,7 @@ export function DashboardHeader({
             style={{ height: "3px" }}
           >
             <div
-              className="h-full bg-blue-600 transition-all duration-300 dark:bg-blue-500"
+              className="h-full bg-brand-gold transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

@@ -262,7 +262,7 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
       {/* Filtro: todos / solo retrasos */}
       <div className="flex shrink-0 items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <History className="size-4 text-blue-500" /> Línea de tiempo
+          <History className="size-4 text-brand-teal" /> Línea de tiempo
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -299,7 +299,7 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
                   onlyDelays === id
                     ? id
                       ? "bg-rose-600 text-white"
-                      : "bg-blue-600 text-white"
+                      : "bg-primary text-primary-foreground"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
                 )}
               >

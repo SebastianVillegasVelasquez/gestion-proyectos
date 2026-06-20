@@ -1,17 +1,28 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
-function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-slate-200 bg-white text-slate-900",
-        "dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50",
-        className,
-      )}
-      {...props}
-    />
-  );
+const cardVariants = cva("rounded-lg border border-border bg-card text-card-foreground", {
+  variants: {
+    /** Borde izquierdo de acento (header de card gold, riesgo alto red). */
+    accent: {
+      none: "",
+      gold: "border-l-4 border-l-brand-gold",
+      red: "border-l-4 border-l-brand-red",
+    },
+    /** Elevación sutil en hover para cards clicables. */
+    interactive: {
+      true: "transition-shadow hover:shadow-md",
+      false: "",
+    },
+  },
+  defaultVariants: { accent: "none", interactive: false },
+});
+
+interface CardProps extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardVariants> {}
+
+function Card({ className, accent, interactive, ...props }: CardProps) {
+  return <div className={cn(cardVariants({ accent, interactive }), className)} {...props} />;
 }
 
 function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -25,10 +36,7 @@ function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn(
-        "text-sm font-semibold leading-none text-slate-900 dark:text-slate-50",
-        className,
-      )}
+      className={cn("text-sm font-semibold leading-none text-card-foreground", className)}
       {...props}
     />
   );

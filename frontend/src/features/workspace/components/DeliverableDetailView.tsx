@@ -115,7 +115,7 @@ function VersionHistory({
                     className={cn(
                       "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                       isLatest
-                        ? "bg-blue-600 text-white"
+                        ? "bg-primary text-primary-foreground"
                         : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
                     )}
                   >
@@ -127,7 +127,7 @@ function VersionHistory({
                     className={cn(
                       "flex-1 rounded-lg border p-3",
                       isLatest
-                        ? "border-blue-200 bg-blue-50/70 dark:border-blue-800/50 dark:bg-blue-950/20"
+                        ? "border-brand-gold/40 bg-brand-gold-light"
                         : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60",
                     )}
                   >
@@ -140,7 +140,7 @@ function VersionHistory({
                             : (v.fileName ?? "Archivo")}
                         </span>
                         {isLatest && (
-                          <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                          <span className="rounded-full bg-brand-gold-light px-1.5 py-0.5 text-[9px] font-semibold text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold">
                             Actual
                           </span>
                         )}
@@ -151,7 +151,7 @@ function VersionHistory({
                           href={v.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-600 dark:hover:text-blue-400"
+                          className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark"
                         >
                           Abrir <ExternalLink className="size-2.5" />
                         </a>
@@ -277,14 +277,14 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
         className={cn(
           "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
           isDragging
-            ? "border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/20"
+            ? "border-brand-gold bg-brand-gold-light"
             : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-700 dark:hover:border-slate-600 dark:hover:bg-slate-800/30",
         )}
       >
         <Upload
           className={cn(
             "size-7",
-            isDragging ? "text-blue-500" : "text-slate-300 dark:text-slate-600",
+            isDragging ? "text-brand-gold" : "text-slate-300 dark:text-slate-600",
           )}
         />
         <div>
@@ -315,7 +315,7 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
             }}
             placeholder="https://figma.com/proto/..."
             autoFocus
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           />
           <input
             type="text"
@@ -324,14 +324,14 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
               setUrlNote(e.target.value);
             }}
             placeholder="Nota opcional (ej: prototipo mobile actualizado)"
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           />
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleAddUrl}
               disabled={!url.trim()}
-              className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
+              className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-40"
             >
               Añadir enlace
             </button>
@@ -354,7 +354,7 @@ function UploadSection({ onAddVersion, currentVersion, uploadedBy }: UploadSecti
           onClick={() => {
             setShowUrlForm(true);
           }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 py-2.5 text-[12px] text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-600 dark:hover:text-blue-400"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 py-2.5 text-[12px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark"
         >
           <Plus className="size-3.5" />
           Añadir enlace externo (Figma, GitHub, Drive…)

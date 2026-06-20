@@ -32,11 +32,11 @@ function CollaboratorRow({
         }
       }}
       aria-label={`Ver actividad de ${fullName}`}
-      className="cursor-pointer border-t border-slate-100 transition-colors hover:bg-blue-50/40 focus:outline-none focus-visible:bg-blue-50/60 dark:border-slate-800 dark:hover:bg-blue-950/20"
+      className="cursor-pointer border-t border-slate-100 transition-colors hover:bg-accent focus:outline-none focus-visible:bg-accent dark:border-slate-800"
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-xs font-semibold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
             {personInitials(collaborator.name, collaborator.last_name)}
           </span>
           <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
@@ -59,7 +59,7 @@ function CollaboratorRow({
         </div>
       </td>
       <td className="px-4 py-3 text-right">
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal">
           Ver detalle <ChevronRight className="size-3.5" />
         </span>
       </td>
@@ -96,7 +96,7 @@ export function CollaboratorsPage() {
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
-            <Users className="size-6 text-blue-500" /> Colaboradores
+            <Users className="size-6 text-brand-teal" /> Colaboradores
           </h1>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {total > 0
@@ -125,7 +125,7 @@ export function CollaboratorsPage() {
           }}
           placeholder="Buscar por nombre o correo…"
           aria-label="Buscar colaborador"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25"
         />
       </div>
 

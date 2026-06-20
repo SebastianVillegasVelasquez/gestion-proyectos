@@ -80,7 +80,7 @@ export function ProjectDetailView({
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all"
+              className="h-full rounded-full bg-brand-gold transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -107,7 +107,7 @@ export function ProjectDetailView({
             className={cn(
               "flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors",
               tab === id
-                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                ? "border-brand-gold text-brand-gold"
                 : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
             )}
           >

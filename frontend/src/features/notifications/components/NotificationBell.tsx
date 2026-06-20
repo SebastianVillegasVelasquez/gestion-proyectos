@@ -62,7 +62,7 @@ function NotificationRow({
         }}
         className={cn(
           "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
-          !notification.is_read && "bg-blue-50/50 dark:bg-blue-950/20",
+          !notification.is_read && "bg-accent",
         )}
       >
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
@@ -78,7 +78,10 @@ function NotificationRow({
           </span>
         </span>
         {!notification.is_read && (
-          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-blue-500" aria-label="No leída" />
+          <span
+            className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-teal"
+            aria-label="No leída"
+          />
         )}
       </button>
     </li>
@@ -147,7 +150,7 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                 onClick={() => {
                   markAll.mutate();
                 }}
-                className="flex items-center gap-1 text-xs font-medium text-blue-600 transition hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-blue-400 dark:disabled:text-slate-600"
+                className="flex items-center gap-1 text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark disabled:cursor-not-allowed disabled:text-slate-300 dark:disabled:text-slate-600"
               >
                 <CheckCheck className="size-3.5" /> Marcar todas
               </button>

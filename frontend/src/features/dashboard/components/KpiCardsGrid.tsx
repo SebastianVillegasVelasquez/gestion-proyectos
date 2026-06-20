@@ -5,7 +5,7 @@ import type { AccentColor, KpiCard } from "../types";
 const accentBorderMap: Record<AccentColor, string> = {
   amber: "border-b-amber-400   dark:border-b-amber-500",
   emerald: "border-b-emerald-500 dark:border-b-emerald-500",
-  blue: "border-b-blue-500    dark:border-b-blue-500",
+  blue: "border-b-brand-teal dark:border-b-brand-teal",
   red: "border-b-red-500     dark:border-b-red-500",
 };
 

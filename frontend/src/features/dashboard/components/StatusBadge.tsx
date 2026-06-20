@@ -1,87 +1,73 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import type { Priority, ProjectStatus, TaskStatus } from "../types";
 
 type BadgeVariant = ProjectStatus | Priority | TaskStatus;
 
-interface BadgeConfig {
-  label: string;
-  /** Light-mode classes first, dark: overrides appended */
-  classes: string;
-}
+/**
+ * Estilos de estado como variantes CVA, alineados a la marca Bitácora OBJ:
+ *  - info / en progreso → teal
+ *  - éxito / completado  → verde
+ *  - riesgo / alta       → rojo de marca
+ *  - pendiente / baja    → gris neutro
+ *  - revisión / media    → ámbar
+ * Cada variante incluye overrides dark: para mantener contraste WCAG AA.
+ */
+const statusBadge = cva(
+  "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium leading-none",
+  {
+    variants: {
+      variant: {
+        // Project status
+        active:
+          "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+        "at-risk":
+          "bg-brand-red-light text-brand-red-dark border-brand-red/30 dark:text-brand-red dark:border-brand-red/40",
+        "in-review":
+          "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+        // Priority
+        today:
+          "bg-brand-teal-light text-brand-teal-dark border-brand-teal/30 dark:text-brand-teal dark:border-brand-teal/40",
+        high: "bg-brand-red-light text-brand-red-dark border-brand-red/30 dark:text-brand-red dark:border-brand-red/40",
+        medium:
+          "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+        low: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+        // Task status
+        pending:
+          "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+        "in-progress":
+          "bg-brand-teal-light text-brand-teal-dark border-brand-teal/30 dark:text-brand-teal dark:border-brand-teal/40",
+        completed:
+          "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+      } satisfies Record<BadgeVariant, string>,
+    },
+    defaultVariants: { variant: "pending" },
+  },
+);
 
-const variantMap: Record<BadgeVariant, BadgeConfig> = {
-  // Project status
-  active: {
-    label: "Activo",
-    classes:
-      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
-  },
-  "at-risk": {
-    label: "En riesgo",
-    classes:
-      "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
-  },
-  "in-review": {
-    label: "En revisión",
-    classes:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
-  },
-  // Priority
-  today: {
-    label: "Hoy",
-    classes:
-      "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
-  },
-  high: {
-    label: "Alta",
-    classes:
-      "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
-  },
-  medium: {
-    label: "Media",
-    classes:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
-  },
-  low: {
-    label: "Baja",
-    classes:
-      "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-  },
-  // Task status
-  pending: {
-    label: "Pendiente",
-    classes:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
-  },
-  "in-progress": {
-    label: "En progreso",
-    classes:
-      "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
-  },
-  completed: {
-    label: "Completado",
-    classes:
-      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
-  },
+const LABELS: Record<BadgeVariant, string> = {
+  active: "Activo",
+  "at-risk": "En riesgo",
+  "in-review": "En revisión",
+  today: "Hoy",
+  high: "Alta",
+  medium: "Media",
+  low: "Baja",
+  pending: "Pendiente",
+  "in-progress": "En progreso",
+  completed: "Completado",
 };
 
-interface StatusBadgeProps {
+interface StatusBadgeProps extends VariantProps<typeof statusBadge> {
   variant: BadgeVariant;
   className?: string;
   overrideLabel?: string;
 }
 
 export function StatusBadge({ variant, className, overrideLabel }: StatusBadgeProps) {
-  const config = variantMap[variant];
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium leading-none",
-        config.classes,
-        className,
-      )}
-    >
-      {overrideLabel ?? config.label}
+    <span className={cn(statusBadge({ variant }), className)}>
+      {overrideLabel ?? LABELS[variant]}
     </span>
   );
 }

@@ -71,7 +71,7 @@ function ActivityContent({
     <>
       {/* Identidad */}
       <div className="flex shrink-0 items-center gap-4">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-lg font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-teal-light text-lg font-semibold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
           {personInitials(activity.name, activity.last_name)}
         </span>
         <div className="min-w-0">
@@ -109,7 +109,7 @@ function ActivityContent({
           icon={ClipboardList}
           label="Asignadas"
           value={activity.assigned_tasks}
-          tone="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+          tone="bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         />
         <StatCard
           icon={CheckCircle2}
@@ -142,7 +142,7 @@ function ActivityContent({
         {/* Tareas asignadas */}
         <section className="flex min-h-0 flex-col">
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            <ClipboardList className="size-4 text-blue-500" /> Tareas asignadas
+            <ClipboardList className="size-4 text-brand-teal" /> Tareas asignadas
             <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500 dark:bg-slate-800">
               {activity.tasks.length}
             </span>

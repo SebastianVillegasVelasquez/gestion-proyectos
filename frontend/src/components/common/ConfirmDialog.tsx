@@ -46,7 +46,7 @@ export function ConfirmDialog({
             className={
               destructive
                 ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-950/40"
-                : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-950/40"
+                : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
             }
           >
             <AlertTriangle className="size-5" />
@@ -90,7 +90,7 @@ export function ConfirmDialog({
             className={
               destructive
                 ? "rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                : "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                : "rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
             }
           >
             {loading ? "Procesando…" : confirmLabel}

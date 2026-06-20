@@ -10,7 +10,7 @@ import { AddMemberModal } from "./AddMemberModal";
 
 function MemberRow({ member }: { member: ProjectMember }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition-colors hover:border-blue-200 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-900/60 dark:hover:bg-blue-950/20">
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition-colors hover:border-brand-gold/40 hover:bg-accent dark:border-slate-700 dark:bg-slate-900">
       <div
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
@@ -69,7 +69,7 @@ export function MembersPanel({ projectId }: { projectId: string }) {
           onClick={() => {
             setShowAdd(true);
           }}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700"
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
         >
           <UserPlus className="size-3.5" /> Agregar integrante
         </button>
@@ -86,7 +86,7 @@ export function MembersPanel({ projectId }: { projectId: string }) {
           }}
           placeholder="Buscar por nombre, correo o cargo…"
           aria-label="Buscar integrante"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25"
         />
       </div>
 

@@ -50,16 +50,23 @@ export function AuthPanel({ isRegister, onSwitch }: AuthPanelProps) {
           color: "#475569",
         }}
       />
-      {/* Resplandor azul */}
+      {/* Resplandor dorado ambiental */}
       <div
-        className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(circle, #2563eb 0%, transparent 70%)" }}
+        className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-20 blur-3xl"
+        style={{ background: "radial-gradient(circle, var(--brand-gold) 0%, transparent 70%)" }}
       />
 
       <div className="relative z-10">
-        <span className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-400">
-          OBJ Digital
-        </span>
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo.webp"
+            alt="Bitácora OBJ"
+            className="h-10 w-10 shrink-0 rounded-lg object-contain"
+          />
+          <span className="text-xs font-semibold uppercase tracking-[0.28em] text-brand-gold">
+            Bitácora OBJ
+          </span>
+        </div>
 
         <h2 className="mt-6 max-w-md text-balance text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl">
           {isRegister ? "Crea tu cuenta de forma segura" : "Gestiona tus proyectos con precisión"}
@@ -68,7 +75,7 @@ export function AuthPanel({ isRegister, onSwitch }: AuthPanelProps) {
         <ul className="mt-10 space-y-5">
           {items.map((item, i) => (
             <li key={i} className="flex items-start gap-3.5">
-              <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400">
+              <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-brand-gold/30 bg-brand-gold/10 text-brand-gold">
                 <svg
                   className="h-4 w-4"
                   fill="none"
@@ -98,7 +105,7 @@ export function AuthPanel({ isRegister, onSwitch }: AuthPanelProps) {
           <button
             type="button"
             onClick={onSwitch}
-            className="font-medium text-blue-400 transition hover:text-blue-300"
+            className="font-medium text-brand-gold transition hover:text-brand-gold-dark"
           >
             {isRegister ? "Inicia sesión" : "Regístrate"}
           </button>

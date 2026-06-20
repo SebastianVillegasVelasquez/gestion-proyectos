@@ -121,7 +121,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               onChange={(e) => {
                 setTargetParentId(e.target.value);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             >
               <option value="">Raíz del proyecto</option>
               {options.map((o) => (
@@ -148,7 +148,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 onChange={(e) => {
                   setOffsetValue(e.target.value);
                 }}
-                className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               />
               <select
                 value={offsetUnidad}
@@ -178,7 +178,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 setRenameTo(e.target.value);
               }}
               placeholder={source.nombre}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
 

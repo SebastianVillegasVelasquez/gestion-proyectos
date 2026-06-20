@@ -13,7 +13,7 @@ import { TaskDetailPanel } from "../gantt/components/TaskDetailPanel";
 
 const COLUMNS: { id: TaskStatus; label: string; accent: string }[] = [
   { id: "pendiente_por_iniciar", label: "Pendiente", accent: "border-t-slate-400" },
-  { id: "en_progreso", label: "En progreso", accent: "border-t-blue-500" },
+  { id: "en_progreso", label: "En progreso", accent: "border-t-brand-teal" },
   { id: "en_revision", label: "En revisión", accent: "border-t-amber-400" },
   { id: "completada", label: "Completada", accent: "border-t-emerald-500" },
 ];
@@ -31,7 +31,7 @@ const STATUS_COLUMN: Record<TaskStatus, TaskStatus> = {
 const PRIORITY_DOT: Record<string, string> = {
   urgente: "bg-rose-500",
   alta: "bg-orange-500",
-  media: "bg-blue-400",
+  media: "bg-amber-400",
   baja: "bg-slate-400",
   no_definida: "bg-slate-300",
 };
@@ -58,7 +58,7 @@ function TaskCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700"
+      className="flex w-full flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-brand-gold/40 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-gold/40"
     >
       <div className="flex items-start gap-2">
         <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[task.priority])} />
@@ -138,7 +138,7 @@ export function TasksPage() {
             onClick={() => {
               setShowCreate(true);
             }}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
           >
             <Plus className="size-4" /> Nueva tarea
           </button>

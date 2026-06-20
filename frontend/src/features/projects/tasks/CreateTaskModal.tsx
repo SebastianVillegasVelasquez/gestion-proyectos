@@ -22,7 +22,7 @@ function flatten(nodes: WorkItemTree[], depth = 0): { id: string; label: string 
 }
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
 
 const PRIORITIES: TaskPriority[] = ["no_definida", "baja", "media", "alta", "urgente"];
 
@@ -80,7 +80,7 @@ export function CreateTaskModal({
       <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
-            <ListPlus className="size-4 text-blue-600" /> Nueva tarea
+            <ListPlus className="size-4 text-brand-teal" /> Nueva tarea
           </h3>
           <button
             type="button"
@@ -268,7 +268,7 @@ export function CreateTaskModal({
             type="button"
             onClick={handleSubmit}
             disabled={createTask.isPending}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
             {createTask.isPending ? "Creando…" : "Crear tarea"}
           </button>

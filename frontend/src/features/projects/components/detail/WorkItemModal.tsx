@@ -183,7 +183,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                   setNombre(e.target.value);
                 }}
                 placeholder="Ej. Módulo 1 — Fundamentos"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900/40"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-gold/25"
               />
             </label>
             <label className="col-span-2 flex flex-col gap-1">
@@ -195,7 +195,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                 onChange={(e) => {
                   setTipoId(e.target.value);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 {nodeTypes.length === 0 && <option value="">Crea un tipo primero</option>}
                 {nodeTypes.map((t) => (
@@ -225,14 +225,14 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                     className={cn(
                       "flex items-start gap-2 rounded-xl border px-3 py-2 text-left transition-all",
                       active
-                        ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-900/20 dark:ring-blue-900/40"
+                        ? "border-brand-gold bg-brand-gold-light ring-2 ring-brand-gold/30"
                         : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800",
                     )}
                   >
                     <Icon
                       className={cn(
                         "mt-0.5 size-4",
-                        active ? "text-blue-600 dark:text-blue-400" : "text-slate-400",
+                        active ? "text-brand-gold-dark dark:text-brand-gold" : "text-slate-400",
                       )}
                     />
                     <span className="flex flex-col">
@@ -240,7 +240,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                         className={cn(
                           "text-xs font-semibold",
                           active
-                            ? "text-blue-700 dark:text-blue-300"
+                            ? "text-brand-gold-dark dark:text-brand-gold"
                             : "text-slate-700 dark:text-slate-200",
                         )}
                       >
@@ -323,7 +323,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
               onChange={(e) => {
                 setEsTransversal(e.target.checked);
               }}
-              className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="size-4 rounded border-slate-300 text-brand-gold focus:ring-brand-gold"
             />
             <span className="text-xs text-slate-600 dark:text-slate-300">
               Frente transversal (continuo, no ligado a un entregable)
@@ -347,7 +347,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
           <button
             onClick={submit}
             disabled={pending}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
           >
             {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear nodo"}
           </button>

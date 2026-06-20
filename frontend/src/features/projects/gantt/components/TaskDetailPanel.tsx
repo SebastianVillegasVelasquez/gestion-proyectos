@@ -96,7 +96,7 @@ export function TaskDetailPanel({
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-xs transition disabled:cursor-not-allowed",
                   status === task.status
-                    ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                    ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark dark:text-brand-gold"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800",
                 )}
               >

@@ -26,7 +26,7 @@ function ProjectCard({
 
   return (
     <Card
-      className="flex cursor-pointer flex-col transition-all duration-150 hover:border-blue-300 hover:shadow-md dark:hover:border-blue-700"
+      className="flex cursor-pointer flex-col transition-all duration-150 hover:border-brand-gold/40 hover:shadow-md dark:hover:border-brand-gold/40"
       onClick={onOpen}
       role="button"
       tabIndex={0}
@@ -78,7 +78,7 @@ function ProjectCard({
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all"
+              className="h-full rounded-full bg-brand-gold transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -103,7 +103,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       <button
         type="button"
         onClick={onNew}
-        className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
       >
         <Plus className="size-4" />
         Crear primer proyecto
@@ -149,7 +149,7 @@ export function AllProjectsPage() {
           <button
             type="button"
             onClick={() => navigate("/projects/builder")}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
           >
             <Plus className="size-4" />
             Nuevo proyecto

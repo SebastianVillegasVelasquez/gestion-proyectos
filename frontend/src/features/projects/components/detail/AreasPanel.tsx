@@ -67,7 +67,7 @@ export function AreasPanel({ projectId }: { projectId: string }) {
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <Layers className="size-4 text-blue-500" /> Progreso por equipo
+          <Layers className="size-4 text-brand-teal" /> Progreso por equipo
           <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500 dark:bg-slate-800">
             {areas.length}
           </span>

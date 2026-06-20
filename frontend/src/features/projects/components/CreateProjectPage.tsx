@@ -6,7 +6,7 @@ import { useCreateProject } from "../hooks/use-projects";
 import type { CreateProjectPayload } from "../types/api.types";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
 
 /** Texto recortado, o null si queda vacío (para enviar campos opcionales). */
 function blank(value?: string | null): string | null {
@@ -81,7 +81,7 @@ export function CreateProjectPage() {
       </button>
 
       <header className="flex items-start gap-3">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+        <div className="flex size-11 items-center justify-center rounded-xl bg-brand-gold text-brand-black shadow-sm">
           <FolderPlus className="size-5" />
         </div>
         <div>
@@ -160,13 +160,13 @@ export function CreateProjectPage() {
 
         <div className="flex items-center justify-between pt-1">
           <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <Sparkles className="size-3.5 text-blue-400" />
+            <Sparkles className="size-3.5 text-brand-gold" />
             Después podrás crear tipos de nodo y un árbol con la profundidad que quieras.
           </span>
           <button
             onClick={submit}
             disabled={createProject.isPending}
-            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
           >
             {createProject.isPending ? "Creando…" : "Crear proyecto"}
           </button>

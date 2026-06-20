@@ -24,7 +24,7 @@ function renderWithMentions(text: string, mentions: string[]): ReactNode[] {
       segments.forEach((seg, i) => {
         if (i > 0) {
           next.push(
-            <span key={`${mention}-${i}`} className="font-medium text-blue-600 dark:text-blue-400">
+            <span key={`${mention}-${i}`} className="font-medium text-brand-teal">
               @{mention}
             </span>,
           );
@@ -44,7 +44,7 @@ function CommentItem({ comment }: { comment: Comment }) {
   return (
     <div className="relative flex gap-2.5 rounded-md p-2 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-800/50">
       {comment.isUnread && (
-        <span className="absolute right-2 top-3 size-1.5 rounded-full bg-blue-500" />
+        <span className="absolute right-2 top-3 size-1.5 rounded-full bg-brand-teal" />
       )}
 
       {/* Avatar */}
@@ -95,7 +95,7 @@ export function CommentsPanel({ comments }: CommentsPanelProps) {
         <div className="flex items-center gap-2">
           <CardTitle className="text-sm font-semibold">Actividad reciente</CardTitle>
           {unreadCount > 0 && (
-            <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400">
+            <span className="inline-flex items-center rounded-md border border-brand-teal/30 bg-brand-teal-light px-1.5 py-0.5 text-[10px] font-semibold text-brand-teal-dark dark:border-brand-teal/40 dark:bg-brand-teal/15 dark:text-brand-teal">
               {unreadCount} sin leer
             </span>
           )}

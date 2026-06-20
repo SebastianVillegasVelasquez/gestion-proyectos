@@ -82,7 +82,7 @@ export function WorkspaceHeader({ group, onNewTask }: WorkspaceHeaderProps) {
         <button
           type="button"
           onClick={onNewTask}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 dark:hover:bg-blue-500"
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
         >
           <Plus className="size-3.5" />
           Nueva Tarea de Grupo

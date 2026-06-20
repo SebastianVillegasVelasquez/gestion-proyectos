@@ -200,7 +200,7 @@ export function GanttView({
         : `${remaining} d`;
 
   const inputCls =
-    "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+    "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-brand-gold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
 
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
@@ -214,14 +214,14 @@ export function GanttView({
             ← {project.name}
           </button>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
-            <GanttChartSquare className="size-5 text-blue-600" /> Cronograma
+            <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => void navigate(`/projects/${project.id}/tareas`)}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
           >
             <Plus className="size-4" /> Tarea
           </button>
@@ -242,11 +242,11 @@ export function GanttView({
           icon={TrendingUp}
           label="Avance"
           value={`${summary.progressPct}%`}
-          tone="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+          tone="bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         >
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all"
+              className="h-full rounded-full bg-brand-gold transition-all"
               style={{ width: `${summary.progressPct}%` }}
             />
           </div>
@@ -363,7 +363,7 @@ export function GanttView({
                 className={cn(
                   "rounded-md px-2 py-1 text-xs font-medium transition",
                   zoom === z
-                    ? "bg-blue-600 text-white"
+                    ? "bg-primary text-primary-foreground"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
                 )}
               >
@@ -476,7 +476,7 @@ export function GanttView({
                               className={cn(
                                 "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                                 assignee
-                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                                  ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
                                   : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
                               )}
                             >

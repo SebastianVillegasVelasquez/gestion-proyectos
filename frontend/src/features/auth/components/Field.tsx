@@ -34,7 +34,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(
           className={`w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 ${
             error
               ? "border-red-400 focus:border-red-500 focus:ring-red-100 dark:border-red-500/60 dark:focus:ring-red-500/20"
-              : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-100 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:focus:ring-blue-500/20"
+              : "border-slate-200 hover:border-slate-300 focus:border-brand-gold focus:ring-brand-gold/20 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-brand-gold dark:focus:ring-brand-gold/25"
           }`}
         />
         {error && (

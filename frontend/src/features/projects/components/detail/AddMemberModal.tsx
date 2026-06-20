@@ -13,7 +13,7 @@ import {
 import type { DirectoryUser, ProjectRole, UserPosition } from "../../types/api.types";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
 
 const PAGE_SIZE = 6;
 
@@ -62,7 +62,7 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
       <div className="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
-            <UserPlus className="size-4 text-blue-600" /> Agregar integrante
+            <UserPlus className="size-4 text-brand-teal" /> Agregar integrante
           </h3>
           <button
             type="button"
@@ -134,7 +134,7 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
                         className={cn(
                           "flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition",
                           isSel
-                            ? "bg-blue-50 dark:bg-blue-950/40"
+                            ? "bg-brand-gold-light dark:bg-brand-gold/15"
                             : "hover:bg-slate-50 dark:hover:bg-slate-800/50",
                         )}
                       >
@@ -149,7 +149,7 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
                             {u.email} · {USER_POSITION_LABELS[u.position]}
                           </span>
                         </span>
-                        {isSel && <Check className="size-4 shrink-0 text-blue-600" />}
+                        {isSel && <Check className="size-4 shrink-0 text-brand-gold-dark" />}
                       </button>
                     </li>
                   );
@@ -233,7 +233,7 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
               type="button"
               onClick={handleAdd}
               disabled={!selected || addMember.isPending}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
               {addMember.isPending ? "Agregando…" : "Agregar"}
             </button>

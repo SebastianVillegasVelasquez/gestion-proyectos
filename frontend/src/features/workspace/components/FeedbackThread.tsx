@@ -59,7 +59,7 @@ function highlightMentions(text: string, members: WorkspaceMember[]) {
       return (
         <mark
           key={i}
-          className="rounded bg-blue-100 px-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+          className="rounded bg-brand-teal-light px-0.5 font-medium text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         >
           {part}
         </mark>
@@ -213,7 +213,7 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
         }}
         rows={3}
         placeholder="Escribe tu comentario… (Ctrl+Enter para enviar)"
-        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
+        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 outline-none transition-colors focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
       />
 
       {/* Action buttons */}
@@ -254,7 +254,7 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
             handleSend("comentario");
           }}
           disabled={!text.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-40 dark:hover:bg-blue-500"
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-40"
         >
           <Send className="size-3.5" />
           Enviar

@@ -144,7 +144,7 @@ function TreeNode({
                 onAddChild(node);
               }}
               title="Añadir nodo hijo"
-              className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30"
+              className="rounded-md p-1 text-slate-400 hover:bg-accent hover:text-brand-gold-dark"
             >
               <Plus className="size-3.5" />
             </button>
@@ -246,9 +246,12 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
             }}
             onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="Ej. Fase"
-            className="w-24 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800"
+            className="w-24 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800"
           />
-          <button onClick={add} className="text-[11px] font-semibold text-blue-600 hover:underline">
+          <button
+            onClick={add}
+            className="text-[11px] font-semibold text-brand-teal hover:text-brand-teal-dark hover:underline"
+          >
             ok
           </button>
         </span>
@@ -257,7 +260,7 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           onClick={() => {
             setAdding(true);
           }}
-          className="flex items-center gap-0.5 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-slate-600"
+          className="flex items-center gap-0.5 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 transition-colors hover:border-brand-gold hover:text-brand-gold-dark dark:border-slate-600"
         >
           <Plus className="size-3" /> nuevo
         </button>
@@ -300,14 +303,14 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <FolderTree className="size-4 text-blue-500" /> Estructura del proyecto
+          <FolderTree className="size-4 text-brand-teal" /> Estructura del proyecto
         </h2>
         <button
           onClick={() => {
             openAdd(null);
           }}
           disabled={types.length === 0}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="size-3.5" /> Añadir nodo raíz
         </button>

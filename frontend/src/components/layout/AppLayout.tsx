@@ -43,7 +43,7 @@ export const AppLayout = () => {
   const context: AppOutletContext = { dark, toggleDark };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
@@ -71,7 +71,7 @@ export const AppLayout = () => {
           type="button"
           onClick={toggleCollapsed}
           aria-label="Abrir menú lateral"
-          className="fixed left-3 top-3 z-50 hidden h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 md:flex"
+          className="fixed left-3 top-3 z-50 hidden h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-accent md:flex"
         >
           <PanelLeftOpen className="size-5" />
         </button>
@@ -79,7 +79,7 @@ export const AppLayout = () => {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile-only topbar */}
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 md:hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -87,17 +87,17 @@ export const AppLayout = () => {
                 setSidebarOpen(true);
               }}
               aria-label="Abrir menú de navegación"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
             >
               <Menu className="size-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
-                OD
-              </div>
-              <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                OBJ DIGITAL
-              </span>
+              <img
+                src="/logo.webp"
+                alt="Bitácora OBJ"
+                className="h-7 w-7 shrink-0 rounded-lg object-contain"
+              />
+              <span className="text-sm font-bold tracking-tight text-foreground">Bitácora OBJ</span>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -106,7 +106,7 @@ export const AppLayout = () => {
               type="button"
               onClick={toggleDark}
               aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
             >
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>

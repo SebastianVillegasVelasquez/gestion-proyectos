@@ -152,7 +152,7 @@ export default function LoginPage() {
     `w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 ${
       hasError
         ? "border-red-400 focus:border-red-500 focus:ring-red-100 dark:border-red-500/60 dark:focus:ring-red-500/20"
-        : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-100 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:focus:ring-blue-500/20"
+        : "border-slate-200 hover:border-slate-300 focus:border-brand-gold focus:ring-brand-gold/20 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-brand-gold dark:focus:ring-brand-gold/25"
     }`;
 
   return (
@@ -216,6 +216,22 @@ export default function LoginPage() {
             style={{ opacity: animating ? 0 : 1, transition: `opacity ${transitionMs}ms` }}
           >
             <div className="mb-8">
+              {/* Marca */}
+              <div className="mb-6 flex items-center gap-3">
+                <img
+                  src="/logo.webp"
+                  alt="Bitácora OBJ"
+                  className="h-11 w-11 shrink-0 rounded-lg object-contain"
+                />
+                <div className="leading-tight">
+                  <p className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                    Bitácora OBJ
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Sistema de gestión de proyectos
+                  </p>
+                </div>
+              </div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {isRegister ? "Crear cuenta" : "Acceso al sistema"}
               </h1>
@@ -501,7 +517,7 @@ export default function LoginPage() {
                 <div className="flex justify-end -mt-1">
                   <button
                     type="button"
-                    className="text-xs font-medium text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark"
                   >
                     ¿Olvidaste tu contraseña?
                   </button>
@@ -524,13 +540,13 @@ export default function LoginPage() {
                       <div
                         className={`flex h-4 w-4 items-center justify-center rounded border-2 transition ${
                           accepted
-                            ? "border-blue-600 bg-blue-600"
-                            : "border-slate-300 group-hover:border-blue-400 dark:border-slate-500"
+                            ? "border-brand-gold bg-brand-gold"
+                            : "border-slate-300 group-hover:border-brand-gold dark:border-slate-500"
                         }`}
                       >
                         {accepted && (
                           <svg
-                            className="h-2.5 w-2.5 text-white"
+                            className="h-2.5 w-2.5 text-brand-black"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -545,7 +561,7 @@ export default function LoginPage() {
                       Acepto el{" "}
                       <button
                         type="button"
-                        className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="font-medium text-brand-teal underline underline-offset-2 hover:text-brand-teal-dark"
                       >
                         tratamiento de datos personales
                       </button>{" "}
@@ -563,7 +579,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isPending}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold tracking-wide text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-gold py-2.5 text-sm font-semibold tracking-wide text-brand-black shadow-sm transition-all hover:bg-brand-gold-dark active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? (
                   <>
@@ -599,7 +615,7 @@ export default function LoginPage() {
                 onClick={() => {
                   switchMode(isRegister ? "login" : "register");
                 }}
-                className="font-semibold text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                className="font-semibold text-brand-teal transition hover:text-brand-teal-dark"
               >
                 {isRegister ? "Inicia sesión" : "Regístrate"}
               </button>

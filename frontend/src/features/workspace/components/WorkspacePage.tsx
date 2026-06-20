@@ -34,7 +34,7 @@ const KANBAN_COLS: GroupTask["status"][] = ["por_hacer", "en_progreso", "complet
 
 const KANBAN_COL_CLS: Record<GroupTask["status"], string> = {
   por_hacer: "border-t-slate-400",
-  en_progreso: "border-t-blue-500",
+  en_progreso: "border-t-brand-teal",
   completado: "border-t-emerald-500",
 };
 
@@ -227,7 +227,7 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
               }}
               placeholder="Ej: Revisar guión del módulo 3"
               autoFocus
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             />
           </div>
           <div>
@@ -263,7 +263,7 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
                   className={cn(
                     "flex-1 rounded-lg border px-3 py-2 text-[12px] font-medium capitalize transition-colors",
                     priority === p
-                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/30 dark:text-blue-400"
+                      ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark"
                       : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400",
                   )}
                 >
@@ -283,7 +283,7 @@ function NewTaskModal({ group, onSave, onClose }: NewTaskModalProps) {
             <button
               type="submit"
               disabled={!title.trim()}
-              className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+              className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-brand-gold-dark disabled:opacity-40"
             >
               Crear tarea
             </button>
@@ -427,7 +427,7 @@ export function WorkspacePage() {
             className={cn(
               "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-md px-4 py-3 text-[13px] font-medium transition-colors",
               g.id === selectedGroupId
-                ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                ? "border-b-2 border-brand-gold text-brand-gold"
                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
             )}
           >
@@ -466,7 +466,7 @@ export function WorkspacePage() {
               className={cn(
                 "flex items-center gap-1.5 rounded-t-md px-3 py-2.5 text-[13px] font-medium transition-colors",
                 activeTab === id
-                  ? "border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                  ? "border-b-2 border-brand-gold text-brand-gold"
                   : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
