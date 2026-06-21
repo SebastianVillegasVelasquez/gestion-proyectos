@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
@@ -26,15 +27,15 @@ function getTextColor(pct: number): string {
   return "text-red-600 dark:text-red-400";
 }
 
-function ProjectRow({ project }: { project: Project }) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-1.5 rounded-md border p-2.5 transition-colors duration-150",
-        "border-slate-200 bg-slate-50 hover:border-slate-300",
-        "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
-      )}
-    >
+function ProjectRow({ project, href }: { project: Project; href?: string }) {
+  const className = cn(
+    "flex flex-col gap-1.5 rounded-md border p-2.5 transition-colors duration-150",
+    "border-slate-200 bg-slate-50 hover:border-slate-300",
+    "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
+    href && "hover:border-brand-gold/50 dark:hover:border-brand-gold/50",
+  );
+  const inner = (
+    <>
       {/* Name + tech badge */}
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
@@ -76,15 +77,25 @@ function ProjectRow({ project }: { project: Project }) {
           {project.progressPercent}%
         </span>
       </div>
-    </div>
+    </>
+  );
+
+  return href ? (
+    <Link to={href} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={className}>{inner}</div>
   );
 }
 
 interface ProjectsPanelProps {
   projects: Project[];
+  /** Si se provee, cada proyecto enlaza a su vista de progreso (rol User). */
+  getProjectHref?: (project: Project) => string;
 }
 
-export function ProjectsPanel({ projects }: ProjectsPanelProps) {
+export function ProjectsPanel({ projects, getProjectHref }: ProjectsPanelProps) {
   const visible = projects.slice(0, MAX_VISIBLE);
   const hasMore = projects.length > MAX_VISIBLE;
 
@@ -95,7 +106,7 @@ export function ProjectsPanel({ projects }: ProjectsPanelProps) {
       </CardHeader>
       <CardContent className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto">
         {visible.map((project) => (
-          <ProjectRow key={project.id} project={project} />
+          <ProjectRow key={project.id} project={project} href={getProjectHref?.(project)} />
         ))}
 
         {hasMore && (

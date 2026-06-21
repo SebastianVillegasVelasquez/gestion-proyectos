@@ -67,6 +67,23 @@ export interface DashboardPanels {
   upcoming_deadlines: DashboardDeadlineItem[];
 }
 
+// ─── Progreso de proyecto (solo lectura, rol User) ────────────────────────────
+
+export interface MyProjectProgress {
+  id: string;
+  name: string;
+  client_name: string | null;
+  coordinator: string | null;
+  status: ProjectStatus;
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_in_review: number;
+  tasks_overdue: number;
+  tasks_pending: number;
+  progress_pct: number;
+  my_tasks: DashboardTaskItem[];
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export type TaskStatus = "pending" | "in-progress" | "completed";

@@ -59,6 +59,28 @@ class DashboardPanels:
     upcoming_deadlines: list[DeadlineItem] = field(default_factory=list)
 
 
+@dataclass
+class ProjectProgressDetail:
+    """Progreso general de un proyecto + las tareas propias del usuario en él.
+
+    Vista de solo lectura para el rol User. El progreso se calcula sobre TODAS
+    las tareas del proyecto (progreso general); `my_tasks` son solo las del usuario.
+    """
+
+    id: uuid.UUID
+    name: str
+    client_name: str | None
+    coordinator: str | None
+    status: str  # active | at-risk | in-review
+    tasks_total: int
+    tasks_completed: int
+    tasks_in_review: int
+    tasks_overdue: int
+    tasks_pending: int
+    progress_pct: int
+    my_tasks: list[TaskBoardItem] = field(default_factory=list)
+
+
 # Estados (se guardan por NAME en la BD; comparamos como string para no forzar
 # a Postgres a castear parámetros al tipo enum, que en algunos entornos es VARCHAR).
 _COMPLETED = TaskStatus.COMPLETADA.name
@@ -94,6 +116,24 @@ class DashboardRepository(ABC):
     async def get_panels(
         self, board_limit: int, projects_limit: int, deadlines_limit: int
     ) -> DashboardPanels: ...
+
+    # ── Variantes por usuario (dashboard del rol User) ──
+    @abstractmethod
+    async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary: ...
+
+    @abstractmethod
+    async def get_panels_for_user(
+        self,
+        user_id: uuid.UUID,
+        board_limit: int,
+        projects_limit: int,
+        deadlines_limit: int,
+    ) -> DashboardPanels: ...
+
+    @abstractmethod
+    async def get_project_progress_for_user(
+        self, user_id: uuid.UUID, project_id: uuid.UUID
+    ) -> ProjectProgressDetail | None: ...
 
 
 class SqlAlchemyDashboardRepository(DashboardRepository):
@@ -165,9 +205,13 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             .where(Task.deleted_at.is_(None))
         )
 
-    async def _get_task_board(self, limit: int) -> list[TaskBoardItem]:
+    async def _get_task_board(
+        self, limit: int, assignee_id: uuid.UUID | None = None
+    ) -> list[TaskBoardItem]:
         status_str = cast(Task.status, String)
         base = self._task_with_project()
+        if assignee_id is not None:
+            base = base.where(Task.assignee_id == assignee_id)
 
         items: list[TaskBoardItem] = []
         # Pendientes y en progreso: lo más urgente primero (fecha de fin asc).
@@ -194,9 +238,13 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 )
         return items
 
-    async def _get_upcoming_deadlines(self, limit: int) -> list[DeadlineItem]:
+    async def _get_upcoming_deadlines(
+        self, limit: int, assignee_id: uuid.UUID | None = None
+    ) -> list[DeadlineItem]:
         status_str = cast(Task.status, String)
         base = self._task_with_project()
+        if assignee_id is not None:
+            base = base.where(Task.assignee_id == assignee_id)
         rows = (
             await self._session.execute(
                 base.where(status_str.notin_(_OPEN_EXCLUDED))
@@ -214,7 +262,9 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             for task, project_name in rows
         ]
 
-    async def _get_projects_overview(self, limit: int) -> list[ProjectOverviewItem]:
+    async def _get_projects_overview(
+        self, limit: int, project_ids=None
+    ) -> list[ProjectOverviewItem]:
         today = datetime.date.today()
         status_str = cast(Task.status, String)
 
@@ -289,6 +339,10 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             .limit(limit)
         )
 
+        # Dashboard del User: restringir a los proyectos donde es miembro.
+        if project_ids is not None:
+            query = query.where(Project.id.in_(project_ids))
+
         rows = (await self._session.execute(query)).all()
         items: list[ProjectOverviewItem] = []
         for row in rows:
@@ -316,3 +370,209 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 )
             )
         return items
+
+    # ── Variantes por usuario (rol User) ──────────────────────────────────────
+    def _member_project_ids(self, user_id: uuid.UUID):
+        """Subconsulta con los IDs de proyectos donde el usuario es miembro."""
+        return select(ProjectMember.project_id).where(
+            ProjectMember.user_id == user_id,
+            ProjectMember.deleted_at.is_(None),
+        )
+
+    @staticmethod
+    def _derive_status(overdue: int, in_review: int) -> str:
+        if overdue > 0:
+            return "at-risk"
+        if in_review > 0:
+            return "in-review"
+        return "active"
+
+    async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary:
+        today = datetime.date.today()
+        status_str = cast(Task.status, String)
+
+        tasks_query = select(
+            func.count(Task.id).label("total"),
+            func.coalesce(
+                func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+            ).label("completed"),
+            func.coalesce(
+                func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+            ).label("in_review"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Task.due_date < today,
+                                status_str.notin_(_OPEN_EXCLUDED),
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("overdue"),
+        ).where(Task.deleted_at.is_(None), Task.assignee_id == user_id)
+
+        # Proyectos activos = proyectos (no borrados) donde el usuario es miembro.
+        projects_query = (
+            select(func.count(func.distinct(ProjectMember.project_id)))
+            .select_from(ProjectMember)
+            .join(Project, Project.id == ProjectMember.project_id)
+            .where(
+                ProjectMember.user_id == user_id,
+                ProjectMember.deleted_at.is_(None),
+                Project.deleted_at.is_(None),
+            )
+        )
+
+        task_row = (await self._session.execute(tasks_query)).one()
+        projects_count = (await self._session.execute(projects_query)).scalar_one()
+
+        return DashboardSummary(
+            active_projects=int(projects_count or 0),
+            total_tasks=int(task_row.total or 0),
+            completed_tasks=int(task_row.completed or 0),
+            in_review_tasks=int(task_row.in_review or 0),
+            overdue_tasks=int(task_row.overdue or 0),
+        )
+
+    async def get_panels_for_user(
+        self,
+        user_id: uuid.UUID,
+        board_limit: int,
+        projects_limit: int,
+        deadlines_limit: int,
+    ) -> DashboardPanels:
+        return DashboardPanels(
+            task_board=await self._get_task_board(board_limit, assignee_id=user_id),
+            projects=await self._get_projects_overview(
+                projects_limit, project_ids=self._member_project_ids(user_id)
+            ),
+            upcoming_deadlines=await self._get_upcoming_deadlines(
+                deadlines_limit, assignee_id=user_id
+            ),
+        )
+
+    async def get_project_progress_for_user(
+        self, user_id: uuid.UUID, project_id: uuid.UUID
+    ) -> ProjectProgressDetail | None:
+        # Guard de membresía: si el usuario no pertenece al proyecto -> None (404).
+        is_member = (
+            await self._session.execute(
+                select(ProjectMember.id)
+                .where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.user_id == user_id,
+                    ProjectMember.deleted_at.is_(None),
+                )
+                .limit(1)
+            )
+        ).first()
+        if is_member is None:
+            return None
+
+        project = (
+            await self._session.execute(
+                select(Project).where(
+                    Project.id == project_id, Project.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
+            return None
+
+        today = datetime.date.today()
+        status_str = cast(Task.status, String)
+        counts = (
+            await self._session.execute(
+                select(
+                    func.count(Task.id).label("total"),
+                    func.coalesce(
+                        func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+                    ).label("completed"),
+                    func.coalesce(
+                        func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+                    ).label("in_review"),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    and_(
+                                        Task.due_date < today,
+                                        status_str.notin_(_OPEN_EXCLUDED),
+                                    ),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ).label("overdue"),
+                    func.coalesce(
+                        func.sum(case((status_str.in_(_PENDING_NAMES), 1), else_=0)), 0
+                    ).label("pending"),
+                )
+                .select_from(Task)
+                .join(WorkItem, Task.work_item_id == WorkItem.id)
+                .where(WorkItem.proyecto_id == project_id, Task.deleted_at.is_(None))
+            )
+        ).one()
+
+        coordinator = (
+            await self._session.execute(
+                select(func.min(func.concat(User.name, " ", User.last_name)))
+                .select_from(ProjectMember)
+                .join(User, User.id == ProjectMember.user_id)
+                .where(
+                    ProjectMember.project_id == project_id,
+                    cast(ProjectMember.project_role, String)
+                    == ProjectRole.COORDINADOR.name,
+                )
+            )
+        ).scalar()
+
+        my_tasks_rows = (
+            await self._session.execute(
+                self._task_with_project()
+                .where(
+                    Task.assignee_id == user_id,
+                    WorkItem.proyecto_id == project_id,
+                )
+                .order_by(Task.due_date.asc())
+            )
+        ).all()
+        my_tasks = [
+            TaskBoardItem(
+                id=task.id,
+                title=task.title,
+                status=_status_value(task.status),
+                project_name=project_name,
+                due_date=task.due_date,
+            )
+            for task, project_name in my_tasks_rows
+        ]
+
+        total = int(counts.total or 0)
+        completed = int(counts.completed or 0)
+        in_review = int(counts.in_review or 0)
+        overdue = int(counts.overdue or 0)
+        pending = int(counts.pending or 0)
+        progress = round(completed / total * 100) if total else 0
+
+        return ProjectProgressDetail(
+            id=project.id,
+            name=project.name,
+            client_name=project.client_name,
+            coordinator=coordinator,
+            status=self._derive_status(overdue, in_review),
+            tasks_total=total,
+            tasks_completed=completed,
+            tasks_in_review=in_review,
+            tasks_overdue=overdue,
+            tasks_pending=pending,
+            progress_pct=progress,
+            my_tasks=my_tasks,
+        )

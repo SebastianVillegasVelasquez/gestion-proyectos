@@ -201,3 +201,130 @@ class TestDashboardPanelsRoute:
         assert project["progress_pct"] == 25
         assert project["status"] == "at-risk"
         assert project["client_name"] == "Cliente OBJ"
+
+
+async def _insert_task(db_session, work_item_id, title, status, due, assignee_id=None):
+    today = datetime.date.today()
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date, assignee_id)
+            VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date, :assignee_id)
+            """
+        ),
+        {
+            "id": uuid.uuid4(),
+            "title": title,
+            "status": status.name,
+            "work_item_id": work_item_id,
+            "start_date": today,
+            "due_date": due,
+            "assignee_id": assignee_id,
+        },
+    )
+
+
+async def _seed_user_scope(db_session, member, other):
+    """Proyecto A: `member` es integrante. Proyecto B: no lo es."""
+    today = datetime.date.today()
+
+    project_a = Project(id=uuid.uuid4(), name="Proyecto A", client_name="Cliente A")
+    project_b = Project(id=uuid.uuid4(), name="Proyecto B", client_name="Cliente B")
+    db_session.add_all([project_a, project_b])
+    await db_session.flush()
+    item_a = await _make_work_item(db_session, project_a.id, nombre="Fase A")
+    item_b = await _make_work_item(db_session, project_b.id, nombre="Fase B")
+
+    db_session.add(
+        ProjectMember(
+            project_id=project_a.id,
+            user_id=member.id,
+            project_role=ProjectRole.INTEGRANTE,
+        )
+    )
+    await db_session.flush()
+
+    # Proyecto A: 2 tareas del member + 1 de "other" (progreso general = 3 tareas).
+    await _insert_task(
+        db_session, item_a.id, "Mía completada", TaskStatus.COMPLETADA, today, member.id
+    )
+    await _insert_task(
+        db_session,
+        item_a.id,
+        "Mía vencida",
+        TaskStatus.EN_PROGRESO,
+        today - datetime.timedelta(days=2),
+        member.id,
+    )
+    await _insert_task(
+        db_session,
+        item_a.id,
+        "De otro",
+        TaskStatus.PENDIENTE_POR_INICIAR,
+        today,
+        other.id,
+    )
+    # Proyecto B: tarea de "other"; el member no debe verla.
+    await _insert_task(
+        db_session, item_b.id, "Ajena", TaskStatus.EN_PROGRESO, today, other.id
+    )
+    await db_session.commit()
+    return project_a, project_b
+
+
+class TestMyDashboardRoutes:
+    async def test_me_summary_requires_auth(self, client):
+        response = await client.get("/api/v1/dashboard/me/summary")
+        assert response.status_code in (401, 403)
+
+    async def test_me_summary_scopes_to_user(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        await _seed_user_scope(db_session, member_user, admin_user)
+        response = await client.get(
+            "/api/v1/dashboard/me/summary", headers=member_headers
+        )
+        body = response.json()
+        assert body["active_projects"] == 1  # solo Proyecto A
+        assert body["total_tasks"] == 2  # solo las tareas del member
+        assert body["completed_tasks"] == 1
+        assert body["overdue_tasks"] == 1
+
+    async def test_me_panels_only_my_projects_and_tasks(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        await _seed_user_scope(db_session, member_user, admin_user)
+        response = await client.get(
+            "/api/v1/dashboard/me/panels", headers=member_headers
+        )
+        body = response.json()
+        assert [p["name"] for p in body["projects"]] == ["Proyecto A"]
+        # Progreso general del proyecto = 3 tareas (no solo las del member).
+        assert body["projects"][0]["tasks_total"] == 3
+        titles = {t["title"] for t in body["task_board"]}
+        assert titles == {"Mía completada", "Mía vencida"}
+
+    async def test_me_project_progress_member_ok(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        project_a, _ = await _seed_user_scope(db_session, member_user, admin_user)
+        response = await client.get(
+            f"/api/v1/dashboard/me/projects/{project_a.id}", headers=member_headers
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["tasks_total"] == 3  # progreso general
+        assert body["tasks_completed"] == 1
+        assert {t["title"] for t in body["my_tasks"]} == {
+            "Mía completada",
+            "Mía vencida",
+        }
+
+    async def test_me_project_progress_non_member_is_404(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        _, project_b = await _seed_user_scope(db_session, member_user, admin_user)
+        response = await client.get(
+            f"/api/v1/dashboard/me/projects/{project_b.id}", headers=member_headers
+        )
+        assert response.status_code == 404

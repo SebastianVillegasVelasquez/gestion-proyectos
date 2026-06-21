@@ -42,3 +42,20 @@ class DashboardPanelsResponse(BaseModelConfig):
     task_board: list[TaskBoardItemResponse]
     projects: list[ProjectOverviewItemResponse]
     upcoming_deadlines: list[DeadlineItemResponse]
+
+
+class MyProjectProgressResponse(BaseModelConfig):
+    """Progreso general de un proyecto (solo lectura) + tareas propias del usuario."""
+
+    id: UUID
+    name: str
+    client_name: str | None = None
+    coordinator: str | None = None
+    status: str  # active | at-risk | in-review
+    tasks_total: int
+    tasks_completed: int
+    tasks_in_review: int
+    tasks_overdue: int
+    tasks_pending: int
+    progress_pct: int
+    my_tasks: list[TaskBoardItemResponse]

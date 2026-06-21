@@ -11,7 +11,12 @@ import { TasksPage } from "@/features/projects/tasks/TasksPage.tsx";
 import { WorkspacePage } from "@/features/workspace/components/WorkspacePage.tsx";
 import { CollaboratorsPage } from "@/features/collaborators/components/CollaboratorsPage.tsx";
 import { CollaboratorActivityPage } from "@/features/collaborators/components/CollaboratorActivityPage.tsx";
+import { ProjectProgressPage } from "@/features/dashboard/components/ProjectProgressPage.tsx";
 import { ProtectedRoute } from "@/router/ProtectedRoute.tsx";
+import { RoleGuard } from "@/router/RoleGuard.tsx";
+import { Role } from "@/features/auth/types";
+
+const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN];
 
 export const AppRouter = () => (
   <Routes>
@@ -21,17 +26,24 @@ export const AppRouter = () => (
     {/* Rutas protegidas — requieren sesión */}
     <Route element={<ProtectedRoute />}>
       <Route element={<AppLayout />}>
+        {/* Accesibles a todos los roles */}
         <Route path="/" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/projects" element={<AllProjectsPage />} />
-        <Route path="/projects/builder" element={<CreateProjectPage />} />
-        <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-        <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
-        <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-        <Route path="/teams/:teamId" element={<TeamDetailPage />} />
         <Route path="/workspace" element={<WorkspacePage />} />
-        <Route path="/collaborators" element={<CollaboratorsPage />} />
-        <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
+        {/* Progreso de proyecto (solo lectura) — el backend valida membresía */}
+        <Route path="/proyectos/:projectId/progreso" element={<ProjectProgressPage />} />
+
+        {/* Solo administración: gestión global de proyectos y colaboradores */}
+        <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
+          <Route path="/projects" element={<AllProjectsPage />} />
+          <Route path="/projects/builder" element={<CreateProjectPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
+          <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
+          <Route path="/teams/:teamId" element={<TeamDetailPage />} />
+          <Route path="/collaborators" element={<CollaboratorsPage />} />
+          <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
+        </Route>
       </Route>
     </Route>
 

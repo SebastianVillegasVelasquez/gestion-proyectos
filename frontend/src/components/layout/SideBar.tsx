@@ -74,6 +74,20 @@ const SECTIONS: NavSection[] = [
   },
 ];
 
+// El rol User solo ve su dashboard y los espacios de trabajo (sin gestión global).
+const USER_SECTIONS: NavSection[] = [
+  {
+    id: "main",
+    title: "Principal",
+    items: [{ id: "overview", label: "Vista general", icon: LayoutDashboard, href: "/" }],
+  },
+  {
+    id: "workspace",
+    title: "Trabajo",
+    items: [{ id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" }],
+  },
+];
+
 const ROUTE_TO_ITEM: Record<string, string> = {
   "/": "overview",
   "/projects": "all-projects",
@@ -108,6 +122,9 @@ export function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+
+  // El rol User ve una navegación reducida (solo su información).
+  const sections = user?.role === Role.USER ? USER_SECTIONS : SECTIONS;
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 
@@ -172,7 +189,7 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-1">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.id} className="mb-5">
             <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
               {section.title}
