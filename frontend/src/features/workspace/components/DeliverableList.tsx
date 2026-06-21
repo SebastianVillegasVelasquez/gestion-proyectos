@@ -1,7 +1,8 @@
-import { FileText, Link, Package } from "lucide-react";
+import { Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Deliverable, WorkspaceMember, DeliverableStatus } from "../types";
 import { DELIVERABLE_STATUS_LABELS, DELIVERABLE_STATUS_BADGE } from "../types";
+import { RESOURCE_META } from "../utils/resource-types";
 
 function StatusBadge({ status }: { status: DeliverableStatus }) {
   return (
@@ -21,14 +22,9 @@ function DeliverableIcon({ d }: { d: Deliverable }) {
   if (!latest) {
     return <Package className="size-4 text-slate-400" />;
   }
-  if (latest.type === "enlace") {
-    return <Link className="size-4 text-blue-500" />;
-  }
-  const mime = latest.mimeType ?? "";
-  if (mime.includes("image")) {
-    return <FileText className="size-4 text-purple-500" />;
-  }
-  return <FileText className="size-4 text-rose-500" />;
+  const meta = RESOURCE_META[latest.type];
+  const Icon = meta.Icon;
+  return <Icon className={cn("size-4", meta.color)} />;
 }
 
 interface DeliverableListProps {

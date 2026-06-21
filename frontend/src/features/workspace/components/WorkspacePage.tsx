@@ -11,7 +11,12 @@ import type {
   DeliverableStatus,
   GroupTask,
 } from "../types";
-import { GROUP_TASK_STATUS_LABELS, GROUP_TASK_PRIORITY_COLOR } from "../types";
+import {
+  GROUP_TASK_STATUS_LABELS,
+  GROUP_TASK_PRIORITY_COLOR,
+  TEAM_ROLE_LABELS,
+  canReviewDeliverables,
+} from "../types";
 import { MOCK_GROUPS } from "../mockData";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { DeliverableList } from "./DeliverableList";
@@ -154,8 +159,8 @@ function GroupSettings({ group }: { group: WorkspaceGroup }) {
               </span>
               <div>
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{m.name}</p>
-                <p className="text-[11px] capitalize text-slate-400 dark:text-slate-500">
-                  {m.role === "lider" ? "Líder del grupo" : "Integrante"}
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {m.role === "lider" ? "Líder del grupo" : TEAM_ROLE_LABELS[m.role]}
                 </p>
               </div>
               {m.id === group.leaderId && (
@@ -323,9 +328,13 @@ export function WorkspacePage() {
   );
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("entregables");
   const [showNewTask, setShowNewTask] = useState(false);
+  // Usuario actual simulado (mock). El selector "Actuar como" lo cambia para
+  // validar los permisos por rol de equipo (líder/supervisor vs integrante).
+  const [currentUserId, setCurrentUserId] = useState<string>(MOCK_GROUPS[0].leaderId);
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)!;
-  const currentUserId = selectedGroup.leaderId; // simulate current user = leader
+  const currentMember = selectedGroup.members.find((m) => m.id === currentUserId);
+  const canReview = canReviewDeliverables(currentMember?.role);
 
   const selectedDeliverable =
     selectedGroup.deliverables.find((d) => d.id === selectedDeliverableId) ?? null;
@@ -372,6 +381,10 @@ export function WorkspacePage() {
       if (!selectedDeliverableId) {
         return;
       }
+      // Defensa en profundidad: las acciones de revisión solo para líder/supervisor.
+      if (type !== "comentario" && !canReview) {
+        return;
+      }
       const statusChange: Partial<Record<CommentType, DeliverableStatus>> = {
         aprobacion: "aprobado",
         solicitud_cambio: "cambios_solicitados",
@@ -393,7 +406,7 @@ export function WorkspacePage() {
         updatedAt: new Date().toISOString(),
       }));
     },
-    [selectedDeliverableId, currentUserId, updateDeliverable],
+    [selectedDeliverableId, currentUserId, canReview, updateDeliverable],
   );
 
   const handleAddTask = useCallback(
@@ -408,6 +421,10 @@ export function WorkspacePage() {
     setSelectedGroupId(id);
     const group = groups.find((g) => g.id === id);
     setSelectedDeliverableId(group?.deliverables[0]?.id ?? null);
+    // El usuario actual simulado pasa a ser el líder del nuevo grupo.
+    if (group) {
+      setCurrentUserId(group.leaderId);
+    }
     setActiveTab("entregables");
   };
 
@@ -449,6 +466,8 @@ export function WorkspacePage() {
         {/* Header */}
         <WorkspaceHeader
           group={selectedGroup}
+          currentUserId={currentUserId}
+          onChangeCurrentUser={setCurrentUserId}
           onNewTask={() => {
             setShowNewTask(true);
           }}
@@ -478,11 +497,11 @@ export function WorkspacePage() {
 
         {/* Tab content */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* ── Entregables: Master-Detail ── */}
+          {/* ── Entregables: lista | detalle | retroalimentación (lado a lado) ── */}
           {activeTab === "entregables" && (
             <>
-              {/* Left: deliverable list */}
-              <div className="w-80 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
+              {/* Columna 1: lista de entregables */}
+              <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
                 <DeliverableList
                   deliverables={selectedGroup.deliverables}
                   members={selectedGroup.members}
@@ -491,11 +510,10 @@ export function WorkspacePage() {
                 />
               </div>
 
-              {/* Right: detail + thread */}
               {selectedDeliverable ? (
-                <div className="flex flex-1 flex-col overflow-hidden">
-                  {/* Versions + upload (top half) */}
-                  <div className="flex-[0_0_45%] overflow-hidden border-b border-slate-200 dark:border-slate-800">
+                <>
+                  {/* Columna 2: detalle del entregable (timeline de entregas) */}
+                  <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800">
                     <DeliverableDetailView
                       deliverable={selectedDeliverable}
                       members={selectedGroup.members}
@@ -504,18 +522,18 @@ export function WorkspacePage() {
                     />
                   </div>
 
-                  {/* Feedback thread (bottom half) */}
-                  <div className="flex-1 overflow-hidden">
+                  {/* Columna 3: hilo de retroalimentación (desacoplado) */}
+                  <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
                     <FeedbackThread
                       comments={selectedDeliverable.comments}
                       members={selectedGroup.members}
-                      leaderId={selectedGroup.leaderId}
+                      canReview={canReview}
                       currentUserId={currentUserId}
                       deliverableStatus={selectedDeliverable.status}
                       onAddComment={handleAddComment}
                     />
                   </div>
-                </div>
+                </>
               ) : (
                 <NoDeliverableSelected />
               )}

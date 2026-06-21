@@ -1,13 +1,21 @@
-import { Plus } from "lucide-react";
+import { Plus, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkspaceGroup } from "../types";
+import { TEAM_ROLE_LABELS } from "../types";
 
 interface WorkspaceHeaderProps {
   group: WorkspaceGroup;
+  currentUserId: string;
+  onChangeCurrentUser: (id: string) => void;
   onNewTask: () => void;
 }
 
-export function WorkspaceHeader({ group, onNewTask }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({
+  group,
+  currentUserId,
+  onChangeCurrentUser,
+  onNewTask,
+}: WorkspaceHeaderProps) {
   const leader = group.members.find((m) => m.id === group.leaderId);
   const others = group.members.filter((m) => m.id !== group.leaderId);
   const overflow = others.length > 4;
@@ -77,6 +85,25 @@ export function WorkspaceHeader({ group, onNewTask }: WorkspaceHeaderProps) {
             {group.members.length} miembros
           </span>
         </div>
+
+        {/* "Actuar como" — simula el miembro actual para validar permisos por rol */}
+        <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] dark:border-slate-700 dark:bg-slate-800">
+          <UserCog className="size-3.5 text-slate-400" />
+          <span className="text-slate-400 dark:text-slate-500">Actuar como</span>
+          <select
+            value={currentUserId}
+            onChange={(e) => {
+              onChangeCurrentUser(e.target.value);
+            }}
+            className="bg-transparent font-medium text-slate-700 outline-none dark:text-slate-200"
+          >
+            {group.members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {TEAM_ROLE_LABELS[m.role]}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {/* CTA */}
         <button

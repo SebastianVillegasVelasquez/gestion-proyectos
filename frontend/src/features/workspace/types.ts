@@ -20,10 +20,39 @@ export const DELIVERABLE_STATUS_BADGE: Record<DeliverableStatus, string> = {
     "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800",
 };
 
-// ── Version / comment types ────────────────────────────────────────────────
+// ── Resource / comment types ───────────────────────────────────────────────
 
-export type VersionType = "archivo" | "enlace";
+/**
+ * Tipo de recurso entregado. Refleja las necesidades del negocio (virtualización
+ * de cursos + TI): enlaces (Figma/Drive), repositorios de código, paquetes SCORM
+ * para el LMS y archivos. `archivo` es un nice-to-have aún NO disponible.
+ */
+export type ResourceType = "enlace" | "repositorio" | "scorm" | "archivo";
+
+/** Alias retrocompatible. */
+export type VersionType = ResourceType;
+
 export type CommentType = "comentario" | "solicitud_cambio" | "aprobacion";
+
+// ── Team roles ──────────────────────────────────────────────────────────────
+
+/**
+ * Rol DENTRO del equipo de trabajo (distinto del rol de sistema y del de
+ * proyecto). Solo líder y supervisor pueden revisar entregables
+ * (solicitar cambios / aprobar); el integrante solo entrega y comenta.
+ */
+export type TeamRole = "lider" | "supervisor" | "integrante";
+
+export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
+  lider: "Líder",
+  supervisor: "Supervisor",
+  integrante: "Integrante",
+};
+
+/** ¿Este rol de equipo puede solicitar cambios o aprobar entregables? */
+export function canReviewDeliverables(role: TeamRole | undefined): boolean {
+  return role === "lider" || role === "supervisor";
+}
 
 // ── Core models ────────────────────────────────────────────────────────────
 
@@ -32,13 +61,13 @@ export interface WorkspaceMember {
   name: string;
   initials: string;
   avatarColor: string;
-  role: "lider" | "integrante";
+  role: TeamRole;
 }
 
 export interface DeliverableVersion {
   id: string;
   versionNumber: number;
-  type: VersionType;
+  type: ResourceType;
   url: string;
   fileName?: string;
   mimeType?: string;

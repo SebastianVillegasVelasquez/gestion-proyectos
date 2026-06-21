@@ -38,7 +38,7 @@ export const MOCK_GROUPS: WorkspaceGroup[] = [
         name: "Diego Torres",
         initials: "DT",
         avatarColor: "bg-amber-500",
-        role: "integrante",
+        role: "supervisor",
       },
     ],
     tasks: [
@@ -233,7 +233,7 @@ export const MOCK_GROUPS: WorkspaceGroup[] = [
         name: "Juan Pérez",
         initials: "JP",
         avatarColor: "bg-cyan-600",
-        role: "integrante",
+        role: "supervisor",
       },
       {
         id: "mbr_man",
@@ -278,7 +278,7 @@ export const MOCK_GROUPS: WorkspaceGroup[] = [
           {
             id: "ver_comp_1",
             versionNumber: 1,
-            type: "enlace",
+            type: "repositorio",
             url: "https://github.com/org/ova-quiz/pull/12",
             uploadedBy: "mbr_man",
             uploadedAt: "2025-01-17T14:00:00Z",
@@ -315,6 +315,37 @@ export const MOCK_GROUPS: WorkspaceGroup[] = [
         updatedAt: "2025-01-18T08:00:00Z",
         versions: [],
         comments: [],
+      },
+      // ── Deliverable SCORM ─────────────────────────────────────────────
+      {
+        id: "del_scorm",
+        taskTitle: "Paquete SCORM — Módulo 1",
+        assigneeId: "mbr_man",
+        status: "en_revision",
+        createdAt: "2025-01-19T09:00:00Z",
+        updatedAt: "2025-01-19T15:00:00Z",
+        versions: [
+          {
+            id: "ver_scorm_1",
+            versionNumber: 1,
+            type: "scorm",
+            url: "https://lms.obj.com/scorm/ova-modulo1-v1.zip",
+            uploadedBy: "mbr_man",
+            uploadedAt: "2025-01-19T15:00:00Z",
+            note: "Paquete SCORM 1.2 del módulo 1, listo para cargar al LMS. Incluye seguimiento de progreso del estudiante.",
+          },
+        ],
+        comments: [
+          {
+            id: "cmt_s1",
+            authorId: "mbr_man",
+            content:
+              "Paquete SCORM exportado y validado en el LMS de pruebas. @Sofía Blanco para su revisión y aprobación.",
+            createdAt: "2025-01-19T15:05:00Z",
+            type: "comentario",
+            mentions: ["mbr_sof"],
+          },
+        ],
       },
     ],
   },

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, AlertCircle, CheckCircle2, Send, AtSign } from "lucide-react";
+import { MessageSquare, AlertCircle, CheckCircle2, Send, AtSign, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeedbackComment, WorkspaceMember, CommentType, DeliverableStatus } from "../types";
+import { TEAM_ROLE_LABELS } from "../types";
 
 // ── date helper ───────────────────────────────────────────────────────────
 
@@ -117,9 +118,9 @@ function CommentItem({ comment, members }: CommentItemProps) {
           <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">
             {author?.name ?? "Desconocido"}
           </span>
-          {author?.role === "lider" && (
+          {author && author.role !== "integrante" && (
             <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-              Líder
+              {TEAM_ROLE_LABELS[author.role]}
             </span>
           )}
         </div>
@@ -141,12 +142,13 @@ function CommentItem({ comment, members }: CommentItemProps) {
 interface ComposeAreaProps {
   members: WorkspaceMember[];
   currentUserId: string;
-  isLeader: boolean;
+  /** Solo líder o supervisor del equipo pueden solicitar cambios / aprobar. */
+  canReview: boolean;
   deliverableStatus: DeliverableStatus;
   onSubmit: (content: string, type: CommentType, mentions: string[]) => void;
 }
 
-function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeAreaProps) {
+function ComposeArea({ members, currentUserId, canReview, onSubmit }: ComposeAreaProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -218,8 +220,8 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
 
       {/* Action buttons */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {/* Leader-only actions */}
-        {isLeader && (
+        {/* Acciones de revisión — solo líder o supervisor del equipo */}
+        {canReview ? (
           <>
             <button
               type="button"
@@ -244,6 +246,11 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
               Aprobar Entregable
             </button>
           </>
+        ) : (
+          <span className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+            <Lock className="size-3" />
+            Solo el líder o supervisor puede solicitar cambios o aprobar.
+          </span>
         )}
 
         <div className="flex-1" />
@@ -269,7 +276,8 @@ function ComposeArea({ members, currentUserId, isLeader, onSubmit }: ComposeArea
 interface FeedbackThreadProps {
   comments: FeedbackComment[];
   members: WorkspaceMember[];
-  leaderId: string;
+  /** ¿El usuario actual puede revisar (líder/supervisor del equipo)? */
+  canReview: boolean;
   currentUserId: string;
   deliverableStatus: DeliverableStatus;
   onAddComment: (content: string, type: CommentType, mentions: string[]) => void;
@@ -278,20 +286,19 @@ interface FeedbackThreadProps {
 export function FeedbackThread({
   comments,
   members,
-  leaderId,
+  canReview,
   currentUserId,
   deliverableStatus,
   onAddComment,
 }: FeedbackThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const isLeader = currentUserId === leaderId;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [comments.length]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden border-t border-slate-200 dark:border-slate-800">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Thread header */}
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
         <MessageSquare className="size-4 text-slate-400 dark:text-slate-500" />
@@ -320,7 +327,7 @@ export function FeedbackThread({
       <ComposeArea
         members={members}
         currentUserId={currentUserId}
-        isLeader={isLeader}
+        canReview={canReview}
         deliverableStatus={deliverableStatus}
         onSubmit={onAddComment}
       />
