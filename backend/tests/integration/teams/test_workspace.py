@@ -91,6 +91,16 @@ class TestWorkspaceAccess:
         )
         assert rl.json()["can_review"] is True
 
+    async def test_mine_lists_only_my_teams(self, client, scenario):
+        s = scenario
+        r = await client.get(f"{BASE}/mine", headers=_headers(s.integrante))
+        assert r.status_code == 200
+        ids = [t["id"] for t in r.json()]
+        assert str(s.team.id) in ids
+        # El externo no pertenece a ningún equipo del escenario.
+        r2 = await client.get(f"{BASE}/mine", headers=_headers(s.outsider))
+        assert str(s.team.id) not in [t["id"] for t in r2.json()]
+
     async def test_admin_can_view_but_not_deliver(self, client, scenario):
         s = scenario
         r = await client.get(

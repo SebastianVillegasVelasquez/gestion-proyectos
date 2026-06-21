@@ -110,3 +110,11 @@ class WorkspaceAccessResponse(BaseModelConfig):
     can_view: bool
     can_deliver: bool
     can_review: bool
+
+
+class MyTeamResponse(BaseModelConfig):
+    """Equipo al que pertenece el usuario (para el selector de espacios)."""
+
+    id: UUID
+    name: str
+    description: Optional[str] = None

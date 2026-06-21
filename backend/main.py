@@ -122,8 +122,10 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
-app.include_router(teams_router, prefix="/api/v1")
+# El router del workspace va ANTES que el de teams: su ruta literal /teams/mine
+# debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
 app.include_router(workspace_router, prefix="/api/v1")
+app.include_router(teams_router, prefix="/api/v1")
 app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")

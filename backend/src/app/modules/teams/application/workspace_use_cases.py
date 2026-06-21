@@ -15,6 +15,7 @@ from app.modules.teams.presentation.workspace_schemas import (
     AddVersionRequest,
     CreateDeliverableRequest,
     DeliverableResponse,
+    MyTeamResponse,
     WorkspaceAccessResponse,
 )
 from app.shared.exceptions import ForbiddenError, NotFoundError
@@ -36,6 +37,13 @@ class WorkspaceService:
     async def _access(self, team_id: UUID, current_user) -> WorkspaceAccess:
         role = await self._repo.get_member_role(team_id, current_user.id)
         return WorkspaceAccess.resolve(current_user.role.value, role)
+
+    async def list_my_teams(self, current_user) -> list[MyTeamResponse]:
+        teams = await self._repo.list_member_teams(current_user.id)
+        return [
+            MyTeamResponse(id=t.id, name=t.name, description=t.description)
+            for t in teams
+        ]
 
     async def access(self, team_id: UUID, current_user) -> WorkspaceAccessResponse:
         a = await self._access(team_id, current_user)

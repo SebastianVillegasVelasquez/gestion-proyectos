@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.teams.domain.workspace import WorkspaceRepository
 from app.modules.teams.infrastructure.enums import TeamRole
-from app.modules.teams.infrastructure.models import TeamMember
+from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
@@ -32,6 +32,15 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
                 TeamMember.team_id == team_id, TeamMember.user_id == user_id
             )
         )
+
+    async def list_member_teams(self, user_id: UUID) -> list[Team]:
+        rows = await self._session.execute(
+            select(Team)
+            .join(TeamMember, TeamMember.team_id == Team.id)
+            .where(TeamMember.user_id == user_id, Team.deleted_at.is_(None))
+            .order_by(Team.name)
+        )
+        return list(rows.scalars().all())
 
     def _with_children(self):
         return select(Deliverable).options(

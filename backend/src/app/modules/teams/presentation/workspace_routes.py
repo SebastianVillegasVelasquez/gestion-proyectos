@@ -10,10 +10,21 @@ from app.modules.teams.presentation.workspace_schemas import (
     AddVersionRequest,
     CreateDeliverableRequest,
     DeliverableResponse,
+    MyTeamResponse,
     WorkspaceAccessResponse,
 )
 
 router = APIRouter(prefix="/teams", tags=["Teams · Workspace"])
+
+
+# Ruta literal: debe registrarse antes que /{team_id} (workspace_router se incluye
+# antes que teams_router en main.py para que "mine" no se interprete como UUID).
+@router.get("/mine", response_model=list[MyTeamResponse])
+async def list_my_teams(
+    repo=Depends(workspace_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await WorkspaceService(repo).list_my_teams(current_user)
 
 
 @router.get("/{team_id}/workspace/access", response_model=WorkspaceAccessResponse)

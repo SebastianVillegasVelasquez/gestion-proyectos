@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.models import Team
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
@@ -63,6 +64,9 @@ class WorkspaceRepository(ABC):
     async def get_member_role(
         self, team_id: UUID, user_id: UUID
     ) -> TeamRole | None: ...
+
+    @abstractmethod
+    async def list_member_teams(self, user_id: UUID) -> list[Team]: ...
 
     @abstractmethod
     async def list_deliverables(self, team_id: UUID) -> list[Deliverable]: ...

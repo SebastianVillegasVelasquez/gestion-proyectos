@@ -95,34 +95,3 @@ export interface Deliverable {
   createdAt: string;
   updatedAt: string;
 }
-
-export interface GroupTask {
-  id: string;
-  title: string;
-  assigneeId: string;
-  status: "por_hacer" | "en_progreso" | "completado";
-  priority: "baja" | "media" | "alta";
-}
-
-export const GROUP_TASK_STATUS_LABELS: Record<GroupTask["status"], string> = {
-  por_hacer: "Por hacer",
-  en_progreso: "En progreso",
-  completado: "Completado",
-};
-
-export const GROUP_TASK_PRIORITY_COLOR: Record<GroupTask["priority"], string> = {
-  baja: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-  media: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  alta: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
-};
-
-export interface WorkspaceGroup {
-  id: string;
-  name: string;
-  description: string;
-  leaderId: string;
-  members: WorkspaceMember[];
-  tasks: GroupTask[];
-  deliverables: Deliverable[];
-  createdAt: string;
-}
