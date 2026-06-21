@@ -12,6 +12,11 @@ from app.modules.tasks.infrastructure.models import (
 
 # ── Teams models ──────────────────────────────────────────────────────────────
 from app.modules.teams.infrastructure.models import Team, TeamMember
+from app.modules.teams.infrastructure.workspace_models import (
+    Deliverable,
+    DeliverableComment,
+    DeliverableVersion,
+)
 
 # ── WorkTree models ───────────────────────────────────────────────────────────
 from app.modules.project.structure.infrastructure.models import (
@@ -36,6 +41,9 @@ __all__ = [
     # Teams
     "Team",
     "TeamMember",
+    "Deliverable",
+    "DeliverableVersion",
+    "DeliverableComment",
     # WorkTree
     "TipoNodo",
     "WorkItem",

@@ -37,6 +37,10 @@ from app.modules.project.infrastructure.repository import (
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
 from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
+from app.modules.teams.domain.workspace import WorkspaceRepository
+from app.modules.teams.infrastructure.workspace_repository import (
+    SqlAlchemyWorkspaceRepository,
+)
 from app.modules.traceability.infrastructure.repository import (
     SqlAlchemyTraceabilityRepository,
     TraceabilityRepository,
@@ -66,6 +70,12 @@ def project_members_repo_dependency(
 def team_repo_dependency(db: AsyncSession = Depends(get_db)) -> TeamRepository:
     # Devuelve la abstracción; la implementación concreta es intercambiable (DIP).
     return SqlAlchemyTeamRepository(db)
+
+
+def workspace_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> WorkspaceRepository:
+    return SqlAlchemyWorkspaceRepository(db)
 
 
 def worktree_repo_dependency(
