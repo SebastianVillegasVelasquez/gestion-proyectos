@@ -8,8 +8,7 @@ import { getErrorMessage } from "@/utils/get-error-message";
 import { useDeleteTeam, useTeams } from "../../hooks/use-teams";
 import { filterTeams } from "../../utils/filter-teams";
 import type { Team } from "../../types/api.types";
-import { EditTeamModal } from "../detail/EditTeamModal";
-import { CreateTeamModal } from "./CreateTeamModal";
+import { TeamFormModal } from "./TeamFormModal";
 import { TeamMembersManager } from "./TeamMembersManager";
 
 // Vista de gestión de equipos para administración (rol admin/super_admin).
@@ -188,7 +187,7 @@ export function TeamsManagementPage() {
       </div>
 
       {showCreate && (
-        <CreateTeamModal
+        <TeamFormModal
           onClose={() => {
             setShowCreate(false);
           }}
@@ -199,7 +198,7 @@ export function TeamsManagementPage() {
       )}
 
       {editing && (
-        <EditTeamModal
+        <TeamFormModal
           team={editing}
           onClose={() => {
             setEditing(null);

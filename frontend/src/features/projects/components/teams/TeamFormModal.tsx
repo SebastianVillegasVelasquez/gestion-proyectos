@@ -1,41 +1,49 @@
 import { useState } from "react";
-import { X, UsersRound } from "lucide-react";
+import { Pencil, UsersRound, X } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useCreateTeam } from "../../hooks/use-teams";
+import { useCreateTeam, useUpdateTeam } from "../../hooks/use-teams";
 import type { Team } from "../../types/api.types";
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-violet-500/20";
 
-// Modal para crear un equipo de trabajo. La unicidad del nombre la valida el
-// backend (409); aquí solo exigimos el mínimo (nombre de 2+ caracteres).
-export function CreateTeamModal({
-  onClose,
-  onCreated,
-}: {
+interface TeamFormModalProps {
+  /** Si se pasa un equipo, el modal edita; si no, crea uno nuevo. */
+  team?: Team;
   onClose: () => void;
   onCreated?: (team: Team) => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+}
+
+// Formulario de equipo (crear/editar) en un solo lugar: ambos modos comparten
+// los mismos campos (nombre + descripción) y validación. La unicidad del nombre
+// la valida el backend (409); aquí exigimos el mínimo (nombre de 2+ caracteres).
+export function TeamFormModal({ team, onClose, onCreated }: TeamFormModalProps) {
+  const isEdit = Boolean(team);
+  const [name, setName] = useState(team?.name ?? "");
+  const [description, setDescription] = useState(team?.description ?? "");
+
   const createTeam = useCreateTeam();
+  const updateTeam = useUpdateTeam(team?.id ?? "");
+  const mutation = isEdit ? updateTeam : createTeam;
 
   const trimmedName = name.trim();
-  const canSubmit = trimmedName.length >= 2 && !createTeam.isPending;
+  const canSubmit = trimmedName.length >= 2 && !mutation.isPending;
 
   const handleSubmit = () => {
     if (!canSubmit) {
       return;
     }
-    createTeam.mutate(
-      { name: trimmedName, description: description.trim() || null },
-      {
-        onSuccess: (team) => {
-          onCreated?.(team);
+    const payload = { name: trimmedName, description: description.trim() || null };
+    if (isEdit) {
+      updateTeam.mutate(payload, { onSuccess: onClose });
+    } else {
+      createTeam.mutate(payload, {
+        onSuccess: (created) => {
+          onCreated?.(created);
           onClose();
         },
-      },
-    );
+      });
+    }
   };
 
   return (
@@ -43,7 +51,7 @@ export function CreateTeamModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Crear equipo"
+      aria-label={isEdit ? "Editar equipo" : "Crear equipo"}
     >
       <button
         type="button"
@@ -54,7 +62,12 @@ export function CreateTeamModal({
       <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
-            <UsersRound className="size-4 text-violet-600" /> Nuevo equipo
+            {isEdit ? (
+              <Pencil className="size-4 text-violet-600" />
+            ) : (
+              <UsersRound className="size-4 text-violet-600" />
+            )}
+            {isEdit ? "Editar equipo" : "Nuevo equipo"}
           </h3>
           <button
             type="button"
@@ -78,7 +91,7 @@ export function CreateTeamModal({
               placeholder="Ej: Equipo de Desarrollo"
               aria-label="Nombre del equipo"
               maxLength={150}
-              autoFocus
+              autoFocus={!isEdit}
             />
           </label>
 
@@ -97,9 +110,12 @@ export function CreateTeamModal({
             />
           </label>
 
-          {createTeam.isError && (
+          {mutation.isError && (
             <p role="alert" className="text-xs text-red-600 dark:text-red-400">
-              {getErrorMessage(createTeam.error, "No se pudo crear el equipo")}
+              {getErrorMessage(
+                mutation.error,
+                isEdit ? "No se pudo guardar el equipo" : "No se pudo crear el equipo",
+              )}
             </p>
           )}
         </div>
@@ -118,7 +134,13 @@ export function CreateTeamModal({
             disabled={!canSubmit}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {createTeam.isPending ? "Creando…" : "Crear equipo"}
+            {mutation.isPending
+              ? isEdit
+                ? "Guardando…"
+                : "Creando…"
+              : isEdit
+                ? "Guardar cambios"
+                : "Crear equipo"}
           </button>
         </div>
       </div>
