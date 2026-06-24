@@ -82,7 +82,9 @@ class SqlAlchemyNotificationRepository(NotificationRepository):
             .values(read_at=datetime.now(timezone.utc))
         )
         await self._session.flush()
-        return int(result.rowcount or 0)
+        # execute() de un UPDATE devuelve un CursorResult con rowcount; mypy lo
+        # tipa como Result genérico y no lo ve.
+        return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
     async def delete(self, notification: Notification) -> None:
         await self._session.delete(notification)

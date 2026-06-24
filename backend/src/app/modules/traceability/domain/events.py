@@ -53,7 +53,11 @@ def classify_event(
     elif action == HistoryAction.COMENTARIO:
         kind = EVENT_COMENTARIO
     elif action == HistoryAction.CAMBIO_ESTADO:
-        kind = _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)
+        kind = (
+            _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)
+            if new_status is not None
+            else EVENT_CAMBIO_ESTADO
+        )
     else:
         kind = EVENT_CAMBIO_ESTADO
 

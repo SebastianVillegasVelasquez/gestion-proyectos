@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import String, and_, case, cast, func, or_, select
+from sqlalchemy import ColumnElement, String, and_, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.collaborators.domain.models import (
@@ -26,8 +26,11 @@ class SqlAlchemyCollaboratorRepository(CollaboratorRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    def _active_user_conditions(self, search: str | None) -> list:
-        conditions = [User.is_active.is_(True), User.deleted_at.is_(None)]
+    def _active_user_conditions(self, search: str | None) -> list[ColumnElement[bool]]:
+        conditions: list[ColumnElement[bool]] = [
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+        ]
         if search:
             like = f"%{search.strip()}%"
             conditions.append(

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from app.modules.areas.domain.metrics import completion_percentage
 from app.modules.areas.infrastructure.repository import AreaRepository
+from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.areas.presentation.schemas import (
     AreaProgress,
     ProjectAreasResponse,
@@ -28,7 +29,7 @@ class GetProjectAreasUseCase:
 
         areas = [
             AreaProgress(
-                position=row.position,
+                position=UserPosition(row.position),
                 member_count=row.member_count,
                 assigned_tasks=row.assigned_tasks,
                 completed_tasks=row.completed_tasks,

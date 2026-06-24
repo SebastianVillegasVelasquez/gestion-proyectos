@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -37,7 +37,7 @@ class SqlAlchemyTeamRepository(TeamRepository):
     async def search_teams(
         self, search: str | None, limit: int, offset: int
     ) -> tuple[list[Team], int]:
-        conditions = [Team.deleted_at.is_(None)]
+        conditions: list[ColumnElement[bool]] = [Team.deleted_at.is_(None)]
         if search:
             like = f"%{search.strip()}%"
             conditions.append(or_(Team.name.ilike(like), Team.description.ilike(like)))

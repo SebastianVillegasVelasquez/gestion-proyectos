@@ -365,8 +365,8 @@ class WorkTreeService:
             ends = [
                 derive(pred).fecha_fin_plan for pred in predecessors.get(node_id, [])
             ]
-            ends = [end for end in ends if end is not None]
-            predecessor_end = max(ends) if ends else None
+            valid_ends = [end for end in ends if end is not None]
+            predecessor_end = max(valid_ends) if valid_ends else None
 
             result = derive_dates(
                 fecha_inicio_plan=item.fecha_inicio_plan,

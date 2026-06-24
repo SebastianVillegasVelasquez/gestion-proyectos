@@ -1,4 +1,4 @@
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.enums import UserPosition
@@ -29,7 +29,10 @@ class UserRepository(BaseRepository[User]):
         Devuelve (página de usuarios, total que cumple el filtro) para no traer
         toda la tabla al cliente.
         """
-        conditions = [User.is_active.is_(True), User.deleted_at.is_(None)]
+        conditions: list[ColumnElement[bool]] = [
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+        ]
         if position is not None:
             conditions.append(User.position == position)
         if search:

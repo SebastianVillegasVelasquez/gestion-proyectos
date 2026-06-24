@@ -148,6 +148,7 @@ class ChangeTaskStatusUseCase:
         assert new_status.assignee_id, "El usuario asignado debe de existir"
         if self._bus and new_status.status == TaskStatus.EN_REVISION:
             work_item = await self.work_tree_repo.get_item(new_status.work_item_id)
+            assert work_item is not None, "La tarea debe colgar de un nodo existente"
             await self._bus.publish(
                 TaskSubmitted(
                     task_id=new_status.id,

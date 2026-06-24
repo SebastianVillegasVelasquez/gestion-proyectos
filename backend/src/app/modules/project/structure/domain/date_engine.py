@@ -65,6 +65,7 @@ def derive_dates(
 
     # Modo 3: solo duración → posición heredada.
     if delta is not None:
+        base: datetime.date | None
         if predecessor_end is not None:
             base = predecessor_end + datetime.timedelta(days=1)
         else:

@@ -45,7 +45,9 @@ class BaseRepository(Repository[T], Generic[T]):
         return await self._session.get(self._model, entity_id)
 
     async def get_all(self) -> list[T]:
-        query = select(self._model).where(self._model.deleted_at.is_(None))
+        # Los modelos concretos incluyen SoftDeleteMixin (deleted_at); T es genérico
+        # y mypy no puede saberlo aquí.
+        query = select(self._model).where(self._model.deleted_at.is_(None))  # type: ignore[attr-defined]
         result = await self._session.execute(query)
         return list(result.scalars().all())
 

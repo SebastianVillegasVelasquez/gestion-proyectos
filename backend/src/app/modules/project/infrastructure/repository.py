@@ -1,6 +1,7 @@
 from typing import Optional
+from uuid import UUID
 
-from sqlalchemy import UUID, select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.modules.project.infrastructure.models import Project, ProjectMember
