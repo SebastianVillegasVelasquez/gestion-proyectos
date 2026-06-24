@@ -45,7 +45,7 @@ export function AuthPanel({ isRegister, onSwitch }: AuthPanelProps) {
   const items = isRegister ? REGISTER_TIPS : LOGIN_FEATURES;
 
   return (
-    <aside className="relative flex w-full md:w-1/2 flex-col justify-between overflow-hidden bg-slate-900 px-8 py-12 md:px-14 md:py-16">
+    <aside className="relative flex w-full md:w-1/2 flex-col justify-between overflow-hidden bg-sidebar text-sidebar-foreground px-8 py-12 md:px-14 md:py-16">
       {/* Malla de puntos */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.20]"

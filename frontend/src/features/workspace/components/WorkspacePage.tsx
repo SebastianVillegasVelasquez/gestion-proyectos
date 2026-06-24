@@ -4,6 +4,8 @@ import { Package, Settings, Users2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { Role } from "@/features/auth/types";
+import { TeamsManagementPage } from "@/features/projects/components/teams/TeamsManagementPage";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion, WorkspaceMember } from "../types";
 import { TEAM_ROLE_LABELS } from "../types";
@@ -212,9 +214,10 @@ function NoDeliverableSelected() {
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+// ── Member workspace ─────────────────────────────────────────────────────────
+// Experiencia del integrante: sus equipos, entregables y revisiones.
 
-export function WorkspacePage() {
+function MemberWorkspace() {
   useOutletContext<AppOutletContext>();
   const { user } = useAuth();
   const currentUserId = user?.id ?? "";
@@ -440,4 +443,16 @@ export function WorkspacePage() {
       )}
     </div>
   );
+}
+
+// ── Dispatcher por rol ───────────────────────────────────────────────────────
+// Para administración, /workspace es una consola de gestión de equipos; para el
+// resto de roles, es su espacio de trabajo (entregables y revisiones).
+
+export function WorkspacePage() {
+  const { hasRole } = useAuth();
+  if (hasRole([Role.ADMIN, Role.SUPER_ADMIN])) {
+    return <TeamsManagementPage />;
+  }
+  return <MemberWorkspace />;
 }

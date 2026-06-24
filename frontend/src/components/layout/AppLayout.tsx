@@ -1,9 +1,18 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Menu, Moon, PanelLeftOpen, Sun } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
+
+// Fallback mientras se descarga el chunk de la ruta (solo el área de contenido;
+// el sidebar permanece visible).
+function RouteFallback() {
+  return (
+    <div className="flex h-full w-full items-center justify-center p-10">
+      <span className="size-6 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
+    </div>
+  );
+}
 
 export interface AppOutletContext {
   dark: boolean;
@@ -65,18 +74,6 @@ export const AppLayout = () => {
         onToggleDark={toggleDark}
       />
 
-      {/* Botón flotante para reabrir el menú en escritorio cuando está colapsado */}
-      {collapsed && (
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label="Abrir menú lateral"
-          className="fixed left-3 top-3 z-50 hidden h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-accent md:flex"
-        >
-          <PanelLeftOpen className="size-5" />
-        </button>
-      )}
-
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile-only topbar */}
         <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
@@ -113,16 +110,11 @@ export const AppLayout = () => {
           </div>
         </header>
 
-        {/* Page content — scrollable on mobile, fixed on desktop.
-            Cuando el menú está colapsado dejamos un hueco a la izquierda en
-            escritorio para que el botón flotante no tape el contenido. */}
-        <main
-          className={cn(
-            "flex flex-1 flex-col overflow-y-auto lg:overflow-hidden",
-            collapsed && "md:pl-14",
-          )}
-        >
-          <Outlet context={context} />
+        {/* Page content — scrollable on mobile, fixed on desktop. */}
+        <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet context={context} />
+          </Suspense>
         </main>
       </div>
     </div>

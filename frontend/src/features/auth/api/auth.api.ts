@@ -1,4 +1,4 @@
-import http from "./http.ts";
+import http from "@/lib/http";
 import type {
   LoginRequest,
   LoginResponse,

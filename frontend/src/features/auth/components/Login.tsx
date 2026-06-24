@@ -53,7 +53,8 @@ export default function LoginPage() {
 
   const loginMutation = useLogin(redirectTo);
   const registerMutation = useRegister(redirectTo);
-  const { data: positions, isLoading: positionsLoading } = usePositions();
+  // Carga perezosa: los cargos solo se piden cuando se abre el registro.
+  const { data: positions, isLoading: positionsLoading } = usePositions(isRegister);
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
   const isSuccess = isRegister ? registerMutation.isSuccess : loginMutation.isSuccess;

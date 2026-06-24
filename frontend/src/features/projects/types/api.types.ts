@@ -245,9 +245,19 @@ export interface PaginatedTeams {
   page_size: number;
 }
 
+export interface CreateTeamPayload {
+  name: string;
+  description?: string | null;
+}
+
 export interface UpdateTeamPayload {
   name?: string;
   description?: string | null;
+}
+
+export interface AddTeamMemberPayload {
+  user_id: string;
+  team_role?: TeamRole;
 }
 
 export interface TeamMember {

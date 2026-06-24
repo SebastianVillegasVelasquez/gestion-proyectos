@@ -1,8 +1,11 @@
-import http from "@/features/auth/api/http";
+import http from "@/lib/http";
 import type {
+  AddTeamMemberPayload,
+  CreateTeamPayload,
   PaginatedTeams,
   Team,
   TeamMember,
+  TeamRole,
   TeamSearchParams,
   UpdateTeamPayload,
 } from "@/features/projects/types/api.types";
@@ -21,6 +24,8 @@ export const teamsApi = {
 
   get: (teamId: string) => http.get<Team>(`/teams/${teamId}`).then((r) => r.data),
 
+  create: (payload: CreateTeamPayload) => http.post<Team>("/teams/", payload).then((r) => r.data),
+
   update: (teamId: string, payload: UpdateTeamPayload) =>
     http.patch<Team>(`/teams/${teamId}`, payload).then((r) => r.data),
 
@@ -28,4 +33,15 @@ export const teamsApi = {
 
   members: (teamId: string) =>
     http.get<TeamMember[]>(`/teams/${teamId}/members`).then((r) => r.data),
+
+  addMember: (teamId: string, payload: AddTeamMemberPayload) =>
+    http.post<TeamMember>(`/teams/${teamId}/members`, payload).then((r) => r.data),
+
+  changeMemberRole: (teamId: string, userId: string, teamRole: TeamRole) =>
+    http
+      .patch<TeamMember>(`/teams/${teamId}/members/${userId}`, { team_role: teamRole })
+      .then((r) => r.data),
+
+  removeMember: (teamId: string, userId: string): Promise<void> =>
+    http.delete(`/teams/${teamId}/members/${userId}`).then(() => undefined),
 };

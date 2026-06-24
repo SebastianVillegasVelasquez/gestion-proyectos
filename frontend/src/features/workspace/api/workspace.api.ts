@@ -1,4 +1,4 @@
-import http from "@/features/auth/api/http";
+import http from "@/lib/http";
 import type {
   CommentType,
   DeliverableStatus,

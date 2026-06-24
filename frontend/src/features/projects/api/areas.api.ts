@@ -1,4 +1,4 @@
-import http from "@/features/auth/api/http";
+import http from "@/lib/http";
 import type { ProjectAreas } from "@/features/projects/types/api.types";
 
 // Cliente HTTP del avance por área (cargo) de un proyecto. Solo lee; el cálculo
