@@ -19,6 +19,10 @@ from app.modules.dashboard.infrastructure.repository import (
     DashboardRepository,
     SqlAlchemyDashboardRepository,
 )
+from app.modules.feedback.domain.repository import FeedbackRepository
+from app.modules.feedback.infrastructure.repository import (
+    SqlAlchemyFeedbackRepository,
+)
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.infrastructure.repository import UserRepository
 from app.modules.identity.presentation.schemas import UserResponse
@@ -114,6 +118,12 @@ def notification_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> NotificationRepository:
     return SqlAlchemyNotificationRepository(db)
+
+
+def feedback_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackRepository:
+    return SqlAlchemyFeedbackRepository(db)
 
 
 def event_bus_dependency(

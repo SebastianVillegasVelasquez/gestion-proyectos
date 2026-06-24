@@ -28,6 +28,9 @@ from app.modules.project.structure.infrastructure.models import (
 # ── Notifications models ──────────────────────────────────────────────────────
 from app.modules.notifications.infrastructure.models import Notification
 
+# ── Feedback models ───────────────────────────────────────────────────────────
+from app.modules.feedback.infrastructure.models import Feedback
+
 __all__ = [
     # Identity
     "User",
@@ -50,4 +53,6 @@ __all__ = [
     "WorkItemDependency",
     # Notifications
     "Notification",
+    # Feedback
+    "Feedback",
 ]
