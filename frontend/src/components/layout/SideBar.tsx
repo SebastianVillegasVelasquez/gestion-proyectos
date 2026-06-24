@@ -11,6 +11,7 @@ import {
   Settings,
   Sun,
   User,
+  UserCog,
   Users2,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",
+  [Role.CLIENT]: "Cliente",
 };
 
 interface NavItem {
@@ -67,7 +69,10 @@ const SECTIONS: NavSection[] = [
   {
     id: "general",
     title: "General",
-    items: [{ id: "settings", label: "Configuración", icon: Settings, href: "/settings" }],
+    items: [
+      { id: "users", label: "Usuarios", icon: UserCog, href: "/admin/users" },
+      { id: "settings", label: "Configuración", icon: Settings, href: "/settings" },
+    ],
   },
 ];
 
@@ -87,6 +92,18 @@ const USER_SECTIONS: NavSection[] = [
     id: "general",
     title: "General",
     items: [{ id: "settings", label: "Configuración", icon: Settings, href: "/settings" }],
+  },
+];
+
+// El cliente solo ve su portal (y sus ajustes de cuenta).
+const CLIENT_SECTIONS: NavSection[] = [
+  {
+    id: "main",
+    title: "Mi espacio",
+    items: [
+      { id: "portal", label: "Mi proyecto", icon: FolderKanban, href: "/portal" },
+      { id: "settings", label: "Configuración", icon: Settings, href: "/settings" },
+    ],
   },
 ];
 
@@ -111,6 +128,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/collaborators": "collab-individual",
   "/settings": "settings",
   "/feedback": "feedback",
+  "/portal": "portal",
 };
 
 const DOT_COLORS: Record<NonNullable<NavItem["dot"]>, string> = {
@@ -140,13 +158,16 @@ export function Sidebar({
   const location = useLocation();
   const { user } = useAuth();
 
-  // User: navegación reducida. Developer: completa + bandeja de feedback.
+  // Cliente: solo su portal. User: navegación reducida. Developer: completa +
+  // bandeja de feedback. Resto (admin/super_admin): navegación completa.
   const sections =
-    user?.role === Role.USER
-      ? USER_SECTIONS
-      : user?.role === Role.DEVELOPER
-        ? DEVELOPER_SECTIONS
-        : SECTIONS;
+    user?.role === Role.CLIENT
+      ? CLIENT_SECTIONS
+      : user?.role === Role.USER
+        ? USER_SECTIONS
+        : user?.role === Role.DEVELOPER
+          ? DEVELOPER_SECTIONS
+          : SECTIONS;
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 

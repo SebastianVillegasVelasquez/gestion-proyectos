@@ -18,6 +18,14 @@ export const authApi = {
 
   logout: () => http.post("/identity/auth/logout").then((r) => r.data),
 
+  changePassword: (currentPassword: string, newPassword: string) =>
+    http
+      .patch("/identity/me/password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
+
   positions: () =>
     http
       .get<PositionOption[]>("/identity/positions")

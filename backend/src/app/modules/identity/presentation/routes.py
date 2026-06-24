@@ -9,24 +9,29 @@ from app.core.dependencies import (
     require_role,
 )
 from app.modules.identity.application.use_cases import (
+    ChangeMyPasswordUseCase,
     CreateUserUseCase,
     DeleteUserUseCase,
     GetUserByIdUseCase,
     LoginUseCase,
     RefreshTokenUseCase,
+    ResetUserPasswordUseCase,
     SearchUsersUseCase,
     UpdateUserUseCase,
 )
 from app.shared.pagination import Pagination, pagination_params
+from app.shared.rate_limit import rate_limiter
 from app.modules.identity.infrastructure.repository import UserRepository
-from app.modules.identity.infrastructure.enums import UserPosition
+from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.modules.identity.presentation.schemas import (
+    ChangePasswordRequest,
     CreateUserRequest,
     DirectoryUserResponse,
     LoginRequest,
     PaginatedDirectoryResponse,
     PositionOption,
     RefreshRequest,
+    ResetPasswordResponse,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
@@ -41,6 +46,23 @@ async def create(
     data: CreateUserRequest,
     repo: UserRepository = Depends(user_repo_dependency),
 ):
+    """Registro PÚBLICO (sin autenticación).
+
+    Seguridad: forzamos role=USER aunque el cliente envíe otro. Si no, cualquiera
+    podría auto-asignarse super_admin. La creación con rol vive en POST /users
+    (solo administración).
+    """
+    data.role = SystemRole.USER
+    return await CreateUserUseCase(user_repo=repo).execute(data)
+
+
+@router.post("/users", response_model=UserResponse, status_code=201)
+async def create_user_admin(
+    data: CreateUserRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin")),
+):
+    """Creación de usuarios por administración: honra el rol indicado."""
     return await CreateUserUseCase(user_repo=repo).execute(data)
 
 
@@ -59,7 +81,9 @@ async def positions():
 async def login(
     data: LoginRequest,
     repo: UserRepository = Depends(user_repo_dependency),
+    _: None = rate_limiter(max_hits=10, window_seconds=60, scope="login"),
 ):
+    # Límite anti fuerza bruta: 10 intentos por IP por minuto.
     return await LoginUseCase(repo).execute(data.email, data.password)
 
 
@@ -74,6 +98,28 @@ async def refresh(
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
+
+
+@router.patch("/me/password", status_code=204)
+async def change_my_password(
+    data: ChangePasswordRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """El usuario autenticado cambia su propia contraseña (verifica la actual)."""
+    await ChangeMyPasswordUseCase(repo).execute(
+        current_user.id, data.current_password, data.new_password
+    )
+
+
+@router.post("/users/{user_id}/reset-password", response_model=ResetPasswordResponse)
+async def reset_user_password(
+    user_id: UUID,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin")),
+):
+    """Administración genera una contraseña temporal para entregar al usuario."""
+    return await ResetUserPasswordUseCase(repo).execute(user_id)
 
 
 @router.get("/directory", response_model=list[DirectoryUserResponse])

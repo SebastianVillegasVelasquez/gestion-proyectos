@@ -54,6 +54,13 @@ export function useRegister(redirectTo = "/dashboard") {
   });
 }
 
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (vars: { currentPassword: string; newPassword: string }) =>
+      authApi.changePassword(vars.currentPassword, vars.newPassword),
+  });
+}
+
 export function useLogout() {
   const navigate = useNavigate();
   const { logout } = useAuth();

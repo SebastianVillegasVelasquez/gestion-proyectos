@@ -2,10 +2,14 @@ from uuid import UUID
 
 from jose import JWTError
 
+import secrets
+import string
+
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
 from app.modules.identity.domain.services import UserService
@@ -14,13 +18,23 @@ from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     DirectoryUserResponse,
     PaginatedDirectoryResponse,
+    ResetPasswordResponse,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
 )
 from app.modules.identity.infrastructure.repository import UserRepository
-from app.shared.exceptions import ConflictError, UnauthorizedError
+from app.shared.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.shared.pagination import Pagination
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    """Contraseña temporal legible con al menos una letra y un dígito."""
+    alphabet = string.ascii_letters + string.digits
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if any(c.isdigit() for c in pwd) and any(c.isalpha() for c in pwd):
+            return pwd
 
 
 def _token_response(user) -> TokenResponse:
@@ -157,3 +171,35 @@ class DeleteUserUseCase:
 
     async def execute(self, user_id: UUID) -> None:
         await self.user_service.delete(user_id=user_id)
+
+
+class ChangeMyPasswordUseCase:
+    """El propio usuario cambia su contraseña (verifica la actual)."""
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(self, user_id: UUID, current: str, new: str) -> None:
+        user = await self.user_repo.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Usuario no encontrado")
+        if not verify_password(current, user.password):
+            raise UnauthorizedError("La contraseña actual no es correcta")
+        user.password = hash_password(new)
+        await self.user_repo.save(user)
+
+
+class ResetUserPasswordUseCase:
+    """Un admin genera una contraseña temporal para un usuario y la devuelve."""
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(self, user_id: UUID) -> ResetPasswordResponse:
+        user = await self.user_repo.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Usuario no encontrado")
+        temp = _generate_temp_password()
+        user.password = hash_password(temp)
+        await self.user_repo.save(user)
+        return ResetPasswordResponse(user_id=user_id, temporary_password=temp)

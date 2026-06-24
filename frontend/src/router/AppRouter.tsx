@@ -19,6 +19,8 @@ const WorkspacePage = lazy(() =>
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
 const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
+const ClientPortal = lazy(() => import("@/features/client/components/ClientPortal.tsx"));
+const AdminUsersPage = lazy(() => import("@/features/admin/components/AdminUsersPage.tsx"));
 const ProjectProgressPage = lazy(() =>
   import("@/features/dashboard/components/ProjectProgressPage.tsx").then((m) => ({
     default: m.ProjectProgressPage,
@@ -78,6 +80,8 @@ export const AppRouter = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<WorkspacePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        {/* Portal del cliente (pantalla única de solo lectura). */}
+        <Route path="/portal" element={<ClientPortal />} />
 
         {/* Bandeja de feedback: solo el rol técnico (developer). */}
         <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
@@ -96,6 +100,7 @@ export const AppRouter = () => (
           <Route path="/teams/:teamId" element={<TeamDetailPage />} />
           <Route path="/collaborators" element={<CollaboratorsPage />} />
           <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Route>
     </Route>

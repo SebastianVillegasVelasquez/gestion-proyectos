@@ -4,8 +4,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from sqlalchemy import text
+
 from app.core.config import get_settings
+from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger
+from app.shared.rate_limit import TooManyRequestsError
 
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
@@ -44,11 +48,18 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
     logger.info(
         "Iniciando OBJ Digital PM",
-        env=get_settings().APP_ENV,
-        debug=get_settings().DEBUG,
+        env=settings.APP_ENV,
+        debug=settings.DEBUG,
     )
+    # Guard de producción: una SECRET_KEY débil compromete todos los tokens.
+    if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
+        logger.warning(
+            "SECRET_KEY débil o ausente en un entorno no-dev: define una clave "
+            "fuerte (>=32 chars) por entorno antes de exponer el servicio."
+        )
     from app.core.seed import ensure_developer, ensure_super_admin
     from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
 
@@ -112,12 +123,30 @@ async def validation_handler(request: Request, exc: ValidationError):
     return JSONResponse(status_code=422, content={"detail": exc.message})
 
 
+@app.exception_handler(TooManyRequestsError)
+async def too_many_requests_handler(request: Request, exc: TooManyRequestsError):
+    return JSONResponse(status_code=429, content={"detail": exc.message})
+
+
 @app.exception_handler(DomainException)
 async def domain_exception_handler(request: Request, exc: DomainException):
     logger.error("Excepción de dominio no manejada", error=exc.message)
     return JSONResponse(
         status_code=500, content={"detail": "Error interno del servidor"}
     )
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    """Healthcheck para orquestadores/balanceadores: verifica la BD."""
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "ok"}
+    except Exception:  # noqa: BLE001 - cualquier fallo de BD => degradado
+        return JSONResponse(
+            status_code=503, content={"status": "degraded", "database": "error"}
+        )
 
 
 app.include_router(users_router, prefix="/api/v1")
@@ -134,8 +163,3 @@ app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(areas_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}

@@ -13,6 +13,7 @@ class SystemRole(str, Enum):
     )
     ADMIN = "admin"  # Gestión de usuarios, creación de proyectos y reportería general.
     USER = "user"  # Usuario estándar que puede entrar al sistema y participar en proyectos.
+    CLIENT = "client"  # Acceso restringido: solo ve el resumen de su(s) proyecto(s).
 
 
 class UserPosition(str, Enum):

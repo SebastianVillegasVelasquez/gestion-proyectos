@@ -1,17 +1,104 @@
+import { useState } from "react";
 import { useOutletContext } from "react-router";
-import { Mail, Moon, ShieldCheck, Sun, UserCircle2 } from "lucide-react";
+import { KeyRound, Mail, Moon, ShieldCheck, Sun, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuth, useChangePassword } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
+import { getErrorMessage } from "@/utils/get-error-message";
 import { positionLabel } from "@/features/projects/types/labels";
+
+const fieldCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+
+function ChangePasswordForm() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const changePassword = useChangePassword();
+
+  const mismatch = confirm.length > 0 && next !== confirm;
+  const canSubmit =
+    current.length > 0 && next.length >= 8 && next === confirm && !changePassword.isPending;
+
+  const handleSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
+    changePassword.mutate(
+      { currentPassword: current, newPassword: next },
+      {
+        onSuccess: () => {
+          setCurrent("");
+          setNext("");
+          setConfirm("");
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <input
+        type="password"
+        value={current}
+        onChange={(e) => {
+          setCurrent(e.target.value);
+        }}
+        placeholder="Contraseña actual"
+        aria-label="Contraseña actual"
+        className={fieldCls}
+      />
+      <input
+        type="password"
+        value={next}
+        onChange={(e) => {
+          setNext(e.target.value);
+        }}
+        placeholder="Nueva contraseña (mín. 8, con un número)"
+        aria-label="Nueva contraseña"
+        className={fieldCls}
+      />
+      <input
+        type="password"
+        value={confirm}
+        onChange={(e) => {
+          setConfirm(e.target.value);
+        }}
+        placeholder="Confirmar nueva contraseña"
+        aria-label="Confirmar nueva contraseña"
+        className={fieldCls}
+      />
+      {mismatch && <p className="text-xs text-red-600 dark:text-red-400">No coinciden.</p>}
+      {changePassword.isError && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {getErrorMessage(changePassword.error, "No se pudo cambiar la contraseña")}
+        </p>
+      )}
+      {changePassword.isSuccess && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400">Contraseña actualizada.</p>
+      )}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {changePassword.isPending ? "Guardando…" : "Cambiar contraseña"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.DEVELOPER]: "Developer",
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",
+  [Role.CLIENT]: "Cliente",
 };
 
 function SettingsCard({
@@ -120,6 +207,16 @@ export function SettingsPage() {
               />
             </button>
           </div>
+        </SettingsCard>
+
+        <SettingsCard
+          title="Seguridad"
+          description="Cambia tu contraseña. Necesitas la actual para confirmarlo."
+        >
+          <div className="flex items-center gap-2 pb-1 text-xs text-muted-foreground">
+            <KeyRound className="size-3.5 text-brand-teal" /> Contraseña
+          </div>
+          <ChangePasswordForm />
         </SettingsCard>
       </div>
     </div>
