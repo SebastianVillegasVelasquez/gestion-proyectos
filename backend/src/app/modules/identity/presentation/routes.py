@@ -16,6 +16,7 @@ from app.modules.identity.application.use_cases import (
     LoginUseCase,
     RefreshTokenUseCase,
     ResetUserPasswordUseCase,
+    SearchUsersAdminUseCase,
     SearchUsersUseCase,
     UpdateUserUseCase,
 )
@@ -29,6 +30,7 @@ from app.modules.identity.presentation.schemas import (
     DirectoryUserResponse,
     LoginRequest,
     PaginatedDirectoryResponse,
+    PaginatedUsersResponse,
     PositionOption,
     RefreshRequest,
     ResetPasswordResponse,
@@ -157,6 +159,17 @@ async def search_users(
 ):
     """Búsqueda paginada de usuarios (nombre/correo/cargo) para los selectores."""
     return await SearchUsersUseCase(repo).execute(search, position, pagination)
+
+
+@router.get("/users/manage", response_model=PaginatedUsersResponse)
+async def manage_users(
+    search: str | None = None,
+    pagination: Pagination = Depends(pagination_params),
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin")),
+):
+    """Lista paginada de usuarios (con rol e is_active) para la gestión admin."""
+    return await SearchUsersAdminUseCase(repo).execute(search, pagination)
 
 
 @router.get(

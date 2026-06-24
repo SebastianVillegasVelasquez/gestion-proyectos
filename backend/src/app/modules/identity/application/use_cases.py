@@ -18,6 +18,7 @@ from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     DirectoryUserResponse,
     PaginatedDirectoryResponse,
+    PaginatedUsersResponse,
     ResetPasswordResponse,
     TokenResponse,
     UpdateUserRequest,
@@ -136,6 +137,26 @@ class SearchUsersUseCase:
         )
         return PaginatedDirectoryResponse(
             items=[DirectoryUserResponse.model_validate(u) for u in items],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
+
+
+class SearchUsersAdminUseCase:
+    """Búsqueda paginada para la gestión de usuarios (incluye inactivos)."""
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(
+        self, search: str | None, pagination: Pagination
+    ) -> PaginatedUsersResponse:
+        items, total = await self.user_repo.search_users_admin(
+            search=search, limit=pagination.limit, offset=pagination.offset
+        )
+        return PaginatedUsersResponse(
+            items=[UserResponse.model_validate(u) for u in items],
             total=total,
             page=pagination.page,
             page_size=pagination.page_size,

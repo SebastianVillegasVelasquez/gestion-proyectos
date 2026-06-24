@@ -109,6 +109,15 @@ class UserResponse(BaseModelConfig):
     is_active: bool
 
 
+class PaginatedUsersResponse(BaseModelConfig):
+    """Página de usuarios COMPLETOS (con rol e is_active) para administración."""
+
+    items: list[UserResponse]
+    total: int
+    page: int
+    page_size: int
+
+
 class PositionOption(BaseModelConfig):
     """Opción de cargo para poblar el selector del registro (value + etiqueta es-CO)."""
 

@@ -19,9 +19,29 @@ export interface CreateUserPayload {
   role: Role;
 }
 
+export interface PaginatedUsers {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminUsersParams {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 // Cliente HTTP de administración de usuarios. Solo traduce a la API.
 export const adminUsersApi = {
-  list: () => http.get<AdminUser[]>("/identity/users").then((r) => r.data),
+  // Paginado en el servidor: no traemos toda la tabla (puede haber miles).
+  search: ({ search, page = 1, pageSize = 20 }: AdminUsersParams = {}) => {
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (search) {
+      params.search = search;
+    }
+    return http.get<PaginatedUsers>("/identity/users/manage", { params }).then((r) => r.data);
+  },
 
   create: (payload: CreateUserPayload) =>
     http.post<AdminUser>("/identity/users", payload).then((r) => r.data),

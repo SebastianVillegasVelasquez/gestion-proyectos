@@ -63,6 +63,44 @@ class UserRepository(BaseRepository[User]):
         )
         return list(rows), int(total or 0)
 
+    async def search_users_admin(
+        self,
+        search: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        """Búsqueda paginada para administración: INCLUYE inactivos (para poder
+        reactivarlos), excluye solo los borrados. Filtra por nombre/apellido/correo.
+        """
+        conditions: list[ColumnElement[bool]] = [User.deleted_at.is_(None)]
+        if search:
+            like = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    User.name.ilike(like),
+                    User.last_name.ilike(like),
+                    User.email.ilike(like),
+                )
+            )
+
+        total = await self._session.scalar(
+            select(func.count()).select_from(User).where(*conditions)
+        )
+        rows = (
+            (
+                await self._session.execute(
+                    select(User)
+                    .where(*conditions)
+                    .order_by(User.name, User.last_name)
+                    .limit(limit)
+                    .offset(offset)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return list(rows), int(total or 0)
+
     async def is_email_available(self, email: str) -> bool:
         user = await self.get_by_email(email)
 

@@ -53,7 +53,7 @@ async def create_node_type(
     data: CreateTipoNodoRequest,
     repo=Depends(worktree_repo_dependency),
     project_repo=Depends(project_repo_dependency),
-    current_user=Depends(_admin),
+    _=Depends(_admin),
 ):
     return await CreateTipoNodoUseCase(repo, project_repo).execute(proyecto_id, data)
 

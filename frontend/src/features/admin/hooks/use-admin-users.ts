@@ -1,12 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminUsersApi, type AdminUser, type CreateUserPayload } from "../api/users.api";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  adminUsersApi,
+  type AdminUser,
+  type AdminUsersParams,
+  type CreateUserPayload,
+} from "../api/users.api";
 
 const adminUserKeys = {
   all: ["admin", "users"] as const,
+  list: (params: AdminUsersParams) =>
+    [...adminUserKeys.all, params.search ?? "", params.page ?? 1] as const,
 };
 
-export function useAdminUsers() {
-  return useQuery({ queryKey: adminUserKeys.all, queryFn: adminUsersApi.list });
+/** Lista paginada y buscable de usuarios (servidor). */
+export function useAdminUsers(params: AdminUsersParams) {
+  return useQuery({
+    queryKey: adminUserKeys.list(params),
+    queryFn: () => adminUsersApi.search(params),
+    // Mantiene la página anterior visible mientras llega la nueva (sin parpadeo).
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+  });
 }
 
 export function useCreateUser() {
