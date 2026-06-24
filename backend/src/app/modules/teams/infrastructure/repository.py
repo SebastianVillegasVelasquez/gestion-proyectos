@@ -59,6 +59,28 @@ class SqlAlchemyTeamRepository(TeamRepository):
         )
         return list(rows), int(total or 0)
 
+    async def count_members(self, team_id: UUID) -> int:
+        total = await self._session.scalar(
+            select(func.count())
+            .select_from(TeamMember)
+            .where(TeamMember.team_id == team_id)
+        )
+        return int(total or 0)
+
+    async def member_counts(self, team_ids: list[UUID]) -> dict[UUID, int]:
+        # Un solo query agrupado para contar integrantes de varios equipos a la vez
+        # (evita el N+1 de pedir los miembros equipo por equipo al listar).
+        if not team_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(TeamMember.team_id, func.count(TeamMember.id))
+                .where(TeamMember.team_id.in_(team_ids))
+                .group_by(TeamMember.team_id)
+            )
+        ).all()
+        return {team_id: int(count) for team_id, count in rows}
+
     # ── Integrantes ──────────────────────────────────────────────────────────
     async def add_member(self, member: TeamMember) -> TeamMember:
         return await self._persist(member)

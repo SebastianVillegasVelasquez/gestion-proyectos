@@ -36,8 +36,8 @@ class TeamService:
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(team, field, value)
         saved = await self.repo.save_team(team)
-        members = await self.repo.list_members(team_id)
-        return self._to_team_response(saved, member_count=len(members))
+        member_count = await self.repo.count_members(team_id)
+        return self._to_team_response(saved, member_count=member_count)
 
     async def delete_team(self, team_id: UUID) -> None:
         team = await self._get_active_team(team_id)
@@ -46,17 +46,19 @@ class TeamService:
 
     async def get_team(self, team_id: UUID) -> TeamResponse:
         team = await self._get_active_team(team_id)
-        members = await self.repo.list_members(team_id)
-        return self._to_team_response(team, member_count=len(members))
+        member_count = await self.repo.count_members(team_id)
+        return self._to_team_response(team, member_count=member_count)
 
     async def search_teams(
         self, search: str | None, limit: int, offset: int
     ) -> tuple[list[TeamResponse], int]:
         teams, total = await self.repo.search_teams(search, limit, offset)
-        responses = []
-        for team in teams:
-            members = await self.repo.list_members(team.id)
-            responses.append(self._to_team_response(team, member_count=len(members)))
+        # Un único query agrupado para todos los conteos (en vez de 1 por equipo).
+        counts = await self.repo.member_counts([team.id for team in teams])
+        responses = [
+            self._to_team_response(team, member_count=counts.get(team.id, 0))
+            for team in teams
+        ]
         return responses, total
 
     # ── Integrantes ──────────────────────────────────────────────────────────

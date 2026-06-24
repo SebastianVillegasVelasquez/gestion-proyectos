@@ -69,6 +69,17 @@ class FakeTeamRepository(TeamRepository):
         total = len(teams)
         return teams[offset : offset + limit], total
 
+    async def count_members(self, team_id):
+        return sum(1 for (tid, _) in self._members if tid == team_id)
+
+    async def member_counts(self, team_ids):
+        ids = set(team_ids)
+        counts: dict[uuid.UUID, int] = {}
+        for tid, _ in self._members:
+            if tid in ids:
+                counts[tid] = counts.get(tid, 0) + 1
+        return counts
+
     async def add_member(self, member: TeamMember) -> TeamMember:
         if member.id is None:
             member.id = uuid.uuid4()
