@@ -1,10 +1,3 @@
-"""Datos de demostración para el entorno de desarrollo.
-
-Crea un proyecto completo (árbol de trabajo flexible, equipo y tareas con
-dependencias y fechas variadas) para ver las vistas con datos reales.
-Idempotente: si el proyecto demo ya existe, no hace nada.
-"""
-
 import datetime
 import uuid
 

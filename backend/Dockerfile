@@ -1,27 +1,22 @@
-# Esta es la imagen base en la cual se monta el backend
 FROM python:3.13-slim
 
-# Copia del codigo fuente en la imagen
-WORKDIR /src
+# WORKDIR distinto de "src" para evitar la ruta /src/src/app
+WORKDIR /app
 
-# El RUN se ejecuta mientras la construcción de la imagen, no en el runtime
-# Esto instala poetry (porque es el gestor de dependencias del proyecto) en la imagen.
-RUN pip install poetry
+# Gestor de dependencias
+RUN pip install --no-cache-dir poetry
 
-# Copia los archivos de dependencias y configuración del proyecto
+# 1) Instala SOLO dependencias (sin el paquete local) para aprovechar la cache
 COPY pyproject.toml poetry.lock ./
-
-# Una vez copiados los archivos, crea un entorne virtual en la imagen
-# e instala las dependencias
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi --only main --no-root
 
-# Copia todo el codigo fuente
+# 2) Copia el código y registra el paquete local "app" (definido en pyproject como from=src)
 COPY . .
+RUN poetry install --no-interaction --no-ansi --only main
 
-# Expone el puerto 8000 para la imagen
 EXPOSE 8000
 
-# Esto es una construccion del comando a la hora del runtime
-# del contenedor (ej. uvicorn app.main:app --host 0.0.0.0 --port 8000)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+CMD ["./entrypoint.sh"]

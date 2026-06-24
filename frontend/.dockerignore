@@ -1,0 +1,48 @@
+# Control de versiones
+.git
+.gitignore
+
+# Dependencias (se reinstalan dentro de la imagen con pnpm)
+node_modules
+**/node_modules
+
+# Build previo en local (se genera dentro de la imagen)
+dist
+build
+.vite
+
+# Variables de entorno locales
+.env
+.env.*
+!.env.example
+
+# Cachés y cobertura
+coverage
+.eslintcache
+.cache
+
+# Editores / IDE
+.vscode
+.idea
+*.swp
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker (no se necesita dentro de la imagen)
+Dockerfile
+.dockerignore
+
+# Documentación
+README.md
+
+# Lockfile alternativo (el Dockerfile usa pnpm-lock.yaml)
+package-lock.json

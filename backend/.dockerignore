@@ -1,0 +1,48 @@
+# Control de versiones
+.git
+.gitignore
+
+# Entornos virtuales y cachés de Python
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+*$py.class
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+coverage
+htmlcov
+.tox
+
+# Variables de entorno locales (se inyectan vía compose)
+.env
+.env.*
+!.env-example
+
+# Pruebas y herramientas de desarrollo
+tests
+test_main.http
+compose-dev.yaml
+
+# Editores / IDE
+.vscode
+.idea
+*.swp
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker (no se necesita dentro de la imagen)
+Dockerfile
+.dockerignore
+
+# Documentación
+README.md

@@ -1,9 +1,3 @@
-"""Reglas de negocio puras para tareas.
-
-Funciones sin efectos secundarios (sin DB) para que sean triviales de testear.
-Los servicios reúnen los datos y delegan la decisión aquí.
-"""
-
 from uuid import UUID
 
 from app.modules.tasks.infrastructure.enums import TaskStatus

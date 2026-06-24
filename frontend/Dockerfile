@@ -7,6 +7,7 @@ ENV CI=true
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 RUN pnpm fetch
 RUN pnpm install --offline

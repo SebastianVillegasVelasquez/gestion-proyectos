@@ -17,3 +17,7 @@ docker-compose.yml
 *.log
 
 README.md
+
+backend/tests/
+.pytest_cache/
+.git/
