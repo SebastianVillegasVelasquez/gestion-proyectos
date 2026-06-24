@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router";
 import {
   FolderKanban,
+  Inbox,
   Layers,
   LayoutDashboard,
   type LucideIcon,
@@ -20,6 +21,7 @@ import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 
 const ROLE_LABELS: Record<Role, string> = {
+  [Role.DEVELOPER]: "Developer",
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",
@@ -88,6 +90,19 @@ const USER_SECTIONS: NavSection[] = [
   },
 ];
 
+// El developer ve la navegación completa MÁS la bandeja de feedback.
+const DEVELOPER_SECTIONS: NavSection[] = SECTIONS.map((section) =>
+  section.id === "general"
+    ? {
+        ...section,
+        items: [
+          { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
+          ...section.items,
+        ],
+      }
+    : section,
+);
+
 const ROUTE_TO_ITEM: Record<string, string> = {
   "/": "overview",
   "/projects": "all-projects",
@@ -95,6 +110,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/workspace": "workspace",
   "/collaborators": "collab-individual",
   "/settings": "settings",
+  "/feedback": "feedback",
 };
 
 const DOT_COLORS: Record<NonNullable<NavItem["dot"]>, string> = {
@@ -124,8 +140,13 @@ export function Sidebar({
   const location = useLocation();
   const { user } = useAuth();
 
-  // El rol User ve una navegación reducida (solo su información).
-  const sections = user?.role === Role.USER ? USER_SECTIONS : SECTIONS;
+  // User: navegación reducida. Developer: completa + bandeja de feedback.
+  const sections =
+    user?.role === Role.USER
+      ? USER_SECTIONS
+      : user?.role === Role.DEVELOPER
+        ? DEVELOPER_SECTIONS
+        : SECTIONS;
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 

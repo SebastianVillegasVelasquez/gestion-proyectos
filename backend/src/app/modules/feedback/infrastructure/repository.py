@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +16,20 @@ class SqlAlchemyFeedbackRepository(FeedbackRepository):
 
     async def add(self, feedback: Feedback) -> Feedback:
         self._session.add(feedback)
+        await self._session.flush()
+        await self._session.refresh(feedback)
+        return feedback
+
+    async def get(self, feedback_id: UUID) -> Feedback | None:
+        return (
+            await self._session.execute(
+                select(Feedback)
+                .options(selectinload(Feedback.author))
+                .where(Feedback.id == feedback_id)
+            )
+        ).scalar_one_or_none()
+
+    async def save(self, feedback: Feedback) -> Feedback:
         await self._session.flush()
         await self._session.refresh(feedback)
         return feedback

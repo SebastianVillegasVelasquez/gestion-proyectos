@@ -7,7 +7,7 @@ from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.modules.feedback.infrastructure.enums import FeedbackType
+from app.modules.feedback.infrastructure.enums import FeedbackStatus, FeedbackType
 from app.shared.base_database import Base
 from app.shared.base_entity import TimestampMixin, UUIDMixin
 
@@ -25,6 +25,13 @@ class Feedback(Base, UUIDMixin, TimestampMixin):
     feedback_type: Mapped[FeedbackType] = mapped_column(
         Enum(FeedbackType, name="feedback_type"),
         nullable=False,
+    )
+
+    # Estado de gestión (lo cambia el developer desde su bandeja).
+    status: Mapped[FeedbackStatus] = mapped_column(
+        Enum(FeedbackStatus, name="feedback_status"),
+        nullable=False,
+        default=FeedbackStatus.PENDIENTE,
     )
 
     # Ruta del frontend desde donde se envió (contexto para triage en producción).

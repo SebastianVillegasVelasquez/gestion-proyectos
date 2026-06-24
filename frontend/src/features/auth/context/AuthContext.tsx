@@ -66,7 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: session?.user ?? null,
       isAuthenticated: session !== null,
-      hasRole: (roles) => Boolean(session && roles.includes(session.user.role)),
+      // Jerarquía: developer (rol técnico) es el tope y satisface cualquier guard
+      // de rol, igual que en el backend (role_satisfies).
+      hasRole: (roles) =>
+        Boolean(
+          session && (session.user.role === "developer" || roles.includes(session.user.role)),
+        ),
       login,
       logout,
     }),

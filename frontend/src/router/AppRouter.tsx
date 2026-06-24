@@ -18,6 +18,7 @@ const WorkspacePage = lazy(() =>
   })),
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
+const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
 const ProjectProgressPage = lazy(() =>
   import("@/features/dashboard/components/ProjectProgressPage.tsx").then((m) => ({
     default: m.ProjectProgressPage,
@@ -77,6 +78,11 @@ export const AppRouter = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<WorkspacePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Bandeja de feedback: solo el rol técnico (developer). */}
+        <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
+          <Route path="/feedback" element={<FeedbackInbox />} />
+        </Route>
         {/* Progreso de proyecto (solo lectura) — el backend valida membresía */}
         <Route path="/proyectos/:projectId/progreso" element={<ProjectProgressPage />} />
 

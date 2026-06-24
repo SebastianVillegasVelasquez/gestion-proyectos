@@ -35,6 +35,7 @@ export interface RegisterRequest {
 }
 
 export const Role = {
+  DEVELOPER: "developer",
   SUPER_ADMIN: "super_admin",
   ADMIN: "admin",
   USER: "user",

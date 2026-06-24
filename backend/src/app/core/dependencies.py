@@ -53,6 +53,7 @@ from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.repository import (
     SqlAlchemyWorkTreeRepository,
 )
+from app.shared.authz import role_satisfies
 from app.shared.events import EventBus
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
@@ -179,7 +180,7 @@ async def get_current_user(
 
 def require_role(*roles: str):
     async def _check(current_user=Depends(get_current_user)):
-        if current_user.role not in roles:
+        if not role_satisfies(current_user.role, roles):
             raise ForbiddenError("No tienes permiso para acceder a este recurso")
         return current_user
 
@@ -197,8 +198,10 @@ def require_project_permission(*allowed_project_roles: ProjectRole):
         current_user: UserResponse = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ):
-        # Regla 1: Si es Admin o Super Admin global, pasa directo (Poder absoluto)
-        if current_user.role in [SystemRole.SUPER_ADMIN, SystemRole.ADMIN]:
+        # Regla 1: acceso total global (Developer/Super Admin/Admin) pasa directo.
+        if role_satisfies(
+            current_user.role, [SystemRole.SUPER_ADMIN, SystemRole.ADMIN]
+        ):
             return current_user
 
         # Regla 2: Si es usuario estándar, verificamos su rol contextual en este proyecto

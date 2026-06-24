@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import StringConstraints
 
-from app.modules.feedback.infrastructure.enums import FeedbackType
+from app.modules.feedback.infrastructure.enums import FeedbackStatus, FeedbackType
 from app.shared.base_model import BaseModelConfig
 
 
@@ -15,13 +15,18 @@ class CreateFeedbackRequest(BaseModelConfig):
     page: Optional[str] = None
 
 
+class UpdateFeedbackStatusRequest(BaseModelConfig):
+    status: FeedbackStatus
+
+
 class FeedbackResponse(BaseModelConfig):
     id: UUID
     feedback_type: FeedbackType
+    status: FeedbackStatus
     message: str
     page: Optional[str] = None
     user_id: Optional[UUID] = None
-    # Nombre del autor para la vista de administración (None si se borró el usuario).
+    # Nombre del autor para la bandeja del developer (None si se borró el usuario).
     author_name: Optional[str] = None
     created_at: datetime
 

@@ -104,4 +104,24 @@ describe("Sidebar items (admin)", () => {
     // Configuración sí permanece y enlaza a la página de ajustes.
     expect(screen.getByRole("button", { name: "Configuración" })).toBeInTheDocument();
   });
+
+  it("does not show the Feedback inbox for admins", () => {
+    renderSidebar();
+    expect(screen.queryByRole("button", { name: "Feedback" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Sidebar feedback inbox (developer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authState.role = "developer";
+  });
+
+  it("shows the Feedback inbox and the full admin navigation", () => {
+    renderSidebar();
+    // Bandeja de feedback (exclusiva del developer)…
+    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
+    // …además de la navegación completa que ve administración.
+    expect(screen.getByRole("button", { name: "Todos los proyectos" })).toBeInTheDocument();
+  });
 });

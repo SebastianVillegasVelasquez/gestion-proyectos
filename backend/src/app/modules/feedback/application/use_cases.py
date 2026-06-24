@@ -1,12 +1,14 @@
 from uuid import UUID
 
 from app.modules.feedback.domain.repository import FeedbackRepository
+from app.modules.feedback.infrastructure.enums import FeedbackStatus
 from app.modules.feedback.infrastructure.models import Feedback
 from app.modules.feedback.presentation.schemas import (
     CreateFeedbackRequest,
     FeedbackResponse,
     PaginatedFeedbackResponse,
 )
+from app.shared.exceptions import NotFoundError
 from app.shared.pagination import Pagination
 
 
@@ -22,6 +24,7 @@ def _to_response(feedback: Feedback, author_name: str | None) -> FeedbackRespons
     return FeedbackResponse(
         id=feedback.id,
         feedback_type=feedback.feedback_type,
+        status=feedback.status,
         message=feedback.message,
         page=feedback.page,
         user_id=feedback.user_id,
@@ -51,8 +54,25 @@ class CreateFeedbackUseCase:
         return _to_response(feedback, author_name=None)
 
 
+class UpdateFeedbackStatusUseCase:
+    """Cambia el estado de gestión de un feedback (developer)."""
+
+    def __init__(self, repo: FeedbackRepository) -> None:
+        self._repo = repo
+
+    async def execute(
+        self, feedback_id: UUID, status: FeedbackStatus
+    ) -> FeedbackResponse:
+        feedback = await self._repo.get(feedback_id)
+        if feedback is None:
+            raise NotFoundError("Feedback no encontrado")
+        feedback.status = status
+        saved = await self._repo.save(feedback)
+        return _to_response(saved, author_name=_author_name(saved))
+
+
 class ListFeedbackUseCase:
-    """Lista el feedback recibido (administración)."""
+    """Lista el feedback recibido (bandeja del developer)."""
 
     def __init__(self, repo: FeedbackRepository) -> None:
         self._repo = repo

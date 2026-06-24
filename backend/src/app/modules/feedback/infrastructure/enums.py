@@ -1,6 +1,16 @@
 import enum
 
 
+class FeedbackStatus(str, enum.Enum):
+    """Estado de gestión del feedback (lo administra el rol developer)."""
+
+    PENDIENTE = "pendiente"  # Sin revisar (estado inicial)
+    REALIZADO = "realizado"  # Atendido / implementado
+    IMPOSIBLE = "imposible"  # No se puede hacer
+    MAS_TARDE = "mas_tarde"  # Pospuesto para más adelante
+    DESCARTADO = "descartado"  # No se hará
+
+
 class FeedbackType(str, enum.Enum):
     """Tipo de feedback que el usuario clasifica al enviarlo."""
 

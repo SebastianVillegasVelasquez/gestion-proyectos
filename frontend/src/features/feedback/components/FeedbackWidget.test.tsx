@@ -50,6 +50,7 @@ describe("FeedbackWidget", () => {
     vi.mocked(feedbackApi.create).mockResolvedValue({
       id: "f1",
       feedback_type: "negativo",
+      status: "pendiente",
       message: "algo falla",
       page: "/",
       user_id: null,

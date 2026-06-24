@@ -7,6 +7,7 @@ class SystemRole(str, Enum):
     Dictan la autorización a nivel de plataforma (Rutas e infraestructura de FastAPI).
     """
 
+    DEVELOPER = "developer"  # Rol técnico (programador): tope de jerarquía + bandeja de feedback.
     SUPER_ADMIN = (
         "super_admin"  # Control total del sistema, borrado físico, gestión de admins.
     )

@@ -8,6 +8,7 @@ import { Role } from "@/features/auth/types";
 import { positionLabel } from "@/features/projects/types/labels";
 
 const ROLE_LABELS: Record<Role, string> = {
+  [Role.DEVELOPER]: "Developer",
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",

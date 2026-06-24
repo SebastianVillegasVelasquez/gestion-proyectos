@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     SUPERADMIN_NAME: str = "Super"
     SUPERADMIN_LAST_NAME: str = "Admin"
 
+    # ── Developer sembrado al iniciar (rol técnico: todo + bandeja de feedback) ─
+    DEVELOPER_EMAIL: str = "developer@objdigital.com"
+    DEVELOPER_PASSWORD: str = ""
+    DEVELOPER_NAME: str = "Dev"
+    DEVELOPER_LAST_NAME: str = "OBJ"
+
     # ── Email ───────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
