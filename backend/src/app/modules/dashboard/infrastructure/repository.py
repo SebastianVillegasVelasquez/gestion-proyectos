@@ -81,17 +81,18 @@ class ProjectProgressDetail:
     my_tasks: list[TaskBoardItem] = field(default_factory=list)
 
 
-# Estados (se guardan por NAME en la BD; comparamos como string para no forzar
-# a Postgres a castear parámetros al tipo enum, que en algunos entornos es VARCHAR).
-_COMPLETED = TaskStatus.COMPLETADA.name
-_IN_REVIEW = TaskStatus.EN_REVISION.name
-_CANCELLED = TaskStatus.CANCELADA.name
+# Estados como miembros del enum. Al comparar Task.status (la columna) contra el
+# miembro, SQLAlchemy bindea al tipo `task_status` nativo SIN cast, por lo que el
+# índice ix_tasks_status es utilizable (un cast a String lo inhabilitaría).
+_COMPLETED = TaskStatus.COMPLETADA
+_IN_REVIEW = TaskStatus.EN_REVISION
+_CANCELLED = TaskStatus.CANCELADA
 _OPEN_EXCLUDED = [_COMPLETED, _CANCELLED]
 
-# Buckets del tablero -> qué estados (NAME) entran en cada columna del frontend.
-_PENDING_NAMES = [TaskStatus.PENDIENTE_POR_INICIAR.name, TaskStatus.DEVUELTA.name]
-_IN_PROGRESS_NAMES = [TaskStatus.EN_PROGRESO.name, TaskStatus.EN_REVISION.name]
-_COMPLETED_NAMES = [TaskStatus.COMPLETADA.name]
+# Buckets del tablero -> qué estados entran en cada columna del frontend.
+_PENDING = [TaskStatus.PENDIENTE_POR_INICIAR, TaskStatus.DEVUELTA]
+_IN_PROGRESS = [TaskStatus.EN_PROGRESO, TaskStatus.EN_REVISION]
+_COMPLETED_BUCKET = [TaskStatus.COMPLETADA]
 
 
 def _status_value(raw) -> str:
@@ -143,15 +144,15 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
     # ── KPIs ──────────────────────────────────────────────────────────────────
     async def get_summary(self) -> DashboardSummary:
         today = datetime.date.today()
-        status_str = cast(Task.status, String)
+        status_col = Task.status
 
         tasks_query = select(
             func.count(Task.id).label("total"),
             func.coalesce(
-                func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+                func.sum(case((status_col == _COMPLETED, 1), else_=0)), 0
             ).label("completed"),
             func.coalesce(
-                func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+                func.sum(case((status_col == _IN_REVIEW, 1), else_=0)), 0
             ).label("in_review"),
             func.coalesce(
                 func.sum(
@@ -159,7 +160,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         (
                             and_(
                                 Task.due_date < today,
-                                status_str.notin_(_OPEN_EXCLUDED),
+                                status_col.notin_(_OPEN_EXCLUDED),
                             ),
                             1,
                         ),
@@ -208,7 +209,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
     async def _get_task_board(
         self, limit: int, assignee_id: uuid.UUID | None = None
     ) -> list[TaskBoardItem]:
-        status_str = cast(Task.status, String)
+        status_col = Task.status
         base = self._task_with_project()
         if assignee_id is not None:
             base = base.where(Task.assignee_id == assignee_id)
@@ -216,14 +217,14 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         items: list[TaskBoardItem] = []
         # Pendientes y en progreso: lo más urgente primero (fecha de fin asc).
         for names, order in (
-            (_PENDING_NAMES, Task.due_date.asc()),
-            (_IN_PROGRESS_NAMES, Task.due_date.asc()),
+            (_PENDING, Task.due_date.asc()),
+            (_IN_PROGRESS, Task.due_date.asc()),
             # Completadas: las más recientes primero.
-            (_COMPLETED_NAMES, Task.completed_at.desc().nullslast()),
+            (_COMPLETED_BUCKET, Task.completed_at.desc().nullslast()),
         ):
             rows = (
                 await self._session.execute(
-                    base.where(status_str.in_(names)).order_by(order).limit(limit)
+                    base.where(status_col.in_(names)).order_by(order).limit(limit)
                 )
             ).all()
             for task, project_name in rows:
@@ -241,13 +242,13 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
     async def _get_upcoming_deadlines(
         self, limit: int, assignee_id: uuid.UUID | None = None
     ) -> list[DeadlineItem]:
-        status_str = cast(Task.status, String)
+        status_col = Task.status
         base = self._task_with_project()
         if assignee_id is not None:
             base = base.where(Task.assignee_id == assignee_id)
         rows = (
             await self._session.execute(
-                base.where(status_str.notin_(_OPEN_EXCLUDED))
+                base.where(status_col.notin_(_OPEN_EXCLUDED))
                 .order_by(Task.due_date.asc())
                 .limit(limit)
             )
@@ -266,7 +267,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         self, limit: int, project_ids=None
     ) -> list[ProjectOverviewItem]:
         today = datetime.date.today()
-        status_str = cast(Task.status, String)
+        status_col = Task.status
 
         # Conteos de tareas por proyecto (total, completadas, vencidas, en revisión).
         counts = (
@@ -274,7 +275,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 WorkItem.proyecto_id.label("pid"),
                 func.count(Task.id).label("total"),
                 func.coalesce(
-                    func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+                    func.sum(case((status_col == _COMPLETED, 1), else_=0)), 0
                 ).label("completed"),
                 func.coalesce(
                     func.sum(
@@ -282,7 +283,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                             (
                                 and_(
                                     Task.due_date < today,
-                                    status_str.notin_(_OPEN_EXCLUDED),
+                                    status_col.notin_(_OPEN_EXCLUDED),
                                 ),
                                 1,
                             ),
@@ -292,7 +293,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                     0,
                 ).label("overdue"),
                 func.coalesce(
-                    func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+                    func.sum(case((status_col == _IN_REVIEW, 1), else_=0)), 0
                 ).label("in_review"),
             )
             .select_from(Task)
@@ -389,15 +390,15 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
 
     async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary:
         today = datetime.date.today()
-        status_str = cast(Task.status, String)
+        status_col = Task.status
 
         tasks_query = select(
             func.count(Task.id).label("total"),
             func.coalesce(
-                func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+                func.sum(case((status_col == _COMPLETED, 1), else_=0)), 0
             ).label("completed"),
             func.coalesce(
-                func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+                func.sum(case((status_col == _IN_REVIEW, 1), else_=0)), 0
             ).label("in_review"),
             func.coalesce(
                 func.sum(
@@ -405,7 +406,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         (
                             and_(
                                 Task.due_date < today,
-                                status_str.notin_(_OPEN_EXCLUDED),
+                                status_col.notin_(_OPEN_EXCLUDED),
                             ),
                             1,
                         ),
@@ -485,16 +486,16 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             return None
 
         today = datetime.date.today()
-        status_str = cast(Task.status, String)
+        status_col = Task.status
         counts = (
             await self._session.execute(
                 select(
                     func.count(Task.id).label("total"),
                     func.coalesce(
-                        func.sum(case((status_str == _COMPLETED, 1), else_=0)), 0
+                        func.sum(case((status_col == _COMPLETED, 1), else_=0)), 0
                     ).label("completed"),
                     func.coalesce(
-                        func.sum(case((status_str == _IN_REVIEW, 1), else_=0)), 0
+                        func.sum(case((status_col == _IN_REVIEW, 1), else_=0)), 0
                     ).label("in_review"),
                     func.coalesce(
                         func.sum(
@@ -502,7 +503,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                                 (
                                     and_(
                                         Task.due_date < today,
-                                        status_str.notin_(_OPEN_EXCLUDED),
+                                        status_col.notin_(_OPEN_EXCLUDED),
                                     ),
                                     1,
                                 ),
@@ -512,7 +513,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         0,
                     ).label("overdue"),
                     func.coalesce(
-                        func.sum(case((status_str.in_(_PENDING_NAMES), 1), else_=0)), 0
+                        func.sum(case((status_col.in_(_PENDING), 1), else_=0)), 0
                     ).label("pending"),
                 )
                 .select_from(Task)
