@@ -6,8 +6,9 @@ from app.modules.identity.infrastructure.models import User, SystemRole
 from app.shared.rate_limit import reset_rate_limit
 
 
+# Nombre público (sin "_") para que `from ... import *` lo registre en el conftest.
 @pytest.fixture(autouse=True)
-def _reset_rate_limit():
+def reset_rate_limit_between_tests():
     """Aísla el limitador de tasa entre tests (estado en memoria por proceso)."""
     reset_rate_limit()
     yield

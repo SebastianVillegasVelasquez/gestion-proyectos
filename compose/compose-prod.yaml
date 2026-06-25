@@ -1,7 +1,7 @@
 services:
   backend:
     image:
-      ghcr.io/SebastianVillegasVelasquez/bitacora-backend:latest
+      ghcr.io/sebastianvillegasvelasquez/bitacora-backend:latest
     expose:
       - "8000"
     networks:
@@ -14,7 +14,7 @@ services:
 
   frontend:
     image:
-      ghcr.io/SebastianVillegasVelasquez/bitacora-frontend:latest
+      ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
     expose:
       - "80"
     networks:

@@ -59,8 +59,13 @@ jobs:
       - name: Mypy (tipos)
         run: poetry run mypy src
 
-      - name: Pytest (unit + integración E2E)
-        run: poetry run pytest tests
+      # Rutas separadas: pytest 9 no permite un pytest_plugins compartido entre
+      # árboles, y así los unitarios no levantan la BD de integración.
+      - name: Pytest unit
+        run: poetry run pytest tests/unit
+
+      - name: Pytest integración (E2E)
+        run: poetry run pytest tests/integration
 
   # ── Tests del frontend ───────────────────────────────────────────────────────
   frontend-tests:
@@ -92,6 +97,7 @@ jobs:
 
   # ── Imagen del backend (solo si pasaron sus tests) ───────────────────────────
   backend:
+    name: backend build image
     needs: backend-tests
     runs-on: ubuntu-latest
     steps:
@@ -115,11 +121,12 @@ jobs:
           # Publica solo en push a main; en PR construye para validar, sin publicar.
           push: ${{ github.event_name == 'push' }}
           tags: |
-            ghcr.io/SebastianVillegasVelasquez/bitacora-backend:latest
-            ghcr.io/SebastianVillegasVelasquez/bitacora-backend:${{ github.sha }}
+            ghcr.io/sebastianvillegasvelasquez/bitacora-backend:latest
+            ghcr.io/sebastianvillegasvelasquez/bitacora-backend:${{ github.sha }}
 
   # ── Imagen del frontend (solo si pasaron sus tests) ──────────────────────────
   frontend:
+    name: frontend build image
     needs: frontend-tests
     runs-on: ubuntu-latest
     steps:
@@ -144,5 +151,5 @@ jobs:
           build-args: |
             VITE_API_URL=/api/v1
           tags: |
-            ghcr.io/SebastianVillegasVelasquez/bitacora-frontend:latest
-            ghcr.io/SebastianVillegasVelasquez/bitacora-frontend:${{ github.sha }}
+            ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
+            ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:${{ github.sha }}
