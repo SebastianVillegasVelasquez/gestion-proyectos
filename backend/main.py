@@ -3,13 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
 from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger
-from app.shared.rate_limit import TooManyRequestsError
 
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
@@ -42,6 +40,7 @@ from app.shared.exceptions import (
     ValidationError,
     UnauthorizedError,
 )
+from app.shared.rate_limit import TooManyRequestsError
 
 logger = get_logger(__name__)
 

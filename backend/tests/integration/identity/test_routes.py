@@ -32,7 +32,9 @@ class TestCreateUserRoute:
         assert body["email"] == "admin@example.com"
         assert body["name"] == "John"
         assert body["last_name"] == "Doe"
-        assert body["role"] == "admin"
+        # Seguridad: el registro PÚBLICO ignora el rol enviado y crea siempre USER
+        # (la creación con rol vive en POST /identity/users, solo admin).
+        assert body["role"] == "user"
 
         assert body["is_active"] is True
 
@@ -153,7 +155,8 @@ class TestLoginRoute:
         assert user["email"] == "admin@example.com"
         assert user["name"] == "John"
         assert user["last_name"] == "Doe"
-        assert user["role"] == "admin"
+        # El registro público crea USER (ver nota de seguridad arriba).
+        assert user["role"] == "user"
         assert user["is_active"] is True
 
     async def test_should_return_401_when_password_is_invalid(

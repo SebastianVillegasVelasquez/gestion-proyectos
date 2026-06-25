@@ -20,6 +20,11 @@ class TooManyRequestsError(DomainException):
 _HITS: dict[str, deque[float]] = defaultdict(deque)
 
 
+def reset_rate_limit() -> None:
+    """Limpia el estado del limitador (para aislar tests entre sí)."""
+    _HITS.clear()
+
+
 def _allow(key: str, max_hits: int, window_seconds: float) -> bool:
     now = time.monotonic()
     hits = _HITS[key]

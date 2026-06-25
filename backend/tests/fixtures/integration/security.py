@@ -3,6 +3,67 @@ import pytest
 from app.core.security import create_access_token, hash_password
 from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.infrastructure.models import User, SystemRole
+from app.shared.rate_limit import reset_rate_limit
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """Aísla el limitador de tasa entre tests (estado en memoria por proceso)."""
+    reset_rate_limit()
+    yield
+    reset_rate_limit()
+
+
+async def _make_user(
+    db_session, *, email, password, role, name="Test", last_name="User"
+):
+    user = User(
+        email=email,
+        password=hash_password(password),
+        name=name,
+        last_name=last_name,
+        role=role,
+        position=UserPosition.DESARROLLADOR,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+async def developer_user(db_session):
+    return await _make_user(
+        db_session,
+        email="dev@test.com",
+        password="Dev123456",
+        role=SystemRole.DEVELOPER,
+    )
+
+
+@pytest.fixture
+async def developer_headers(developer_user):
+    token = create_access_token(
+        user_id=developer_user.id, role=developer_user.role.value
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def client_user(db_session):
+    return await _make_user(
+        db_session,
+        email="cliente@test.com",
+        password="Cliente123",
+        role=SystemRole.CLIENT,
+    )
+
+
+@pytest.fixture
+async def client_headers(client_user):
+    token = create_access_token(user_id=client_user.id, role=client_user.role.value)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
