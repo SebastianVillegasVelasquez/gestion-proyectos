@@ -3,6 +3,12 @@ FROM python:3.13-slim
 # WORKDIR distinto de "src" para evitar la ruta /src/src/app
 WORKDIR /app
 
+# postgresql-client aporta `pg_isready`, que el entrypoint usa para esperar a que
+# la base de datos acepte conexiones antes de migrar/arrancar.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 # Gestor de dependencias
 RUN pip install --no-cache-dir poetry
 

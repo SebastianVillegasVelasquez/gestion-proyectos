@@ -12,7 +12,6 @@ build
 .vite
 
 # Variables de entorno locales
-.env
 .env.*
 !.env.example
 
@@ -29,6 +28,9 @@ coverage
 # SO
 .DS_Store
 Thumbs.db
+
+**/*.test.ts
+**/*.test.tsx
 
 # Logs
 *.log
