@@ -16,6 +16,9 @@ asyncpg = "^0.31.0"
 httpx = "^0.28.1"
 pydantic-settings = "^2.14.1"
 pwdlib = {extras = ["argon2"], version = "^0.3.0"}
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+python-multipart = "^0.0.29"
+types-python-jose = "^3.5.0.20260408"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -33,6 +36,16 @@ testpaths = [
 ]
 addopts = "-ra -q"
 asyncio_mode = "auto"
+
+[tool.mypy]
+# Configuración deliberadamente poco estricta: detecta errores reales (tipos
+# incompatibles, None no manejado) sin exigir anotar todo el código heredado.
+python_version = "3.13"
+ignore_missing_imports = true       # no exige stubs de libs de terceros
+check_untyped_defs = true           # revisa el cuerpo de funciones sin anotar
+# NO activamos disallow_untyped_defs / strict / warn_unused_ignores: demasiado
+# ruidoso para este código (p. ej. ignores defensivos de pydantic-settings).
+exclude = '(^|/)(alembic|tests)/'
 
 [build-system]
 requires = ["poetry-core"]

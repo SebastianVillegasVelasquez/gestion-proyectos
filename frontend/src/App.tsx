@@ -1,12 +1,8 @@
-import './App.css'
+import "./App.css";
+import { AppRouter } from "@/router/AppRouter.tsx";
 
-function App() {
+const App = () => {
+  return <AppRouter />;
+};
 
-    return (
-        <>
-            <div>Hola mundo</div>
-        </>
-    )
-}
-
-export default App
+export default App;

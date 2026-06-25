@@ -1,4 +1,5 @@
-run-name: Frontend CI
+name: frontend-ci
+run-name: Frontend CI - ${{ github.actor }}
 
 on:
   push:
@@ -11,14 +12,53 @@ on:
       - "frontend/**"
     branches: [develop]
 
+# Cancel older runs on the same branch when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
     steps:
-      - uses: actions/checkout@v5
-      - name: Use Node.js 14.x
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 22 (LTS) with npm cache
         uses: actions/setup-node@v5
         with:
-          node-version: 14.x
-      - run: npm ci
-      - run: npm run build --if-present
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies (clean, reproducible)
+        run: npm ci
+
+      - name: Prettier — check formatting
+        run: npm run format
+
+      - name: ESLint — lint source
+        # Soft-fail for now: surfaces all issues but doesn't block PRs while
+        # AI-generated legacy code is being refactored. lint-staged (pre-commit)
+        # still hard-fails on errors for files the developer actually touches.
+        # Flip continue-on-error to false and lower --max-warnings as code
+        # gets cleaned up.
+        continue-on-error: true
+        run: npx eslint --max-warnings=80 src
+
+      - name: TypeScript — type-check
+        # Soft-fail: surfaces pre-existing type errors in AI-generated legacy
+        # code without blocking PRs. Flip to hard-fail once refactoring is done.
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Vitest — run unit tests
+        run: npm test
+
+      - name: Vite — production build
+        run: npm run build

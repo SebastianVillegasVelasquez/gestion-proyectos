@@ -1,21 +1,46 @@
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.models import UserRole
+from app.modules.identity.infrastructure.enums import (
+    POSITION_LABELS,
+    UserPosition,
+    SystemRole,
+)
+from app.shared.base_model import BaseModelConfig
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(BaseModelConfig):
     email: EmailStr
-    password: str = Field(min_length=1)
+
+    password: Annotated[
+        str,
+        StringConstraints(min_length=1),
+    ]
 
 
-class CreateUserRequest(BaseModel):
+class CreateUserRequest(BaseModelConfig):
     email: EmailStr
-    password: str = Field(min_length=8, description="Mínimo 8 caracteres")
-    name: str = Field(min_length=2, max_length=200)
-    last_name: str = Field(min_length=2, max_length=200)
-    role: UserRole = UserRole.MEMBER
+
+    password: Annotated[
+        str,
+        StringConstraints(min_length=8),
+    ]
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    role: SystemRole = SystemRole.USER
+
+    position: UserPosition = UserPosition.SIN_CARGO
 
     @field_validator("password")
     @classmethod
@@ -25,33 +50,114 @@ class CreateUserRequest(BaseModel):
         return v
 
 
-class UpdateUserRequest(BaseModel):
-    full_name: str | None = Field(default=None, min_length=2, max_length=200)
-    role: UserRole | None = None
+class UpdateUserRequest(BaseModelConfig):
+    email: EmailStr
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    role: SystemRole | None = None
     is_active: bool | None = None
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(BaseModelConfig):
     refresh_token: str
 
 
-class UserResponse(BaseModel):
+class ChangePasswordRequest(BaseModelConfig):
+    current_password: str
+    new_password: Annotated[str, StringConstraints(min_length=8)]
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not any(c.isdigit() for c in v):
+            raise ValueError("La contraseña debe contener al menos un número")
+        return v
+
+
+class ResetPasswordResponse(BaseModelConfig):
+    """Contraseña temporal generada por un admin para entregar al usuario."""
+
+    user_id: UUID
+    temporary_password: str
+
+
+class UserResponse(BaseModelConfig):
     id: UUID
     email: str
-    name: str
-    last_name: str
-    role: UserRole
+
+    name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    last_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=200),
+    ]
+
+    role: SystemRole
+    position: UserPosition
     is_active: bool
 
-    model_config = {"from_attributes": True}
+
+class PaginatedUsersResponse(BaseModelConfig):
+    """Página de usuarios COMPLETOS (con rol e is_active) para administración."""
+
+    items: list[UserResponse]
+    total: int
+    page: int
+    page_size: int
 
 
-class TokenResponse(BaseModel):
+class PositionOption(BaseModelConfig):
+    """Opción de cargo para poblar el selector del registro (value + etiqueta es-CO)."""
+
+    value: UserPosition
+    label: str
+
+
+def position_options() -> list[PositionOption]:
+    """Cargos disponibles, en el orden de presentación definido en POSITION_LABELS."""
+    return [
+        PositionOption(value=value, label=label)
+        for value, label in POSITION_LABELS.items()
+    ]
+
+
+class DirectoryUserResponse(BaseModelConfig):
+    """Vista ligera para elegir responsables de tareas (filtrable por cargo)."""
+
+    id: UUID
+    name: str
+    last_name: str
+    email: str
+    position: UserPosition
+
+
+class PaginatedDirectoryResponse(BaseModelConfig):
+    """Página de usuarios para los selectores (evita traer toda la tabla)."""
+
+    items: list[DirectoryUserResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class TokenResponse(BaseModelConfig):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(BaseModelConfig):
     message: str

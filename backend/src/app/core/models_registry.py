@@ -1,85 +1,58 @@
 # ── Identity models ───────────────────────────────────────────────────────────
-from app.modules.identity.infrastructure.models import (
-    User,
-    UserRole,
-)
+from app.modules.identity.infrastructure.models import User
 
 # ── Project models ────────────────────────────────────────────────────────────
-from app.modules.project.infrastructure.models import (
-    Module,
-    Project,
-    ProjectMember,
-    ProjectMemberRole,
-    ProjectStatus,
-    ProjectStatusType,
-    Risk,
-    RiskLevel,
+from app.modules.project.infrastructure.models import Project, ProjectMember
+
+from app.modules.tasks.infrastructure.models import (
+    Task,
+    TaskDependency,
+    TaskHistory,
 )
 
-# ── Tasks models ──────────────────────────────────────────────────────────────
-from app.modules.tasks.infrastructure.models import (
-    DependencyType,
-    Task,
-    TaskPriority,
-    TaskStatus,
-    TaskType,
+# ── Teams models ──────────────────────────────────────────────────────────────
+from app.modules.teams.infrastructure.models import Team, TeamMember
+from app.modules.teams.infrastructure.workspace_models import (
+    Deliverable,
+    DeliverableComment,
+    DeliverableVersion,
+)
+
+# ── WorkTree models ───────────────────────────────────────────────────────────
+from app.modules.project.structure.infrastructure.models import (
+    TipoNodo,
+    WorkItem,
+    WorkItemDependency,
 )
 
 # ── Notifications models ──────────────────────────────────────────────────────
-from app.modules.notifications.infrastructure.models import (
-    AlertFrequency,
-    AlertRule,
-    DeliveryLog,
-    Notification,
-    NotificationChannel,
-    NotificationType,
-)
+from app.modules.notifications.infrastructure.models import Notification
 
-# ── Scheduling models ─────────────────────────────────────────────────────────
-from app.modules.scheduling.infrastructure.models import (
-    GanttEntry,
-    Reprogramming,
-    Schedule,
-)
-
-# ── IA reporting ─────────────────────────────────────────────────────────
-from app.modules.ia_reporting.infrastructure.models import Report
-
-# ── Client portal ─────────────────────────────────────────────────────────
-from app.modules.client_portal.infrastructure.models import ClientAccess
+# ── Feedback models ───────────────────────────────────────────────────────────
+from app.modules.feedback.infrastructure.models import Feedback
 
 __all__ = [
     # Identity
     "User",
-    "UserRole",
     # Project
-    "Module",
     "Project",
     "ProjectMember",
-    "ProjectMemberRole",
-    "ProjectStatus",
-    "ProjectStatusType",
-    "Risk",
-    "RiskLevel",
-    # Tasks
-    "DependencyType",
+    # Task
     "Task",
-    "TaskPriority",
-    "TaskStatus",
-    "TaskType",
+    "TaskHistory",
+    "TaskDependency",
+    # Teams
+    "Team",
+    "TeamMember",
+    "Deliverable",
+    "DeliverableVersion",
+    "DeliverableComment",
+    # WorkTree
+    "TipoNodo",
+    "WorkItem",
+    "WorkItemDependency",
     # Notifications
-    "AlertFrequency",
-    "AlertRule",
-    "DeliveryLog",
     "Notification",
-    "NotificationChannel",
-    "NotificationType",
-    # Scheduling
-    "GanttEntry",
-    "Reprogramming",
-    "Schedule",
-    # Client portal
-    "ClientAccess",
-    # IA reporting
-    "Report",
+    # Feedback
+    "Feedback",
 ]

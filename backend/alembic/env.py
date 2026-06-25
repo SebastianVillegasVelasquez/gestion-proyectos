@@ -11,14 +11,7 @@ from app.shared.base_database import Base
 
 # Imports de modelos ORM
 
-# from app.modules.project.infrastructure.models import Project
-# from app.modules.tasks.infrastructure.models import Task
-# from app.modules.client_portal.infrastructure.models import ClientAccess
-# from app.modules.ia_reporting.infrastructure.models import ReportSchedule, Report
-# from app.modules.notifications.infrastructure.models import Notification
-# from app.modules.scheduling.infrastructure.models import Schedule
-# from app.modules.scheduling.infrastructure.models import GanttEntry
-
+from app.core.models_registry import *  # noqa: F401, F403
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -41,7 +34,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 
-def get_url() -> str:
+def get_database_url() -> str:
     from app.core.config import get_settings
 
     settings = get_settings()
@@ -62,7 +55,7 @@ def run_migrations_offline() -> None:
     """
     # url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=get_url(),
+        url=get_database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -85,7 +78,7 @@ def do_run_migrations(connection):
 
 async def run_async_migrations() -> None:
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_url()
+    configuration["sqlalchemy.url"] = get_database_url()
 
     connectable = async_engine_from_config(
         configuration,

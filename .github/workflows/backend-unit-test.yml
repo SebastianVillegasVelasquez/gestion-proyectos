@@ -1,0 +1,58 @@
+name: backend-unit-test.yml
+run-name: Backend Unit Tests - ${{ github.actor }}
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-unit-test.yml"
+    branches: [ develop ]
+  pull_request:
+    paths:
+      - "backend/**"
+    branches: [ develop ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            backend/.venv
+          key: ${{ runner.os }}-poetry-${{ hashFiles('backend/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install Poetry
+        working-directory: .
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Setup Poetry config
+        run: |
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
+
+      - name: Install backend dependencies
+        run: poetry install
+
+      - name: Run backend unit tests
+        run: poetry run pytest tests/unit

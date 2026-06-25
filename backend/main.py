@@ -1,40 +1,67 @@
-"""
-Entry point de la aplicación FastAPI.
-"""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
+from app.core.config import get_settings
+from app.core.database import AsyncSessionLocal
+from app.core.logger import get_logger
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
-
-from app.core.config import get_settings
-from app.core.logger import get_logger
+from app.modules.areas.presentation.routes import router as areas_router
+from app.modules.collaborators.presentation.routes import (
+    router as collaborators_router,
+)
+from app.modules.dashboard.presentation.routes import router as dashboard_router
+from app.modules.feedback.presentation.routes import router as feedback_router
+from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
+from app.modules.notifications.presentation.routes import (
+    router as notifications_router,
+)
+from app.modules.project.presentation.routes import router as projects_router
+from app.modules.project.structure.presentation.routes import router as worktree_router
+from app.modules.tasks.presentation.routes import router as tasks_router
+from app.modules.teams.presentation.routes import router as teams_router
+from app.modules.teams.presentation.workspace_routes import (
+    router as workspace_router,
+)
+from app.modules.traceability.presentation.routes import (
+    router as traceability_router,
+)
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
     ForbiddenError,
     NotFoundError,
     ValidationError,
+    UnauthorizedError,
 )
+from app.shared.rate_limit import TooManyRequestsError
 
 logger = get_logger(__name__)
-settings = get_settings()
-
-# ── Lifespan (startup / shutdown) ──────────────────────────────────────────────
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
     logger.info(
         "Iniciando OBJ Digital PM",
         env=settings.APP_ENV,
         debug=settings.DEBUG,
     )
+    # Guard de producción: una SECRET_KEY débil compromete todos los tokens.
+    if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
+        logger.warning(
+            "SECRET_KEY débil o ausente en un entorno no-dev: define una clave "
+            "fuerte (>=32 chars) por entorno antes de exponer el servicio."
+        )
+    # Siembra desacoplada: el orquestador decide qué cargar según el entorno.
+    from app.core.seeding import run_seed
+
+    await run_seed()
     yield
     logger.info("Cerrando OBJ Digital PM")
 
@@ -45,8 +72,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OBJ Digital — Sistema de Gestión de Proyectos",
     version="0.1.0",
-    docs_url="/docs" if settings.IS_DEV else None,
-    redoc_url="/redoc" if settings.IS_DEV else None,
+    docs_url="/docs" if get_settings().IS_DEV else None,
+    redoc_url="/redoc" if get_settings().IS_DEV else None,
     lifespan=lifespan,
 )
 
@@ -54,7 +81,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=get_settings().CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +96,11 @@ app.add_middleware(
 @app.exception_handler(NotFoundError)
 async def not_found_handler(request: Request, exc: NotFoundError):
     return JSONResponse(status_code=404, content={"detail": exc.message})
+
+
+@app.exception_handler(UnauthorizedError)
+async def unauthorized_handler(request: Request, exc: UnauthorizedError):
+    return JSONResponse(status_code=401, content={"detail": exc.message})
 
 
 @app.exception_handler(ForbiddenError)
@@ -86,6 +118,11 @@ async def validation_handler(request: Request, exc: ValidationError):
     return JSONResponse(status_code=422, content={"detail": exc.message})
 
 
+@app.exception_handler(TooManyRequestsError)
+async def too_many_requests_handler(request: Request, exc: TooManyRequestsError):
+    return JSONResponse(status_code=429, content={"detail": exc.message})
+
+
 @app.exception_handler(DomainException)
 async def domain_exception_handler(request: Request, exc: DomainException):
     logger.error("Excepción de dominio no manejada", error=exc.message)
@@ -94,19 +131,30 @@ async def domain_exception_handler(request: Request, exc: DomainException):
     )
 
 
-# ── Routers ────────────────────────────────────────────────────────────────────
-# from app.modules.identity.presentation.router import router as auth_router
-from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
+@app.get("/health", tags=["Health"])
+async def health():
+    """Healthcheck para orquestadores/balanceadores: verifica la BD."""
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "ok"}
+    except Exception:  # noqa: BLE001 - cualquier fallo de BD => degradado
+        return JSONResponse(
+            status_code=503, content={"status": "degraded", "database": "error"}
+        )
 
-#
-# app.include_router(auth_router, prefix="/api/v1")
+
+app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
-# Próximos:
-# from app.modules.projects.presentation.router import router as projects_router
-# app.include_router(projects_router, prefix="/api/v1")
-
-
-@app.get("/ping", tags=["health"])
-async def ping():
-    """Health check — confirma que el API está corriendo."""
-    return {"status": "ok", "env": settings.APP_ENV}
+app.include_router(projects_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
+# El router del workspace va ANTES que el de teams: su ruta literal /teams/mine
+# debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
+app.include_router(workspace_router, prefix="/api/v1")
+app.include_router(teams_router, prefix="/api/v1")
+app.include_router(collaborators_router, prefix="/api/v1")
+app.include_router(traceability_router, prefix="/api/v1")
+app.include_router(areas_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(feedback_router, prefix="/api/v1")

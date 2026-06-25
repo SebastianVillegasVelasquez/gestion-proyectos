@@ -1,14 +1,14 @@
+import os
 from functools import lru_cache
 from typing import Literal
 
 from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env" if not os.getenv("TESTING") else None,
+        env_file=os.getenv("ENV_FILE", ".env") if not os.getenv("TESTING") else None,
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="allow",
@@ -21,17 +21,41 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     # ── Database ────────────────────────────────
-    DATABASE_HOST: str
-    DATABASE_PORT: int
-    DATABASE_NAME: str
-    DATABASE_USER: str
-    DATABASE_PASSWORD: str
+    DATABASE_HOST: str = ""
+    DATABASE_PORT: int = 0
+    DATABASE_NAME: str = ""
+    DATABASE_USER: str = ""
+    DATABASE_PASSWORD: str = ""
 
     # ── Security ────────────────────────────────
-    SECRET_KEY: str
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+
+    # ── Super admin sembrado al iniciar ─────────
+    SUPERADMIN_EMAIL: str = "superadmin@objdigital.com"
+    SUPERADMIN_PASSWORD: str = ""
+    SUPERADMIN_NAME: str = "Super"
+    SUPERADMIN_LAST_NAME: str = "Admin"
+
+    # ── Developer sembrado al iniciar (rol técnico: todo + bandeja de feedback) ─
+    DEVELOPER_EMAIL: str = "developer@objdigital.com"
+    DEVELOPER_PASSWORD: str = ""
+    DEVELOPER_NAME: str = "Dev"
+    DEVELOPER_LAST_NAME: str = "OBJ"
+
+    # ── Usuarios de OBJ Digital sembrados al iniciar SOLO en producción ─────────
+    # Individuales (no equipos). Ana/Jorge/Jhon son super_admin; Sebastian, usuario.
+    # Cada uno se crea únicamente si su contraseña está definida.
+    ANA_EMAIL: str = "ana@objdigital.com"
+    ANA_PASSWORD: str = ""
+    JORGE_EMAIL: str = "jorge@objdigital.com"
+    JORGE_PASSWORD: str = ""
+    JHON_EMAIL: str = "jhon@objdigital.com"
+    JHON_PASSWORD: str = ""
+    SEBASTIAN_EMAIL: str = "sebastian@objdigital.com"
+    SEBASTIAN_PASSWORD: str = ""
 
     # ── Email ───────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"

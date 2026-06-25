@@ -72,7 +72,7 @@ up-db-dev:
 	cd backend && docker compose --env-file .env -f compose-dev.yaml up db_dev -d
 
 up-db-test:
-	cd backend && docker compose --env-file .env.test -f compose-test.yaml up db_test -d
+	cd backend && docker compose --env-file .env.test -f compose-dev.yaml up db_test -d
 # =========================
 # Frontend
 # =========================
