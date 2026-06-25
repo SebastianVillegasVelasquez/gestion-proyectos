@@ -4,7 +4,7 @@ Desacopla del `main` toda la decisión de "qué se carga y cuándo". El `main` s
 llama `run_seed()`; la lógica de entorno vive aquí:
 
 - Desarrollo: datos de demostración (para ver la app con contenido real).
-- Producción: el equipo real de OBJ Digital (developer + administradores).
+- Producción: los usuarios reales de OBJ Digital (developer + super admins + usuario).
 
 Los usuarios base (super admin, developer) se intentan en ambos entornos, pero
 solo se crean si su contraseña está definida en el entorno.
@@ -12,7 +12,7 @@ solo se crean si su contraseña está definida en el entorno.
 
 from app.core.config import get_settings
 from app.core.logger import get_logger
-from app.core.seed import ensure_developer, ensure_super_admin, ensure_team_users
+from app.core.seed import ensure_developer, ensure_prod_users, ensure_super_admin
 from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
 
 logger = get_logger(__name__)
@@ -30,5 +30,5 @@ async def run_seed() -> None:
         await ensure_demo_data()
         await ensure_demo_traceability()
     else:
-        logger.info("Seed: entorno de producción → equipo de OBJ Digital")
-        await ensure_team_users()
+        logger.info("Seed: entorno de producción → usuarios de OBJ Digital")
+        await ensure_prod_users()

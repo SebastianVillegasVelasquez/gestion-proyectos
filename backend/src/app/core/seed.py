@@ -90,26 +90,52 @@ async def ensure_developer() -> None:
         logger.warning("No se pudo sembrar el developer", error=str(exc))
 
 
-async def ensure_team_users() -> None:
-    """Crea el equipo de OBJ Digital (Ana, Jorge, Jhon) como ADMIN en producción.
+async def ensure_prod_users() -> None:
+    """Crea los usuarios individuales de OBJ Digital en producción.
 
-    Idempotente por email; cada usuario se crea solo si su contraseña está
-    definida en el entorno (igual que super admin/developer). No interrumpe el
-    arranque si algo falla.
+    Ana, Jorge y Jhon como SUPER ADMIN; Sebastian como usuario estándar. No son
+    equipos (entidades Team), son cuentas de usuario. Idempotente por email; cada
+    uno se crea solo si su contraseña está definida en el entorno (igual que super
+    admin/developer). No interrumpe el arranque si algo falla.
     """
     settings = get_settings()
 
-    team = [
-        ("Ana", "OBJ", settings.ANA_EMAIL, settings.ANA_PASSWORD),
-        ("Jorge", "OBJ", settings.JORGE_EMAIL, settings.JORGE_PASSWORD),
-        ("Jhon", "OBJ", settings.JHON_EMAIL, settings.JHON_PASSWORD),
+    users = [
+        (
+            "Ana",
+            "OBJ",
+            settings.ANA_EMAIL,
+            settings.ANA_PASSWORD,
+            SystemRole.SUPER_ADMIN,
+        ),
+        (
+            "Jorge",
+            "OBJ",
+            settings.JORGE_EMAIL,
+            settings.JORGE_PASSWORD,
+            SystemRole.SUPER_ADMIN,
+        ),
+        (
+            "Jhon",
+            "OBJ",
+            settings.JHON_EMAIL,
+            settings.JHON_PASSWORD,
+            SystemRole.SUPER_ADMIN,
+        ),
+        (
+            "Sebastian",
+            "OBJ",
+            settings.SEBASTIAN_EMAIL,
+            settings.SEBASTIAN_PASSWORD,
+            SystemRole.USER,
+        ),
     ]
 
     try:
         async with AsyncSessionLocal() as session:
             repo = UserRepository(session)
             created: list[str] = []
-            for name, last_name, email, password in team:
+            for name, last_name, email, password, role in users:
                 if not password:
                     logger.warning("Sin contraseña; se omite el seed", email=email)
                     continue
@@ -121,7 +147,7 @@ async def ensure_team_users() -> None:
                         password=hash_password(password),
                         name=name,
                         last_name=last_name,
-                        role=SystemRole.ADMIN,
+                        role=role,
                         position=UserPosition.SIN_CARGO,
                         is_active=True,
                     )
@@ -129,6 +155,8 @@ async def ensure_team_users() -> None:
                 created.append(email)
             if created:
                 await session.commit()
-                logger.info("Equipo de producción creado", emails=created)
+                logger.info("Usuarios de producción creados", emails=created)
     except Exception as exc:  # noqa: BLE001 - el arranque no debe fallar por el seed
-        logger.warning("No se pudo sembrar el equipo de producción", error=str(exc))
+        logger.warning(
+            "No se pudieron sembrar los usuarios de producción", error=str(exc)
+        )
