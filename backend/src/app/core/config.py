@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     DEVELOPER_NAME: str = "Dev"
     DEVELOPER_LAST_NAME: str = "OBJ"
 
+    # ── Equipo de OBJ Digital sembrado al iniciar SOLO en producción (admins) ───
+    # Cada usuario se crea únicamente si su contraseña está definida.
+    ANA_EMAIL: str = "ana@objdigital.com"
+    ANA_PASSWORD: str = ""
+    JORGE_EMAIL: str = "jorge@objdigital.com"
+    JORGE_PASSWORD: str = ""
+    JHON_EMAIL: str = "jhon@objdigital.com"
+    JHON_PASSWORD: str = ""
+
     # ── Email ───────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

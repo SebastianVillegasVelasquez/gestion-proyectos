@@ -88,3 +88,47 @@ async def ensure_developer() -> None:
             logger.info("Developer creado", email=settings.DEVELOPER_EMAIL)
     except Exception as exc:  # noqa: BLE001 - el arranque no debe fallar por el seed
         logger.warning("No se pudo sembrar el developer", error=str(exc))
+
+
+async def ensure_team_users() -> None:
+    """Crea el equipo de OBJ Digital (Ana, Jorge, Jhon) como ADMIN en producción.
+
+    Idempotente por email; cada usuario se crea solo si su contraseña está
+    definida en el entorno (igual que super admin/developer). No interrumpe el
+    arranque si algo falla.
+    """
+    settings = get_settings()
+
+    team = [
+        ("Ana", "OBJ", settings.ANA_EMAIL, settings.ANA_PASSWORD),
+        ("Jorge", "OBJ", settings.JORGE_EMAIL, settings.JORGE_PASSWORD),
+        ("Jhon", "OBJ", settings.JHON_EMAIL, settings.JHON_PASSWORD),
+    ]
+
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = UserRepository(session)
+            created: list[str] = []
+            for name, last_name, email, password in team:
+                if not password:
+                    logger.warning("Sin contraseña; se omite el seed", email=email)
+                    continue
+                if await repo.get_by_email(email) is not None:
+                    continue
+                session.add(
+                    User(
+                        email=email,
+                        password=hash_password(password),
+                        name=name,
+                        last_name=last_name,
+                        role=SystemRole.ADMIN,
+                        position=UserPosition.SIN_CARGO,
+                        is_active=True,
+                    )
+                )
+                created.append(email)
+            if created:
+                await session.commit()
+                logger.info("Equipo de producción creado", emails=created)
+    except Exception as exc:  # noqa: BLE001 - el arranque no debe fallar por el seed
+        logger.warning("No se pudo sembrar el equipo de producción", error=str(exc))

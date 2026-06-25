@@ -8,7 +8,6 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger
-
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
@@ -59,13 +58,10 @@ async def lifespan(app: FastAPI):
             "SECRET_KEY débil o ausente en un entorno no-dev: define una clave "
             "fuerte (>=32 chars) por entorno antes de exponer el servicio."
         )
-    from app.core.seed import ensure_developer, ensure_super_admin
-    from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
+    # Siembra desacoplada: el orquestador decide qué cargar según el entorno.
+    from app.core.seeding import run_seed
 
-    await ensure_super_admin()
-    await ensure_developer()
-    await ensure_demo_data()
-    await ensure_demo_traceability()
+    await run_seed()
     yield
     logger.info("Cerrando OBJ Digital PM")
 
@@ -148,6 +144,7 @@ async def health():
         )
 
 
+app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
@@ -156,7 +153,6 @@ app.include_router(dashboard_router, prefix="/api/v1")
 # debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
 app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
-app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(areas_router, prefix="/api/v1")
