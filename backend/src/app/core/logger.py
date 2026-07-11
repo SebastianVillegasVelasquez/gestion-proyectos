@@ -5,7 +5,7 @@ Uso en cualquier archivo:
     from app.core.logger import get_logger
     logger = get_logger(__name__)
 
-    logger.info("Proyecto creado", project_id=str(project.id))
+    logger.info("Proyecto creado", work_item_id=str(project.id))
     logger.warning("Tarea vencida", task_id=str(task.id), delay_days=3)
     logger.error("Fallo al enviar email", exc_info=True)
 

@@ -1,9 +1,3 @@
-"""Reglas de autorización por rol de sistema (lógica pura, sin FastAPI).
-
-Centraliza la jerarquía de roles para que sea trivial de testear y para no
-repetir el chequeo en cada dependencia.
-"""
-
 from collections.abc import Sequence
 
 from app.modules.identity.infrastructure.enums import SystemRole

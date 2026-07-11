@@ -46,8 +46,6 @@ class Settings(BaseSettings):
     DEVELOPER_LAST_NAME: str = "OBJ"
 
     # ── Usuarios de OBJ Digital sembrados al iniciar SOLO en producción ─────────
-    # Individuales (no equipos). Ana/Jorge/Jhon son super_admin; Sebastian, usuario.
-    # Cada uno se crea únicamente si su contraseña está definida.
     ANA_EMAIL: str = "ana@objdigital.com"
     ANA_PASSWORD: str = ""
     JORGE_EMAIL: str = "jorge@objdigital.com"
@@ -69,6 +67,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_MAX_TOKENS: int = 2000
+
+    # ── Redis ──────────────────────────────────
+    REDIS_URL: str = ""
+
+    # ── Broadcaster option ──────────────────────────────────
+    USE_REDIS_AS_BROADCASTER: bool = False
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

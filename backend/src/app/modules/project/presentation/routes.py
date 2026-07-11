@@ -38,7 +38,7 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 async def create_project(
     data: CreateProjectRequest,
     repo=Depends(project_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    _=Depends(require_role("admin", "super_admin")),
 ):
     return await CreateProjectUseCase(repo).execute(data)
 
@@ -46,7 +46,7 @@ async def create_project(
 @router.get("/", response_model=List[ProjectResponse])
 async def get_all_projects(
     repo=Depends(project_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin", "user")),
+    _=Depends(require_role("admin", "super_admin", "user")),
 ):
     return await GetProjectsUseCase(repo).execute()
 
@@ -55,7 +55,7 @@ async def get_all_projects(
 async def get_project_by_id(
     project_id: UUID,
     repo=Depends(project_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin", "user")),
+    _=Depends(require_role("admin", "super_admin", "user")),
 ):
     return await GetProjectByIdUseCase(repo).execute(project_id)
 
@@ -65,7 +65,7 @@ async def update_project(
     project_id: UUID,
     data: UpdateProjectRequest,
     repo=Depends(project_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    _=Depends(require_role("admin", "super_admin")),
 ):
     return await UpdateProjectUseCase(repo).execute(project_id, data)
 
@@ -74,7 +74,7 @@ async def update_project(
 async def delete_project(
     project_id: UUID,
     repo=Depends(project_repo_dependency),
-    current_user=Depends(require_role("super_admin")),
+    _=Depends(require_role("super_admin")),
 ):
     await DeleteProjectUseCase(repo).execute(project_id)
 
@@ -103,7 +103,7 @@ async def get_project_members(
     project_repo=Depends(project_repo_dependency),
     user_repo=Depends(user_repo_dependency),
     project_member_repo=Depends(project_members_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin", "user")),
+    _=Depends(require_role("admin", "super_admin", "user")),
 ):
     return await GetProjectMembersUseCase(
         project_repo=project_repo,
@@ -123,7 +123,7 @@ async def assign_team_to_project(
     project_repo=Depends(project_repo_dependency),
     member_repo=Depends(project_members_repo_dependency),
     team_repo=Depends(team_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    _=Depends(require_role("admin", "super_admin")),
 ):
     return await AssignTeamToProjectUseCase(
         project_repo=project_repo, member_repo=member_repo, team_repo=team_repo

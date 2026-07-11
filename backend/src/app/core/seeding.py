@@ -26,9 +26,9 @@ async def run_seed() -> None:
     await ensure_developer()
 
     if settings.IS_DEV:
-        logger.info("Seed: entorno de desarrollo → datos de demostración")
+        # logger.info("Seed: entorno de desarrollo → datos de demostración")
         await ensure_demo_data()
         await ensure_demo_traceability()
     else:
-        logger.info("Seed: entorno de producción → usuarios de OBJ Digital")
+        # logger.info("Seed: entorno de producción → usuarios de OBJ Digital")
         await ensure_prod_users()

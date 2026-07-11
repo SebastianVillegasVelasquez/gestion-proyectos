@@ -3,7 +3,6 @@ from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.models import WorkItem
-from app.modules.tasks.domain.events import TaskSubmitted
 from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
@@ -20,6 +19,7 @@ from app.modules.tasks.presentation.schemas import (
 )
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
+from app.shared.events.events import TaskSubmitted, TaskCreated
 from app.shared.exceptions import NotFoundError
 
 
@@ -31,18 +31,18 @@ async def _get_work_item(repo: WorkTreeRepository, work_item_id: UUID) -> WorkIt
 
 
 class CreateTaskUseCase:
-    """Crea una tarea que cuelga de un WorkItem (cualquier nivel del árbol)."""
-
     def __init__(
         self,
         task_repo: TaskRepository,
         work_tree_repo: WorkTreeRepository,
         user_repo: Repository,
+        bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
         self.work_tree_repo = work_tree_repo
         self.user_repo = user_repo
         self.service = TaskService(task_repo)
+        self._bus = bus
 
     async def execute(self, data: CreateTaskRequest) -> TaskResponse:
         await _get_work_item(self.work_tree_repo, data.work_item_id)
@@ -57,6 +57,17 @@ class CreateTaskUseCase:
             await TaskDependencyService(self.task_repo).add_dependency(
                 created.id, data.depends_on_id
             )
+
+        if self._bus:
+            await self._bus.publish(
+                TaskCreated(
+                    task_id=created.id,
+                    work_item_id=data.work_item_id,
+                    assigned_id=data.assignee_id,  # type: ignore
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+
         return created
 
 
@@ -145,14 +156,18 @@ class ChangeTaskStatusUseCase:
         self, task_id: UUID, data: UpdateTaskStatusRequest
     ) -> TaskResponse:
         new_status = await self.service.change_status(task_id, data)
+
         assert new_status.assignee_id, "El usuario asignado debe de existir"
+
         if self._bus and new_status.status == TaskStatus.EN_REVISION:
             work_item = await self.work_tree_repo.get_item(new_status.work_item_id)
+
             assert work_item is not None, "La tarea debe colgar de un nodo existente"
+
             await self._bus.publish(
                 TaskSubmitted(
                     task_id=new_status.id,
-                    project_id=work_item.proyecto_id,
+                    work_item_id=work_item.proyecto_id,
                     assigned_id=new_status.assignee_id,
                     occurred_at=datetime.now(timezone.utc),
                 )

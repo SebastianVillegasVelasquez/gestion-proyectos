@@ -1,16 +1,20 @@
 from app.modules.notifications.application.handlers import (
-    NotifyOnMemberAssigned,
+    NotifyOnMemberAssignedToProject,
     NotifyOnTaskSubmitted,
+    NotifyOnTaskCreated,
 )
 from app.modules.notifications.domain.repository import NotificationRepository
-from app.modules.project.domain.events import MemberAssigned
-from app.modules.tasks.domain.events import TaskSubmitted
+from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events import EventBus
+from app.shared.events.events import MemberAssigned
+from app.shared.events.events import TaskSubmitted, TaskCreated
 
 
 def register_notification_handlers(
-    bus: EventBus,
-    notification_repo: NotificationRepository,
+    bus: EventBus, notification_repo: NotificationRepository, broadcaster: Broadcaster
 ) -> None:
-    bus.subscribe(MemberAssigned, NotifyOnMemberAssigned(notification_repo))
-    bus.subscribe(TaskSubmitted, NotifyOnTaskSubmitted(notification_repo))
+    bus.subscribe(
+        MemberAssigned, NotifyOnMemberAssignedToProject(notification_repo, broadcaster)
+    )
+    bus.subscribe(TaskSubmitted, NotifyOnTaskSubmitted(notification_repo, broadcaster))
+    bus.subscribe(TaskCreated, NotifyOnTaskCreated(notification_repo, broadcaster))

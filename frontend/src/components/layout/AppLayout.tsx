@@ -4,6 +4,7 @@ import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
+import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
 // Fallback mientras se descarga el chunk de la ruta (solo el área de contenido;
 // el sidebar permanece visible).
@@ -50,6 +51,7 @@ export const AppLayout = () => {
     });
   };
 
+  useNotificationsSocket();
   const context: AppOutletContext = { dark, toggleDark };
 
   return (

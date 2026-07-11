@@ -42,12 +42,13 @@ _any_user = require_role("admin", "super_admin", "user")
 @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     payload: CreateTaskRequest,
-    current_user=Depends(_admin),
+    _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
 ):
-    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo).execute(
+    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo, bus).execute(
         payload
     )
 
@@ -55,7 +56,7 @@ async def create_task(
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task(
     task_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
     return await GetTaskByIdUseCase(task_repo).execute(task_id)
@@ -85,7 +86,7 @@ async def delete_task(
 @router.get("/projects/{project_id}/tasks", response_model=list[TaskResponse])
 async def get_project_tasks(
     project_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     project_repo=Depends(project_repo_dependency),
 ):
@@ -95,7 +96,7 @@ async def get_project_tasks(
 @router.get("/work-items/{work_item_id}/tasks", response_model=list[TaskResponse])
 async def get_work_item_tasks(
     work_item_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
 ):
@@ -113,7 +114,7 @@ async def get_work_item_tasks(
 async def add_task_dependency(
     task_id: UUID,
     payload: CreateTaskDependencyRequest,
-    current_user=Depends(_admin),
+    _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
     return await AddTaskDependencyUseCase(task_repo).execute(
@@ -126,7 +127,7 @@ async def add_task_dependency(
 )
 async def list_task_dependencies(
     task_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
     return await GetTaskDependenciesUseCase(task_repo).execute(task_id)
@@ -137,7 +138,7 @@ async def change_task_status(
     task_id: UUID,
     payload: UpdateTaskStatusRequest,
     bus: EventBus = Depends(event_bus_dependency),
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
 ):

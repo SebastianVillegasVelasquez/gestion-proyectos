@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.config import get_settings
 
 from app.core.database import get_db
+from app.shared.broadcasting.memory import InMemoryBroadcaster
+from app.shared.connection_manager import ConnectionManager
 from main import app
 
 
@@ -78,12 +80,22 @@ async def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # ASGITransport NO ejecuta el lifespan de FastAPI, así que replicamos aquí
+    # lo que este monta en app.state (broadcaster + manager) con la variante
+    # en memoria: los endpoints que publican eventos al bus lo necesitan.
+    broadcaster = InMemoryBroadcaster()
+    await broadcaster.connect()
+    app.state.broadcaster = broadcaster
+    app.state.manager = ConnectionManager(broadcaster=broadcaster)
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
         yield client
 
+    await app.state.manager.shutdown()
+    await broadcaster.disconnect()
     app.dependency_overrides.clear()
 
 

@@ -23,12 +23,14 @@ def fake_create_project_request() -> CreateProjectRequest:
 
 @pytest.fixture
 def valid_project_payload() -> dict:
+    # Fechas relativas a hoy: el schema rechaza start_date en el pasado, así
+    # que una fecha fija haría fallar la suite cuando el calendario la alcance.
     return {
         "name": "Test Project",
         "description": "This is a test project",
         "client_name": "Test Client",
-        "start_date": "2026-07-01",
-        "end_date": "2026-12-31",
+        "start_date": date.today().isoformat(),
+        "end_date": (date.today() + timedelta(days=180)).isoformat(),
     }
 
 

@@ -19,6 +19,7 @@ pwdlib = {extras = ["argon2"], version = "^0.3.0"}
 python-jose = {extras = ["cryptography"], version = "^3.5.0"}
 python-multipart = "^0.0.29"
 types-python-jose = "^3.5.0.20260408"
+redis = ">=5"
 
 
 [tool.poetry.group.dev.dependencies]

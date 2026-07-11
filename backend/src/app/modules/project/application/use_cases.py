@@ -4,7 +4,6 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from app.modules.project.domain.events import MemberAssigned
 from app.modules.project.domain.services import ProjectMemberService, ProjectService
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
@@ -20,6 +19,7 @@ from app.modules.project.presentation.schemas import (
 from app.modules.teams.domain.repository import TeamRepository
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
+from app.shared.events.events import MemberAssigned
 
 
 class CreateProjectUseCase:

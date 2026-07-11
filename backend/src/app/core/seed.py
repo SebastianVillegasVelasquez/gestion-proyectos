@@ -47,7 +47,7 @@ async def ensure_super_admin() -> None:
                 )
             )
             await session.commit()
-            logger.info("Super admin creado", email=settings.SUPERADMIN_EMAIL)
+            # logger.info("Super admin creado", email=settings.SUPERADMIN_EMAIL)
     except Exception as exc:  # noqa: BLE001 - el arranque no debe fallar por el seed
         logger.warning("No se pudo sembrar el super admin", error=str(exc))
 

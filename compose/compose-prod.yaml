@@ -16,7 +16,7 @@ services:
     image:
       ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
     expose:
-      - "80"
+      - "127.0.0.1:3000:80"
     networks:
       - bitacora-network
 
@@ -35,6 +35,16 @@ services:
       .env
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - bitacora-network
+
+  redis:
+    container_name: redis
+    image: redis:7.2-alpine
+    expose:
+      - "6379"
+    networks:
+      - bitacora-network
 
 
 volumes:

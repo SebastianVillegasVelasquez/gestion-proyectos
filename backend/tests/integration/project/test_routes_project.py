@@ -12,8 +12,8 @@ class TestProjectRoutes:
         assert response.status_code == 201
         assert response.json()["name"] == "Test Project"
         assert response.json()["description"] == "This is a test project"
-        assert response.json()["start_date"] == "2026-07-01"
-        assert response.json()["end_date"] == "2026-12-31"
+        assert response.json()["start_date"] == valid_project_payload["start_date"]
+        assert response.json()["end_date"] == valid_project_payload["end_date"]
 
         persisted_project = await client.get(
             f"/api/v1/projects/{response.json()['id']}", headers=admin_headers

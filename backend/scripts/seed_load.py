@@ -25,20 +25,17 @@ import asyncio
 import datetime
 import uuid
 
-import app.core.models_registry  # noqa: F401 - registra los mappers ORM
 from sqlalchemy import delete, select
 
+import app.core.models_registry  # noqa: F401 - registra los mappers ORM
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
 from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
-from app.modules.project.infrastructure.models import (
-    Phase,
-    Project,
-    ProjectMember,
-    ProjectNode,
-)
+from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.structure.infrastructure.enums import DuracionUnidad
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import TaskPriority, TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
@@ -214,10 +211,14 @@ async def reset(session) -> None:
         # Las dependencias/historial de tareas tienen ON DELETE CASCADE.
         await session.execute(delete(Task).where(Task.assignee_id.in_(user_ids)))
     if project_ids:
+        # Las tareas cuelgan de WorkItems del proyecto: hay que borrarlas antes
+        # de tumbar los nodos. El resto (WorkItems, TiposNodo, ProjectMembers)
+        # cae por ON DELETE CASCADE al eliminar el proyecto, pero lo hacemos
+        # explícito para no depender del orden que decida SQLAlchemy.
         await session.execute(
             delete(Task).where(
-                Task.phase_id.in_(
-                    select(Phase.id).where(Phase.project_id.in_(project_ids))
+                Task.work_item_id.in_(
+                    select(WorkItem.id).where(WorkItem.proyecto_id.in_(project_ids))
                 )
             )
         )
@@ -225,9 +226,11 @@ async def reset(session) -> None:
             delete(ProjectMember).where(ProjectMember.project_id.in_(project_ids))
         )
         await session.execute(
-            delete(ProjectNode).where(ProjectNode.project_id.in_(project_ids))
+            delete(WorkItem).where(WorkItem.proyecto_id.in_(project_ids))
         )
-        await session.execute(delete(Phase).where(Phase.project_id.in_(project_ids)))
+        await session.execute(
+            delete(TipoNodo).where(TipoNodo.proyecto_id.in_(project_ids))
+        )
         await session.execute(delete(Project).where(Project.id.in_(project_ids)))
     if team_ids:
         await session.execute(
@@ -366,9 +369,12 @@ async def seed() -> dict:
 
         # ── 3. Proyectos + asignación de equipos (snapshot) ───────────────────
         projects: list[Project] = []
-        project_phases: list[list[Phase]] = []
-        # user_id -> lista de (project, phases) a los que pertenece
-        user_projects: dict[uuid.UUID, list[tuple[Project, list[Phase]]]] = {}
+        # Reemplazo semántico de las antiguas fases fijas: cada proyecto tiene
+        # un TipoNodo "Fase" y tres WorkItems (Planeación / Producción /
+        # Publicación) colgando de él. La lista aquí abajo cumple el mismo rol
+        # que la vieja `phases`: fases[0]=Planeación, fases[1]=Producción.
+        project_phases: list[list[WorkItem]] = []
+        user_projects: dict[uuid.UUID, list[tuple[Project, list[WorkItem]]]] = {}
 
         for p_idx, pname in enumerate(PROJECT_NAMES):
             project = Project(
@@ -384,28 +390,27 @@ async def seed() -> dict:
             projects.append(project)
             await session.flush()
 
+            # Catálogo de tipos por proyecto (patrón Composite): en este seed
+            # solo necesitamos un tipo "Fase" para replicar la estructura vieja.
+            tipo_fase = TipoNodo(id=uuid.uuid4(), proyecto_id=project.id, nombre="Fase")
+            session.add(tipo_fase)
+            await session.flush()
+
+            def _fase(nombre: str, orden: int, dias: int) -> WorkItem:
+                return WorkItem(
+                    id=uuid.uuid4(),
+                    proyecto_id=project.id,
+                    tipo_id=tipo_fase.id,
+                    nombre=nombre,
+                    orden=orden,
+                    duracion_valor=dias,
+                    duracion_unidad=DuracionUnidad.DIAS,
+                )
+
             phases = [
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Planeación",
-                    order_index=0,
-                    duration_days=15,
-                    project_id=project.id,
-                ),
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Producción",
-                    order_index=1,
-                    duration_days=30,
-                    project_id=project.id,
-                ),
-                Phase(
-                    id=uuid.uuid4(),
-                    name="Publicación",
-                    order_index=2,
-                    duration_days=10,
-                    project_id=project.id,
-                ),
+                _fase("Planeación", 0, 15),
+                _fase("Producción", 1, 30),
+                _fase("Publicación", 2, 10),
             ]
             session.add_all(phases)
             project_phases.append(phases)
@@ -423,12 +428,12 @@ async def seed() -> dict:
             coord = team_members[first_team_idx][0]
             roles[coord.id] = (ProjectRole.COORDINADOR, teams[first_team_idx].id)
 
-            for user_id, (role, source_team_id) in roles.items():
+            for user_id, (member_role, source_team_id) in roles.items():
                 session.add(
                     ProjectMember(
                         project_id=project.id,
                         user_id=user_id,
-                        project_role=role,
+                        project_role=member_role,
                         source_team_id=source_team_id,
                     )
                 )
@@ -456,7 +461,7 @@ async def seed() -> dict:
                     description="Tarea generada para pruebas de volumen.",
                     status=status,
                     priority=PRIORITIES[i % len(PRIORITIES)],
-                    phase_id=phases[1].id,  # Producción
+                    work_item_id=phases[1].id,  # Producción
                     assignee_id=user.id,
                     start_date=start,
                     due_date=due,
@@ -470,7 +475,7 @@ async def seed() -> dict:
                 due_today += 1
 
         # Una tarea por equipo, asignada a su líder, en un proyecto del equipo.
-        team_to_project: dict[int, tuple[Project, list[Phase]]] = {}
+        team_to_project: dict[int, tuple[Project, list[WorkItem]]] = {}
         for p_idx, team_idxs in enumerate(PROJECT_TEAMS):
             for t_idx in team_idxs:
                 team_to_project.setdefault(
@@ -504,7 +509,7 @@ async def seed() -> dict:
                     description="Tarea de coordinación del equipo (pruebas de volumen).",
                     status=status,
                     priority=TaskPriority.ALTA,
-                    phase_id=phases[0].id,  # Planeación
+                    work_item_id=phases[0].id,  # Planeación
                     assignee_id=lider.id,
                     start_date=start,
                     due_date=due,
@@ -527,13 +532,14 @@ async def seed() -> dict:
 
 
 async def _main() -> None:
+    import io
     import sys
 
-    # La consola de Windows (cp1252) no codifica algunos caracteres; forzamos UTF-8.
-    try:
+    # La consola de Windows (cp1252) no codifica algunos caracteres; forzamos
+    # UTF-8. `reconfigure` solo existe en TextIOWrapper (stdout real, no
+    # redirigido) y el isinstance se lo demuestra a mypy.
+    if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
 
     stats = await seed()
     print("[OK] Sembrado de carga completado:")

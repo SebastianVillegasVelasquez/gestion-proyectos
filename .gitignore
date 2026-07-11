@@ -60,10 +60,3 @@ htmlcov/
 
 postgres_data/
 /.todo/tasks.json
-
-# =========================
-# Temporal markdowns
-# =========================
-
-*.md
-/*.md
