@@ -8,6 +8,7 @@ import { Sidebar } from "./SideBar";
 // Rol controlable para distinguir la navegación de admin (SECTIONS) de la de
 // usuario (USER_SECTIONS).
 const authState = vi.hoisted(() => ({ role: "user" }));
+const logoutMutate = vi.hoisted(() => vi.fn());
 
 vi.mock("react-router", () => ({
   useNavigate: () => vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("react-router", () => ({
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
   useAuth: () => ({ user: { name: "Ana López", role: authState.role }, isAuthenticated: true }),
+  useLogout: () => ({ mutate: logoutMutate, isPending: false }),
 }));
 
 // El pie del sidebar incluye <NotificationBell/>, que consulta el backend.
@@ -87,6 +89,21 @@ describe("Sidebar collapse (modo riel)", () => {
     // su nombre (aria-label) y operable (no deshabilitado).
     const overview = screen.getByRole("button", { name: "Vista general" });
     expect(overview).toBeEnabled();
+  });
+});
+
+describe("Sidebar logout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authState.role = "user";
+  });
+
+  it("triggers the logout mutation when 'Cerrar sesión' is clicked", async () => {
+    renderSidebar();
+
+    await userEvent.click(screen.getByRole("button", { name: /Cerrar sesión/ }));
+
+    expect(logoutMutate).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -311,7 +311,7 @@ function UserRow({
           aria-label={`Restablecer contraseña de ${user.name}`}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
         >
-          <KeyRound className="size-3.5" /> Reset
+          <KeyRound className="size-3.0" /> Cambiar contraseña
         </button>
 
         {confirmReset && (
@@ -416,9 +416,9 @@ export function AdminUsersPage() {
             <thead className="sticky top-0 bg-card">
               <tr className="border-b border-border text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2">Usuario</th>
-                <th className="px-3 py-2">Rol</th>
+                <th className="px-15 py-2">Rol</th>
                 <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
+                <th className="px-0 py-2 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>

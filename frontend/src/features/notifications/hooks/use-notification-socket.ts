@@ -3,8 +3,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { readSession } from "@/features/auth/utils/session.utils";
 
-const WS_URL = import.meta.env.VITE_WS_URL as string;
+const WS_URL_ENV = import.meta.env.VITE_WS_URL as string | undefined;
 const MAX_BACKOFF_MS = 30_000;
+
+/**
+ * Construye la URL del WebSocket de forma segura para dev y producción:
+ * - Si `VITE_WS_URL` es una URL absoluta (empieza con `ws://` o `wss://`), se
+ *   usa tal cual — útil en dev cuando el backend vive en otro origen.
+ * - Si no, se construye a partir del origen actual (`location`) para que en
+ *   producción el navegador hable con el mismo host que sirvió la SPA
+ *   (nginx hace el proxy con Upgrade). Escoge `wss://` automáticamente cuando
+ *   la app se sirve por HTTPS: mezclar `ws://` en una página HTTPS lo bloquea
+ *   el navegador.
+ */
+function resolveWsUrl(): string {
+  const path = "/api/v1/ws/notifications";
+  if (WS_URL_ENV && /^wss?:\/\//i.test(WS_URL_ENV)) {
+    return WS_URL_ENV;
+  }
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}${WS_URL_ENV ?? path}`;
+}
 
 /**
  * Mantiene una conexión WebSocket con /ws/notifications mientras el usuario
@@ -37,7 +56,7 @@ export function useNotificationsSocket(): void {
         return;
       }
 
-      const ws = new WebSocket(`${WS_URL}?token=${session.accessToken}`);
+      const ws = new WebSocket(`${resolveWsUrl()}?token=${session.accessToken}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
