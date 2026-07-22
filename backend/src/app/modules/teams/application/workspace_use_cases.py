@@ -105,9 +105,7 @@ class WorkspaceService:
             if task is None:
                 raise NotFoundError("La tarea vinculada no existe")
             if task.team_id != team_id:
-                raise ValidationError(
-                    "La tarea no está delegada a este equipo"
-                )
+                raise ValidationError("La tarea no está delegada a este equipo")
 
         created = await self._repo.add_deliverable(
             Deliverable(

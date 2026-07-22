@@ -53,7 +53,9 @@ async def _make_task(db, team_id, assignee_id) -> Task:
 async def _headers_for(user):
     from app.core.security import create_access_token
 
-    return {"Authorization": f"Bearer {create_access_token(user_id=user.id, role=user.role.value)}"}
+    return {
+        "Authorization": f"Bearer {create_access_token(user_id=user.id, role=user.role.value)}"
+    }
 
 
 async def _history_for(db, task_id) -> list[TaskHistory]:
@@ -104,9 +106,7 @@ class TestDeliverableLinkedToTask:
         assert history[0].new_status == TaskStatus.EN_REVISION
         assert history[0].changed_by_id == s.integrante.id
 
-    async def test_approve_marks_task_completed(
-        self, client, scenario, db_session
-    ):
+    async def test_approve_marks_task_completed(self, client, scenario, db_session):
         s = scenario
         task = await _make_task(db_session, s.team.id, s.integrante.id)
         integrante_h = await _headers_for(s.integrante)

@@ -21,7 +21,9 @@ def _day(offset: int) -> str:
 
 
 async def _create_team(client, admin_headers, name="Equipo de Diseño") -> str:
-    resp = await client.post("/api/v1/teams/", json={"name": name}, headers=admin_headers)
+    resp = await client.post(
+        "/api/v1/teams/", json={"name": name}, headers=admin_headers
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
 
@@ -32,7 +34,9 @@ class TestTeamTasks:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
-        modulo = await _create_item(client, admin_headers, project_id, tipo_id, "Módulo 1")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
         team_id = await _create_team(client, admin_headers)
 
         # Tarea general delegada al equipo (sin responsable todavía).
@@ -51,7 +55,9 @@ class TestTeamTasks:
         assert created.json()["team_id"] == team_id
 
         # El workspace lista las tareas del equipo con módulo y proyecto resueltos.
-        listed = await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        listed = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=admin_headers
+        )
         assert listed.status_code == 200, listed.text
         items = listed.json()
         assert len(items) == 1
@@ -66,7 +72,9 @@ class TestTeamTasks:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
-        modulo = await _create_item(client, admin_headers, project_id, tipo_id, "Módulo 1")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
         team_id = await _create_team(client, admin_headers)
 
         # Tarea normal del proyecto, SIN equipo (no debe romperse ni aparecer).
@@ -83,7 +91,9 @@ class TestTeamTasks:
         assert created.status_code == 201, created.text
         assert created.json()["team_id"] is None
 
-        listed = await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        listed = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=admin_headers
+        )
         assert listed.status_code == 200
         assert listed.json() == []
 
@@ -93,7 +103,9 @@ class TestTeamTasks:
         """Fase 3: el líder crea subtareas de la tarea general del equipo."""
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
-        modulo = await _create_item(client, admin_headers, project_id, tipo_id, "Módulo 1")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
         team_id = await _create_team(client, admin_headers)
 
         parent_id = (
@@ -127,7 +139,9 @@ class TestTeamTasks:
         assert sub.json()["parent_task_id"] == parent_id
 
         # Aparece en GET /teams/{id}/tasks junto a su padre.
-        listed = await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        listed = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=admin_headers
+        )
         items = listed.json()
         assert {i["title"] for i in items} == {
             "Banner del Módulo 1",
@@ -139,7 +153,9 @@ class TestTeamTasks:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
-        modulo = await _create_item(client, admin_headers, project_id, tipo_id, "Módulo 1")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
         team_id = await _create_team(client, admin_headers)
 
         task_id = (
@@ -163,5 +179,7 @@ class TestTeamTasks:
         assert patched.status_code == 200, patched.text
         assert patched.json()["team_id"] == team_id
 
-        listed = await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        listed = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=admin_headers
+        )
         assert len(listed.json()) == 1
