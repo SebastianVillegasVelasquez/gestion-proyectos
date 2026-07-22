@@ -1,8 +1,12 @@
 import { Moon, Sun } from "lucide-react";
-import type { DashboardHeaderData } from "../types";
 import { greetingForHour } from "../utils/greeting";
 
-interface DashboardHeaderProps extends DashboardHeaderData {
+interface DashboardHeaderProps {
+  name: string;
+  date: string;
+  /** Tareas completadas / totales (del resumen real). Sin datos → se oculta la píldora. */
+  tasksCompleted?: number;
+  tasksTotal?: number;
   dark: boolean;
   onToggleDark: () => void;
 }
@@ -10,13 +14,14 @@ interface DashboardHeaderProps extends DashboardHeaderData {
 export function DashboardHeader({
   name,
   date,
-  tasksToday,
-  tasksTodayTotal,
+  tasksCompleted,
+  tasksTotal,
   dark,
   onToggleDark,
 }: DashboardHeaderProps) {
-  const progressPercent = Math.round((tasksToday / tasksTodayTotal) * 100);
   const greeting = greetingForHour(new Date().getHours());
+  const hasProgress = tasksCompleted != null && tasksTotal != null && tasksTotal > 0;
+  const progressPercent = hasProgress ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-4">
@@ -28,31 +33,30 @@ export function DashboardHeader({
         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{date}</p>
       </div>
 
-      {/* Right side: progress pill + dark toggle */}
+      {/* Right side: progreso real de tareas + dark toggle */}
       <div className="flex shrink-0 items-center gap-3">
-        {/* Hoy X/Y progress pill */}
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Hoy
-            </span>
-            <span className="text-[13px] font-semibold text-slate-900 dark:text-slate-50">
-              {tasksToday}
-            </span>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-              / {tasksTodayTotal}
-            </span>
-          </div>
-          <div
-            className="w-28 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
-            style={{ height: "3px" }}
-          >
+        {hasProgress && (
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Tareas
+              </span>
+              <span className="text-[13px] font-semibold text-slate-900 dark:text-slate-50">
+                {tasksCompleted}
+              </span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">/ {tasksTotal}</span>
+            </div>
             <div
-              className="h-full bg-brand-gold transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
+              className="w-28 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+              style={{ height: "3px" }}
+            >
+              <div
+                className="h-full bg-brand-gold transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Dark mode toggle — matches Login.tsx button style */}
         <button

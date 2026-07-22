@@ -5,11 +5,10 @@ import { KpiCardsGrid } from "./KpiCardsGrid";
 import { TaskBoard } from "./TaskBoard";
 import { ProjectsPanel } from "./ProjectsPanel";
 import { UpcomingDeadlines } from "./UpcomingDeadlines";
-import { CommentsPanel } from "./CommentsPanel";
+import { ActivityPanel } from "./ActivityPanel";
 import { useDashboardPanels, useDashboardSummary } from "../hooks/use-dashboard-summary";
 import { buildKpiCards } from "../utils/build-kpi-cards";
 import { toTask, toProject, toDeadline } from "../utils/transform-panels";
-import { mockHeaderData, mockComments } from "../mockData";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const TODAY_FORMATTER = new Intl.DateTimeFormat("es-CO", {
@@ -33,15 +32,16 @@ export function DashboardPage() {
   const projects = panels ? panels.projects.map(toProject) : [];
   const deadlines = panels ? panels.upcoming_deadlines.map((d) => toDeadline(d, today)) : [];
 
-  const headerData = {
-    ...mockHeaderData,
-    name: user?.name ?? "Usuario",
-    date: TODAY_FORMATTER.format(today),
-  };
-
   return (
     <div className="flex flex-col gap-3 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
-      <DashboardHeader {...headerData} dark={dark} onToggleDark={toggleDark} />
+      <DashboardHeader
+        name={user?.name ?? "Usuario"}
+        date={TODAY_FORMATTER.format(today)}
+        tasksCompleted={summaryQuery.data?.completed_tasks}
+        tasksTotal={summaryQuery.data?.total_tasks}
+        dark={dark}
+        onToggleDark={toggleDark}
+      />
 
       <KpiCardsGrid
         cards={kpiCards}
@@ -60,7 +60,7 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:shrink-0">
         <UpcomingDeadlines deadlines={deadlines} />
-        <CommentsPanel comments={mockComments} />
+        <ActivityPanel />
       </div>
     </div>
   );
