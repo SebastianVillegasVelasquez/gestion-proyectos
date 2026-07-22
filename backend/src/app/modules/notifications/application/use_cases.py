@@ -31,10 +31,10 @@ class ListMyNotificationsUseCase:
         self._repo = repo
 
     async def execute(
-            self,
-            user_id: UUID,
-            only_unread: bool,
-            pagination: Pagination,
+        self,
+        user_id: UUID,
+        only_unread: bool,
+        pagination: Pagination,
     ) -> PaginatedNotificationsResponse:
         items, total = await self._repo.list_for_user(
             user_id=user_id,
@@ -65,7 +65,7 @@ class MarkNotificationAsReadUseCase:
         self._repo = repo
 
     async def execute(
-            self, notification_id: UUID, requester_id: UUID
+        self, notification_id: UUID, requester_id: UUID
     ) -> NotificationResponse:
         n = await self._repo.get(notification_id)
         if n is None:

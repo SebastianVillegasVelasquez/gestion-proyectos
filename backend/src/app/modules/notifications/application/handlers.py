@@ -85,6 +85,12 @@ class NotifyOnTaskCreated:
         self._broadcaster = broadcaster
 
     async def __call__(self, event: TaskCreated) -> None:
+        # Sin responsable no hay a quién notificar (p. ej. una tarea delegada a un
+        # equipo, que el líder repartirá después). Evita insertar con user_to_id
+        # NULL, que rompería la restricción de la tabla.
+        if event.assigned_id is None:
+            return
+
         notification = Notification(
             user_to_id=event.assigned_id,
             notification_type=NotificationType.TAREA_ASIGNADA,
