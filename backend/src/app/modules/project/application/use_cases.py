@@ -10,6 +10,7 @@ from app.modules.project.infrastructure.models import ProjectMember
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
+    ClientAccessResponse,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
@@ -44,6 +45,26 @@ class GetProjectByIdUseCase:
 
     async def execute(self, project_id: UUID) -> ProjectResponse:
         return await self.service.get_project_by_id(project_id)
+
+
+class GetClientAccessUseCase:
+    """Devuelve (o crea, si faltara) el token del portal del cliente."""
+
+    def __init__(self, repo: Repository):
+        self.service = ProjectService(repo)
+
+    async def execute(self, project_id: UUID) -> ClientAccessResponse:
+        return await self.service.get_client_access(project_id)
+
+
+class RegenerateClientAccessUseCase:
+    """Rota el token: el enlace anterior deja de funcionar (revocación)."""
+
+    def __init__(self, repo: Repository):
+        self.service = ProjectService(repo)
+
+    async def execute(self, project_id: UUID) -> ClientAccessResponse:
+        return await self.service.regenerate_client_access(project_id)
 
 
 class UpdateProjectUseCase:

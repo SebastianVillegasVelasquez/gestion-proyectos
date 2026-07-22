@@ -4,9 +4,11 @@ from uuid import UUID
 from fastapi import HTTPException
 from starlette import status
 
+from app.modules.project.domain.client_access import generate_client_token
 from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.modules.project.presentation.schemas import (
+    ClientAccessResponse,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
@@ -21,8 +23,25 @@ class ProjectService:
         self.repo = repo
 
     async def create_project(self, data: CreateProjectRequest) -> ProjectResponse:
-        persisted = await self.repo.save(Project(**data.model_dump()))
+        project = Project(**data.model_dump())
+        # Enlace del cliente listo desde la creación: no hay que "activarlo" aparte.
+        project.client_access_token = generate_client_token()
+        persisted = await self.repo.save(project)
         return self._to_response(persisted)
+
+    async def get_client_access(self, project_id: UUID) -> ClientAccessResponse:
+        project = await self._get_active(project_id)
+        if not project.client_access_token:
+            # Proyectos creados antes de esta función: generamos el token al vuelo.
+            project.client_access_token = generate_client_token()
+            await self.repo.update(project)
+        return ClientAccessResponse(token=project.client_access_token)
+
+    async def regenerate_client_access(self, project_id: UUID) -> ClientAccessResponse:
+        project = await self._get_active(project_id)
+        project.client_access_token = generate_client_token()
+        await self.repo.update(project)
+        return ClientAccessResponse(token=project.client_access_token)
 
     async def project_exists(self, project_id) -> bool:
         project: Union[Project, None] = await self.repo.get_by_id(project_id)

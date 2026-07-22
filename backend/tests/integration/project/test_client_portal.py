@@ -69,8 +69,12 @@ class TestClientPortal:
 
         assert new_token != old_token
         # El enlace viejo deja de funcionar; el nuevo sí.
-        assert (await client.get(f"/api/v1/public/projects/{old_token}")).status_code == 404
-        assert (await client.get(f"/api/v1/public/projects/{new_token}")).status_code == 200
+        assert (
+            await client.get(f"/api/v1/public/projects/{old_token}")
+        ).status_code == 404
+        assert (
+            await client.get(f"/api/v1/public/projects/{new_token}")
+        ).status_code == 200
 
     async def test_client_access_requires_admin(
         self, client, member_headers, admin_headers, valid_project_payload

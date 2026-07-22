@@ -17,13 +17,16 @@ from app.modules.project.application.use_cases import (
     AssignTeamToProjectUseCase,
     CreateProjectUseCase,
     DeleteProjectUseCase,
+    GetClientAccessUseCase,
     GetProjectByIdUseCase,
     GetProjectMembersUseCase,
     GetProjectsUseCase,
+    RegenerateClientAccessUseCase,
     UpdateProjectUseCase,
 )
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
+    ClientAccessResponse,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
@@ -77,6 +80,29 @@ async def delete_project(
     _=Depends(require_role("super_admin")),
 ):
     await DeleteProjectUseCase(repo).execute(project_id)
+
+
+# ── Acceso del cliente (enlace público de solo lectura) ──────────────────────
+@router.get("/{project_id}/client-access", response_model=ClientAccessResponse)
+async def get_client_access(
+    project_id: UUID,
+    repo=Depends(project_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    """Token del portal del cliente para armar y compartir el enlace."""
+    return await GetClientAccessUseCase(repo).execute(project_id)
+
+
+@router.post(
+    "/{project_id}/client-access/regenerate", response_model=ClientAccessResponse
+)
+async def regenerate_client_access(
+    project_id: UUID,
+    repo=Depends(project_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    """Rota el token: invalida el enlace anterior (revocación)."""
+    return await RegenerateClientAccessUseCase(repo).execute(project_id)
 
 
 # ── Miembros del proyecto ────────────────────────────────────────────────────

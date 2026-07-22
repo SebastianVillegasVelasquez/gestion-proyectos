@@ -80,3 +80,9 @@ class AssignTeamResponse(BaseModelConfig):
 
     assigned: int
     skipped: int
+
+
+class ClientAccessResponse(BaseModelConfig):
+    """Token del portal del cliente. El frontend arma el enlace /portal/{token}."""
+
+    token: str
