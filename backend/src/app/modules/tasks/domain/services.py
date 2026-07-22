@@ -66,6 +66,7 @@ class TaskService:
             description=task.description,
             priority=task.priority,
             assignee_id=task.assignee_id,
+            team_id=task.team_id,
             start_date=task.start_date,
             due_date=task.due_date,
             status=task.status or TaskStatus.PENDIENTE_POR_INICIAR,

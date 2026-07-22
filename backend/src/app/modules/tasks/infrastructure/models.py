@@ -48,6 +48,16 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
 
+    # Equipo al que se delega la tarea (Fase 1 del espacio de trabajo). Nullable:
+    # una tarea normal del proyecto no pertenece a ningún equipo. ON DELETE SET
+    # NULL: borrar el equipo no borra la tarea, solo la desvincula.
+    team_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Tarea padre: el admin crea la tarea global y el coordinador crea subtareas
     # apuntando a ella. Auto-relación nullable.
     parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(

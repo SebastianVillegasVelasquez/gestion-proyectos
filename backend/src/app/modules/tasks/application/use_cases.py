@@ -14,6 +14,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
+    TeamTaskItemResponse,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
@@ -52,6 +53,16 @@ class CreateTaskUseCase:
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
+        # Fase 3: si la nueva tarea cuelga de otra (líder repartiendo subtareas
+        # de una tarea general del equipo) y no se envía team_id explícito,
+        # hereda el del padre. Así aparece en `GET /teams/{id}/tasks` sin pedir
+        # al frontend que replique la relación.
+        if data.parent_task_id is not None and data.team_id is None:
+            parent = await self.task_repo.get_by_id(data.parent_task_id)
+            if parent is None or parent.is_deleted:
+                raise NotFoundError("La tarea padre no existe")
+            data.team_id = parent.team_id
+
         created = await self.service.add_task(data)
         if data.depends_on_id is not None:
             await TaskDependencyService(self.task_repo).add_dependency(
@@ -81,6 +92,38 @@ class GetTasksByProjectUseCase:
         if not project or project.is_deleted:
             raise NotFoundError("El proyecto no existe")
         return await self.service.get_tasks_by_project(project_id)
+
+
+class GetTasksByTeamUseCase:
+    """Tareas delegadas a un equipo (read model del espacio de trabajo).
+
+    Devuelve cada tarea con su módulo, proyecto y responsable ya resueltos, para
+    que el workspace las agrupe por módulo ("Módulo 1", …) sin pedir el árbol.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, team_id: UUID) -> list[TeamTaskItemResponse]:
+        rows = await self.task_repo.get_by_team(team_id)
+        return [
+            TeamTaskItemResponse(
+                id=task.id,
+                title=task.title,
+                status=task.status or TaskStatus.PENDIENTE_POR_INICIAR,
+                priority=task.priority,
+                work_item_id=task.work_item_id,
+                work_item_name=work_item_name,
+                project_id=project_id,
+                project_name=project_name,
+                assignee_id=task.assignee_id,
+                assignee_name=assignee_name,
+                parent_task_id=task.parent_task_id,
+                start_date=task.start_date,
+                due_date=task.due_date,
+            )
+            for task, work_item_name, project_id, project_name, assignee_name in rows
+        ]
 
 
 class GetTasksByWorkItemUseCase:

@@ -19,6 +19,7 @@ from app.modules.tasks.application.use_cases import (
     GetTaskByIdUseCase,
     GetTaskDependenciesUseCase,
     GetTasksByProjectUseCase,
+    GetTasksByTeamUseCase,
     GetTasksByWorkItemUseCase,
     UpdateTaskUseCase,
 )
@@ -27,6 +28,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
+    TeamTaskItemResponse,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
@@ -103,6 +105,16 @@ async def get_work_item_tasks(
     return await GetTasksByWorkItemUseCase(task_repo, work_tree_repo).execute(
         work_item_id
     )
+
+
+@router.get("/teams/{team_id}/tasks", response_model=list[TeamTaskItemResponse])
+async def get_team_tasks(
+    team_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Tareas delegadas a un equipo, con módulo y responsable (espacio de trabajo)."""
+    return await GetTasksByTeamUseCase(task_repo).execute(team_id)
 
 
 # ── Dependencias y estado ────────────────────────────────────────────────────

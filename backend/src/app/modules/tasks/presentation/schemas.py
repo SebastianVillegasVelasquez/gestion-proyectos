@@ -17,6 +17,8 @@ class TaskBase(BaseModelConfig):
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
     assignee_id: Optional[UUID] = None
+    # Equipo al que se delega la tarea (opcional). None = tarea normal del proyecto.
+    team_id: Optional[UUID] = None
     status: Optional[TaskStatus] = None
 
 
@@ -76,8 +78,31 @@ class UpdateTaskRequest(BaseModelConfig):
     description: Optional[str] = None
     priority: Optional[TaskPriority] = None
     assignee_id: Optional[UUID] = None
+    team_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
+
+
+class TeamTaskItemResponse(BaseModelConfig):
+    """Tarea delegada a un equipo, con su módulo y responsable para el workspace.
+
+    Read model del espacio de trabajo: trae ya resuelto el nombre del módulo
+    (WorkItem) y del responsable, para agrupar por módulo sin pedir el árbol.
+    """
+
+    id: UUID
+    title: str
+    status: TaskStatus
+    priority: TaskPriority
+    work_item_id: UUID
+    work_item_name: str
+    project_id: UUID
+    project_name: str
+    assignee_id: Optional[UUID] = None
+    assignee_name: Optional[str] = None
+    parent_task_id: Optional[UUID] = None
+    start_date: date
+    due_date: date
 
 
 ###############
