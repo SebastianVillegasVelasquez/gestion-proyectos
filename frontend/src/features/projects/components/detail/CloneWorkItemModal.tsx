@@ -39,7 +39,7 @@ function flatten(
       id: n.id,
       label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}`,
       disabled,
-      reason: disabled ? "Pertenece al subárbol que vas a copiar" : undefined,
+      reason: disabled ? "Pertenece al contenido que vas a copiar" : undefined,
     });
     flatten(n.children, forbidden, depth + 1, acc);
   });
@@ -96,7 +96,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-                Duplicar subárbol
+                Duplicar elemento
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500">
                 Copia “{source.nombre}” y todo lo que cuelga de él.
@@ -132,8 +132,8 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               ))}
             </select>
             <span className="text-[11px] text-slate-400">
-              Los nodos del propio subárbol están deshabilitados (no se puede pegar dentro de sí
-              mismo).
+              Los elementos del contenido a copiar están deshabilitados (no se puede pegar dentro de
+              sí mismo).
             </span>
           </label>
 
@@ -162,7 +162,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               </select>
             </div>
             <span className="text-[11px] text-slate-400">
-              Se suma a todas las fechas plan del subárbol clonado. Usa
+              Se suma a todas las fechas plan del contenido duplicado. Usa
               <span className="font-medium"> 0</span> para mantenerlas iguales, o un valor negativo
               para adelantarlas.
             </span>
@@ -170,7 +170,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
 
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Nombre del nodo raíz copiado
+              Nombre del elemento copiado
             </span>
             <input
               value={renameTo}
@@ -190,11 +190,12 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               <li>
                 <span className="font-medium text-slate-700 dark:text-slate-200">Sí</span>:
                 jerarquía completa, fechas plan (desplazadas), duraciones, tipos y dependencias FtS
-                internas al subárbol.
+                internas al contenido copiado.
               </li>
               <li>
                 <span className="font-medium text-rose-600 dark:text-rose-400">No</span>: fechas
-                reales, porcentaje completado, ni dependencias hacia nodos fuera del subárbol.
+                reales, porcentaje completado, ni dependencias hacia elementos fuera del contenido
+                copiado.
               </li>
             </ul>
           </div>
@@ -220,7 +221,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               "rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60",
             )}
           >
-            {cloneItem.isPending ? "Duplicando…" : "Duplicar subárbol"}
+            {cloneItem.isPending ? "Duplicando…" : "Duplicar elemento"}
           </button>
         </footer>
       </div>

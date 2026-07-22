@@ -65,7 +65,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
       setPick("");
     } catch {
       setError(
-        "No se pudo añadir: crearía un ciclo, ya existe, o el nodo iniciaría antes de que termine su predecesor.",
+        "No se pudo añadir: crearía un ciclo, ya existe, o el elemento iniciaría antes de que termine su predecesor.",
       );
     }
   }
@@ -115,7 +115,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                   >
                     <ArrowRight className="size-3.5 shrink-0 text-amber-500" />
                     <span className="flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
-                      {nameById.get(d.depends_on_id) ?? "Nodo"}
+                      {nameById.get(d.depends_on_id) ?? "Elemento"}
                     </span>
                     <button
                       onClick={() => {
@@ -144,7 +144,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                 }}
                 className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
-                <option value="">Selecciona un nodo…</option>
+                <option value="">Selecciona un elemento…</option>
                 {options.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}

@@ -90,7 +90,9 @@ export function AreasPanel({ projectId }: { projectId: string }) {
           hint="Cuando se asignen tareas a integrantes, verás aquí el avance de cada equipo."
         />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+        // content-start: sin él, el grid estira las filas hasta llenar la altura
+        // disponible y las tarjetas pierden simetría con pocos equipos.
+        <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
           {areas.map((area) => (
             <AreaCard key={area.position} area={area} />
           ))}

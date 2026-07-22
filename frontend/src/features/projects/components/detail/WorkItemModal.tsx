@@ -119,11 +119,11 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
   async function submit() {
     setError(null);
     if (nombre.trim().length < 1) {
-      setError("Ponle un nombre al nodo.");
+      setError("Ponle un nombre al elemento.");
       return;
     }
     if (!tipoId) {
-      setError("Elige un tipo de nodo.");
+      setError("Elige un tipo de elemento.");
       return;
     }
     const dates = buildDates();
@@ -144,7 +144,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
       }
       onClose();
     } catch {
-      setError("No se pudo guardar el nodo. Revisa los datos e inténtalo de nuevo.");
+      setError("No se pudo guardar el elemento. Revisa los datos e inténtalo de nuevo.");
     }
   }
 
@@ -154,7 +154,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-              {isEdit ? "Editar nodo" : "Nuevo nodo"}
+              {isEdit ? "Editar elemento" : "Nuevo elemento"}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-500">
               {isEdit
@@ -188,7 +188,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
             </label>
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Tipo de nodo
+                Tipo de elemento
               </span>
               <select
                 value={tipoId}
@@ -349,7 +349,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
             disabled={pending}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
           >
-            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear nodo"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear elemento"}
           </button>
         </footer>
       </div>

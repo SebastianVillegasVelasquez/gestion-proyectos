@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import type { Project } from "../types/api.types";
 import { ProjectActions } from "./detail/ProjectActions";
+import { ClientAccessCard } from "./detail/ClientAccessCard";
 import { StructurePanel } from "./detail/StructurePanel";
 import { MembersPanel } from "./detail/MembersPanel";
 import { WorkTeamsPanel } from "./detail/WorkTeamsPanel";
@@ -86,6 +87,9 @@ export function ProjectDetailView({
           </div>
         </CardContent>
       </Card>
+
+      {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
+      <ClientAccessCard projectId={project.id} />
 
       {/* Tabs: Estructura | Integrantes | Equipos | Progreso por equipo | Trazabilidad */}
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">

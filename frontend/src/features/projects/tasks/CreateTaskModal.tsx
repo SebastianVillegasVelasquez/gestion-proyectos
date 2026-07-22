@@ -4,6 +4,7 @@ import { getErrorMessage } from "@/utils/get-error-message";
 import { useCreateTask } from "../hooks/use-tasks";
 import { useWorkTree } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
+import { useTeams } from "../hooks/use-teams";
 import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
 import type { Task, TaskPriority, UserPosition, WorkItemTree } from "../types/api.types";
 import {
@@ -52,6 +53,8 @@ export function CreateTaskModal({
   const [clientError, setClientError] = useState<string | null>(null);
 
   const directoryQuery = useDirectory(position || undefined);
+  const teamsQuery = useTeams();
+  const teams = teamsQuery.data?.items ?? [];
 
   const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -114,7 +117,7 @@ export function CreateTaskModal({
           </Field>
 
           {/* Nodo del árbol de trabajo al que cuelga la tarea */}
-          <Field label="Nodo del proyecto *">
+          <Field label="Ubicación en el proyecto *">
             <select
               className={inputCls}
               value={form.workItemId}
@@ -122,7 +125,7 @@ export function CreateTaskModal({
                 set("workItemId", e.target.value);
               }}
             >
-              <option value="">Selecciona el nodo…</option>
+              <option value="">Selecciona la ubicación…</option>
               {nodeOptions.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.label}
@@ -164,6 +167,24 @@ export function CreateTaskModal({
                 ))}
               </select>
             </div>
+          </Field>
+
+          {/* Delegar a un equipo: el líder repartirá subtareas dentro del equipo */}
+          <Field label="Delegar a equipo (opcional)">
+            <select
+              className={inputCls}
+              value={form.teamId}
+              onChange={(e) => {
+                set("teamId", e.target.value);
+              }}
+            >
+              <option value="">Sin equipo</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </Field>
 
           {/* Dependencia */}

@@ -67,7 +67,9 @@ export function WorkTeamsPanel() {
           hint={`Ningún equipo coincide con «${search}».`}
         />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+        // content-start evita que el grid estire las filas para llenar la altura
+        // (las cards se deformaban cuando había pocos equipos).
+        <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((team) => (
             <TeamCard key={team.id} team={team} />
           ))}

@@ -10,7 +10,6 @@ import {
   Play,
   RefreshCw,
   Send,
-  Sparkles,
   TrendingUp,
   Undo2,
   UserPlus,
@@ -21,7 +20,6 @@ import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/Asy
 import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
 import { useProjectTraceability } from "../../hooks/use-traceability";
 import { TRACE_EVENT_LABELS, filterTraceabilityEvents } from "../../utils/traceability-events";
-import { MOCK_TRACEABILITY } from "../../utils/traceability-mock";
 import type { TraceabilityEvent, TraceabilityEventKind } from "../../types/api.types";
 
 // Estilo por tipo de evento. El color comunica el significado de un vistazo
@@ -122,8 +120,8 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
   const badge = event.is_delay ? DELAY_META.badge : meta.badge;
 
   return (
-    <li className="relative flex gap-3 pb-4 last:pb-0">
-      {/* Punto + línea vertical */}
+    <li className="group relative flex gap-3 pb-4 last:pb-0">
+      {/* Punto + línea vertical (la línea se oculta en el último evento) */}
       <div className="relative flex flex-col items-center">
         <span
           className={cn(
@@ -133,7 +131,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
         >
           <Icon className="size-3.5" />
         </span>
-        <span className="absolute top-7 h-full w-px bg-slate-200 dark:bg-slate-700" />
+        <span className="absolute top-7 h-full w-px bg-slate-200 group-last:hidden dark:bg-slate-700" />
       </div>
 
       <div className="min-w-0 flex-1 pb-1">
@@ -188,19 +186,15 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
 export function TraceabilityPanel({ projectId }: { projectId: string }) {
   const query = useProjectTraceability(projectId);
   const [onlyDelays, setOnlyDelays] = useState(false);
-  // Vista previa con datos de ejemplo (no reales) para validar el diseño antes
-  // de que la base de datos tenga historial real.
-  const [preview, setPreview] = useState(false);
 
-  const source = preview ? MOCK_TRACEABILITY : query.data;
-  const events = useMemo(() => source?.events ?? [], [source]);
+  const events = useMemo(() => query.data?.events ?? [], [query.data]);
   const visible = useMemo(() => filterTraceabilityEvents(events, onlyDelays), [events, onlyDelays]);
-  const summary = source?.summary;
+  const summary = query.data?.summary;
 
-  if (!preview && query.isLoading) {
+  if (query.isLoading) {
     return <LoadingSkeleton rows={5} />;
   }
-  if (!preview && query.isError) {
+  if (query.isError) {
     return (
       <ErrorState
         title="No se pudo cargar la trazabilidad"
@@ -212,25 +206,6 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Aviso de datos de ejemplo */}
-      {preview && (
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          <Sparkles className="size-4 shrink-0" />
-          <span className="flex-1">
-            Estás viendo <strong>datos de ejemplo</strong> (no reales) para previsualizar el diseño.
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setPreview(false);
-            }}
-            className="shrink-0 font-medium underline-offset-2 hover:underline"
-          >
-            Salir del ejemplo
-          </button>
-        </div>
-      )}
-
       {/* Resumen */}
       <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
@@ -265,21 +240,6 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
           <History className="size-4 text-brand-teal" /> Línea de tiempo
         </h2>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setPreview((p) => !p);
-            }}
-            aria-pressed={preview}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-colors",
-              preview
-                ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
-                : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
-            )}
-          >
-            <Sparkles className="size-3.5" /> Datos de ejemplo
-          </button>
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
             {(
               [
@@ -312,22 +272,11 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
 
       {/* Timeline */}
       {events.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-          <EmptyState
-            icon={History}
-            title="Sin eventos de trazabilidad"
-            hint="Cuando se creen, asignen o entreguen tareas, el historial aparecerá aquí."
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setPreview(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
-          >
-            <Sparkles className="size-3.5" /> Ver datos de ejemplo
-          </button>
-        </div>
+        <EmptyState
+          icon={History}
+          title="Sin eventos de trazabilidad"
+          hint="Cuando se creen, asignen o entreguen tareas, el historial aparecerá aquí."
+        />
       ) : visible.length === 0 ? (
         <EmptyState
           icon={AlertTriangle}
@@ -335,7 +284,9 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
           hint="No hay eventos de retraso en este proyecto. ¡Buen ritmo!"
         />
       ) : (
-        <ol className="min-h-0 flex-1 overflow-y-auto pr-1">
+        // max-w acota el ancho de lectura: en pantallas anchas el texto de cada
+        // evento no se estira de borde a borde (patrón de feed tipo Linear/Jira).
+        <ol className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
           {visible.map((event) => (
             <TimelineEvent key={event.id} event={event} />
           ))}

@@ -112,7 +112,7 @@ function TreeNode({
             style.chip,
           )}
         >
-          {typeNameById.get(node.tipo_id) ?? "nodo"}
+          {typeNameById.get(node.tipo_id) ?? "elemento"}
         </span>
 
         <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -143,7 +143,7 @@ function TreeNode({
               onClick={() => {
                 onAddChild(node);
               }}
-              title="Añadir nodo hijo"
+              title="Añadir elemento dentro"
               className="rounded-md p-1 text-slate-400 hover:bg-accent hover:text-brand-gold-dark"
             >
               <Plus className="size-3.5" />
@@ -152,7 +152,7 @@ function TreeNode({
               onClick={() => {
                 onEdit(node);
               }}
-              title="Editar nodo"
+              title="Editar elemento"
               className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700"
             >
               <Pencil className="size-3.5" />
@@ -170,7 +170,7 @@ function TreeNode({
               onClick={() => {
                 onClone(node);
               }}
-              title="Duplicar nodo y su subárbol"
+              title="Duplicar con todo su contenido"
               className="rounded-md p-1 text-slate-400 hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-900/30"
             >
               <Copy className="size-3.5" />
@@ -179,7 +179,7 @@ function TreeNode({
               onClick={() => {
                 onDelete(node);
               }}
-              title="Eliminar nodo y su subárbol"
+              title="Eliminar con todo su contenido"
               className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
             >
               <Trash2 className="size-3.5" />
@@ -312,7 +312,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           disabled={types.length === 0}
           className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus className="size-3.5" /> Añadir nodo raíz
+          <Plus className="size-3.5" /> Añadir elemento
         </button>
       </div>
 
@@ -329,8 +329,8 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             </p>
             <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
               {types.length === 0
-                ? "Crea primero un tipo de nodo (ej. «Módulo», «Fase»)."
-                : "Empieza añadiendo el primer nodo del árbol."}
+                ? "Crea primero un tipo de elemento (ej. «Módulo», «Fase»)."
+                : "Empieza añadiendo el primer elemento de la estructura."}
             </p>
           </div>
         </div>

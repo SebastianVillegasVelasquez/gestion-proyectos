@@ -121,6 +121,7 @@ export interface Task {
   description: string | null;
   priority: TaskPriority;
   assignee_id: string | null;
+  team_id: string | null;
   start_date: string;
   due_date: string;
   status: TaskStatus;
@@ -134,6 +135,8 @@ export interface CreateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
+  // Equipo al que se delega la tarea (opcional).
+  team_id?: string | null;
   // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
   work_item_id: string;
   start_date: string;
@@ -150,6 +153,7 @@ export interface UpdateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
+  team_id?: string | null;
   start_date?: string;
   due_date?: string;
 }

@@ -57,7 +57,7 @@ describe("validateTaskForm", () => {
   });
 
   it("requires a work item", () => {
-    expect(validateTaskForm({ ...base, workItemId: "" })).toMatch(/nodo/i);
+    expect(validateTaskForm({ ...base, workItemId: "" })).toMatch(/ubicaci/i);
   });
 
   it("requires positive duration", () => {

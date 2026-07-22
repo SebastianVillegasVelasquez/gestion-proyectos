@@ -224,7 +224,7 @@ export function GanttView({
     return Array.from(byItem.entries())
       .map(([id, items]) => ({
         id,
-        name: itemMeta.get(id)?.name ?? "Sin nodo",
+        name: itemMeta.get(id)?.name ?? "Sin ubicación",
         order: itemMeta.get(id)?.order ?? 999,
         tasks: items,
       }))
