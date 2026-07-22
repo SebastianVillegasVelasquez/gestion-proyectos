@@ -7,6 +7,7 @@ from app.modules.dashboard.presentation.schemas import (
     DeadlineItemResponse,
     MyProjectProgressResponse,
     ProjectOverviewItemResponse,
+    PublicProjectProgressResponse,
     TaskBoardItemResponse,
 )
 from app.shared.exceptions import NotFoundError
@@ -163,4 +164,29 @@ class GetMyProjectProgressUseCase:
                 )
                 for item in detail.my_tasks
             ],
+        )
+
+
+class GetPublicProjectProgressUseCase:
+    """Progreso público de un proyecto por token de cliente (sin autenticación)."""
+
+    def __init__(self, repo: DashboardRepository) -> None:
+        self._repo = repo
+
+    async def execute(self, token: str) -> PublicProjectProgressResponse:
+        detail = await self._repo.get_project_progress_by_token(token)
+        if detail is None:
+            # 404 indistinto: no revela si el token existió alguna vez.
+            raise NotFoundError("Proyecto no encontrado")
+        return PublicProjectProgressResponse(
+            name=detail.name,
+            client_name=detail.client_name,
+            coordinator=detail.coordinator,
+            status=detail.status,
+            tasks_total=detail.tasks_total,
+            tasks_completed=detail.tasks_completed,
+            tasks_in_review=detail.tasks_in_review,
+            tasks_overdue=detail.tasks_overdue,
+            tasks_pending=detail.tasks_pending,
+            progress_pct=detail.progress_pct,
         )
