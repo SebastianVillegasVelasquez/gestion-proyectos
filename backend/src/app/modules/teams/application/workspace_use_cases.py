@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.teams.domain.workspace import WorkspaceAccess, WorkspaceRepository
 from app.modules.teams.infrastructure.workspace_enums import (
     CommentType,
@@ -18,13 +19,20 @@ from app.modules.teams.presentation.workspace_schemas import (
     MyTeamResponse,
     WorkspaceAccessResponse,
 )
-from app.shared.exceptions import ForbiddenError, NotFoundError
+from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
 
 # Una solicitud de cambio o una aprobación mueve el estado del entregable.
 _STATUS_BY_COMMENT = {
     CommentType.APROBACION: DeliverableStatus.APROBADO,
     CommentType.SOLICITUD_CAMBIO: DeliverableStatus.CAMBIOS_SOLICITADOS,
 }
+
+# Fase 2: cómo el estado de la Task vinculada acompaña al del entregable. Una
+# entrega mueve la tarea a EN_REVISION; aprobar la marca COMPLETADA; rechazar
+# la deja DEVUELTA (para que el integrante la retome).
+_TASK_STATUS_ON_APPROVE = TaskStatus.COMPLETADA
+_TASK_STATUS_ON_REJECT = TaskStatus.DEVUELTA
+_TASK_STATUS_ON_DELIVER = TaskStatus.EN_REVISION
 
 
 class WorkspaceService:
@@ -88,11 +96,25 @@ class WorkspaceService:
             raise ForbiddenError(
                 "Solo los integrantes del equipo pueden crear entregables"
             )
+
+        # Fase 2: si viene `task_id`, la Task debe existir y estar delegada a
+        # este equipo. Así el entregable no puede "colarse" en tareas de otro
+        # equipo o inexistentes.
+        if data.task_id is not None:
+            task = await self._repo.get_task(data.task_id)
+            if task is None:
+                raise NotFoundError("La tarea vinculada no existe")
+            if task.team_id != team_id:
+                raise ValidationError(
+                    "La tarea no está delegada a este equipo"
+                )
+
         created = await self._repo.add_deliverable(
             Deliverable(
                 team_id=team_id,
                 task_title=data.task_title,
                 assignee_id=data.assignee_id,
+                task_id=data.task_id,
                 status=DeliverableStatus.BORRADOR,
             )
         )
@@ -121,6 +143,11 @@ class WorkspaceService:
         )
         deliverable.status = DeliverableStatus.EN_REVISION
         await self._repo.save_deliverable(deliverable)
+
+        # Fase 2: si el entregable está vinculado a una Task, entregar mueve la
+        # tarea a "en revisión" y deja rastro en TaskHistory. Idempotente.
+        await self._sync_task_status(deliverable, _TASK_STATUS_ON_DELIVER, current_user)
+
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
         )
@@ -150,6 +177,41 @@ class WorkspaceService:
         if new_status is not None:
             deliverable.status = new_status
             await self._repo.save_deliverable(deliverable)
+
+            # Fase 2: la revisión mueve la Task vinculada. El motivo del
+            # rechazo viaja al historial (los jefes leen el porqué en Trazabilidad).
+            if data.type == CommentType.APROBACION:
+                await self._sync_task_status(
+                    deliverable, _TASK_STATUS_ON_APPROVE, current_user
+                )
+            elif data.type == CommentType.SOLICITUD_CAMBIO:
+                await self._sync_task_status(
+                    deliverable,
+                    _TASK_STATUS_ON_REJECT,
+                    current_user,
+                    reason=data.content,
+                )
+
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
         )
+
+    # ── Sincronía Deliverable → Task (Fase 2) ────────────────────────────────
+    async def _sync_task_status(
+        self,
+        deliverable: Deliverable,
+        new_status: TaskStatus,
+        actor,
+        reason: str | None = None,
+    ) -> None:
+        """Refleja el cambio de revisión en la Task vinculada, si existe.
+
+        Silencioso cuando no hay vínculo o la tarea fue borrada: la Fase 2 es
+        aditiva y el flujo antiguo (entregables sueltos) sigue funcionando.
+        """
+        if deliverable.task_id is None:
+            return
+        task = await self._repo.get_task(deliverable.task_id)
+        if task is None:
+            return
+        await self._repo.transition_task(task, new_status, actor.id, reason)

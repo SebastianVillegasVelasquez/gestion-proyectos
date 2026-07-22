@@ -39,6 +39,14 @@ class Deliverable(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     assignee_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    # Vínculo opcional con la Task real del proyecto (Fase 2): al entregar,
+    # aprobar o rechazar aquí, movemos Task.status y escribimos TaskHistory.
+    # Nullable para retrocompatibilidad con entregables sueltos existentes.
+    task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[DeliverableStatus] = mapped_column(
         _enum(DeliverableStatus, "deliverable_status"),
         nullable=False,
