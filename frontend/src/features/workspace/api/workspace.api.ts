@@ -53,11 +53,48 @@ export interface ApiDeliverable {
   team_id: string;
   task_title: string;
   assignee_id: string;
+  // Fase 2: cuando el entregable está enganchado a una Task real del proyecto,
+  // aprobar/rechazar aquí mueve el estado de la tarea y queda en trazabilidad.
+  task_id: string | null;
   status: DeliverableStatus;
   versions: ApiVersion[];
   comments: ApiComment[];
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateDeliverableBody {
+  task_title: string;
+  assignee_id: string;
+  task_id?: string | null;
+}
+
+// Estado de tarea del proyecto (espejo del enum del backend). Reutiliza la
+// máquina de estados existente: pendiente → en progreso → en revisión →
+// completada/devuelta.
+export type ProjectTaskStatus =
+  | "pendiente_por_iniciar"
+  | "en_progreso"
+  | "en_revision"
+  | "devuelta"
+  | "completada"
+  | "cancelada";
+
+// Tarea delegada al equipo, con módulo y responsable resueltos (Fase 1).
+export interface ApiTeamTask {
+  id: string;
+  title: string;
+  status: ProjectTaskStatus;
+  priority: string;
+  work_item_id: string;
+  work_item_name: string;
+  project_id: string;
+  project_name: string;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  parent_task_id: string | null;
+  start_date: string;
+  due_date: string;
 }
 
 export interface NewVersionBody {
@@ -86,7 +123,9 @@ export const workspaceApi = {
   deliverables: (teamId: string) =>
     http.get<ApiDeliverable[]>(`${base(teamId)}/deliverables`).then((r) => r.data),
 
-  createDeliverable: (teamId: string, body: { task_title: string; assignee_id: string }) =>
+  tasks: (teamId: string) => http.get<ApiTeamTask[]>(`${base(teamId)}/tasks`).then((r) => r.data),
+
+  createDeliverable: (teamId: string, body: CreateDeliverableBody) =>
     http.post<ApiDeliverable>(`${base(teamId)}/deliverables`, body).then((r) => r.data),
 
   addVersion: (teamId: string, deliverableId: string, body: NewVersionBody) =>

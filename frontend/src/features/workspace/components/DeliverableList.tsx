@@ -1,4 +1,4 @@
-import { Package } from "lucide-react";
+import { Link2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Deliverable, WorkspaceMember, DeliverableStatus } from "../types";
 import { DELIVERABLE_STATUS_LABELS, DELIVERABLE_STATUS_BADGE } from "../types";
@@ -117,9 +117,17 @@ export function DeliverableList({
                       </div>
                     )}
 
-                    {/* Footer: status + version count */}
-                    <div className="mt-2 flex items-center gap-2">
+                    {/* Footer: status + vínculo con la tarea + version count */}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <StatusBadge status={d.status} />
+                      {d.taskId && (
+                        <span
+                          title="Vinculado a una tarea del proyecto"
+                          className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[10px] font-medium text-brand-teal-dark dark:text-brand-teal"
+                        >
+                          <Link2 className="size-2.5" /> Tarea vinculada
+                        </span>
+                      )}
                       {d.versions.length > 0 && (
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">
                           {d.versions.length} versión{d.versions.length !== 1 ? "es" : ""}

@@ -31,6 +31,7 @@ vi.mock("../hooks/use-workspace", () => ({
   useTeamMembers: () => ({ data: [] }),
   useWorkspaceAccess: () => ({ data: { can_deliver: false, can_review: false } }),
   useDeliverables: () => ({ data: [], isLoading: false }),
+  useTeamTasks: () => ({ data: [], isLoading: false }),
   useCreateDeliverable: () => ({ mutate: vi.fn(), isPending: false }),
   useAddVersion: () => ({ mutate: vi.fn() }),
   useAddComment: () => ({ mutate: vi.fn() }),
