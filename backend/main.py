@@ -17,6 +17,9 @@ from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )
 from app.modules.dashboard.presentation.routes import router as dashboard_router
+from app.modules.dashboard.presentation.public_routes import (
+    router as public_router,
+)
 from app.modules.feedback.presentation.routes import router as feedback_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.notifications.presentation.routes import (
@@ -166,6 +169,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(public_router, prefix="/api/v1")
 # El router del workspace va ANTES que el de teams: su ruta literal /teams/mine
 # debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
 app.include_router(workspace_router, prefix="/api/v1")
