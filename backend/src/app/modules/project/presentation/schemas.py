@@ -28,8 +28,6 @@ class CreateProjectRequest(BaseModelConfig):
             raise ValueError(
                 "La fecha de finalización no puede ser menor a la fecha de inicio"
             )
-        if self.start_date is not None and self.start_date < date.today():
-            raise ValueError("La fecha de inicio no puede ser menor a la fecha actual")
         return self
 
 
