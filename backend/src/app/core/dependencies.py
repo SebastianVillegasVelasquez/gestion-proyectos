@@ -146,7 +146,7 @@ def event_bus_dependency(
     """
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
-    register_notification_handlers(bus, notification_repo, broadcaster)
+    register_notification_handlers(bus, notification_repo, broadcaster, db)
     return bus
 
 

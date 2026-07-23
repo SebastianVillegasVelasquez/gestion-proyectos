@@ -11,6 +11,8 @@ import {
   Copy,
   Pencil,
   Link2,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -292,8 +294,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
   const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
+  const [expandedViewOpen, setExpandedViewOpen] = useState(false);
 
-  const types = typesQuery.data ?? [];
+  const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
   const typeNameById = useMemo(() => {
     const map = new Map<string, string>();
     types.forEach((t) => map.set(t.id, t.nombre));
@@ -315,10 +318,23 @@ export function StructurePanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Fila combinada: TIPOS + botón "Añadir elemento" alineados */}
+      {/* Fila combinada: TIPOS + botón "Añadir elemento" + beta botón alineados */}
       <div className="flex shrink-0 flex-wrap items-center gap-4">
         <NodeTypesBar projectId={projectId} types={types} />
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => {
+              setExpandedViewOpen(true);
+            }}
+            title="Vista expandida de la estructura (beta)"
+            aria-label="Vista expandida de la estructura"
+            className="flex items-center justify-center rounded-lg border border-border bg-card p-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Maximize2 className="size-4" />
+            <span className="ml-1 hidden text-xs font-bold text-amber-600 dark:text-amber-400 sm:inline">
+              BETA
+            </span>
+          </button>
           <button
             onClick={() => {
               openAdd(null);
@@ -417,6 +433,117 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             setCloneSource(null);
           }}
         />
+      )}
+
+      {/* Expanded structure view (beta) */}
+      {expandedViewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div className="flex items-center gap-3">
+                <FolderTree className="size-5 text-brand-blue" />
+                <h2 className="text-lg font-semibold text-foreground">Estructura del Proyecto</h2>
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  BETA
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setExpandedViewOpen(false);
+                }}
+                aria-label="Cerrar"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {tree.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-center">
+                  <div>
+                    <FolderTree className="mx-auto mb-3 size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      No hay elementos en la estructura
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {tree.map((node) => (
+                    <ExpandedTreeNode
+                      key={node.id}
+                      node={node}
+                      depth={0}
+                      typeNameById={typeNameById}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExpandedTreeNode({
+  node,
+  depth,
+  typeNameById,
+}: {
+  node: WorkItemTree;
+  depth: number;
+  typeNameById: Map<string, string>;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const typeName = typeNameById.get(node.tipo_id) ?? "Elemento";
+  const style = tipoStyle(node.tipo_id);
+  const hasChildren = node.children.length > 0;
+
+  return (
+    <div>
+      <div
+        className={cn(
+          "flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
+          depth === 0 && "bg-accent/40",
+        )}
+      >
+        {hasChildren && (
+          <button
+            onClick={() => {
+              setExpanded(!expanded);
+            }}
+            type="button"
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-background"
+          >
+            <ChevronRight className={cn("size-4 transition-transform", expanded && "rotate-90")} />
+          </button>
+        )}
+        {!hasChildren && <div className="w-5" />}
+
+        <div className="flex flex-1 items-start gap-2">
+          <span className={cn("mt-1 inline-block h-2 w-2 rounded-full shrink-0", style.dot)} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-foreground">{node.nombre}</p>
+            <p className="text-xs text-muted-foreground">{typeName}</p>
+          </div>
+        </div>
+      </div>
+
+      {expanded && hasChildren && (
+        <div className="ml-6 border-l border-border/50 py-1">
+          {node.children.map((child) => (
+            <ExpandedTreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              typeNameById={typeNameById}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

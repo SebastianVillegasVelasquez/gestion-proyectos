@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  Moon,
-  Sun,
   Calendar,
   ChevronLeft,
   FolderTree,
-  Users,
-  UsersRound,
   History,
   Layers,
+  Moon,
+  Sun,
+  Users,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,7 +47,7 @@ export function ProjectDetailView({
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12">
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-y-auto p-4 sm:p-6 lg:px-12">
       {/* Encabezado */}
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
@@ -139,7 +139,7 @@ export function ProjectDetailView({
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-col flex-1">
         {tab === "estructura" && <StructurePanel projectId={project.id} />}
         {tab === "integrantes" && <MembersPanel projectId={project.id} />}
         {tab === "equipos" && (

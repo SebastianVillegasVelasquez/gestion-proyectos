@@ -48,3 +48,6 @@ README.md
 
 # Lockfile alternativo (el Dockerfile usa pnpm-lock.yaml)
 package-lock.json
+
+# Mock data
+

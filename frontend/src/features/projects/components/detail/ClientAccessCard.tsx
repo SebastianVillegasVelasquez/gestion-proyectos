@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Share2 } from "lucide-react";
+import { Share2, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useClientAccess, useRegenerateClientAccess } from "../../hooks/use-projects";
 import { ClientAccessFields } from "./ClientAccessFields";
@@ -46,11 +46,23 @@ export function ClientAccessCard({ projectId }: { projectId: string }) {
   return (
     <Card className="shrink-0">
       <CardContent className="flex flex-col gap-3 py-4">
-        <div className="flex items-center gap-2">
-          <Share2 className="size-4 text-brand-blue" />
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Enlace del cliente
-          </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Share2 className="size-4 text-brand-blue" />
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Enlace del cliente
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+            }}
+            aria-label="Cerrar"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
         {accessQuery.isLoading ? (
