@@ -5,6 +5,6 @@ from tests.fixtures.unit.collaborators import *  # noqa: F401, F403
 from tests.fixtures.unit.config import *  # noqa: F401, F403
 from tests.fixtures.unit.dashboard import *  # noqa: F401, F403
 from tests.fixtures.unit.identity import *  # noqa: F401, F403
-from tests.fixtures.unit.notification import *  # noqa: F401, F40
+from tests.fixtures.unit.notification import *  # noqa: F401, F403
 from tests.fixtures.unit.project import *  # noqa: F401, F403
 from tests.fixtures.unit.traceability import *  # noqa: F401, F403

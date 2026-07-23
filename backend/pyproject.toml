@@ -48,6 +48,10 @@ check_untyped_defs = true           # revisa el cuerpo de funciones sin anotar
 # ruidoso para este código (p. ej. ignores defensivos de pydantic-settings).
 exclude = '(^|/)(alembic|tests)/'
 
+[tool.ruff.lint.per-file-ignores]
+# pytest re-exports fixtures via import; test method parameters shadow them (expected)
+"tests/integration/teams/test_workspace_task_link.py" = ["F811"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

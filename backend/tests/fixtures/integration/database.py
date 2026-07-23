@@ -17,6 +17,7 @@ from main import app
 async def setup_test_database():
     import os
     import subprocess
+    import sys
 
     ROOT_DIR = Path(__file__).resolve().parents[3]
 
@@ -34,6 +35,8 @@ async def setup_test_database():
 
     result = subprocess.run(
         [
+            sys.executable,
+            "-m",
             "alembic",
             "-c",
             str(ALEMBIC_INI),
