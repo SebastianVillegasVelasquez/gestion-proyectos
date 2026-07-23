@@ -6,6 +6,8 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   tarea_entregada: "Tarea entregada",
   tarea_rechazada: "Tarea devuelta",
   tarea_atrasada: "Tarea atrasada",
+  tarea_completada: "Tarea aprobada",
+  tarea_devuelta: "Entrega con observaciones",
   proyecto_miembro_agregado: "Agregado a un proyecto",
   proyecto_cerrado: "Proyecto cerrado",
   proyecto_iniciado: "Proyecto iniciado",

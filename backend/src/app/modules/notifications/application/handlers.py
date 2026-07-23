@@ -6,7 +6,12 @@ from app.modules.notifications.infrastructure.enums import NotificationType
 from app.modules.notifications.infrastructure.models import Notification
 from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events.events import MemberAssigned
-from app.shared.events.events import TaskSubmitted, TaskCreated
+from app.shared.events.events import (
+    TaskCompleted,
+    TaskCreated,
+    TaskReturned,
+    TaskSubmitted,
+)
 
 logger = get_logger(__name__)
 
@@ -26,7 +31,7 @@ class NotifyOnTaskSubmitted:
         notification = Notification(
             user_to_id=event.assigned_id,
             notification_type=NotificationType.TAREA_ENTREGADA,
-            message="La tarea ha sido entregada",
+            message="Tu tarea quedó marcada como entregada y está en revisión.",
             payload={
                 "work_item_id": str(event.work_item_id),
                 "task_id": str(event.task_id),
@@ -94,9 +99,71 @@ class NotifyOnTaskCreated:
         notification = Notification(
             user_to_id=event.assigned_id,
             notification_type=NotificationType.TAREA_ASIGNADA,
-            message="Te asignaron una nueva tarea",
+            message="Te asignaron una nueva tarea. Revisa los detalles antes de iniciarla.",
             payload={
                 "work_item_id": str(event.work_item_id),
+                "task_id": str(event.task_id),
+            },
+        )
+        await self._repo.add(notification)
+        try:
+            await self._broadcaster.publish(
+                channel=channel_for(event.assigned_id),
+                message=json.dumps({"type": "notification.new"}),
+            )
+        except Exception:
+            logger.exception(
+                "Error al publicar la notificacion al usuario %s", event.assigned_id
+            )
+
+
+class NotifyOnTaskCompleted:
+    """Aviso al responsable cuando el líder aprueba su entrega."""
+
+    def __init__(
+        self, notification_repo: NotificationRepository, broadcaster: Broadcaster
+    ):
+        self._repo = notification_repo
+        self._broadcaster = broadcaster
+
+    async def __call__(self, event: TaskCompleted) -> None:
+        notification = Notification(
+            user_to_id=event.assigned_id,
+            notification_type=NotificationType.TAREA_COMPLETADA,
+            message="Tu entrega fue aprobada y la tarea quedó completada.",
+            payload={
+                "project_id": str(event.project_id),
+                "task_id": str(event.task_id),
+            },
+        )
+        await self._repo.add(notification)
+        try:
+            await self._broadcaster.publish(
+                channel=channel_for(event.assigned_id),
+                message=json.dumps({"type": "notification.new"}),
+            )
+        except Exception:
+            logger.exception(
+                "Error al publicar la notificacion al usuario %s", event.assigned_id
+            )
+
+
+class NotifyOnTaskReturned:
+    """Aviso al responsable cuando el líder devuelve su entrega para corregir."""
+
+    def __init__(
+        self, notification_repo: NotificationRepository, broadcaster: Broadcaster
+    ):
+        self._repo = notification_repo
+        self._broadcaster = broadcaster
+
+    async def __call__(self, event: TaskReturned) -> None:
+        notification = Notification(
+            user_to_id=event.assigned_id,
+            notification_type=NotificationType.TAREA_DEVUELTA,
+            message="Tu entrega fue devuelta con observaciones. Ajusta lo indicado y vuelve a enviarla.",
+            payload={
+                "project_id": str(event.project_id),
                 "task_id": str(event.task_id),
             },
         )

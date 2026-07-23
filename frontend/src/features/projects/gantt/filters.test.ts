@@ -26,6 +26,7 @@ function filters(over: Partial<GanttFilters> = {}): GanttFilters {
   return {
     statuses: new Set(ALL),
     assigneeId: null,
+    position: null,
     onlyAtRisk: false,
     ...over,
   };
@@ -60,6 +61,26 @@ describe("filterGanttTasks", () => {
     const result = filterGanttTasks(tasks, filters({ onlyAtRisk: true }), today);
     expect(result).toHaveLength(1);
     expect(result[0].due_date).toBe("2026-06-10");
+  });
+
+  it("filters by cargo/position of the assignee", () => {
+    const tasks = [
+      task({ assignee_id: "u1" }),
+      task({ assignee_id: "u2" }),
+      task({ assignee_id: null }), // sin responsable → fuera cuando se filtra por cargo
+    ];
+    const positions = new Map<string, "desarrollador" | "diseñador_grafico">([
+      ["u1", "desarrollador"],
+      ["u2", "diseñador_grafico"],
+    ]);
+    const result = filterGanttTasks(
+      tasks,
+      filters({ position: "desarrollador" }),
+      today,
+      positions,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].assignee_id).toBe("u1");
   });
 
   it("combines filters (AND)", () => {

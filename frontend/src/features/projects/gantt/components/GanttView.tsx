@@ -33,8 +33,8 @@ import {
 import { statusProgressPct, isOverdue, summarize, daysRemaining } from "../metrics";
 import { filterGanttTasks, type GanttFilters } from "../filters";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
-import { TASK_STATUS_LABELS } from "../../types/labels";
-import type { Project, Task, TaskStatus } from "../../types/api.types";
+import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
+import type { Project, Task, TaskStatus, UserPosition, WorkItemTree } from "../../types/api.types";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 
 // Ancho de la columna de etiquetas. Una sola fuente de verdad.
@@ -78,6 +78,42 @@ interface NodeGroup {
 }
 
 const TODAY = new Date().toISOString().slice(0, 10);
+
+/**
+ * Sintetiza tareas placeholder desde work items con fechas plan, para que el
+ * cronograma exista desde que se crea la estructura. Sólo se agregan cuando
+ * el work item NO tiene tareas reales asociadas (evita duplicar filas).
+ * Estas tareas llevan prefijo `wi-` en el id para distinguirlas y no aparecen
+ * en el detalle porque nadie las abre (no llegan del listado real de tareas).
+ */
+function synthesizeFromStructure(tree: WorkItemTree[], realTasks: Task[]): Task[] {
+  const workItemsWithTasks = new Set(realTasks.map((t) => t.work_item_id));
+  const acc: Task[] = [];
+  const now = new Date().toISOString();
+  const visit = (node: WorkItemTree) => {
+    if (node.fecha_inicio_plan && node.fecha_fin_plan && !workItemsWithTasks.has(node.id)) {
+      acc.push({
+        id: `wi-${node.id}`,
+        work_item_id: node.id,
+        parent_task_id: null,
+        title: node.nombre,
+        description: null,
+        priority: "no_definida",
+        assignee_id: null,
+        team_id: null,
+        start_date: node.fecha_inicio_plan,
+        due_date: node.fecha_fin_plan,
+        status: "pendiente_por_iniciar",
+        completed_at: null,
+        created_at: now,
+        updated_at: null,
+      });
+    }
+    node.children.forEach(visit);
+  };
+  tree.forEach(visit);
+  return acc;
+}
 
 function KpiCard({
   icon: Icon,
@@ -129,15 +165,40 @@ export function GanttView({
   const [zoom, setZoom] = useState<Zoom>("semana");
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(() => new Set(LEGEND_STATUSES));
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
 
-  const allTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
-  const filters: GanttFilters = useMemo(
-    () => ({ statuses, assigneeId, onlyAtRisk }),
-    [statuses, assigneeId, onlyAtRisk],
+  const realTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+
+  // Cronograma "desde la estructura": si un work item tiene fechas plan y
+  // aún no tiene tareas reales, sintetizamos una tarea placeholder para que
+  // la línea de tiempo empiece a formarse desde que se crea la estructura.
+  // Las tareas reales dictan el tiempo cuando llegan; estas solo son andamiaje.
+  const syntheticTasks = useMemo<Task[]>(
+    () => synthesizeFromStructure(treeQuery.data ?? [], realTasks),
+    [treeQuery.data, realTasks],
   );
-  const tasks = useMemo(() => filterGanttTasks(allTasks, filters, TODAY), [allTasks, filters]);
+
+  const allTasks = useMemo(() => [...realTasks, ...syntheticTasks], [realTasks, syntheticTasks]);
+
+  // Mapa user_id → cargo, para poder filtrar por responsabilidad.
+  const positionByUser = useMemo(() => {
+    const map = new Map<string, UserPosition>();
+    (membersQuery.data ?? []).forEach((m) => {
+      map.set(m.user_id, m.position as UserPosition);
+    });
+    return map;
+  }, [membersQuery.data]);
+
+  const filters: GanttFilters = useMemo(
+    () => ({ statuses, assigneeId, position, onlyAtRisk }),
+    [statuses, assigneeId, position, onlyAtRisk],
+  );
+  const tasks = useMemo(
+    () => filterGanttTasks(allTasks, filters, TODAY, positionByUser),
+    [allTasks, filters, positionByUser],
+  );
 
   // El rango se calcula sobre TODAS las tareas (no las filtradas): así el eje
   // de tiempo es estable y filtrar no "salta" la escala. Se le agrega aire en
@@ -396,6 +457,23 @@ export function GanttView({
             ))}
           </select>
 
+          {/* Cargo / responsabilidad */}
+          <select
+            className={inputCls}
+            value={position ?? ""}
+            onChange={(e) => {
+              setPosition((e.target.value || null) as UserPosition | null);
+            }}
+            aria-label="Filtrar por responsabilidad"
+          >
+            <option value="">Todas las responsabilidades</option>
+            {Array.from(new Set(Array.from(positionByUser.values()))).map((pos) => (
+              <option key={pos} value={pos}>
+                {USER_POSITION_LABELS[pos] ?? pos}
+              </option>
+            ))}
+          </select>
+
           {/* Solo en riesgo */}
           <button
             type="button"
@@ -456,9 +534,9 @@ export function GanttView({
         <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center dark:border-slate-700">
           <GanttChartSquare className="size-8 text-slate-300 dark:text-slate-600" />
           <p className="text-sm text-slate-400 dark:text-slate-500">
-            No hay tareas con fechas para mostrar en el cronograma.
+            El cronograma se arma solo cuando los elementos de la estructura tienen fechas plan.
             <br />
-            Crea tareas para verlas aquí.
+            Añade fechas a los elementos o crea tareas para verlas aquí.
           </p>
         </div>
       ) : (
@@ -690,6 +768,11 @@ export function GanttView({
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    // Las tareas sintéticas (id `wi-…`) vienen de la estructura,
+                                    // no del listado real, así que no abren el panel de detalle.
+                                    if (task.id.startsWith("wi-")) {
+                                      return;
+                                    }
                                     setSelected(task);
                                   }}
                                   title={[

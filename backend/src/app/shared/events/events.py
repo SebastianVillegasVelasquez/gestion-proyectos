@@ -35,6 +35,24 @@ class TaskCreated(DomainEvent):
 
 
 @dataclass(frozen=True)
+class TaskCompleted(DomainEvent):
+    """El líder aprobó la entrega y marcó la tarea como completada."""
+
+    project_id: uuid.UUID
+    task_id: uuid.UUID
+    assigned_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class TaskReturned(DomainEvent):
+    """El líder devolvió la entrega para que el responsable corrija."""
+
+    project_id: uuid.UUID
+    task_id: uuid.UUID
+    assigned_id: uuid.UUID
+
+
+@dataclass(frozen=True)
 class MemberAssigned(DomainEvent):
     """Un usuario fue agregado como miembro de un proyecto."""
 
