@@ -4,6 +4,7 @@ import {
   Ban,
   CheckCircle2,
   FilePlus2,
+  FolderOpen,
   History,
   type LucideIcon,
   MessageSquare,
@@ -12,7 +13,9 @@ import {
   Send,
   TrendingUp,
   Undo2,
+  User,
   UserPlus,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,9 +25,6 @@ import { useProjectTraceability } from "../../hooks/use-traceability";
 import { TRACE_EVENT_LABELS, filterTraceabilityEvents } from "../../utils/traceability-events";
 import type { TraceabilityEvent, TraceabilityEventKind } from "../../types/api.types";
 
-// Estilo por tipo de evento. El color comunica el significado de un vistazo
-// (verde = entrega/aprobación, rojo = devolución). Los retrasos se pintan en
-// rojo por encima de su tipo (ver más abajo).
 const KIND_META: Record<TraceabilityEventKind, { icon: LucideIcon; dot: string; badge: string }> = {
   creacion: {
     icon: FilePlus2,
@@ -79,10 +79,10 @@ const DELAY_META = {
 };
 
 function formatDateTime(iso: string): string {
-  const [date, time = ""] = iso.split("T");
+  const [date, timePart = ""] = iso.split("T");
   const [year, month, day] = date.split("-");
-  const hhmm = time.slice(0, 5);
-  return hhmm ? `${day}/${month}/${year} · ${hhmm}` : `${day}/${month}/${year}`;
+  const hhmm = timePart.slice(0, 5);
+  return hhmm ? `${day}/${month}/${year} - ${hhmm}` : `${day}/${month}/${year}`;
 }
 
 function SummaryCard({
@@ -121,7 +121,6 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
 
   return (
     <li className="group relative flex gap-3 pb-4 last:pb-0">
-      {/* Punto + línea vertical (la línea se oculta en el último evento) */}
       <div className="relative flex flex-col items-center">
         <span
           className={cn(
@@ -148,10 +147,40 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           {event.task_title}
         </p>
 
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {event.actor_name ?? "Sistema"}
+        {(event.work_item_name ?? event.team_name) && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            {event.work_item_name && (
+              <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                <FolderOpen className="size-3 shrink-0" />
+                {event.work_item_name}
+              </span>
+            )}
+            {event.team_name && (
+              <span className="flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600 dark:bg-violet-900/20 dark:text-violet-300">
+                <UsersRound className="size-2.5 shrink-0" />
+                {event.team_name}
+              </span>
+            )}
+          </div>
+        )}
+
+        <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1">
+            <User className="size-3 shrink-0" />
+            {event.actor_name ?? "Sistema"}
+          </span>
+          {event.assignee_name && event.assignee_name !== event.actor_name && (
+            <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+          )}
+          {event.assignee_name && event.assignee_name !== event.actor_name && (
+            <span className="text-slate-400 dark:text-slate-500">
+              {"responsable: "}
+              {event.assignee_name}
+            </span>
+          )}
           {event.old_status && event.new_status && (
-            <span className="ml-1 inline-flex flex-wrap items-center gap-1 align-middle">
+            <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+              <span className="text-slate-300 dark:text-slate-600">&middot;</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -160,7 +189,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
               >
                 {TASK_STATUS_LABELS[event.old_status]}
               </span>
-              →
+              <span className="text-slate-400">{">"}</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -175,7 +204,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
 
         {event.change_reason && (
           <p className="mt-1 rounded-md bg-slate-50 px-2 py-1 text-xs italic text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            “{event.change_reason}”
+            &ldquo;{event.change_reason}&rdquo;
           </p>
         )}
       </div>
@@ -206,7 +235,6 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Resumen */}
       <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
           icon={History}
@@ -234,10 +262,9 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
         />
       </div>
 
-      {/* Filtro: todos / solo retrasos */}
       <div className="flex shrink-0 items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <History className="size-4 text-brand-teal" /> Línea de tiempo
+          <History className="size-4 text-brand-teal" /> Linea de tiempo
         </h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
@@ -270,22 +297,19 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Timeline */}
       {events.length === 0 ? (
         <EmptyState
           icon={History}
           title="Sin eventos de trazabilidad"
-          hint="Cuando se creen, asignen o entreguen tareas, el historial aparecerá aquí."
+          hint="Cuando se creen, asignen o entreguen tareas, el historial aparecera aqui."
         />
       ) : visible.length === 0 ? (
         <EmptyState
           icon={AlertTriangle}
           title="Sin retrasos"
-          hint="No hay eventos de retraso en este proyecto. ¡Buen ritmo!"
+          hint="No hay eventos de retraso en este proyecto."
         />
       ) : (
-        // max-w acota el ancho de lectura: en pantallas anchas el texto de cada
-        // evento no se estira de borde a borde (patrón de feed tipo Linear/Jira).
         <ol className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
           {visible.map((event) => (
             <TimelineEvent key={event.id} event={event} />

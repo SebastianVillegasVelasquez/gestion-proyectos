@@ -5,6 +5,7 @@ import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_PRIORITY_LABELS } from "..
 import type { Task, TaskStatus } from "../../types/api.types";
 import { useChangeTaskStatus, useProjectTasks, useTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
+import { useTeams } from "../../hooks/use-teams";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
 
@@ -51,7 +52,15 @@ export function TaskDetailPanel({
   const depsQuery = useTaskDependencies(task.id);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId);
+  const teamsQuery = useTeams();
   const { user } = useAuth();
+
+  const teamName = useMemo(() => {
+    if (!task.team_id) {
+      return null;
+    }
+    return (teamsQuery.data?.items ?? []).find((t) => t.id === task.team_id)?.name ?? null;
+  }, [task.team_id, teamsQuery.data]);
 
   const titleById = useMemo(() => {
     const map = new Map<string, string>();
@@ -125,6 +134,14 @@ export function TaskDetailPanel({
               {TASK_PRIORITY_LABELS[task.priority]}
             </dd>
           </div>
+          {teamName && (
+            <div className="col-span-2">
+              <dt className="text-xs text-slate-400">Equipo delegado</dt>
+              <dd className="mt-0.5 w-fit rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                {teamName}
+              </dd>
+            </div>
+          )}
         </dl>
 
         {/* Acciones de flujo — sólo visibles para responsable o líder. El admin

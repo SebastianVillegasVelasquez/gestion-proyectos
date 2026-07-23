@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree } from "../../hooks/use-structure";
 import { useProjectTasks } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
+import { useTeams } from "../../hooks/use-teams";
 import {
   computeRange,
   padRange,
@@ -159,7 +160,14 @@ export function GanttView({
   const treeQuery = useWorkTree(project.id);
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
+  const teamsQuery = useTeams();
   const [selected, setSelected] = useState<Task | null>(null);
+
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    (teamsQuery.data?.items ?? []).forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teamsQuery.data]);
 
   // Estado de filtros, zoom y grupos colapsados.
   const [zoom, setZoom] = useState<Zoom>("semana");
@@ -725,6 +733,7 @@ export function GanttView({
                           const assignee = task.assignee_id
                             ? assignees.get(task.assignee_id)
                             : null;
+                          const teamLabel = task.team_id ? teamNameById.get(task.team_id) : null;
                           const barLeft = pctToPx(metrics.offsetPct);
                           const barW = Math.max(10, pctToPx(metrics.widthPct));
                           const days =
@@ -749,9 +758,16 @@ export function GanttView({
                                     STATUS_DOT[task.status],
                                   )}
                                 />
-                                <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300">
-                                  {task.title}
-                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs text-slate-600 dark:text-slate-300">
+                                    {task.title}
+                                  </p>
+                                  {teamLabel && (
+                                    <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
+                                      {teamLabel}
+                                    </p>
+                                  )}
+                                </div>
                                 <span
                                   title={assignee?.name ?? "Sin responsable"}
                                   className={cn(
@@ -777,10 +793,13 @@ export function GanttView({
                                   }}
                                   title={[
                                     task.title,
+                                    teamLabel ? `Equipo: ${teamLabel}` : null,
                                     assignee?.name ?? "Sin responsable",
                                     `${task.start_date} → ${task.due_date}`,
                                     `${TASK_STATUS_LABELS[task.status]} · ${progress}%`,
-                                  ].join("\n")}
+                                  ]
+                                    .filter(Boolean)
+                                    .join("\n")}
                                   className={cn(
                                     "absolute top-1/2 h-[18px] -translate-y-1/2 overflow-hidden rounded-[5px] text-left shadow-sm outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-brand-gold",
                                     STATUS_BAR_SOFT[task.status],

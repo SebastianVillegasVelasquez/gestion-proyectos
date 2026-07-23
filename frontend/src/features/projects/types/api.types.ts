@@ -305,6 +305,10 @@ export interface TraceabilityEvent {
   created_at: string;
   kind: TraceabilityEventKind;
   is_delay: boolean;
+  // Contexto adicional del evento (el backend puede omitirlos; el frontend los muestra si existen).
+  work_item_name?: string | null;
+  team_name?: string | null;
+  assignee_name?: string | null;
 }
 
 export interface TraceabilitySummary {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router";
-import { ListTodo, Package, Settings, Users2, X } from "lucide-react";
+import { ListTodo, Package, Settings, Settings2, Users2, UsersRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -509,14 +509,63 @@ function MemberWorkspace() {
   );
 }
 
+// ── Vista con tabs para roles privilegiados ──────────────────────────────────
+// Admin/super_admin/developer acceden tanto a la gestión de equipos como a su
+// propio espacio de trabajo (pueden pertenecer a equipos como cualquier miembro).
+
+type AdminTab = "gestion" | "mis-equipos";
+
+function AdminWorkspace() {
+  const [tab, setTab] = useState<AdminTab>("gestion");
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
+        <button
+          type="button"
+          onClick={() => {
+            setTab("gestion");
+          }}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors",
+            tab === "gestion"
+              ? "border-brand-gold text-brand-gold"
+              : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+          )}
+        >
+          <Settings2 className="size-3.5" /> Administrar equipos
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTab("mis-equipos");
+          }}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors",
+            tab === "mis-equipos"
+              ? "border-brand-gold text-brand-gold"
+              : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+          )}
+        >
+          <UsersRound className="size-3.5" /> Mis equipos
+        </button>
+      </div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="absolute inset-0 flex flex-col">
+          {tab === "gestion" ? <TeamsManagementPage /> : <MemberWorkspace />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dispatcher por rol ───────────────────────────────────────────────────────
-// Para administración, /workspace es una consola de gestión de equipos; para el
-// resto de roles, es su espacio de trabajo (entregables y revisiones).
+// Para administración/developer, /workspace muestra gestión + mis equipos con tabs.
+// Para el resto de roles, es su espacio de trabajo personal.
 
 export function WorkspacePage() {
   const { hasRole } = useAuth();
-  if (hasRole([Role.ADMIN, Role.SUPER_ADMIN])) {
-    return <TeamsManagementPage />;
+  if (hasRole([Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER])) {
+    return <AdminWorkspace />;
   }
   return <MemberWorkspace />;
 }

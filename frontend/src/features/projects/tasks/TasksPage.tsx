@@ -6,6 +6,7 @@ import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useProject } from "../hooks/use-projects";
 import { useProjectTasks } from "../hooks/use-tasks";
 import { useDirectory } from "../hooks/use-members";
+import { useTeams } from "../hooks/use-teams";
 import { TASK_STATUS_LABELS } from "../types/labels";
 import type { Task, TaskStatus } from "../types/api.types";
 import { CreateTaskModal } from "./CreateTaskModal";
@@ -47,10 +48,12 @@ function isOverdue(task: Task): boolean {
 function TaskCard({
   task,
   assignee,
+  teamName,
   onClick,
 }: {
   task: Task;
   assignee: string | undefined;
+  teamName: string | undefined;
   onClick: () => void;
 }) {
   const overdue = isOverdue(task);
@@ -73,6 +76,11 @@ function TaskCard({
         </span>
         {assignee && <span className="ml-auto truncate">{assignee}</span>}
       </div>
+      {teamName && (
+        <span className="w-fit rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+          {teamName}
+        </span>
+      )}
       {task.status !== STATUS_COLUMN[task.status] && (
         <span className="w-fit rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
           {TASK_STATUS_LABELS[task.status]}
@@ -89,6 +97,7 @@ export function TasksPage() {
   const projectQuery = useProject(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const directoryQuery = useDirectory();
+  const teamsQuery = useTeams();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<Task | null>(null);
@@ -100,6 +109,12 @@ export function TasksPage() {
     (directoryQuery.data ?? []).forEach((u) => map.set(u.id, `${u.name} ${u.last_name}`));
     return map;
   }, [directoryQuery.data]);
+
+  const teamName = useMemo(() => {
+    const map = new Map<string, string>();
+    (teamsQuery.data?.items ?? []).forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teamsQuery.data]);
 
   const byColumn = useMemo(() => {
     const groups = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.id, []]));
@@ -183,6 +198,7 @@ export function TasksPage() {
                         key={task.id}
                         task={task}
                         assignee={task.assignee_id ? assigneeName.get(task.assignee_id) : undefined}
+                        teamName={task.team_id ? teamName.get(task.team_id) : undefined}
                         onClick={() => {
                           setSelected(task);
                         }}
