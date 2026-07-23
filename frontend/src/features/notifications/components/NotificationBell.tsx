@@ -34,6 +34,8 @@ const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   tarea_entregada: CheckCircle2,
   tarea_rechazada: Undo2,
   tarea_atrasada: AlertTriangle,
+  tarea_completada: CheckCircle2,
+  tarea_devuelta: Undo2,
   proyecto_miembro_agregado: FolderKanban,
   proyecto_cerrado: FolderKanban,
   proyecto_iniciado: FolderKanban,
@@ -52,6 +54,8 @@ const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   tarea_entregada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   tarea_rechazada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
   tarea_atrasada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
+  tarea_completada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
+  tarea_devuelta: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
   proyecto_miembro_agregado:
     "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
   proyecto_cerrado: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",

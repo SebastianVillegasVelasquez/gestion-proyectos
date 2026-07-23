@@ -5,6 +5,8 @@ from starlette import status
 
 from app.core.dependencies import (
     event_bus_dependency,
+    get_current_user,
+    project_members_repo_dependency,
     project_repo_dependency,
     require_role,
     task_repo_dependency,
@@ -150,10 +152,13 @@ async def change_task_status(
     task_id: UUID,
     payload: UpdateTaskStatusRequest,
     bus: EventBus = Depends(event_bus_dependency),
-    _=Depends(_any_user),
+    current_user=Depends(get_current_user),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
+    member_repo=Depends(project_members_repo_dependency),
 ):
-    return await ChangeTaskStatusUseCase(task_repo, work_tree_repo, bus).execute(
-        task_id, payload
-    )
+    """El responsable entrega y el líder aprueba o devuelve. Ver
+    `ChangeTaskStatusUseCase` para el detalle del flujo."""
+    return await ChangeTaskStatusUseCase(
+        task_repo, work_tree_repo, member_repo, bus
+    ).execute(task_id, payload, current_user_id=current_user.id)
