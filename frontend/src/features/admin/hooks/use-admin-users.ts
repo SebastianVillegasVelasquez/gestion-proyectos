@@ -4,6 +4,7 @@ import {
   type AdminUser,
   type AdminUsersParams,
   type CreateUserPayload,
+  type UpdateUserChanges,
 } from "../api/users.api";
 
 const adminUserKeys = {
@@ -34,10 +35,8 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: {
-      user: AdminUser;
-      changes: Partial<Pick<AdminUser, "role" | "is_active">>;
-    }) => adminUsersApi.update(vars.user, vars.changes),
+    mutationFn: (vars: { user: AdminUser; changes: UpdateUserChanges }) =>
+      adminUsersApi.update(vars.user, vars.changes),
     onSuccess: () => qc.invalidateQueries({ queryKey: adminUserKeys.all }),
   });
 }
