@@ -47,7 +47,7 @@ export function ProjectDetailView({
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden p-4 sm:p-5">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-10">
       {/* Encabezado */}
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
@@ -59,10 +59,10 @@ export function ProjectDetailView({
             <ChevronLeft className="size-3.5" />
             Proyectos
           </button>
-          <h1 className="truncate text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">
             {project.name}
           </h1>
-          <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
+          <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[15px] text-muted-foreground">
             <Calendar className="size-4" />
             <span>
               {formatDate(project.start_date)} → {formatDate(project.end_date)}
@@ -92,14 +92,14 @@ export function ProjectDetailView({
       <Card className="shrink-0 rounded-2xl">
         <CardContent className="flex flex-col gap-3 py-5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground">Progreso general</span>
-            <span className="text-xl font-extrabold text-brand-gold-dark dark:text-brand-gold tabular-nums">
+            <span className="text-[15px] font-medium text-foreground">Progreso general</span>
+            <span className="text-xl font-semibold tabular-nums text-brand-blue-dark dark:text-brand-blue">
               {progress}%
             </span>
           </div>
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-accent">
             <div
-              className="h-full rounded-full bg-brand-gold transition-all"
+              className="h-full rounded-full bg-brand-blue transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -110,7 +110,7 @@ export function ProjectDetailView({
       <ClientAccessCard projectId={project.id} />
 
       {/* Tabs: Estructura | Integrantes | Equipos | Progreso por equipo | Trazabilidad */}
-      <div className="flex shrink-0 gap-6 overflow-x-auto border-b border-border px-1">
+      <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-b border-border px-1">
         {(
           [
             { id: "estructura", label: "Estructura", icon: FolderTree },
@@ -127,10 +127,10 @@ export function ProjectDetailView({
               setTab(id);
             }}
             className={cn(
-              "-mb-px flex shrink-0 items-center gap-2 whitespace-nowrap border-b-[2.5px] py-3.5 text-sm transition-colors",
+              "-mb-px flex items-center gap-2 border-b-[2.5px] py-3 text-[15px] transition-colors",
               tab === id
-                ? "border-brand-gold font-bold text-brand-gold-dark dark:text-brand-gold"
-                : "border-transparent font-semibold text-muted-foreground hover:text-foreground",
+                ? "border-brand-blue font-semibold text-brand-blue-dark dark:text-brand-blue"
+                : "border-transparent font-medium text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="size-4" />
