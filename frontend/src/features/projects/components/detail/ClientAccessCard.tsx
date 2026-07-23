@@ -17,16 +17,14 @@ export function ClientAccessCard({ projectId }: { projectId: string }) {
   if (!open) {
     return (
       <Card className="shrink-0">
-        <CardContent className="flex items-center justify-between gap-3 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
+        <CardContent className="flex items-center justify-between gap-4 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue">
               <Share2 className="size-4" />
             </span>
             <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                Compartir con el cliente
-              </p>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-[15px] font-medium text-foreground">Compartir con el cliente</p>
+              <p className="text-[13px] text-muted-foreground">
                 Enlace de solo lectura con el avance del proyecto
               </p>
             </div>
@@ -36,7 +34,7 @@ export function ClientAccessCard({ projectId }: { projectId: string }) {
             onClick={() => {
               setOpen(true);
             }}
-            className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+            className="shrink-0 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
           >
             Obtener enlace
           </button>
@@ -49,7 +47,7 @@ export function ClientAccessCard({ projectId }: { projectId: string }) {
     <Card className="shrink-0">
       <CardContent className="flex flex-col gap-3 py-4">
         <div className="flex items-center gap-2">
-          <Share2 className="size-4 text-brand-teal" />
+          <Share2 className="size-4 text-brand-blue" />
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
             Enlace del cliente
           </p>

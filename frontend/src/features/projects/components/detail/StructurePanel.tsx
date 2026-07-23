@@ -89,10 +89,10 @@ function TreeNode({
 
   const nameSize =
     depth === 0
-      ? "text-[15px] font-bold text-foreground"
+      ? "text-[15.5px] font-semibold text-foreground"
       : depth === 1
-        ? "text-[14.5px] font-semibold text-foreground/90"
-        : "text-sm font-medium text-foreground/80";
+        ? "text-[15px] font-medium text-foreground/90"
+        : "text-[14.5px] font-medium text-foreground/80";
 
   return (
     <div
@@ -152,7 +152,7 @@ function TreeNode({
                 onAddChild(node);
               }}
               title="Añadir un elemento dentro de este"
-              className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-brand-gold-dark"
+              className="rounded-md p-1 text-muted-foreground hover:bg-brand-blue/10 hover:text-brand-blue-dark"
             >
               <Plus className="size-3.5" />
             </button>
@@ -260,7 +260,7 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
             }}
             onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="Ej. Fase"
-            className="w-24 rounded-full border border-border bg-background px-3 py-1 text-[12.5px] outline-none focus:border-brand-gold"
+            className="w-24 rounded-full border border-border bg-background px-3 py-1 text-[12.5px] outline-none focus:border-brand-blue"
           />
           <button
             onClick={add}
@@ -314,9 +314,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Fila combinada: TIPOS + botón "Añadir elemento" alineados */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-4">
         <NodeTypesBar projectId={projectId} types={types} />
         <div className="ml-auto">
           <button
@@ -324,7 +324,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               openAdd(null);
             }}
             disabled={types.length === 0}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="size-4" /> Añadir elemento
           </button>
@@ -332,9 +332,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       </div>
 
       {treeQuery.isLoading ? (
-        <div className="h-32 animate-pulse rounded-2xl bg-accent" />
+        <div className="min-h-[400px] flex-1 animate-pulse rounded-2xl bg-accent" />
       ) : tree.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card py-12 text-center">
+        <div className="flex min-h-[400px] flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
           <FolderTree className="size-8 text-muted-foreground" />
           <div>
             <p className="text-sm font-semibold text-foreground">Aún no hay estructura</p>
@@ -346,8 +346,8 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           </div>
         </div>
       ) : (
-        <Card className="overflow-hidden rounded-2xl">
-          <CardContent className="flex flex-col p-0">
+        <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+          <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
             {tree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode

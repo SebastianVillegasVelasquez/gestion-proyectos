@@ -22,6 +22,10 @@
   --brand-teal-light: #e8f4f7; /* Fondos info, badges info         */
   --brand-teal-dark: #2d7d8c; /* Hover teal                        */
 
+  --brand-blue: #4f7cc4; /* Botones primarios, progreso, acciones */
+  --brand-blue-light: #eaf0fa; /* Fondos hover, badges azules      */
+  --brand-blue-dark: #3960a3; /* Hover y estado activo             */
+
   --brand-red: #c4573a; /* Destructivo, riesgo alto, alertas      */
   --brand-red-light: #faeae6; /* Fondos danger                     */
   --brand-red-dark: #9e3f28; /* Hover danger                       */
@@ -87,6 +91,8 @@
   --brand-teal-light: #1a2e31; /* fondo badge teal en dark   */
   --brand-red: #d4705a; /* aclarado desde #c4573a     */
   --brand-red-light: #2e1a16; /* fondo badge rojo en dark   */
+  --brand-blue: #7fa2dd; /* aclarado desde #4f7cc4     */
+  --brand-blue-light: #1a2338; /* fondo badge azul en dark   */
   /* gold y gold-dark NO cambian */
 
   /* --- Tokens semánticos shadcn (modo oscuro) --- */
@@ -168,6 +174,9 @@
   --color-brand-red: var(--brand-red);
   --color-brand-red-light: var(--brand-red-light);
   --color-brand-red-dark: var(--brand-red-dark);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-light: var(--brand-blue-light);
+  --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-black: var(--brand-black);
   --color-brand-surface: var(--brand-surface);
   --color-brand-muted: var(--brand-muted);
