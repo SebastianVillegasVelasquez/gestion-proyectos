@@ -6,7 +6,10 @@ from starlette import status
 
 from app.modules.project.domain.client_access import generate_client_token
 from app.modules.project.infrastructure.models import Project, ProjectMember
-from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.modules.project.infrastructure.repository import (
+    ProjectMemberRepository,
+    ProjectRepository,
+)
 from app.modules.project.presentation.schemas import (
     ClientAccessResponse,
     CreateProjectRequest,
@@ -27,7 +30,8 @@ class ProjectService:
         # Enlace del cliente listo desde la creación: no hay que "activarlo" aparte.
         project.client_access_token = generate_client_token()
         persisted = await self.repo.save(project)
-        return self._to_response(persisted)
+        # Nuevo proyecto: aún no hay tareas, así que el progreso es 0.
+        return self._to_response(persisted, progress_pct=0.0)
 
     async def get_client_access(self, project_id: UUID) -> ClientAccessResponse:
         project = await self._get_active(project_id)
@@ -49,17 +53,32 @@ class ProjectService:
 
     async def get_all_projects(self) -> List[ProjectResponse]:
         projects = await self.repo.get_all()
-        return [self._to_response(p) for p in projects]
+        # Progreso derivado de tareas en un solo query (evita N+1).
+        progress = await self._progress_map([p.id for p in projects])
+        return [
+            self._to_response(p, progress_pct=progress.get(p.id, 0.0)) for p in projects
+        ]
 
     async def get_project_by_id(self, project_id: UUID) -> ProjectResponse:
-        return self._to_response(await self._get_active(project_id))
+        project = await self._get_active(project_id)
+        progress = await self._progress_map([project.id])
+        return self._to_response(project, progress_pct=progress.get(project.id, 0.0))
 
     async def update_project(
         self, project_id: UUID, data: UpdateProjectRequest
     ) -> ProjectResponse:
         project = await self._get_active(project_id)
         updated = await self.repo.patch(project, data.model_dump(exclude_unset=True))
-        return self._to_response(updated)
+        progress = await self._progress_map([updated.id])
+        return self._to_response(updated, progress_pct=progress.get(updated.id, 0.0))
+
+    async def _progress_map(self, project_ids: list[UUID]) -> dict[UUID, float]:
+        """Batch: pide el progreso de todos los proyectos al ProjectRepository.
+        Si el repo inyectado no lo soporta (tests con doubles), devuelve {}.
+        """
+        if not project_ids or not isinstance(self.repo, ProjectRepository):
+            return {}
+        return await self.repo.get_progress_map(project_ids)
 
     async def delete_project(self, project_id: UUID) -> None:
         project = await self._get_active(project_id)
@@ -75,7 +94,17 @@ class ProjectService:
         return project
 
     @staticmethod
-    def _to_response(project: Project) -> ProjectResponse:
+    def _to_response(
+        project: Project, progress_pct: float | None = None
+    ) -> ProjectResponse:
+        # progress_pct viene derivado de tareas: la columna almacenada quedó
+        # como legado y no se actualiza. Si no se pasa (p. ej. desde tests que
+        # llaman helpers viejos), caemos al valor guardado.
+        pct = (
+            progress_pct
+            if progress_pct is not None
+            else float(getattr(project, "progress_pct", 0.0) or 0.0)
+        )
         return ProjectResponse(
             id=project.id,
             name=project.name,
@@ -83,7 +112,7 @@ class ProjectService:
             client_name=project.client_name or "",
             start_date=project.start_date,
             end_date=project.end_date,
-            progress_pct=getattr(project, "progress_pct", 0.0),
+            progress_pct=pct,
         )
 
 
