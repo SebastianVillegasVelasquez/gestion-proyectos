@@ -61,7 +61,10 @@ class TestNotificationUseCases:
         notif = notifications[0]
         assert str(notif.user_to_id) == assignee_id
         assert notif.notification_type == NotificationType.TAREA_ASIGNADA
-        assert notif.message == "Te asignaron una nueva tarea"
+        assert (
+            notif.message
+            == "Te asignaron una nueva tarea. Revisa los detalles antes de iniciarla."
+        )
         assert notif.payload == {
             "work_item_id": str(work_item["id"]),
             "task_id": str(task.json()["id"]),
