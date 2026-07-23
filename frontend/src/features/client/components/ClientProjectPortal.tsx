@@ -1,13 +1,7 @@
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
-import {
-  AlertTriangle,
-  CalendarClock,
-  CheckCircle2,
-  FolderKanban,
-  Loader2,
-  ListTodo,
-} from "lucide-react";
+import { FolderKanban, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { portalApi, type PublicProjectProgress } from "../api/portal.api";
 
@@ -26,30 +20,82 @@ const STATUS_META: Record<PublicProjectProgress["status"], { label: string; badg
   },
 };
 
-function Stat({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof ListTodo;
-  label: string;
-  value: number;
-  tone: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", tone)}>
-        <Icon className="size-5" />
-      </div>
-      <div>
-        <p className="text-2xl font-semibold leading-none text-slate-900 dark:text-slate-50">
-          {value}
-        </p>
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{label}</p>
-      </div>
-    </div>
-  );
+/** Arma la narrativa que "escribe" la IA a partir de los datos reales del proyecto. */
+function buildSummary(data: PublicProjectProgress): string {
+  const progress = Math.round(data.progress_pct);
+  const parts: string[] = [];
+
+  // Apertura contextual según el avance.
+  if (progress === 0) {
+    parts.push(
+      `El proyecto “${data.name}” está en su fase inicial: aún no se ha registrado avance sobre las tareas planificadas.`,
+    );
+  } else if (progress < 25) {
+    parts.push(
+      `El proyecto “${data.name}” está arrancando: llevamos un ${progress}% completado y el equipo se encuentra sentando las bases.`,
+    );
+  } else if (progress < 60) {
+    parts.push(
+      `El proyecto “${data.name}” avanza a buen ritmo con un ${progress}% completado; ya hay resultados tangibles y el trabajo continúa.`,
+    );
+  } else if (progress < 90) {
+    parts.push(
+      `El proyecto “${data.name}” se encuentra en una etapa avanzada, con un ${progress}% completado. El cierre está cada vez más cerca.`,
+    );
+  } else if (progress < 100) {
+    parts.push(
+      `El proyecto “${data.name}” está prácticamente terminado: hemos alcanzado un ${progress}% y solo quedan los últimos detalles.`,
+    );
+  } else {
+    parts.push(
+      `El proyecto “${data.name}” está completado al 100%. Todas las tareas planificadas han cerrado con éxito.`,
+    );
+  }
+
+  // Segunda frase: estado global.
+  const statusPhrase: Record<PublicProjectProgress["status"], string> = {
+    active: "El equipo trabaja según lo planeado y no hay bloqueos relevantes en este momento.",
+    "in-review": "Actualmente hay entregables en revisión y se están validando antes de continuar.",
+    "at-risk":
+      "Se han detectado señales que requieren atención y el equipo está trabajando para retomar el rumbo previsto.",
+  };
+  parts.push(statusPhrase[data.status]);
+
+  // Cierre con la persona responsable.
+  if (data.coordinator) {
+    parts.push(
+      `${data.coordinator} lidera esta iniciativa y es el punto de contacto directo con el equipo.`,
+    );
+  }
+
+  parts.push("Este resumen se actualiza automáticamente conforme el equipo registra los avances.");
+
+  return parts.join(" ");
+}
+
+/** Efecto typewriter: revela `text` carácter a carácter (~55 wpm). */
+function useStreamingText(text: string, charsPerTick = 4, tickMs = 22): string {
+  const [shown, setShown] = useState("");
+
+  useEffect(() => {
+    setShown("");
+    if (!text) {
+      return;
+    }
+    let i = 0;
+    const id = window.setInterval(() => {
+      i = Math.min(i + charsPerTick, text.length);
+      setShown(text.slice(0, i));
+      if (i >= text.length) {
+        window.clearInterval(id);
+      }
+    }, tickMs);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [text, charsPerTick, tickMs]);
+
+  return shown;
 }
 
 export function ClientProjectPortal() {
@@ -115,13 +161,18 @@ function Portal({ data }: { data: PublicProjectProgress }) {
   const status = STATUS_META[data.status];
   const progress = Math.round(data.progress_pct);
 
+  // Simulación de IA: la narrativa se computa una vez y se revela en streaming.
+  const summary = useMemo(() => buildSummary(data), [data]);
+  const streamed = useStreamingText(summary);
+  const isStreaming = streamed.length < summary.length;
+
   return (
     <>
-      {/* Encabezado del proyecto */}
+      {/* Encabezado del proyecto + avance general */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
               {data.name}
             </h1>
             {(data.client_name ?? data.coordinator) && (
@@ -139,58 +190,48 @@ function Portal({ data }: { data: PublicProjectProgress }) {
           </span>
         </div>
 
-        {/* Barra de avance general */}
         <div className="mt-6">
           <div className="mb-1.5 flex items-baseline justify-between">
             <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
               Avance general
             </span>
-            <span className="text-2xl font-bold text-brand-gold-dark dark:text-brand-gold">
+            <span className="text-2xl font-semibold text-brand-blue-dark dark:text-brand-blue tabular-nums">
               {progress}%
             </span>
           </div>
           <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-brand-gold transition-all duration-500"
+              className="h-full rounded-full bg-brand-blue transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-            {data.tasks_completed} de {data.tasks_total} tareas completadas
-          </p>
         </div>
       </section>
 
-      {/* Desglose por estado */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          icon={CheckCircle2}
-          label="Completadas"
-          value={data.tasks_completed}
-          tone="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300"
-        />
-        <Stat
-          icon={Loader2}
-          label="En revisión"
-          value={data.tasks_in_review}
-          tone="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300"
-        />
-        <Stat
-          icon={ListTodo}
-          label="Por hacer"
-          value={data.tasks_pending}
-          tone="bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-        />
-        <Stat
-          icon={data.tasks_overdue > 0 ? AlertTriangle : CalendarClock}
-          label="Vencidas"
-          value={data.tasks_overdue}
-          tone={
-            data.tasks_overdue > 0
-              ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300"
-              : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-          }
-        />
+      {/* Resumen "generado" por IA con efecto streaming */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+            <Sparkles className="size-4" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Resumen automático
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              Redactado a partir del estado actual del proyecto
+            </p>
+          </div>
+        </div>
+        <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
+          {streamed}
+          {isStreaming && (
+            <span
+              aria-hidden
+              className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-brand-blue"
+            />
+          )}
+        </p>
       </section>
     </>
   );

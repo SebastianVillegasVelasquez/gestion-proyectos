@@ -47,7 +47,9 @@ describe("ClientProjectPortal", () => {
     expect(await screen.findByText("Diplomado en Analítica")).toBeInTheDocument();
     expect(screen.getByText("40%")).toBeInTheDocument();
     expect(screen.getByText("En marcha")).toBeInTheDocument();
-    expect(screen.getByText("4 de 10 tareas completadas")).toBeInTheDocument();
+    // El nuevo portal sólo muestra Avance general + resumen automático (sin
+    // desglose de tareas). Verificamos que la sección del resumen esté presente.
+    expect(screen.getByText("Resumen automático")).toBeInTheDocument();
   });
 
   it("shows a friendly error when the token is invalid", async () => {

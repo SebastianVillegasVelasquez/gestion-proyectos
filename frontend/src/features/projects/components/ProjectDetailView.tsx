@@ -47,7 +47,7 @@ export function ProjectDetailView({
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-10">
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12">
       {/* Encabezado */}
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
