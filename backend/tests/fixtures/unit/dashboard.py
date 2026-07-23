@@ -47,6 +47,11 @@ class FakeDashboardRepository(DashboardRepository):
     ) -> ProjectProgressDetail | None:
         return self._project_progress
 
+    async def get_project_progress_by_token(
+        self, token: str
+    ) -> ProjectProgressDetail | None:
+        return self._project_progress
+
 
 @pytest.fixture
 def build_fake_dashboard_repo():

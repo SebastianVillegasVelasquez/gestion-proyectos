@@ -34,6 +34,35 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_by_team(self, team_id: UUID) -> list[tuple]:
+        """Tareas delegadas a un equipo, con nombre de módulo, proyecto y responsable.
+
+        Read model del workspace: devuelve filas
+        (Task, work_item_name, project_id, project_name, assignee_name) para
+        agrupar por módulo sin pedir el árbol del proyecto. LEFT JOIN al usuario
+        porque el responsable es opcional (tarea aún sin asignar).
+        """
+        from app.modules.identity.infrastructure.models import User
+        from app.modules.project.infrastructure.models import Project
+        from sqlalchemy import func
+
+        query = (
+            select(
+                Task,
+                WorkItem.nombre.label("work_item_name"),
+                Project.id.label("project_id"),
+                Project.name.label("project_name"),
+                func.concat(User.name, " ", User.last_name).label("assignee_name"),
+            )
+            .join(WorkItem, Task.work_item_id == WorkItem.id)
+            .join(Project, WorkItem.proyecto_id == Project.id)
+            .outerjoin(User, Task.assignee_id == User.id)
+            .where(Task.team_id == team_id, Task.deleted_at.is_(None))
+            .order_by(WorkItem.orden, Task.start_date)
+        )
+        # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
+        return [tuple(r) for r in (await self._session.execute(query)).all()]
+
     async def get_dependencies(self, task_id: UUID) -> list[TaskDependency]:
         query = (
             select(TaskDependency)

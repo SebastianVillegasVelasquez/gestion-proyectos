@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router";
-import { Package, Settings, Users2, X } from "lucide-react";
+import { ListTodo, Package, Settings, Settings2, Users2, UsersRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -10,10 +10,12 @@ import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/Asy
 import type { CommentType, DeliverableVersion, WorkspaceMember } from "../types";
 import { TEAM_ROLE_LABELS } from "../types";
 import { WorkspaceHeader } from "./WorkspaceHeader";
+import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
 import { DeliverableDetailView } from "./DeliverableDetailView";
 import { FeedbackThread } from "./FeedbackThread";
 import { mapDeliverable, mapMember } from "../utils/adapters";
+import type { ApiTeamTask } from "../api/workspace.api";
 import {
   useAddComment,
   useAddVersion,
@@ -21,12 +23,14 @@ import {
   useDeliverables,
   useMyTeams,
   useTeamMembers,
+  useTeamTasks,
   useWorkspaceAccess,
 } from "../hooks/use-workspace";
 
-type WorkspaceTab = "entregables" | "configuracion";
+type WorkspaceTab = "tareas" | "entregables" | "configuracion";
 
 const TABS: { id: WorkspaceTab; label: string; Icon: React.ElementType }[] = [
+  { id: "tareas", label: "Tareas del equipo", Icon: ListTodo },
   { id: "entregables", label: "Entregables y Revisiones", Icon: Package },
   { id: "configuracion", label: "Configuración del Grupo", Icon: Settings },
 ];
@@ -107,17 +111,35 @@ function GroupSettings({
 
 function NewDeliverableModal({
   members,
+  tasks,
   pending,
   onCreate,
   onClose,
 }: {
   members: WorkspaceMember[];
+  // Tareas del equipo abiertas (aún no completadas) para elegir opcionalmente:
+  // así el entregable queda enganchado y aprobar/rechazar mueve la tarea real.
+  tasks: ApiTeamTask[];
   pending: boolean;
-  onCreate: (taskTitle: string, assigneeId: string) => void;
+  onCreate: (taskTitle: string, assigneeId: string, taskId: string | null) => void;
   onClose: () => void;
 }) {
+  const [taskId, setTaskId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [assigneeId, setAssigneeId] = useState(members[0]?.id ?? "");
+
+  // Al elegir una tarea real, autorrellenamos título y responsable. Si el usuario
+  // los edita después, respetamos su valor (no sobreescribimos en cada render).
+  const selectTask = (id: string) => {
+    setTaskId(id);
+    const t = tasks.find((x) => x.id === id);
+    if (t) {
+      setTitle(t.title);
+      if (t.assignee_id) {
+        setAssigneeId(t.assignee_id);
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
@@ -139,14 +161,39 @@ function NewDeliverableModal({
           onSubmit={(e) => {
             e.preventDefault();
             if (title.trim()) {
-              onCreate(title.trim(), assigneeId);
+              onCreate(title.trim(), assigneeId, taskId || null);
             }
           }}
           className="mt-5 space-y-4"
         >
+          {tasks.length > 0 && (
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Tarea del proyecto
+              </label>
+              <select
+                value={taskId}
+                onChange={(e) => {
+                  selectTask(e.target.value);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="">Sin vincular (entrega suelta)</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.work_item_name} · {t.title}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                Al aprobar o rechazar, se actualiza la tarea vinculada y queda en la trazabilidad
+                del proyecto.
+              </p>
+            </div>
+          )}
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Tarea entregada *
+              Título del entregable *
             </label>
             <input
               type="text"
@@ -227,7 +274,7 @@ function MemberWorkspace() {
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("entregables");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("tareas");
   const [showNew, setShowNew] = useState(false);
 
   // El equipo activo: el seleccionado o el primero disponible.
@@ -237,9 +284,19 @@ function MemberWorkspace() {
   const membersQuery = useTeamMembers(activeTeamId);
   const accessQuery = useWorkspaceAccess(activeTeamId);
   const deliverablesQuery = useDeliverables(activeTeamId);
+  const tasksQuery = useTeamTasks(activeTeamId);
 
   const members = (membersQuery.data ?? []).map(mapMember);
   const deliverables = (deliverablesQuery.data ?? []).map(mapDeliverable);
+  // Al abrir "Nuevo entregable" solo ofrecemos tareas abiertas y aún NO
+  // vinculadas — evita que dos entregables apunten a la misma Task (el
+  // backend además rechaza el duplicado con un índice único parcial).
+  const linkableTasks = useMemo(() => {
+    const linked = new Set((deliverablesQuery.data ?? []).map((d) => d.task_id).filter(Boolean));
+    return (tasksQuery.data ?? []).filter(
+      (t) => t.status !== "completada" && t.status !== "cancelada" && !linked.has(t.id),
+    );
+  }, [deliverablesQuery.data, tasksQuery.data]);
   const access = accessQuery.data;
   const canDeliver = access?.can_deliver ?? false;
   const canReview = access?.can_review ?? false;
@@ -254,7 +311,7 @@ function MemberWorkspace() {
   const handleSwitchTeam = (id: string) => {
     setSelectedTeamId(id);
     setSelectedDeliverableId(null);
-    setActiveTab("entregables");
+    setActiveTab("tareas");
   };
 
   const handleAddVersion = (version: Omit<DeliverableVersion, "id" | "versionNumber">) => {
@@ -274,9 +331,9 @@ function MemberWorkspace() {
     addComment.mutate({ deliverableId: selectedDeliverable.id, body: { content, type, mentions } });
   };
 
-  const handleCreate = (taskTitle: string, assigneeId: string) => {
+  const handleCreate = (taskTitle: string, assigneeId: string, taskId: string | null) => {
     createDeliverable.mutate(
-      { task_title: taskTitle, assignee_id: assigneeId },
+      { task_title: taskTitle, assignee_id: assigneeId, task_id: taskId },
       {
         onSuccess: (d) => {
           setSelectedDeliverableId(d.id);
@@ -374,6 +431,12 @@ function MemberWorkspace() {
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
+          {activeTab === "tareas" && (
+            <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+              <TeamTasksView teamId={activeTeam.id} />
+            </div>
+          )}
+
           {activeTab === "entregables" && (
             <>
               <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
@@ -434,6 +497,7 @@ function MemberWorkspace() {
       {showNew && (
         <NewDeliverableModal
           members={members}
+          tasks={linkableTasks}
           pending={createDeliverable.isPending}
           onCreate={handleCreate}
           onClose={() => {
@@ -445,14 +509,63 @@ function MemberWorkspace() {
   );
 }
 
+// ── Vista con tabs para roles privilegiados ──────────────────────────────────
+// Admin/super_admin/developer acceden tanto a la gestión de equipos como a su
+// propio espacio de trabajo (pueden pertenecer a equipos como cualquier miembro).
+
+type AdminTab = "gestion" | "mis-equipos";
+
+function AdminWorkspace() {
+  const [tab, setTab] = useState<AdminTab>("gestion");
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
+        <button
+          type="button"
+          onClick={() => {
+            setTab("gestion");
+          }}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors",
+            tab === "gestion"
+              ? "border-brand-gold text-brand-gold"
+              : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+          )}
+        >
+          <Settings2 className="size-3.5" /> Administrar equipos
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTab("mis-equipos");
+          }}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors",
+            tab === "mis-equipos"
+              ? "border-brand-gold text-brand-gold"
+              : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+          )}
+        >
+          <UsersRound className="size-3.5" /> Mis equipos
+        </button>
+      </div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="absolute inset-0 flex flex-col">
+          {tab === "gestion" ? <TeamsManagementPage /> : <MemberWorkspace />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dispatcher por rol ───────────────────────────────────────────────────────
-// Para administración, /workspace es una consola de gestión de equipos; para el
-// resto de roles, es su espacio de trabajo (entregables y revisiones).
+// Para administración/developer, /workspace muestra gestión + mis equipos con tabs.
+// Para el resto de roles, es su espacio de trabajo personal.
 
 export function WorkspacePage() {
   const { hasRole } = useAuth();
-  if (hasRole([Role.ADMIN, Role.SUPER_ADMIN])) {
-    return <TeamsManagementPage />;
+  if (hasRole([Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER])) {
+    return <AdminWorkspace />;
   }
   return <MemberWorkspace />;
 }

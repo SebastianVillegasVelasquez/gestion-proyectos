@@ -48,6 +48,8 @@ describe("NOTIFICATION_TYPE_LABELS", () => {
       "tarea_entregada",
       "tarea_rechazada",
       "tarea_atrasada",
+      "tarea_completada",
+      "tarea_devuelta",
       "proyecto_miembro_agregado",
       "proyecto_cerrado",
       "proyecto_iniciado",

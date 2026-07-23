@@ -1,0 +1,26 @@
+import http from "@/lib/http";
+
+// Estado agregado del proyecto para el cliente (espejo de PublicProjectProgressResponse
+// del backend). Sin `id` ni tareas individuales: el cliente solo ve el avance.
+export type ProjectStatus = "active" | "at-risk" | "in-review";
+
+export interface PublicProjectProgress {
+  name: string;
+  client_name: string | null;
+  coordinator: string | null;
+  status: ProjectStatus;
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_in_review: number;
+  tasks_overdue: number;
+  tasks_pending: number;
+  progress_pct: number;
+}
+
+// Endpoint PÚBLICO: no requiere sesión. El token de la ruta es la credencial.
+// Reutiliza el cliente http compartido (si no hay token de sesión, no manda
+// Authorization; un 404 no dispara el flujo de refresh).
+export const portalApi = {
+  getProgress: (token: string) =>
+    http.get<PublicProjectProgress>(`/public/projects/${token}`).then((r) => r.data),
+};

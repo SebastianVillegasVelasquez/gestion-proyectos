@@ -16,8 +16,8 @@ def fake_create_project_request() -> CreateProjectRequest:
         name="Sistema de Gestión de Proyectos",
         description="Aplicación para administrar proyectos, tareas y miembros del equipo.",
         client_name="Acme Corporation",
-        start_date=date.today() + timedelta(days=1),
-        end_date=date.today() + timedelta(days=180),
+        start_date=date.today() - timedelta(days=30),
+        end_date=date.today() + timedelta(days=150),
     )
 
 
@@ -27,8 +27,8 @@ def valid_project_payload() -> dict:
         "name": "Test Project",
         "description": "This is a test project",
         "client_name": "Test Client",
-        "start_date": "2026-07-01",
-        "end_date": "2026-12-31",
+        "start_date": (date.today() - timedelta(days=30)).isoformat(),
+        "end_date": (date.today() + timedelta(days=150)).isoformat(),
     }
 
 

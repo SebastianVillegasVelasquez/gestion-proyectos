@@ -1,16 +1,44 @@
 from app.modules.notifications.application.handlers import (
-    NotifyOnMemberAssigned,
+    NotifyOnMemberAssignedToProject,
+    NotifyOnTaskCompleted,
+    NotifyOnTaskCreated,
+    NotifyOnTaskReturned,
     NotifyOnTaskSubmitted,
+    RecordTaskCompletionInTraceability,
+    RecordTaskCreationInTraceability,
+    RecordTaskReturnInTraceability,
+    RecordTaskSubmissionInTraceability,
 )
 from app.modules.notifications.domain.repository import NotificationRepository
-from app.modules.project.domain.events import MemberAssigned
-from app.modules.tasks.domain.events import TaskSubmitted
+from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events import EventBus
+from app.shared.events.events import (
+    MemberAssigned,
+    TaskCompleted,
+    TaskCreated,
+    TaskReturned,
+    TaskSubmitted,
+)
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def register_notification_handlers(
     bus: EventBus,
     notification_repo: NotificationRepository,
+    broadcaster: Broadcaster,
+    db: AsyncSession,
 ) -> None:
-    bus.subscribe(MemberAssigned, NotifyOnMemberAssigned(notification_repo))
-    bus.subscribe(TaskSubmitted, NotifyOnTaskSubmitted(notification_repo))
+    # Notification handlers
+    bus.subscribe(
+        MemberAssigned, NotifyOnMemberAssignedToProject(notification_repo, broadcaster)
+    )
+    bus.subscribe(TaskSubmitted, NotifyOnTaskSubmitted(notification_repo, broadcaster))
+    bus.subscribe(TaskCreated, NotifyOnTaskCreated(notification_repo, broadcaster))
+    bus.subscribe(TaskCompleted, NotifyOnTaskCompleted(notification_repo, broadcaster))
+    bus.subscribe(TaskReturned, NotifyOnTaskReturned(notification_repo, broadcaster))
+
+    # Traceability handlers (record task actions in history)
+    bus.subscribe(TaskCreated, RecordTaskCreationInTraceability(db))
+    bus.subscribe(TaskSubmitted, RecordTaskSubmissionInTraceability(db))
+    bus.subscribe(TaskCompleted, RecordTaskCompletionInTraceability(db))
+    bus.subscribe(TaskReturned, RecordTaskReturnInTraceability(db))

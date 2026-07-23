@@ -184,10 +184,9 @@ export function FeedbackWidget() {
           setOpen(true);
         }}
         aria-label="Abrir feedback"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-brand-gold px-4 py-3 text-sm font-semibold text-brand-black shadow-lg transition hover:bg-brand-gold-dark active:scale-95"
+        className="fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full bg-brand-gold p-3 text-brand-black shadow-lg transition hover:bg-brand-gold-dark active:scale-95"
       >
         <MessageSquarePlus className="size-5" />
-        <span className="hidden sm:inline">Feedback</span>
       </button>
 
       {open && (

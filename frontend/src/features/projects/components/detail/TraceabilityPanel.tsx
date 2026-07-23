@@ -4,16 +4,18 @@ import {
   Ban,
   CheckCircle2,
   FilePlus2,
+  FolderOpen,
   History,
   type LucideIcon,
   MessageSquare,
   Play,
   RefreshCw,
   Send,
-  Sparkles,
   TrendingUp,
   Undo2,
+  User,
   UserPlus,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,12 +23,8 @@ import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/Asy
 import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
 import { useProjectTraceability } from "../../hooks/use-traceability";
 import { TRACE_EVENT_LABELS, filterTraceabilityEvents } from "../../utils/traceability-events";
-import { MOCK_TRACEABILITY } from "../../utils/traceability-mock";
 import type { TraceabilityEvent, TraceabilityEventKind } from "../../types/api.types";
 
-// Estilo por tipo de evento. El color comunica el significado de un vistazo
-// (verde = entrega/aprobación, rojo = devolución). Los retrasos se pintan en
-// rojo por encima de su tipo (ver más abajo).
 const KIND_META: Record<TraceabilityEventKind, { icon: LucideIcon; dot: string; badge: string }> = {
   creacion: {
     icon: FilePlus2,
@@ -81,10 +79,10 @@ const DELAY_META = {
 };
 
 function formatDateTime(iso: string): string {
-  const [date, time = ""] = iso.split("T");
+  const [date, timePart = ""] = iso.split("T");
   const [year, month, day] = date.split("-");
-  const hhmm = time.slice(0, 5);
-  return hhmm ? `${day}/${month}/${year} · ${hhmm}` : `${day}/${month}/${year}`;
+  const hhmm = timePart.slice(0, 5);
+  return hhmm ? `${day}/${month}/${year} - ${hhmm}` : `${day}/${month}/${year}`;
 }
 
 function SummaryCard({
@@ -122,8 +120,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
   const badge = event.is_delay ? DELAY_META.badge : meta.badge;
 
   return (
-    <li className="relative flex gap-3 pb-4 last:pb-0">
-      {/* Punto + línea vertical */}
+    <li className="group relative flex gap-3 pb-4 last:pb-0">
       <div className="relative flex flex-col items-center">
         <span
           className={cn(
@@ -133,7 +130,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
         >
           <Icon className="size-3.5" />
         </span>
-        <span className="absolute top-7 h-full w-px bg-slate-200 dark:bg-slate-700" />
+        <span className="absolute top-7 h-full w-px bg-slate-200 group-last:hidden dark:bg-slate-700" />
       </div>
 
       <div className="min-w-0 flex-1 pb-1">
@@ -150,10 +147,40 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           {event.task_title}
         </p>
 
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {event.actor_name ?? "Sistema"}
+        {(event.work_item_name ?? event.team_name) && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            {event.work_item_name && (
+              <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                <FolderOpen className="size-3 shrink-0" />
+                {event.work_item_name}
+              </span>
+            )}
+            {event.team_name && (
+              <span className="flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600 dark:bg-violet-900/20 dark:text-violet-300">
+                <UsersRound className="size-2.5 shrink-0" />
+                {event.team_name}
+              </span>
+            )}
+          </div>
+        )}
+
+        <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1">
+            <User className="size-3 shrink-0" />
+            {event.actor_name ?? "Sistema"}
+          </span>
+          {event.assignee_name && event.assignee_name !== event.actor_name && (
+            <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+          )}
+          {event.assignee_name && event.assignee_name !== event.actor_name && (
+            <span className="text-slate-400 dark:text-slate-500">
+              {"responsable: "}
+              {event.assignee_name}
+            </span>
+          )}
           {event.old_status && event.new_status && (
-            <span className="ml-1 inline-flex flex-wrap items-center gap-1 align-middle">
+            <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+              <span className="text-slate-300 dark:text-slate-600">&middot;</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -162,7 +189,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
               >
                 {TASK_STATUS_LABELS[event.old_status]}
               </span>
-              →
+              <span className="text-slate-400">{">"}</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -177,7 +204,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
 
         {event.change_reason && (
           <p className="mt-1 rounded-md bg-slate-50 px-2 py-1 text-xs italic text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            “{event.change_reason}”
+            &ldquo;{event.change_reason}&rdquo;
           </p>
         )}
       </div>
@@ -188,19 +215,15 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
 export function TraceabilityPanel({ projectId }: { projectId: string }) {
   const query = useProjectTraceability(projectId);
   const [onlyDelays, setOnlyDelays] = useState(false);
-  // Vista previa con datos de ejemplo (no reales) para validar el diseño antes
-  // de que la base de datos tenga historial real.
-  const [preview, setPreview] = useState(false);
 
-  const source = preview ? MOCK_TRACEABILITY : query.data;
-  const events = useMemo(() => source?.events ?? [], [source]);
+  const events = useMemo(() => query.data?.events ?? [], [query.data]);
   const visible = useMemo(() => filterTraceabilityEvents(events, onlyDelays), [events, onlyDelays]);
-  const summary = source?.summary;
+  const summary = query.data?.summary;
 
-  if (!preview && query.isLoading) {
+  if (query.isLoading) {
     return <LoadingSkeleton rows={5} />;
   }
-  if (!preview && query.isError) {
+  if (query.isError) {
     return (
       <ErrorState
         title="No se pudo cargar la trazabilidad"
@@ -212,26 +235,6 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Aviso de datos de ejemplo */}
-      {preview && (
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          <Sparkles className="size-4 shrink-0" />
-          <span className="flex-1">
-            Estás viendo <strong>datos de ejemplo</strong> (no reales) para previsualizar el diseño.
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setPreview(false);
-            }}
-            className="shrink-0 font-medium underline-offset-2 hover:underline"
-          >
-            Salir del ejemplo
-          </button>
-        </div>
-      )}
-
-      {/* Resumen */}
       <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
           icon={History}
@@ -259,27 +262,11 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
         />
       </div>
 
-      {/* Filtro: todos / solo retrasos */}
       <div className="flex shrink-0 items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <History className="size-4 text-brand-teal" /> Línea de tiempo
+          <History className="size-4 text-brand-teal" /> Linea de tiempo
         </h2>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setPreview((p) => !p);
-            }}
-            aria-pressed={preview}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-colors",
-              preview
-                ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
-                : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
-            )}
-          >
-            <Sparkles className="size-3.5" /> Datos de ejemplo
-          </button>
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
             {(
               [
@@ -310,32 +297,20 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Timeline */}
       {events.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-          <EmptyState
-            icon={History}
-            title="Sin eventos de trazabilidad"
-            hint="Cuando se creen, asignen o entreguen tareas, el historial aparecerá aquí."
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setPreview(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
-          >
-            <Sparkles className="size-3.5" /> Ver datos de ejemplo
-          </button>
-        </div>
+        <EmptyState
+          icon={History}
+          title="Sin eventos de trazabilidad"
+          hint="Cuando se creen, asignen o entreguen tareas, el historial aparecera aqui."
+        />
       ) : visible.length === 0 ? (
         <EmptyState
           icon={AlertTriangle}
           title="Sin retrasos"
-          hint="No hay eventos de retraso en este proyecto. ¡Buen ritmo!"
+          hint="No hay eventos de retraso en este proyecto."
         />
       ) : (
-        <ol className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <ol className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
           {visible.map((event) => (
             <TimelineEvent key={event.id} event={event} />
           ))}

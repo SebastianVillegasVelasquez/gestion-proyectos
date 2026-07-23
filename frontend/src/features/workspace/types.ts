@@ -89,6 +89,9 @@ export interface Deliverable {
   id: string;
   taskTitle: string;
   assigneeId: string;
+  // Fase 2: `taskId` (opcional) engancha el entregable a una Task real; al
+  // aprobar/rechazar aquí se mueve el estado de la tarea y queda en trazabilidad.
+  taskId: string | null;
   status: DeliverableStatus;
   versions: DeliverableVersion[];
   comments: FeedbackComment[];

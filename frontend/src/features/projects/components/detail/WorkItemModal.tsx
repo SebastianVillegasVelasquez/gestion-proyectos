@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, CalendarRange, Clock, Hourglass, CornerDownRight } from "lucide-react";
+import { X, CalendarRange, Clock, Hourglass, CornerDownRight, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreateWorkItem, useUpdateWorkItem } from "../../hooks/use-structure";
 import type { DuracionUnidad, TipoNodo, WorkItemTree } from "../../types/api.types";
@@ -19,7 +19,7 @@ const MODES: { id: DateMode; label: string; hint: string; icon: typeof Clock }[]
   {
     id: "solo_dur",
     label: "Solo duración",
-    hint: "Hereda del padre o predecesor",
+    hint: "Toma las fechas del elemento que lo contiene o del anterior",
     icon: CornerDownRight,
   },
   { id: "fechas", label: "Fechas exactas", hint: "Inicio y fin", icon: CalendarRange },
@@ -119,11 +119,11 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
   async function submit() {
     setError(null);
     if (nombre.trim().length < 1) {
-      setError("Ponle un nombre al nodo.");
+      setError("Ponle un nombre al elemento.");
       return;
     }
     if (!tipoId) {
-      setError("Elige un tipo de nodo.");
+      setError("Elige un tipo de elemento.");
       return;
     }
     const dates = buildDates();
@@ -144,7 +144,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
       }
       onClose();
     } catch {
-      setError("No se pudo guardar el nodo. Revisa los datos e inténtalo de nuevo.");
+      setError("No se pudo guardar el elemento. Revisa los datos e inténtalo de nuevo.");
     }
   }
 
@@ -154,14 +154,14 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-              {isEdit ? "Editar nodo" : "Nuevo nodo"}
+              {isEdit ? "Editar elemento" : "Nuevo elemento"}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-500">
               {isEdit
                 ? `Editando “${editItem!.nombre}”`
                 : parent
                   ? `Dentro de “${parent.nombre}”`
-                  : "En la raíz del proyecto"}
+                  : "En el nivel principal del proyecto"}
             </p>
           </div>
           <button
@@ -183,19 +183,19 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                   setNombre(e.target.value);
                 }}
                 placeholder="Ej. Módulo 1 — Fundamentos"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-gold/25"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-blue/25"
               />
             </label>
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Tipo de nodo
+                Tipo de elemento
               </span>
               <select
                 value={tipoId}
                 onChange={(e) => {
                   setTipoId(e.target.value);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 {nodeTypes.length === 0 && <option value="">Crea un tipo primero</option>}
                 {nodeTypes.map((t) => (
@@ -204,6 +204,10 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                   </option>
                 ))}
               </select>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                Categoría dentro de tu proyecto (p. ej. Módulo, Curso, Fase, Tema). La creas y
+                nombras tú desde la fila de <span className="font-medium">Tipos</span>.
+              </span>
             </label>
           </div>
 
@@ -225,14 +229,14 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                     className={cn(
                       "flex items-start gap-2 rounded-xl border px-3 py-2 text-left transition-all",
                       active
-                        ? "border-brand-gold bg-brand-gold-light ring-2 ring-brand-gold/30"
+                        ? "border-brand-blue bg-brand-blue/10 ring-2 ring-brand-blue/30"
                         : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800",
                     )}
                   >
                     <Icon
                       className={cn(
                         "mt-0.5 size-4",
-                        active ? "text-brand-gold-dark dark:text-brand-gold" : "text-slate-400",
+                        active ? "text-brand-blue-dark dark:text-brand-blue" : "text-slate-400",
                       )}
                     />
                     <span className="flex flex-col">
@@ -240,7 +244,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                         className={cn(
                           "text-xs font-semibold",
                           active
-                            ? "text-brand-gold-dark dark:text-brand-gold"
+                            ? "text-brand-blue-dark dark:text-brand-blue"
                             : "text-slate-700 dark:text-slate-200",
                         )}
                       >
@@ -316,17 +320,32 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
             )}
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2">
+          {/* Nota: las tareas del elemento pueden tener fechas fuera de este rango */}
+          <div className="flex items-start gap-2 rounded-lg border border-brand-blue/25 bg-brand-blue/5 px-3 py-2 text-[12px] text-foreground/80">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-brand-blue" />
+            <p>
+              Estas fechas planifican el <span className="font-medium">elemento</span>. Las tareas
+              que crees dentro pueden tener sus propias fechas y no se limitan a este rango — sirven
+              como referencia, no como tope.
+            </p>
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-2">
             <input
               type="checkbox"
               checked={esTransversal}
               onChange={(e) => {
                 setEsTransversal(e.target.checked);
               }}
-              className="size-4 rounded border-slate-300 text-brand-gold focus:ring-brand-gold"
+              className="mt-0.5 size-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
             />
-            <span className="text-xs text-slate-600 dark:text-slate-300">
-              Frente transversal (continuo, no ligado a un entregable)
+            <span className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
+              <span className="font-medium text-foreground">Frente transversal</span>
+              <span className="text-[11px] text-muted-foreground">
+                Trabajo continuo que acompaña al proyecto sin un entregable puntual (p. ej. QA,
+                soporte, coordinación). No se le marca un fin porque avanza en paralelo a los demás
+                elementos y no bloquea a los que dependen de él.
+              </span>
             </span>
           </label>
 
@@ -347,9 +366,9 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
           <button
             onClick={submit}
             disabled={pending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
+            className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark disabled:opacity-60"
           >
-            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear nodo"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear elemento"}
           </button>
         </footer>
       </div>

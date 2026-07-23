@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
+from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team
 from app.modules.teams.infrastructure.workspace_models import (
@@ -87,3 +89,26 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def add_comment(self, comment: DeliverableComment) -> DeliverableComment: ...
+
+    # ── Puerto hacia el mundo Task (Fase 2) ──────────────────────────────────
+    # No expone la API de tareas: solo las 3 operaciones que el workspace
+    # necesita para engancharse a la trazabilidad (SRP), y en la misma
+    # transacción (consistencia entre entregable y estado de la tarea).
+
+    @abstractmethod
+    async def get_task(self, task_id: UUID) -> Task | None: ...
+
+    @abstractmethod
+    async def transition_task(
+        self,
+        task: Task,
+        new_status: TaskStatus,
+        actor_id: UUID,
+        change_reason: str | None = None,
+    ) -> Task:
+        """Cambia el estado de la tarea Y escribe TaskHistory en un solo paso.
+
+        Idempotente: si la tarea ya está en `new_status`, no re-escribe historial
+        ni toca `completed_at`. Esto evita que reentregas o clics dobles inflen
+        la trazabilidad.
+        """

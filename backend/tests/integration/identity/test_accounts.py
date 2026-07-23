@@ -1,8 +1,3 @@
-"""E2E de gestión de cuentas: contraseñas, creación con rol, registro seguro y
-listado paginado para administración.
-"""
-
-
 async def _login(client, email, password):
     return await client.post(
         "/api/v1/identity/auth/login",

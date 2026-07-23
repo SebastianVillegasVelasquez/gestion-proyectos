@@ -3,7 +3,6 @@ from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.models import WorkItem
-from app.modules.tasks.domain.events import TaskSubmitted
 from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
@@ -15,12 +14,26 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
+    TeamTaskItemResponse,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
-from app.shared.exceptions import NotFoundError
+from app.shared.events.events import (
+    TaskCompleted,
+    TaskCreated,
+    TaskReturned,
+    TaskSubmitted,
+)
+from app.shared.exceptions import ForbiddenError, NotFoundError
+
+# Roles del proyecto que pueden aprobar o devolver una entrega.
+_REVIEW_ROLES = {ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR}
+# Estado que sólo el revisor puede fijar.
+_REVIEW_TARGET_STATUSES = {TaskStatus.COMPLETADA, TaskStatus.DEVUELTA}
 
 
 async def _get_work_item(repo: WorkTreeRepository, work_item_id: UUID) -> WorkItem:
@@ -31,18 +44,18 @@ async def _get_work_item(repo: WorkTreeRepository, work_item_id: UUID) -> WorkIt
 
 
 class CreateTaskUseCase:
-    """Crea una tarea que cuelga de un WorkItem (cualquier nivel del árbol)."""
-
     def __init__(
         self,
         task_repo: TaskRepository,
         work_tree_repo: WorkTreeRepository,
         user_repo: Repository,
+        bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
         self.work_tree_repo = work_tree_repo
         self.user_repo = user_repo
         self.service = TaskService(task_repo)
+        self._bus = bus
 
     async def execute(self, data: CreateTaskRequest) -> TaskResponse:
         await _get_work_item(self.work_tree_repo, data.work_item_id)
@@ -52,11 +65,32 @@ class CreateTaskUseCase:
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
+        # Fase 3: si la nueva tarea cuelga de otra (líder repartiendo subtareas
+        # de una tarea general del equipo) y no se envía team_id explícito,
+        # hereda el del padre. Así aparece en `GET /teams/{id}/tasks` sin pedir
+        # al frontend que replique la relación.
+        if data.parent_task_id is not None and data.team_id is None:
+            parent = await self.task_repo.get_by_id(data.parent_task_id)
+            if parent is None or parent.is_deleted:
+                raise NotFoundError("La tarea padre no existe")
+            data.team_id = parent.team_id
+
         created = await self.service.add_task(data)
         if data.depends_on_id is not None:
             await TaskDependencyService(self.task_repo).add_dependency(
                 created.id, data.depends_on_id
             )
+
+        if self._bus:
+            await self._bus.publish(
+                TaskCreated(
+                    task_id=created.id,
+                    work_item_id=data.work_item_id,
+                    assigned_id=data.assignee_id,  # type: ignore
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+
         return created
 
 
@@ -70,6 +104,38 @@ class GetTasksByProjectUseCase:
         if not project or project.is_deleted:
             raise NotFoundError("El proyecto no existe")
         return await self.service.get_tasks_by_project(project_id)
+
+
+class GetTasksByTeamUseCase:
+    """Tareas delegadas a un equipo (read model del espacio de trabajo).
+
+    Devuelve cada tarea con su módulo, proyecto y responsable ya resueltos, para
+    que el workspace las agrupe por módulo ("Módulo 1", …) sin pedir el árbol.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, team_id: UUID) -> list[TeamTaskItemResponse]:
+        rows = await self.task_repo.get_by_team(team_id)
+        return [
+            TeamTaskItemResponse(
+                id=task.id,
+                title=task.title,
+                status=task.status or TaskStatus.PENDIENTE_POR_INICIAR,
+                priority=task.priority,
+                work_item_id=task.work_item_id,
+                work_item_name=work_item_name,
+                project_id=project_id,
+                project_name=project_name,
+                assignee_id=task.assignee_id,
+                assignee_name=assignee_name,
+                parent_task_id=task.parent_task_id,
+                start_date=task.start_date,
+                due_date=task.due_date,
+            )
+            for task, work_item_name, project_id, project_name, assignee_name in rows
+        ]
 
 
 class GetTasksByWorkItemUseCase:
@@ -130,31 +196,120 @@ class GetTaskDependenciesUseCase:
 
 
 class ChangeTaskStatusUseCase:
+    """Cambia el estado de una tarea con el flujo:
+
+    * El responsable puede mover PENDIENTE → EN_PROGRESO → EN_REVISION (entrega).
+    * El líder/supervisor del proyecto puede mover EN_REVISION → COMPLETADA
+      (aprobar) o EN_REVISION → DEVUELTA (regresarla para corrección).
+    * Cualquier otra combinación queda prohibida — evita que un admin o un
+      tercero pise el estado sin ver el avance real.
+
+    Requiere `member_repo` para consultar el rol del usuario en el proyecto.
+    """
+
     def __init__(
         self,
         task_repo: TaskRepository,
         work_tree_repo: WorkTreeRepository,
+        member_repo: ProjectMemberRepository | None = None,
         bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
         self.work_tree_repo = work_tree_repo
+        self.member_repo = member_repo
         self.service = TaskStatusService(task_repo)
         self._bus = bus
 
     async def execute(
-        self, task_id: UUID, data: UpdateTaskStatusRequest
+        self,
+        task_id: UUID,
+        data: UpdateTaskStatusRequest,
+        current_user_id: UUID | None = None,
     ) -> TaskResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        work_item = await self.work_tree_repo.get_item(task.work_item_id)
+        assert work_item is not None, "La tarea debe colgar de un nodo existente"
+        project_id = work_item.proyecto_id
+
+        # Autorización: quién puede pedir qué transición.
+        if current_user_id is not None:
+            await self._authorize(
+                current_user_id=current_user_id,
+                assignee_id=task.assignee_id,
+                project_id=project_id,
+                new_status=data.status,
+            )
+
         new_status = await self.service.change_status(task_id, data)
         assert new_status.assignee_id, "El usuario asignado debe de existir"
-        if self._bus and new_status.status == TaskStatus.EN_REVISION:
-            work_item = await self.work_tree_repo.get_item(new_status.work_item_id)
-            assert work_item is not None, "La tarea debe colgar de un nodo existente"
-            await self._bus.publish(
+
+        if self._bus:
+            await self._emit_status_event(new_status, data.status, project_id)
+        return new_status
+
+    async def _authorize(
+        self,
+        current_user_id: UUID,
+        assignee_id: UUID | None,
+        project_id: UUID,
+        new_status: TaskStatus,
+    ) -> None:
+        # El responsable puede entregar o retomar; nunca autoaprobarse.
+        is_assignee = assignee_id is not None and assignee_id == current_user_id
+        if new_status not in _REVIEW_TARGET_STATUSES and is_assignee:
+            return
+
+        # Sólo el líder/supervisor del proyecto puede aprobar o devolver.
+        if self.member_repo is None:
+            raise ForbiddenError("No puedes cambiar el estado de esta tarea")
+        member = await self.member_repo.get_member_by_project_id_and_user_id(
+            project_id=project_id, user_id=current_user_id
+        )
+        if (
+            member is None
+            or member.is_deleted
+            or member.project_role not in _REVIEW_ROLES
+        ):
+            raise ForbiddenError(
+                "Sólo el responsable puede entregar y sólo el líder/supervisor "
+                "puede aprobar o devolver la entrega."
+            )
+
+    async def _emit_status_event(
+        self,
+        task: TaskResponse,
+        new_status: TaskStatus,
+        project_id: UUID,
+    ) -> None:
+        assert task.assignee_id is not None
+        now = datetime.now(timezone.utc)
+        if new_status == TaskStatus.EN_REVISION:
+            await self._bus.publish(  # type: ignore[union-attr]
                 TaskSubmitted(
-                    task_id=new_status.id,
-                    project_id=work_item.proyecto_id,
-                    assigned_id=new_status.assignee_id,
-                    occurred_at=datetime.now(timezone.utc),
+                    task_id=task.id,
+                    work_item_id=project_id,
+                    assigned_id=task.assignee_id,
+                    occurred_at=now,
                 )
             )
-        return new_status
+        elif new_status == TaskStatus.COMPLETADA:
+            await self._bus.publish(  # type: ignore[union-attr]
+                TaskCompleted(
+                    task_id=task.id,
+                    project_id=project_id,
+                    assigned_id=task.assignee_id,
+                    occurred_at=now,
+                )
+            )
+        elif new_status == TaskStatus.DEVUELTA:
+            await self._bus.publish(  # type: ignore[union-attr]
+                TaskReturned(
+                    task_id=task.id,
+                    project_id=project_id,
+                    assigned_id=task.assignee_id,
+                    occurred_at=now,
+                )
+            )

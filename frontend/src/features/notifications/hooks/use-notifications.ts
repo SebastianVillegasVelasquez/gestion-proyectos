@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "../api/notifications.api";
+import type { PaginatedNotifications, UnreadCount } from "../types";
 
 export const notificationKeys = {
   all: ["notifications"] as const,
@@ -35,23 +36,91 @@ export function useNotifications(enabled: boolean) {
   });
 }
 
-function useInvalidateNotifications() {
-  const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: notificationKeys.all });
+// Snapshot del cache antes de una mutación optimista, para poder revertir
+// si el servidor falla (patrón "optimistic update" de React Query).
+interface CacheSnapshot {
+  list: PaginatedNotifications | undefined;
+  unread: UnreadCount | undefined;
 }
 
+function snapshot(qc: QueryClient): CacheSnapshot {
+  return {
+    list: qc.getQueryData<PaginatedNotifications>(notificationKeys.list()),
+    unread: qc.getQueryData<UnreadCount>(notificationKeys.unread()),
+  };
+}
+
+function restore(qc: QueryClient, snap: CacheSnapshot | undefined) {
+  if (!snap) {
+    return;
+  }
+  qc.setQueryData(notificationKeys.list(), snap.list);
+  qc.setQueryData(notificationKeys.unread(), snap.unread);
+}
+
+/**
+ * Marca todas como leídas con actualización optimista: el cache se modifica
+ * al instante (UI inmediata) y solo se revierte si el servidor responde error.
+ */
 export function useMarkAllRead() {
-  const invalidate = useInvalidateNotifications();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: notificationsApi.markAllAsRead,
-    onSuccess: invalidate,
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: notificationKeys.all });
+      const snap = snapshot(qc);
+      qc.setQueryData<PaginatedNotifications>(
+        notificationKeys.list(),
+        (old) =>
+          old && {
+            ...old,
+            unread_count: 0,
+            items: old.items.map((n) =>
+              n.is_read ? n : { ...n, is_read: true, read_at: new Date().toISOString() },
+            ),
+          },
+      );
+      qc.setQueryData<UnreadCount>(notificationKeys.unread(), { unread_count: 0 });
+      return snap;
+    },
+    onError: (_err, _vars, snap) => {
+      restore(qc, snap);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
   });
 }
 
+/** Marca una notificación como leída, también de forma optimista. */
 export function useMarkRead() {
-  const invalidate = useInvalidateNotifications();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => notificationsApi.markAsRead(id),
-    onSuccess: invalidate,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: notificationKeys.all });
+      const snap = snapshot(qc);
+      const wasUnread = snap.list?.items.some((n) => n.id === id && !n.is_read) ?? true;
+      qc.setQueryData<PaginatedNotifications>(
+        notificationKeys.list(),
+        (old) =>
+          old && {
+            ...old,
+            unread_count: wasUnread ? Math.max(0, old.unread_count - 1) : old.unread_count,
+            items: old.items.map((n) =>
+              n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n,
+            ),
+          },
+      );
+      if (wasUnread) {
+        qc.setQueryData<UnreadCount>(
+          notificationKeys.unread(),
+          (old) => old && { unread_count: Math.max(0, old.unread_count - 1) },
+        );
+      }
+      return snap;
+    },
+    onError: (_err, _id, snap) => {
+      restore(qc, snap);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
   });
 }

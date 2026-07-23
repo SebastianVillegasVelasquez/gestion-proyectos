@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,10 +38,14 @@ from app.modules.project.infrastructure.repository import (
     ProjectMemberRepository,
     ProjectRepository,
 )
+from app.modules.project.structure.domain.repository import WorkTreeRepository
+from app.modules.project.structure.infrastructure.repository import (
+    SqlAlchemyWorkTreeRepository,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
-from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
 from app.modules.teams.domain.workspace import WorkspaceRepository
+from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
 from app.modules.teams.infrastructure.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
 )
@@ -49,11 +53,8 @@ from app.modules.traceability.infrastructure.repository import (
     SqlAlchemyTraceabilityRepository,
     TraceabilityRepository,
 )
-from app.modules.project.structure.domain.repository import WorkTreeRepository
-from app.modules.project.structure.infrastructure.repository import (
-    SqlAlchemyWorkTreeRepository,
-)
 from app.shared.authz import role_satisfies
+from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events import EventBus
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
@@ -127,8 +128,13 @@ def feedback_repo_dependency(
     return SqlAlchemyFeedbackRepository(db)
 
 
+def get_broadcaster_from_request(request: Request) -> Broadcaster:
+    return request.app.state.broadcaster
+
+
 def event_bus_dependency(
     db: AsyncSession = Depends(get_db),
+    broadcaster: Broadcaster = Depends(get_broadcaster_from_request),
 ) -> EventBus:
     """Construye un EventBus por-request con sus handlers ya suscritos.
 
@@ -140,7 +146,7 @@ def event_bus_dependency(
     """
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
-    register_notification_handlers(bus, notification_repo)
+    register_notification_handlers(bus, notification_repo, broadcaster, db)
     return bus
 
 
@@ -194,7 +200,9 @@ def require_project_permission(*allowed_project_roles: ProjectRole):
     """
 
     async def _auth_check(
-        project_id: UUID = Path(...),  # Captura automáticamente el project_id de la URL
+        project_id: UUID = Path(
+            ...
+        ),  # Captura automáticamente el work_item_id de la URL
         current_user: UserResponse = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ):

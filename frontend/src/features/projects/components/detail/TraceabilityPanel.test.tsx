@@ -114,30 +114,4 @@ describe("TraceabilityPanel", () => {
 
     expect(await screen.findByText("Sin eventos de trazabilidad")).toBeInTheDocument();
   });
-
-  it("previews sample data from the empty state", async () => {
-    vi.mocked(traceabilityApi.get).mockResolvedValue({
-      project_id: "p1",
-      summary: { total_events: 0, delays: 0, deliveries: 0, returns: 0 },
-      events: [],
-    });
-    renderPanel();
-    await screen.findByText("Sin eventos de trazabilidad");
-
-    await userEvent.click(screen.getByText("Ver datos de ejemplo"));
-
-    // Aparece el aviso (botón para salir) y eventos de ejemplo (no reales).
-    expect(screen.getByText("Salir del ejemplo")).toBeInTheDocument();
-    expect(screen.getAllByText("Guion de la Unidad 1").length).toBeGreaterThan(0);
-  });
-
-  it("toggles the sample-data banner from the header", async () => {
-    vi.mocked(traceabilityApi.get).mockResolvedValue(data);
-    renderPanel();
-    await screen.findByText("Guion Unidad 1");
-
-    await userEvent.click(screen.getByRole("button", { name: "Datos de ejemplo" }));
-
-    expect(screen.getByText("Salir del ejemplo")).toBeInTheDocument();
-  });
 });

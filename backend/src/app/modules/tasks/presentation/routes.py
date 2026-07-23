@@ -5,6 +5,8 @@ from starlette import status
 
 from app.core.dependencies import (
     event_bus_dependency,
+    get_current_user,
+    project_members_repo_dependency,
     project_repo_dependency,
     require_role,
     task_repo_dependency,
@@ -19,6 +21,7 @@ from app.modules.tasks.application.use_cases import (
     GetTaskByIdUseCase,
     GetTaskDependenciesUseCase,
     GetTasksByProjectUseCase,
+    GetTasksByTeamUseCase,
     GetTasksByWorkItemUseCase,
     UpdateTaskUseCase,
 )
@@ -27,6 +30,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
+    TeamTaskItemResponse,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
@@ -42,12 +46,13 @@ _any_user = require_role("admin", "super_admin", "user")
 @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     payload: CreateTaskRequest,
-    current_user=Depends(_admin),
+    _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
 ):
-    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo).execute(
+    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo, bus).execute(
         payload
     )
 
@@ -55,7 +60,7 @@ async def create_task(
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task(
     task_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
     return await GetTaskByIdUseCase(task_repo).execute(task_id)
@@ -85,7 +90,7 @@ async def delete_task(
 @router.get("/projects/{project_id}/tasks", response_model=list[TaskResponse])
 async def get_project_tasks(
     project_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     project_repo=Depends(project_repo_dependency),
 ):
@@ -95,13 +100,23 @@ async def get_project_tasks(
 @router.get("/work-items/{work_item_id}/tasks", response_model=list[TaskResponse])
 async def get_work_item_tasks(
     work_item_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
 ):
     return await GetTasksByWorkItemUseCase(task_repo, work_tree_repo).execute(
         work_item_id
     )
+
+
+@router.get("/teams/{team_id}/tasks", response_model=list[TeamTaskItemResponse])
+async def get_team_tasks(
+    team_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Tareas delegadas a un equipo, con módulo y responsable (espacio de trabajo)."""
+    return await GetTasksByTeamUseCase(task_repo).execute(team_id)
 
 
 # ── Dependencias y estado ────────────────────────────────────────────────────
@@ -113,7 +128,7 @@ async def get_work_item_tasks(
 async def add_task_dependency(
     task_id: UUID,
     payload: CreateTaskDependencyRequest,
-    current_user=Depends(_admin),
+    _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
     return await AddTaskDependencyUseCase(task_repo).execute(
@@ -126,7 +141,7 @@ async def add_task_dependency(
 )
 async def list_task_dependencies(
     task_id: UUID,
-    current_user=Depends(_any_user),
+    _=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
     return await GetTaskDependenciesUseCase(task_repo).execute(task_id)
@@ -137,10 +152,13 @@ async def change_task_status(
     task_id: UUID,
     payload: UpdateTaskStatusRequest,
     bus: EventBus = Depends(event_bus_dependency),
-    current_user=Depends(_any_user),
+    current_user=Depends(get_current_user),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
+    member_repo=Depends(project_members_repo_dependency),
 ):
-    return await ChangeTaskStatusUseCase(task_repo, work_tree_repo, bus).execute(
-        task_id, payload
-    )
+    """El responsable entrega y el líder aprueba o devuelve. Ver
+    `ChangeTaskStatusUseCase` para el detalle del flujo."""
+    return await ChangeTaskStatusUseCase(
+        task_repo, work_tree_repo, member_repo, bus
+    ).execute(task_id, payload, current_user_id=current_user.id)

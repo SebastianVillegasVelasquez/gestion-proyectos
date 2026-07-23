@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from "../types/api.types";
+import type { Task, TaskStatus, UserPosition } from "../types/api.types";
 import { isOverdue } from "./metrics";
 
 export interface GanttFilters {
@@ -6,18 +6,21 @@ export interface GanttFilters {
   statuses: Set<TaskStatus>;
   /** Responsable a filtrar (null = todos). */
   assigneeId: string | null;
+  /** Cargo/responsabilidad a filtrar (null = todos). Requiere `positionByUser`. */
+  position: UserPosition | null;
   /** Mostrar solo tareas en riesgo (vencidas y abiertas). */
   onlyAtRisk: boolean;
 }
 
 /**
- * Filtra las tareas del cronograma por estado, responsable y riesgo. Pura: sin
- * React ni red, fácil de testear y de razonar.
+ * Filtra las tareas del cronograma por estado, responsable, cargo y riesgo.
+ * Pura: sin React ni red, fácil de testear y de razonar.
  */
 export function filterGanttTasks<T extends Pick<Task, "status" | "assignee_id" | "due_date">>(
   tasks: T[],
   filters: GanttFilters,
   today: string,
+  positionByUser = new Map<string, UserPosition>(),
 ): T[] {
   return tasks.filter((task) => {
     if (!filters.statuses.has(task.status)) {
@@ -25,6 +28,15 @@ export function filterGanttTasks<T extends Pick<Task, "status" | "assignee_id" |
     }
     if (filters.assigneeId && task.assignee_id !== filters.assigneeId) {
       return false;
+    }
+    if (filters.position) {
+      // Sin responsable no podemos derivar cargo → excluir cuando el filtro está activo.
+      if (!task.assignee_id) {
+        return false;
+      }
+      if (positionByUser.get(task.assignee_id) !== filters.position) {
+        return false;
+      }
     }
     if (filters.onlyAtRisk && !isOverdue(task, today)) {
       return false;

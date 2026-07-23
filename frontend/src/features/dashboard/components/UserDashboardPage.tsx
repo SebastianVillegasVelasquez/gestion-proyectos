@@ -17,14 +17,6 @@ const TODAY_FORMATTER = new Intl.DateTimeFormat("es-CO", {
   year: "numeric",
 });
 
-/** Fecha local en formato YYYY-MM-DD (sin saltos de zona horaria). */
-function localISO(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 /**
  * Dashboard del rol User: misma estructura visual que el de administrador, pero
  * solo con SU información (sus tareas, sus proyectos y vencimientos), servida por
@@ -38,27 +30,21 @@ export function UserDashboardPage() {
   const kpiCards = summaryQuery.data ? buildMyKpiCards(summaryQuery.data) : [];
 
   const today = new Date();
-  const todayISO = localISO(today);
   const panels = panelsQuery.data;
   const tasks = panels ? panels.task_board.map(toTask) : [];
   const projects = panels ? panels.projects.map(toProject) : [];
   const deadlines = panels ? panels.upcoming_deadlines.map((d) => toDeadline(d, today)) : [];
 
-  const dueToday = panels
-    ? panels.upcoming_deadlines.filter((d) => d.due_date === todayISO).length
-    : 0;
-
-  const headerData = {
-    name: user?.name ?? "Usuario",
-    date: TODAY_FORMATTER.format(today),
-    tasksToday: dueToday,
-    // Evita división por cero en la barra de progreso del encabezado.
-    tasksTodayTotal: Math.max(summaryQuery.data?.total_tasks ?? 0, 1),
-  };
-
   return (
     <div className="flex flex-col gap-3 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
-      <DashboardHeader {...headerData} dark={dark} onToggleDark={toggleDark} />
+      <DashboardHeader
+        name={user?.name ?? "Usuario"}
+        date={TODAY_FORMATTER.format(today)}
+        tasksCompleted={summaryQuery.data?.completed_tasks}
+        tasksTotal={summaryQuery.data?.total_tasks}
+        dark={dark}
+        onToggleDark={toggleDark}
+      />
 
       <KpiCardsGrid
         cards={kpiCards}

@@ -29,6 +29,13 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Progreso a calcular usando la cantidad de tareas máximas por tareas completadas
     progress_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
+    # Token secreto e impredecible para el portal público del cliente. El cliente
+    # accede a /portal/{token} sin iniciar sesión y ve, en solo lectura, el avance
+    # de ESTE proyecto. Regenerarlo invalida el enlace anterior (revocación).
+    client_access_token: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, unique=True, index=True
+    )
+
     members: Mapped[list[ProjectMember]] = relationship(
         "ProjectMember",
         back_populates="project",

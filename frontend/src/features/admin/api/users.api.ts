@@ -19,6 +19,10 @@ export interface CreateUserPayload {
   role: Role;
 }
 
+export type UpdateUserChanges = Partial<
+  Pick<AdminUser, "role" | "is_active" | "name" | "last_name" | "email" | "position">
+>;
+
 export interface PaginatedUsers {
   items: AdminUser[];
   total: number;
@@ -47,14 +51,15 @@ export const adminUsersApi = {
     http.post<AdminUser>("/identity/users", payload).then((r) => r.data),
 
   // PATCH requiere los datos base; reenviamos los actuales + el cambio.
-  update: (user: AdminUser, changes: Partial<Pick<AdminUser, "role" | "is_active">>) =>
+  update: (user: AdminUser, changes: UpdateUserChanges) =>
     http
       .patch<AdminUser>(`/identity/users/${user.id}`, {
-        email: user.email,
-        name: user.name,
-        last_name: user.last_name,
+        email: changes.email ?? user.email,
+        name: changes.name ?? user.name,
+        last_name: changes.last_name ?? user.last_name,
         role: changes.role ?? user.role,
         is_active: changes.is_active ?? user.is_active,
+        position: changes.position ?? user.position,
       })
       .then((r) => r.data),
 

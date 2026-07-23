@@ -136,6 +136,12 @@ class DashboardRepository(ABC):
         self, user_id: uuid.UUID, project_id: uuid.UUID
     ) -> ProjectProgressDetail | None: ...
 
+    # ── Portal público del cliente (sin autenticación, por token) ──
+    @abstractmethod
+    async def get_project_progress_by_token(
+        self, token: str
+    ) -> ProjectProgressDetail | None: ...
+
 
 class SqlAlchemyDashboardRepository(DashboardRepository):
     def __init__(self, session: AsyncSession) -> None:
@@ -457,37 +463,15 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             ),
         )
 
-    async def get_project_progress_for_user(
-        self, user_id: uuid.UUID, project_id: uuid.UUID
-    ) -> ProjectProgressDetail | None:
-        # Guard de membresía: si el usuario no pertenece al proyecto -> None (404).
-        is_member = (
-            await self._session.execute(
-                select(ProjectMember.id)
-                .where(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id == user_id,
-                    ProjectMember.deleted_at.is_(None),
-                )
-                .limit(1)
-            )
-        ).first()
-        if is_member is None:
-            return None
+    async def _project_counts(self, project_id: uuid.UUID):
+        """Conteo de tareas de un proyecto por estado (total/completadas/…).
 
-        project = (
-            await self._session.execute(
-                select(Project).where(
-                    Project.id == project_id, Project.deleted_at.is_(None)
-                )
-            )
-        ).scalar_one_or_none()
-        if project is None:
-            return None
-
+        Extraído para compartirlo entre el progreso del miembro y el del portal
+        público del cliente: una sola consulta, una sola fuente de verdad (DRY).
+        """
         today = datetime.date.today()
         status_col = Task.status
-        counts = (
+        return (
             await self._session.execute(
                 select(
                     func.count(Task.id).label("total"),
@@ -522,7 +506,8 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             )
         ).one()
 
-        coordinator = (
+    async def _project_coordinator(self, project_id: uuid.UUID) -> str | None:
+        return (
             await self._session.execute(
                 select(func.min(func.concat(User.name, " ", User.last_name)))
                 .select_from(ProjectMember)
@@ -534,6 +519,61 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 )
             )
         ).scalar()
+
+    def _build_progress(
+        self, project, counts, coordinator: str | None, my_tasks: list[TaskBoardItem]
+    ) -> ProjectProgressDetail:
+        total = int(counts.total or 0)
+        completed = int(counts.completed or 0)
+        in_review = int(counts.in_review or 0)
+        overdue = int(counts.overdue or 0)
+        pending = int(counts.pending or 0)
+        progress = round(completed / total * 100) if total else 0
+        return ProjectProgressDetail(
+            id=project.id,
+            name=project.name,
+            client_name=project.client_name,
+            coordinator=coordinator,
+            status=self._derive_status(overdue, in_review),
+            tasks_total=total,
+            tasks_completed=completed,
+            tasks_in_review=in_review,
+            tasks_overdue=overdue,
+            tasks_pending=pending,
+            progress_pct=progress,
+            my_tasks=my_tasks,
+        )
+
+    async def get_project_progress_for_user(
+        self, user_id: uuid.UUID, project_id: uuid.UUID
+    ) -> ProjectProgressDetail | None:
+        # Guard de membresía: si el usuario no pertenece al proyecto -> None (404).
+        is_member = (
+            await self._session.execute(
+                select(ProjectMember.id)
+                .where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.user_id == user_id,
+                    ProjectMember.deleted_at.is_(None),
+                )
+                .limit(1)
+            )
+        ).first()
+        if is_member is None:
+            return None
+
+        project = (
+            await self._session.execute(
+                select(Project).where(
+                    Project.id == project_id, Project.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
+            return None
+
+        counts = await self._project_counts(project_id)
+        coordinator = await self._project_coordinator(project_id)
 
         my_tasks_rows = (
             await self._session.execute(
@@ -556,24 +596,28 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             for task, project_name in my_tasks_rows
         ]
 
-        total = int(counts.total or 0)
-        completed = int(counts.completed or 0)
-        in_review = int(counts.in_review or 0)
-        overdue = int(counts.overdue or 0)
-        pending = int(counts.pending or 0)
-        progress = round(completed / total * 100) if total else 0
+        return self._build_progress(project, counts, coordinator, my_tasks)
 
-        return ProjectProgressDetail(
-            id=project.id,
-            name=project.name,
-            client_name=project.client_name,
-            coordinator=coordinator,
-            status=self._derive_status(overdue, in_review),
-            tasks_total=total,
-            tasks_completed=completed,
-            tasks_in_review=in_review,
-            tasks_overdue=overdue,
-            tasks_pending=pending,
-            progress_pct=progress,
-            my_tasks=my_tasks,
-        )
+    async def get_project_progress_by_token(
+        self, token: str
+    ) -> ProjectProgressDetail | None:
+        """Progreso público de un proyecto por su token de cliente (sin login).
+
+        No expone `my_tasks` (no hay usuario): el cliente ve solo el avance
+        agregado. Devuelve None si el token no corresponde a ningún proyecto
+        activo (el endpoint lo traduce a 404, sin revelar si el token existió).
+        """
+        project = (
+            await self._session.execute(
+                select(Project).where(
+                    Project.client_access_token == token,
+                    Project.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
+            return None
+
+        counts = await self._project_counts(project.id)
+        coordinator = await self._project_coordinator(project.id)
+        return self._build_progress(project, counts, coordinator, my_tasks=[])

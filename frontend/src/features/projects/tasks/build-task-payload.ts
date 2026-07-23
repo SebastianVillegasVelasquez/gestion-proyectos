@@ -3,9 +3,11 @@ import type { CreateTaskPayload, TaskPriority } from "@/features/projects/types/
 export interface TaskFormState {
   title: string;
   description: string;
-  // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
+  // La tarea cuelga de un elemento del árbol de trabajo (cualquier nivel).
   workItemId: string;
   assigneeId: string;
+  // Equipo al que se delega la tarea (opcional).
+  teamId: string;
   dependsOnId: string;
   priority: TaskPriority;
   startDate: string;
@@ -20,6 +22,7 @@ export function emptyTaskForm(workItemId = ""): TaskFormState {
     description: "",
     workItemId,
     assigneeId: "",
+    teamId: "",
     dependsOnId: "",
     priority: "media",
     startDate: "",
@@ -40,6 +43,7 @@ export function buildTaskPayload(form: TaskFormState): CreateTaskPayload {
     description: nullIfEmpty(form.description),
     priority: form.priority,
     assignee_id: nullIfEmpty(form.assigneeId),
+    team_id: nullIfEmpty(form.teamId),
     depends_on_id: nullIfEmpty(form.dependsOnId),
     work_item_id: form.workItemId,
     start_date: form.startDate,
@@ -60,7 +64,7 @@ export function validateTaskForm(form: TaskFormState): string | null {
     return "El título debe tener al menos 2 caracteres";
   }
   if (!form.workItemId) {
-    return "Selecciona el nodo del proyecto";
+    return "Selecciona la ubicación en el proyecto";
   }
   if (!form.startDate) {
     return "Indica la fecha de inicio";

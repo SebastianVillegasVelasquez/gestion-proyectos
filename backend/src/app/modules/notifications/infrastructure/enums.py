@@ -7,6 +7,8 @@ class NotificationType(str, enum.Enum):
     TAREA_ENTREGADA = "tarea_entregada"
     TAREA_RECHAZADA = "tarea_rechazada"
     TAREA_ATRASADA = "tarea_atrasada"
+    TAREA_COMPLETADA = "tarea_completada"
+    TAREA_DEVUELTA = "tarea_devuelta"
 
     # Notificacion para todos los usuarios acerca de proyectos
     PROYECTO_MIEMBRO_AGREGADO = "proyecto_miembro_agregado"

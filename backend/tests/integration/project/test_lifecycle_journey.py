@@ -11,6 +11,16 @@ planificadas) + las tasks (fechas/estado) + las dependencias. Este test verifica
 que toda esa base de datos se crea y se consulta correctamente de punta a punta.
 """
 
+from datetime import date, timedelta
+
+# Fechas relativas a hoy (fijas → la suite se rompería al alcanzarlas en el
+# calendario). El "mes que viene" del organizador de la historia.
+BASE = date.today() + timedelta(days=30)
+
+
+def _day(offset: int) -> str:
+    return (BASE + timedelta(days=offset)).isoformat()
+
 
 async def _post(client, headers, url, body, expected=201):
     resp = await client.post(url, json=body, headers=headers)
@@ -45,14 +55,14 @@ class TestProjectLifecycleJourney:
             {
                 "tipo_id": tipo_id,
                 "nombre": "Módulo 1",
-                "fecha_inicio_plan": "2026-08-01",
+                "fecha_inicio_plan": _day(0),
                 "duracion_valor": 10,
                 "duracion_unidad": "dias",
             },
         )
         work_item_id = modulo["id"]
-        assert modulo["fecha_inicio_plan"] == "2026-08-01"
-        assert modulo["fecha_fin_plan"] == "2026-08-11"  # inicio + 10 días
+        assert modulo["fecha_inicio_plan"] == _day(0)
+        assert modulo["fecha_fin_plan"] == _day(10)  # inicio + 10 días
 
         # 3. Crea dos tareas bajo el módulo, asignadas al integrante; la 2ª depende
         #    de la 1ª (finish-to-start: la flecha que dibuja el Gantt).
@@ -64,12 +74,12 @@ class TestProjectLifecycleJourney:
                 "title": "Diseñar guion",
                 "work_item_id": work_item_id,
                 "assignee_id": str(member_user.id),
-                "start_date": "2026-08-01",
+                "start_date": _day(0),
                 "duration_days": 3,
             },
         )
         task1_id = guion["id"]
-        assert guion["due_date"] == "2026-08-04"  # inicio + 3 días
+        assert guion["due_date"] == _day(3)  # inicio + 3 días
 
         grabar = await _post(
             client,
@@ -79,7 +89,7 @@ class TestProjectLifecycleJourney:
                 "title": "Grabar video",
                 "work_item_id": work_item_id,
                 "assignee_id": str(member_user.id),
-                "start_date": "2026-08-04",
+                "start_date": _day(3),
                 "duration_days": 2,
                 "depends_on_id": task1_id,
             },
@@ -101,7 +111,7 @@ class TestProjectLifecycleJourney:
         assert tasks.status_code == 200, tasks.text
         by_title = {t["title"]: t for t in tasks.json()}
         assert {"Diseñar guion", "Grabar video"} <= set(by_title)
-        assert by_title["Diseñar guion"]["start_date"] == "2026-08-01"
+        assert by_title["Diseñar guion"]["start_date"] == _day(0)
 
         # 5. El integrante avanza su tarea: pendiente → en progreso → en revisión
         #    (entrega). Lo hace él mismo (rol user), no el admin.

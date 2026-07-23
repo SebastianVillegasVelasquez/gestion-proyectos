@@ -11,6 +11,7 @@ Uso: poetry run python scripts/seed_demo_user.py
 import asyncio
 import datetime
 import uuid
+from typing import TypedDict
 
 import app.core.models_registry  # noqa: F401  (resuelve relaciones ORM)
 from app.core.database import AsyncSessionLocal
@@ -31,8 +32,19 @@ def _d(offset_days: int) -> datetime.date:
     return TODAY + datetime.timedelta(days=offset_days)
 
 
-# (título, estado, offset_due_días, asignar_al_usuario)
-PROJECTS = [
+class ProjectSpec(TypedDict):
+    """Forma de cada spec de proyecto demo. Sin esto, mypy infiere los valores
+    del dict como una unión amplia y el unpacking de `tasks` pierde los tipos."""
+
+    name: str
+    client_name: str
+    tipo: str
+    work_item: str
+    # (título, estado, offset_due_días, asignar_al_usuario)
+    tasks: list[tuple[str, TaskStatus, int, bool]]
+
+
+PROJECTS: list[ProjectSpec] = [
     {
         "name": "Virtualización Curso de Excel (Demo)",
         "client_name": "Área de Formación",

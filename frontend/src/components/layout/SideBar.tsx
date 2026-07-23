@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from "react-router";
 import {
   FolderKanban,
+  FolderPlus,
   Inbox,
-  Layers,
   LayoutDashboard,
+  LogOut,
   type LucideIcon,
   Moon,
   PanelLeftClose,
@@ -16,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuth, useLogout } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
@@ -54,7 +55,12 @@ const SECTIONS: NavSection[] = [
     id: "projects",
     title: "Proyectos",
     items: [
-      { id: "project-builder", label: "Constructor", icon: Layers, href: "/projects/builder" },
+      {
+        id: "project-builder",
+        label: "Nuevo proyecto",
+        icon: FolderPlus,
+        href: "/projects/builder",
+      },
       { id: "all-projects", label: "Todos los proyectos", icon: FolderKanban, href: "/projects" },
     ],
   },
@@ -157,6 +163,7 @@ export function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const logout = useLogout();
 
   // Cliente: solo su portal. User: navegación reducida. Developer: completa +
   // bandeja de feedback. Resto (admin/super_admin): navegación completa.
@@ -328,6 +335,25 @@ export function Sidebar({
             </button>
           </div>
         </div>
+
+        {/* Cerrar sesión: limpia los tokens y vuelve al login */}
+        <button
+          type="button"
+          onClick={() => {
+            logout.mutate();
+          }}
+          disabled={logout.isPending}
+          title={collapsed ? "Cerrar sesión" : undefined}
+          className={cn(
+            "mt-3 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60",
+            collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+          )}
+        >
+          <LogOut className="size-4 shrink-0" />
+          <span className={cn("truncate", collapsed && "md:hidden")}>
+            {logout.isPending ? "Cerrando sesión…" : "Cerrar sesión"}
+          </span>
+        </button>
       </div>
     </aside>
   );

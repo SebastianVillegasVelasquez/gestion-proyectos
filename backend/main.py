@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger
+
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
@@ -16,11 +17,15 @@ from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )
 from app.modules.dashboard.presentation.routes import router as dashboard_router
+from app.modules.dashboard.presentation.public_routes import (
+    router as public_router,
+)
 from app.modules.feedback.presentation.routes import router as feedback_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.notifications.presentation.routes import (
     router as notifications_router,
 )
+from app.modules.notifications.presentation.websocket import router as ws_router
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.project.structure.presentation.routes import router as worktree_router
 from app.modules.tasks.presentation.routes import router as tasks_router
@@ -31,6 +36,10 @@ from app.modules.teams.presentation.workspace_routes import (
 from app.modules.traceability.presentation.routes import (
     router as traceability_router,
 )
+from app.shared.broadcasting.broadcaster import Broadcaster
+from app.shared.broadcasting.memory import InMemoryBroadcaster
+from app.shared.broadcasting.redis import RedisBroadcaster
+from app.shared.connection_manager import ConnectionManager
 from app.shared.exceptions import (
     ConflictError,
     DomainException,
@@ -47,22 +56,33 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    logger.info(
-        "Iniciando OBJ Digital PM",
-        env=settings.APP_ENV,
-        debug=settings.DEBUG,
-    )
-    # Guard de producción: una SECRET_KEY débil compromete todos los tokens.
+
+    logger.info("Iniciando OBJ Digital PM", env=settings.APP_ENV, debug=settings.DEBUG)
+
     if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
-        logger.warning(
-            "SECRET_KEY débil o ausente en un entorno no-dev: define una clave "
-            "fuerte (>=32 chars) por entorno antes de exponer el servicio."
-        )
-    # Siembra desacoplada: el orquestador decide qué cargar según el entorno.
+        logger.warning("SECRET_KEY débil o ausente en un entorno no-dev: ...")
+
     from app.core.seeding import run_seed
 
     await run_seed()
+
+    broadcaster: Broadcaster = (
+        RedisBroadcaster(url=settings.REDIS_URL)
+        if settings.USE_REDIS_AS_BROADCASTER
+        else InMemoryBroadcaster()
+    )
+
+    await broadcaster.connect()
+    logger.debug(f"Conectado al broadcaster {broadcaster.__class__.__name__}")
+    app.state.broadcaster = broadcaster
+    app.state.manager = ConnectionManager(broadcaster=broadcaster)
+
     yield
+
+    # ── Shutdown en orden inverso ──
+    await app.state.manager.shutdown()
+    await app.state.broadcaster.disconnect()
+
     logger.info("Cerrando OBJ Digital PM")
 
 
@@ -149,6 +169,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(public_router, prefix="/api/v1")
 # El router del workspace va ANTES que el de teams: su ruta literal /teams/mine
 # debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
 app.include_router(workspace_router, prefix="/api/v1")
@@ -158,3 +179,4 @@ app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(areas_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
+app.include_router(ws_router, prefix="/api/v1")

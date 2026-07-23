@@ -64,6 +64,7 @@ export function mapDeliverable(d: ApiDeliverable): Deliverable {
     id: d.id,
     taskTitle: d.task_title,
     assigneeId: d.assignee_id,
+    taskId: d.task_id,
     status: d.status,
     versions: d.versions.map(mapVersion),
     comments: d.comments.map(mapComment),

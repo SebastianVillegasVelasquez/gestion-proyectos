@@ -9,8 +9,6 @@ from app.modules.notifications.infrastructure.models import Notification
 
 
 class SqlAlchemyNotificationRepository(NotificationRepository):
-    """Implementación concreta con SQLAlchemy."""
-
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 

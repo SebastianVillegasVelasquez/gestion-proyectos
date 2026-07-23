@@ -48,3 +48,24 @@ export function useDeleteProject() {
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.list() }),
   });
 }
+
+/** Token del portal del cliente (se pide bajo demanda al abrir la tarjeta). */
+export function useClientAccess(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: projectKeys.clientAccess(id),
+    queryFn: () => projectsApi.getClientAccess(id),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Rota el token: invalida el enlace anterior y refresca el mostrado. */
+export function useRegenerateClientAccess(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => projectsApi.regenerateClientAccess(id),
+    onSuccess: (data) => {
+      qc.setQueryData(projectKeys.clientAccess(id), data);
+    },
+  });
+}

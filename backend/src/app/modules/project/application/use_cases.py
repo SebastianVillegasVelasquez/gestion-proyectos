@@ -4,13 +4,13 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from app.modules.project.domain.events import MemberAssigned
 from app.modules.project.domain.services import ProjectMemberService, ProjectService
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
+    ClientAccessResponse,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
@@ -20,6 +20,7 @@ from app.modules.project.presentation.schemas import (
 from app.modules.teams.domain.repository import TeamRepository
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
+from app.shared.events.events import MemberAssigned
 
 
 class CreateProjectUseCase:
@@ -44,6 +45,26 @@ class GetProjectByIdUseCase:
 
     async def execute(self, project_id: UUID) -> ProjectResponse:
         return await self.service.get_project_by_id(project_id)
+
+
+class GetClientAccessUseCase:
+    """Devuelve (o crea, si faltara) el token del portal del cliente."""
+
+    def __init__(self, repo: Repository):
+        self.service = ProjectService(repo)
+
+    async def execute(self, project_id: UUID) -> ClientAccessResponse:
+        return await self.service.get_client_access(project_id)
+
+
+class RegenerateClientAccessUseCase:
+    """Rota el token: el enlace anterior deja de funcionar (revocación)."""
+
+    def __init__(self, repo: Repository):
+        self.service = ProjectService(repo)
+
+    async def execute(self, project_id: UUID) -> ClientAccessResponse:
+        return await self.service.regenerate_client_access(project_id)
 
 
 class UpdateProjectUseCase:

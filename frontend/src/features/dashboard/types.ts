@@ -2,15 +2,6 @@
 
 export type AccentColor = "amber" | "emerald" | "blue" | "red";
 
-// ─── Header ───────────────────────────────────────────────────────────────────
-
-export interface DashboardHeaderData {
-  name: string;
-  date: string;
-  tasksToday: number;
-  tasksTodayTotal: number;
-}
-
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
 
 export interface KpiCard {
@@ -128,19 +119,4 @@ export interface Deadline {
   title: string;
   project: string;
   priority: Priority;
-}
-
-// ─── Comments ─────────────────────────────────────────────────────────────────
-
-export interface Comment {
-  id: string;
-  authorInitials: string;
-  authorColor: string;
-  authorName: string;
-  timestamp: string;
-  text: string;
-  mentions: string[];
-  project: string;
-  section: string;
-  isUnread: boolean;
 }

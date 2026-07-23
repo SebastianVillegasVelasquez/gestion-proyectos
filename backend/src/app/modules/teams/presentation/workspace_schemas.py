@@ -18,6 +18,9 @@ from app.shared.base_model import BaseModelConfig
 class CreateDeliverableRequest(BaseModelConfig):
     task_title: Annotated[str, StringConstraints(min_length=2, max_length=300)]
     assignee_id: UUID
+    # Fase 2: vincula el entregable a una Task real del proyecto. Opcional para
+    # no romper el flujo antiguo (entregable suelto con task_title libre).
+    task_id: Optional[UUID] = None
 
 
 class AddVersionRequest(BaseModelConfig):
@@ -82,6 +85,7 @@ class DeliverableResponse(BaseModelConfig):
     team_id: UUID
     task_title: str
     assignee_id: UUID
+    task_id: Optional[UUID] = None
     status: DeliverableStatus
     versions: list[VersionResponse]
     comments: list[CommentResponse]
@@ -95,6 +99,7 @@ class DeliverableResponse(BaseModelConfig):
             team_id=d.team_id,
             task_title=d.task_title,
             assignee_id=d.assignee_id,
+            task_id=d.task_id,
             status=d.status,
             versions=[VersionResponse.of(v) for v in d.versions],
             comments=[CommentResponse.of(c) for c in d.comments],

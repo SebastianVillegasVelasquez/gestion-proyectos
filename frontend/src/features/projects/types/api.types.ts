@@ -97,11 +97,11 @@ export interface CreateWorkItemPayload {
 export type UpdateWorkItemPayload = Partial<Omit<CreateWorkItemPayload, "parent_id">>;
 
 export interface CloneWorkItemPayload {
-  /** Donde pegar el subárbol; null = raíz del proyecto. */
+  /** Donde pegar el elemento y su contenido; null = nivel principal del proyecto. */
   target_parent_id?: string | null;
   /** Desplazamiento (en días) de TODAS las fechas plan del clon. */
   offset_days?: number;
-  /** Renombra solo el nodo raíz del clon; los hijos conservan su nombre. */
+  /** Renombra solo el elemento principal del clon; lo que contiene conserva su nombre. */
   rename_root_to?: string | null;
 }
 
@@ -121,6 +121,7 @@ export interface Task {
   description: string | null;
   priority: TaskPriority;
   assignee_id: string | null;
+  team_id: string | null;
   start_date: string;
   due_date: string;
   status: TaskStatus;
@@ -134,6 +135,8 @@ export interface CreateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
+  // Equipo al que se delega la tarea (opcional).
+  team_id?: string | null;
   // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
   work_item_id: string;
   start_date: string;
@@ -150,6 +153,7 @@ export interface UpdateTaskPayload {
   description?: string | null;
   priority?: TaskPriority;
   assignee_id?: string | null;
+  team_id?: string | null;
   start_date?: string;
   due_date?: string;
 }
@@ -301,6 +305,10 @@ export interface TraceabilityEvent {
   created_at: string;
   kind: TraceabilityEventKind;
   is_delay: boolean;
+  // Contexto adicional del evento (el backend puede omitirlos; el frontend los muestra si existen).
+  work_item_name?: string | null;
+  team_name?: string | null;
+  assignee_name?: string | null;
 }
 
 export interface TraceabilitySummary {

@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Copy,
   KeyRound,
+  Pencil,
   Search,
   UserPlus,
   Users,
@@ -16,6 +17,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { Role } from "@/features/auth/types";
 import { useDebouncedValue } from "@/features/projects/utils/use-debounced-value";
+import { USER_POSITION_LABELS, USER_POSITIONS } from "@/features/projects/types/labels";
 import {
   useAdminUsers,
   useCreateUser,
@@ -240,6 +242,149 @@ function CreateUserModal({
   );
 }
 
+// ── Modal: editar datos del usuario ─────────────────────────────────────────
+function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  const [form, setForm] = useState({
+    name: user.name,
+    last_name: user.last_name,
+    email: user.email,
+    position: user.position,
+  });
+  const updateUser = useUpdateUser();
+
+  const canSubmit =
+    form.name.trim().length >= 2 &&
+    form.last_name.trim().length >= 2 &&
+    form.email.trim().length > 0 &&
+    !updateUser.isPending;
+
+  const set =
+    (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setForm((f) => ({ ...f, [k]: e.target.value }));
+    };
+
+  const handleSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
+    updateUser.mutate(
+      {
+        user,
+        changes: {
+          name: form.name.trim(),
+          last_name: form.last_name.trim(),
+          email: form.email.trim(),
+          position: form.position,
+        },
+      },
+      { onSuccess: onClose },
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Editar ${user.name} ${user.last_name}`}
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Pencil className="size-4 text-brand-gold" /> Editar usuario
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Nombre</span>
+              <input
+                className={inputCls}
+                placeholder="Nombre"
+                aria-label="Nombre"
+                value={form.name}
+                onChange={set("name")}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Apellido</span>
+              <input
+                className={inputCls}
+                placeholder="Apellido"
+                aria-label="Apellido"
+                value={form.last_name}
+                onChange={set("last_name")}
+              />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Correo</span>
+            <input
+              className={inputCls}
+              type="email"
+              placeholder="Correo"
+              aria-label="Correo"
+              value={form.email}
+              onChange={set("email")}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Cargo en la empresa</span>
+            <select
+              className={inputCls}
+              value={form.position}
+              onChange={set("position")}
+              aria-label="Cargo"
+            >
+              {USER_POSITIONS.map((pos) => (
+                <option key={pos} value={pos}>
+                  {USER_POSITION_LABELS[pos]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {updateUser.isError && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {getErrorMessage(updateUser.error, "No se pudo actualizar el usuario")}
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-60"
+          >
+            {updateUser.isPending ? "Guardando…" : "Guardar cambios"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Fila de la tabla ──────────────────────────────────────────────────────────
 function UserRow({
   user,
@@ -251,95 +396,153 @@ function UserRow({
   const updateUser = useUpdateUser();
   const resetPassword = useResetPassword();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmToggle, setConfirmToggle] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   // El developer/super_admin no se editan desde esta UI (evita pisar privilegios).
   const locked = user.role === "developer" || user.role === "super_admin";
 
   return (
-    <tr className={cn("border-b border-border", !user.is_active && "opacity-60")}>
-      <td className="px-3 py-2.5">
-        <p className="text-sm font-medium text-foreground">
-          {user.name} {user.last_name}
-        </p>
-        <p className="text-xs text-muted-foreground">{user.email}</p>
-      </td>
-      <td className="px-3 py-2.5">
-        {locked ? (
-          <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-foreground">
-            {ROLE_LABEL[user.role] ?? user.role}
-          </span>
-        ) : (
-          <select
-            value={user.role}
-            disabled={updateUser.isPending}
-            aria-label={`Rol de ${user.name}`}
-            onChange={(e) => {
-              updateUser.mutate({ user, changes: { role: e.target.value as Role } });
-            }}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold disabled:opacity-50"
-          >
-            {ASSIGNABLE_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </td>
-      <td className="px-3 py-2.5">
-        <button
-          type="button"
-          disabled={locked || updateUser.isPending}
-          onClick={() => {
-            updateUser.mutate({ user, changes: { is_active: !user.is_active } });
-          }}
-          className={cn(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
-            user.is_active
-              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300",
+    <>
+      <tr className={cn("border-b border-border", !user.is_active && "opacity-60")}>
+        <td className="px-3 py-2.5">
+          <p className="text-sm font-medium text-foreground">
+            {user.name} {user.last_name}
+          </p>
+          <p className="text-xs text-muted-foreground">{user.email}</p>
+        </td>
+        <td className="px-3 py-2.5">
+          {locked ? (
+            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-foreground">
+              {ROLE_LABEL[user.role] ?? user.role}
+            </span>
+          ) : (
+            <select
+              value={user.role}
+              disabled={updateUser.isPending}
+              aria-label={`Rol de ${user.name}`}
+              onChange={(e) => {
+                updateUser.mutate({ user, changes: { role: e.target.value as Role } });
+              }}
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold disabled:opacity-50"
+            >
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
           )}
-        >
-          {user.is_active ? "Activo" : "Inactivo"}
-        </button>
-      </td>
-      <td className="px-3 py-2.5 text-right">
-        <button
-          type="button"
-          onClick={() => {
-            setConfirmReset(true);
-          }}
-          aria-label={`Restablecer contraseña de ${user.name}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
-        >
-          <KeyRound className="size-3.5" /> Reset
-        </button>
+        </td>
+        <td className="px-3 py-2.5">
+          <button
+            type="button"
+            disabled={locked || updateUser.isPending}
+            onClick={() => {
+              setConfirmToggle(true);
+            }}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
+              user.is_active
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300",
+            )}
+          >
+            {user.is_active ? "Activo" : "Inactivo"}
+          </button>
+        </td>
+        <td className="px-3 py-2.5 text-right">
+          <div className="flex items-center justify-end gap-1.5">
+            {!locked && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEdit(true);
+                }}
+                aria-label={`Editar ${user.name} ${user.last_name}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
+              >
+                <Pencil className="size-3" /> Editar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmReset(true);
+              }}
+              aria-label={`Restablecer contraseña de ${user.name}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
+            >
+              <KeyRound className="size-3" /> Contraseña
+            </button>
+          </div>
+        </td>
+      </tr>
 
-        {confirmReset && (
-          <ConfirmDialog
-            title="Restablecer contraseña"
-            message={`Se generará una contraseña temporal para ${user.name} ${user.last_name} y la actual dejará de funcionar. ¿Continuar?`}
-            confirmLabel="Restablecer"
-            loading={resetPassword.isPending}
-            errorMessage={
-              resetPassword.isError
-                ? getErrorMessage(resetPassword.error, "No se pudo restablecer la contraseña")
-                : null
-            }
-            onConfirm={() => {
-              resetPassword.mutate(user.id, {
-                onSuccess: (res) => {
-                  setConfirmReset(false);
-                  onCredentials(user.email, res.temporary_password);
+      {confirmToggle && (
+        <ConfirmDialog
+          title={user.is_active ? "Desactivar usuario" : "Activar usuario"}
+          message={
+            user.is_active
+              ? `${user.name} ${user.last_name} no podrá iniciar sesión mientras esté inactivo. ¿Continuar?`
+              : `${user.name} ${user.last_name} volverá a poder iniciar sesión. ¿Continuar?`
+          }
+          confirmLabel={user.is_active ? "Desactivar" : "Activar"}
+          loading={updateUser.isPending}
+          errorMessage={
+            updateUser.isError
+              ? getErrorMessage(updateUser.error, "No se pudo actualizar el estado")
+              : null
+          }
+          onConfirm={() => {
+            updateUser.mutate(
+              { user, changes: { is_active: !user.is_active } },
+              {
+                onSuccess: () => {
+                  setConfirmToggle(false);
                 },
-              });
-            }}
-            onCancel={() => {
-              setConfirmReset(false);
-            }}
-          />
-        )}
-      </td>
-    </tr>
+              },
+            );
+          }}
+          onCancel={() => {
+            setConfirmToggle(false);
+          }}
+        />
+      )}
+
+      {confirmReset && (
+        <ConfirmDialog
+          title="Restablecer contraseña"
+          message={`Se generará una contraseña temporal para ${user.name} ${user.last_name} y la actual dejará de funcionar. ¿Continuar?`}
+          confirmLabel="Restablecer"
+          loading={resetPassword.isPending}
+          errorMessage={
+            resetPassword.isError
+              ? getErrorMessage(resetPassword.error, "No se pudo restablecer la contraseña")
+              : null
+          }
+          onConfirm={() => {
+            resetPassword.mutate(user.id, {
+              onSuccess: (res) => {
+                setConfirmReset(false);
+                onCredentials(user.email, res.temporary_password);
+              },
+            });
+          }}
+          onCancel={() => {
+            setConfirmReset(false);
+          }}
+        />
+      )}
+
+      {showEdit && (
+        <EditUserModal
+          user={user}
+          onClose={() => {
+            setShowEdit(false);
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -416,9 +619,9 @@ export function AdminUsersPage() {
             <thead className="sticky top-0 bg-card">
               <tr className="border-b border-border text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2">Usuario</th>
-                <th className="px-3 py-2">Rol</th>
+                <th className="px-15 py-2">Rol</th>
                 <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
+                <th className="px-0 py-2 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>

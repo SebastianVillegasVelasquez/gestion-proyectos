@@ -42,7 +42,7 @@ class Notification(Base, UUIDMixin, TimestampMixin):
         nullable=False,
     )
 
-    # Datos contextuales (project_id, task_id, etc.) para que el frontend pueda
+    # Datos contextuales (work_item_id, task_id, etc.) para que el frontend pueda
     # construir el link "ver tarea" sin pegar otro query. Estructura libre por diseño.
     payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 

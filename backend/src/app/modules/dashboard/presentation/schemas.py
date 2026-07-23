@@ -59,3 +59,22 @@ class MyProjectProgressResponse(BaseModelConfig):
     tasks_pending: int
     progress_pct: int
     my_tasks: list[TaskBoardItemResponse]
+
+
+class PublicProjectProgressResponse(BaseModelConfig):
+    """Progreso del proyecto para el portal público del cliente (solo lectura).
+
+    No incluye `id` ni tareas individuales: el cliente ve solo el avance agregado
+    y nada que permita navegar o inferir la estructura interna del sistema.
+    """
+
+    name: str
+    client_name: str | None = None
+    coordinator: str | None = None
+    status: str  # active | at-risk | in-review
+    tasks_total: int
+    tasks_completed: int
+    tasks_in_review: int
+    tasks_overdue: int
+    tasks_pending: int
+    progress_pct: int
