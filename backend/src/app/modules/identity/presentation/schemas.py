@@ -65,6 +65,7 @@ class UpdateUserRequest(BaseModelConfig):
 
     role: SystemRole | None = None
     is_active: bool | None = None
+    position: UserPosition | None = None
 
 
 class RefreshRequest(BaseModelConfig):

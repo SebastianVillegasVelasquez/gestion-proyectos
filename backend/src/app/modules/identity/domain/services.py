@@ -38,7 +38,7 @@ class UserService:
         user_id: UUID,
         data: UpdateUserRequest,
     ) -> UserResponse:
-        if not await self._repo.is_email_available(data.model_dump()["email"]):
+        if not await self._repo.is_email_available(data.email, exclude_id=user_id):
             raise ConflictError("El correo ya se encuentra registrado")
 
         existing_user = await self._repo.get_by_id(user_id)

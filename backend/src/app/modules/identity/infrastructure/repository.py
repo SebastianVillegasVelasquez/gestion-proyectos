@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -101,10 +103,13 @@ class UserRepository(BaseRepository[User]):
         )
         return list(rows), int(total or 0)
 
-    async def is_email_available(self, email: str) -> bool:
+    async def is_email_available(
+        self, email: str, exclude_id: UUID | None = None
+    ) -> bool:
         user = await self.get_by_email(email)
-
-        return user is None
+        if user is None:
+            return True
+        return exclude_id is not None and user.id == exclude_id
 
     async def soft_delete(self, user: User) -> User:
         user.is_active = False
