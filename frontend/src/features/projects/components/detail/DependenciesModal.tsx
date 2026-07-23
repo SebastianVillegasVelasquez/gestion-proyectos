@@ -46,8 +46,8 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
     return map;
   }, [tree]);
 
-  // Candidatos a predecesor: todos menos el propio nodo (el backend rechaza
-  // ciclos y auto-dependencias; aquí solo evitamos lo obvio).
+  // Candidatos a elemento previo: todos menos el propio elemento (el backend
+  // rechaza ciclos y auto-dependencias; aquí solo evitamos lo obvio).
   const options = useMemo(
     () => flattenOptions(tree).filter((o) => o.id !== item.id),
     [tree, item.id],
@@ -65,7 +65,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
       setPick("");
     } catch {
       setError(
-        "No se pudo añadir: crearía un ciclo, ya existe, o el elemento iniciaría antes de que termine su predecesor.",
+        "No se pudo añadir: crearía un ciclo, ya existe, o el elemento iniciaría antes de que termine su elemento previo.",
       );
     }
   }
@@ -83,7 +83,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                 Dependencias
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                “{item.nombre}” no podrá iniciar hasta que terminen sus predecesores.
+                “{item.nombre}” no podrá iniciar hasta que terminen los elementos previos.
               </p>
             </div>
           </div>
@@ -104,7 +104,8 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
               <div className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
             ) : deps.length === 0 ? (
               <p className="text-sm italic text-slate-400 dark:text-slate-500">
-                Sin dependencias. Empieza cuando quiera (según sus fechas o su padre).
+                Sin dependencias. Empieza cuando quiera (según sus fechas o el elemento que lo
+                contiene).
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
@@ -134,7 +135,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
 
           <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Añadir predecesor
+              Añadir elemento previo
             </p>
             <div className="flex gap-2">
               <select

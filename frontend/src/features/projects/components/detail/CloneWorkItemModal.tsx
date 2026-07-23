@@ -18,7 +18,7 @@ interface FlatOption {
   reason?: string;
 }
 
-/** Recoge los ids del subárbol que se va a clonar (no son destinos válidos). */
+/** Recoge los ids del elemento y de todo lo que contiene (no son destinos válidos). */
 function collectDescendantIds(node: WorkItemTree, into: Set<string>): void {
   into.add(node.id);
   node.children.forEach((c) => {
@@ -26,7 +26,7 @@ function collectDescendantIds(node: WorkItemTree, into: Set<string>): void {
   });
 }
 
-/** Aplana el árbol con sangría, marcando inválido el propio subárbol. */
+/** Aplana la estructura con sangría, marcando como inválido lo que se va a copiar. */
 function flatten(
   nodes: WorkItemTree[],
   forbidden: Set<string>,
@@ -99,7 +99,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 Duplicar elemento
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                Copia “{source.nombre}” y todo lo que cuelga de él.
+                Copia “{source.nombre}” con todo lo que contiene dentro.
               </p>
             </div>
           </div>
@@ -123,7 +123,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             >
-              <option value="">Raíz del proyecto</option>
+              <option value="">Nivel principal del proyecto</option>
               {options.map((o) => (
                 <option key={o.id} value={o.id} disabled={o.disabled}>
                   {o.label}

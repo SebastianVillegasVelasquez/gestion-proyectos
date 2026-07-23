@@ -32,7 +32,7 @@ export const structureApi = {
 
   remove: (itemId: string) => http.delete(`/work-items/${itemId}`).then(() => undefined),
 
-  /** Duplica un subárbol bajo el destino (spec §9). */
+  /** Duplica un elemento con todo su contenido bajo el destino (spec §9). */
   clone: (itemId: string, payload: CloneWorkItemPayload) =>
     http.post<WorkItem>(`/work-items/${itemId}/clone`, payload).then((r) => r.data),
 

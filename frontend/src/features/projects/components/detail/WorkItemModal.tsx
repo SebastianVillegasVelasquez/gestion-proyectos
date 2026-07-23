@@ -19,7 +19,7 @@ const MODES: { id: DateMode; label: string; hint: string; icon: typeof Clock }[]
   {
     id: "solo_dur",
     label: "Solo duración",
-    hint: "Hereda del padre o predecesor",
+    hint: "Toma las fechas del elemento que lo contiene o del anterior",
     icon: CornerDownRight,
   },
   { id: "fechas", label: "Fechas exactas", hint: "Inicio y fin", icon: CalendarRange },
@@ -161,7 +161,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                 ? `Editando “${editItem!.nombre}”`
                 : parent
                   ? `Dentro de “${parent.nombre}”`
-                  : "En la raíz del proyecto"}
+                  : "En el nivel principal del proyecto"}
             </p>
           </div>
           <button

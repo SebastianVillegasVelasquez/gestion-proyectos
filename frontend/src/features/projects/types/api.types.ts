@@ -97,11 +97,11 @@ export interface CreateWorkItemPayload {
 export type UpdateWorkItemPayload = Partial<Omit<CreateWorkItemPayload, "parent_id">>;
 
 export interface CloneWorkItemPayload {
-  /** Donde pegar el subárbol; null = raíz del proyecto. */
+  /** Donde pegar el elemento y su contenido; null = nivel principal del proyecto. */
   target_parent_id?: string | null;
   /** Desplazamiento (en días) de TODAS las fechas plan del clon. */
   offset_days?: number;
-  /** Renombra solo el nodo raíz del clon; los hijos conservan su nombre. */
+  /** Renombra solo el elemento principal del clon; lo que contiene conserva su nombre. */
   rename_root_to?: string | null;
 }
 
