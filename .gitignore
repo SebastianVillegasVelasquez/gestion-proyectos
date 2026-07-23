@@ -60,3 +60,4 @@ htmlcov/
 
 postgres_data/
 /.todo/tasks.json
+./fix
