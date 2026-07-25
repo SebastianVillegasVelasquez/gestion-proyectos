@@ -56,23 +56,6 @@ class TestAdminResetPassword:
         assert denied.status_code == 403
 
 
-class TestPublicRegisterSecurity:
-    async def test_public_register_forces_user_role(self, client):
-        # Aunque pida super_admin, debe quedar en user (cierra escalada).
-        resp = await client.post(
-            "/api/v1/identity/",
-            json={
-                "email": "hacker@test.com",
-                "password": "Passw0rd1",
-                "name": "Mal",
-                "last_name": "Actor",
-                "role": "super_admin",
-            },
-        )
-        assert resp.status_code == 201, resp.text
-        assert resp.json()["role"] == "user"
-
-
 class TestAdminCreateUser:
     async def test_admin_creates_user_with_role(self, client, super_admin_headers):
         resp = await client.post(

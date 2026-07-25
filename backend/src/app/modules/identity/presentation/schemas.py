@@ -3,11 +3,7 @@ from uuid import UUID
 
 from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.enums import (
-    POSITION_LABELS,
-    UserPosition,
-    SystemRole,
-)
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.shared.base_model import BaseModelConfig
 
 
@@ -40,7 +36,11 @@ class CreateUserRequest(BaseModelConfig):
 
     role: SystemRole = SystemRole.USER
 
-    position: UserPosition = UserPosition.SIN_CARGO
+    # Clave de un cargo existente en la tabla `positions` (ver PositionRepository).
+    # Se valida contra la BD en el use case, no aquí: el catálogo es mutable.
+    position: Annotated[str, StringConstraints(min_length=1, max_length=64)] = (
+        "sin_cargo"
+    )
 
     @field_validator("password")
     @classmethod
@@ -65,7 +65,9 @@ class UpdateUserRequest(BaseModelConfig):
 
     role: SystemRole | None = None
     is_active: bool | None = None
-    position: UserPosition | None = None
+    position: Annotated[str, StringConstraints(min_length=1, max_length=64)] | None = (
+        None
+    )
 
 
 class RefreshRequest(BaseModelConfig):
@@ -106,7 +108,7 @@ class UserResponse(BaseModelConfig):
     ]
 
     role: SystemRole
-    position: UserPosition
+    position: str
     is_active: bool
 
 
@@ -120,18 +122,31 @@ class PaginatedUsersResponse(BaseModelConfig):
 
 
 class PositionOption(BaseModelConfig):
-    """Opción de cargo para poblar el selector del registro (value + etiqueta es-CO)."""
+    """Opción de cargo para poblar los selectores (value + etiqueta es-CO).
 
-    value: UserPosition
+    Fuente de verdad: la tabla `positions` (mutable), no un enum estático.
+    """
+
+    value: str
     label: str
 
 
-def position_options() -> list[PositionOption]:
-    """Cargos disponibles, en el orden de presentación definido en POSITION_LABELS."""
-    return [
-        PositionOption(value=value, label=label)
-        for value, label in POSITION_LABELS.items()
+class CreatePositionRequest(BaseModelConfig):
+    """Alta de un cargo nuevo que la empresa nunca había tenido.
+
+    `key` es el identificador estable (minúsculas, snake_case) que queda
+    referenciado desde `users.position`.
+    """
+
+    key: Annotated[
+        str,
+        StringConstraints(
+            min_length=2,
+            max_length=64,
+            pattern=r"^[a-záéíóúñ][a-záéíóúñ0-9_]*$",
+        ),
     ]
+    label: Annotated[str, StringConstraints(min_length=2, max_length=150)]
 
 
 class DirectoryUserResponse(BaseModelConfig):
@@ -141,7 +156,7 @@ class DirectoryUserResponse(BaseModelConfig):
     name: str
     last_name: str
     email: str
-    position: UserPosition
+    position: str
 
 
 class PaginatedDirectoryResponse(BaseModelConfig):
@@ -162,3 +177,32 @@ class TokenResponse(BaseModelConfig):
 
 class MessageResponse(BaseModelConfig):
     message: str
+
+
+class BulkUserRowError(BaseModelConfig):
+    """Motivo por el que una fila del CSV no se pudo crear."""
+
+    row: int
+    email: str | None = None
+    error: str
+
+
+class BulkCreatedUser(BaseModelConfig):
+    """Usuario creado desde el CSV. `temporary_password` solo viene informada
+    cuando la fila no traía contraseña y el sistema la generó."""
+
+    id: UUID
+    email: str
+    name: str
+    last_name: str
+    temporary_password: str | None = None
+
+
+class BulkCreateUsersResponse(BaseModelConfig):
+    """Resultado de la carga masiva: procesamos todas las filas válidas (best
+    effort) y reportamos el resto con su motivo, en vez de rechazar el archivo
+    completo por una fila mala."""
+
+    created: list[BulkCreatedUser]
+    failed: list[BulkUserRowError]
+    total_rows: int

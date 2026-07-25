@@ -46,7 +46,6 @@ services:
     networks:
       - bitacora-network
 
-
 volumes:
   postgres_data:
 

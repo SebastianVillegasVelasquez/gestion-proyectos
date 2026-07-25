@@ -1,6 +1,8 @@
-async def _create_user(client, email, name, last_name, position="desarrollador"):
+async def _create_user(
+    client, headers, email, name, last_name, position="desarrollador"
+):
     res = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": email,
             "password": "password123",
@@ -9,6 +11,7 @@ async def _create_user(client, email, name, last_name, position="desarrollador")
             "role": "user",
             "position": position,
         },
+        headers=headers,
     )
     assert res.status_code == 201
 
@@ -16,7 +19,9 @@ async def _create_user(client, email, name, last_name, position="desarrollador")
 class TestUserSearch:
     async def test_should_paginate_results(self, client, admin_headers):
         for i in range(7):
-            await _create_user(client, f"user{i}@test.com", f"Nombre{i}", "Apellido")
+            await _create_user(
+                client, admin_headers, f"user{i}@test.com", f"Nombre{i}", "Apellido"
+            )
 
         res = await client.get(
             "/api/v1/identity/users/search?page=1&page_size=5", headers=admin_headers
@@ -37,8 +42,10 @@ class TestUserSearch:
         assert ids_p1.isdisjoint(ids_p2)
 
     async def test_should_filter_by_name_email(self, client, admin_headers):
-        await _create_user(client, "ana.busqueda@test.com", "Ana", "García")
-        await _create_user(client, "otro@test.com", "Pedro", "López")
+        await _create_user(
+            client, admin_headers, "ana.busqueda@test.com", "Ana", "García"
+        )
+        await _create_user(client, admin_headers, "otro@test.com", "Pedro", "López")
 
         by_name = await client.get(
             "/api/v1/identity/users/search?search=Ana", headers=admin_headers
@@ -55,9 +62,11 @@ class TestUserSearch:
         )
 
     async def test_should_filter_by_position(self, client, admin_headers):
-        await _create_user(client, "dev@test.com", "Dev", "Uno", "desarrollador")
         await _create_user(
-            client, "disenio@test.com", "Dis", "Dos", "diseñador_grafico"
+            client, admin_headers, "dev@test.com", "Dev", "Uno", "desarrollador"
+        )
+        await _create_user(
+            client, admin_headers, "disenio@test.com", "Dis", "Dos", "diseñador_grafico"
         )
 
         res = await client.get(

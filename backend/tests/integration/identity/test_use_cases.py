@@ -3,9 +3,9 @@ from uuid import uuid4
 import pytest
 
 
-async def test_create_user_test_case(client):
+async def test_create_user_test_case(client, admin_headers):
     response = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": "test@obj.com",
             "password": "secret123",
@@ -14,6 +14,7 @@ async def test_create_user_test_case(client):
             "role": "user",
             "position": "desarrollador",
         },
+        headers=admin_headers,
     )
 
     assert response.status_code == 201
@@ -21,9 +22,11 @@ async def test_create_user_test_case(client):
     assert "password" not in response.json()
 
 
-async def test_create_user_password_should_have_at_least_8_characters(client):
+async def test_create_user_password_should_have_at_least_8_characters(
+    client, admin_headers
+):
     result = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": "test@obj.com",
             "password": "pass",
@@ -31,6 +34,7 @@ async def test_create_user_password_should_have_at_least_8_characters(client):
             "last_name": "García",
             "role": "user",
         },
+        headers=admin_headers,
     )
 
     print(result.json())
@@ -40,9 +44,11 @@ async def test_create_user_password_should_have_at_least_8_characters(client):
     )
 
 
-async def test_create_user_password_should_have_at_least_1_number(client):
+async def test_create_user_password_should_have_at_least_1_number(
+    client, admin_headers
+):
     result = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": "test@obj.com",
             "password": "passworddd",
@@ -50,6 +56,7 @@ async def test_create_user_password_should_have_at_least_1_number(client):
             "last_name": "García",
             "role": "user",
         },
+        headers=admin_headers,
     )
 
     assert result.status_code == 422

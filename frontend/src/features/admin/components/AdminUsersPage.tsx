@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Copy,
   KeyRound,
   Pencil,
+  Plus,
   Search,
+  Upload,
   UserPlus,
   Users,
   X,
@@ -17,14 +19,15 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { Role } from "@/features/auth/types";
 import { useDebouncedValue } from "@/features/projects/utils/use-debounced-value";
-import { USER_POSITION_LABELS, USER_POSITIONS } from "@/features/projects/types/labels";
+import { usePositions, useCreatePosition } from "../hooks/use-positions";
 import {
   useAdminUsers,
+  useBulkCreateUsers,
   useCreateUser,
   useResetPassword,
   useUpdateUser,
 } from "../hooks/use-admin-users";
-import type { AdminUser } from "../api/users.api";
+import type { AdminUser, BulkCreateUsersResult } from "../api/users.api";
 
 const PAGE_SIZE = 20;
 
@@ -101,6 +104,82 @@ function CredentialsModal({
   );
 }
 
+// ── Formulario inline: alta de un cargo nuevo (sin salir del modal) ─────────
+function NewPositionInlineForm({
+  onCreated,
+  onCancel,
+}: {
+  onCreated: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [key, setKey] = useState("");
+  const [label, setLabel] = useState("");
+  const createPosition = useCreatePosition();
+
+  const canSubmit = /^[a-z][a-z0-9_]*$/.test(key) && label.trim().length >= 2;
+
+  const handleSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
+    createPosition.mutate(
+      { key, label: label.trim() },
+      {
+        onSuccess: (created) => {
+          onCreated(created.value);
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          className={inputCls}
+          placeholder="clave_del_cargo"
+          aria-label="Clave del cargo"
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value.toLowerCase().replace(/\s+/g, "_"));
+          }}
+        />
+        <input
+          className={inputCls}
+          placeholder="Etiqueta visible"
+          aria-label="Etiqueta del cargo"
+          value={label}
+          onChange={(e) => {
+            setLabel(e.target.value);
+          }}
+        />
+      </div>
+      {createPosition.isError && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {getErrorMessage(createPosition.error, "No se pudo crear el cargo")}
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition hover:bg-accent"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit || createPosition.isPending}
+          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-60"
+        >
+          {createPosition.isPending ? "Creando…" : "Crear cargo"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal: crear usuario ────────────────────────────────────────────────────
 function CreateUserModal({
   onClose,
@@ -115,7 +194,10 @@ function CreateUserModal({
     email: "",
     password: "",
     role: Role.USER as Role,
+    position: "sin_cargo",
   });
+  const [addingPosition, setAddingPosition] = useState(false);
+  const { data: positions, isLoading: positionsLoading } = usePositions();
   const createUser = useCreateUser();
 
   const canSubmit =
@@ -214,6 +296,47 @@ function CreateUserModal({
               ))}
             </select>
           </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Cargo en la empresa</span>
+            <select
+              className={inputCls}
+              value={form.position}
+              onChange={set("position")}
+              disabled={positionsLoading}
+              aria-label="Cargo"
+            >
+              {positionsLoading ? (
+                <option value="sin_cargo">Cargando cargos…</option>
+              ) : (
+                positions?.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          {addingPosition ? (
+            <NewPositionInlineForm
+              onCreated={(value) => {
+                setForm((f) => ({ ...f, position: value }));
+                setAddingPosition(false);
+              }}
+              onCancel={() => {
+                setAddingPosition(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setAddingPosition(true);
+              }}
+              className="flex items-center gap-1.5 self-start text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark"
+            >
+              <Plus className="size-3.5" /> Este cargo no existe todavía
+            </button>
+          )}
           {createUser.isError && (
             <p role="alert" className="text-xs text-red-600 dark:text-red-400">
               {getErrorMessage(createUser.error, "No se pudo crear el usuario")}
@@ -250,6 +373,8 @@ function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () => void
     email: user.email,
     position: user.position,
   });
+  const [addingPosition, setAddingPosition] = useState(false);
+  const { data: positions, isLoading: positionsLoading } = usePositions();
   const updateUser = useUpdateUser();
 
   const canSubmit =
@@ -348,15 +473,41 @@ function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () => void
               className={inputCls}
               value={form.position}
               onChange={set("position")}
+              disabled={positionsLoading}
               aria-label="Cargo"
             >
-              {USER_POSITIONS.map((pos) => (
-                <option key={pos} value={pos}>
-                  {USER_POSITION_LABELS[pos]}
-                </option>
-              ))}
+              {positionsLoading ? (
+                <option value={form.position}>Cargando cargos…</option>
+              ) : (
+                positions?.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))
+              )}
             </select>
           </label>
+          {addingPosition ? (
+            <NewPositionInlineForm
+              onCreated={(value) => {
+                setForm((f) => ({ ...f, position: value }));
+                setAddingPosition(false);
+              }}
+              onCancel={() => {
+                setAddingPosition(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setAddingPosition(true);
+              }}
+              className="flex items-center gap-1.5 self-start text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark"
+            >
+              <Plus className="size-3.5" /> Este cargo no existe todavía
+            </button>
+          )}
           {updateUser.isError && (
             <p role="alert" className="text-xs text-red-600 dark:text-red-400">
               {getErrorMessage(updateUser.error, "No se pudo actualizar el usuario")}
@@ -546,6 +697,120 @@ function UserRow({
   );
 }
 
+// ── Modal: carga masiva desde CSV ───────────────────────────────────────────
+function BulkUploadModal({ onClose }: { onClose: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const bulkCreate = useBulkCreateUsers();
+  const [result, setResult] = useState<BulkCreateUsersResult | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setFileName(file.name);
+    setResult(null);
+    bulkCreate.mutate(file, { onSuccess: setResult });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Cargar usuarios desde CSV"
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Upload className="size-4 text-brand-gold" /> Cargar usuarios desde CSV
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <p className="text-xs text-muted-foreground">
+            Columnas: <code>email, name, last_name</code> (obligatorias) y{" "}
+            <code>role, position, password</code> (opcionales). Sin contraseña, se genera una
+            temporal por fila. Las filas inválidas se reportan sin bloquear al resto.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            aria-label="Archivo CSV"
+            onChange={handleFileChange}
+            className="text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-brand-gold-dark"
+          />
+          {fileName && bulkCreate.isPending && (
+            <p className="text-xs text-muted-foreground">Procesando {fileName}…</p>
+          )}
+          {bulkCreate.isError && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {getErrorMessage(bulkCreate.error, "No se pudo procesar el archivo")}
+            </p>
+          )}
+          {result && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3 text-sm">
+              <p className="font-medium text-foreground">
+                {result.created.length} de {result.total_rows} usuarios creados
+              </p>
+              {result.created.length > 0 && (
+                <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                  {result.created.map((u) => (
+                    <li key={u.id}>
+                      {u.email}
+                      {u.temporary_password && (
+                        <span className="text-foreground"> — temp: {u.temporary_password}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {result.failed.length > 0 && (
+                <>
+                  <p className="font-medium text-red-600 dark:text-red-400">
+                    {result.failed.length} fila{result.failed.length !== 1 ? "s" : ""} con errores
+                  </p>
+                  <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-red-600 dark:text-red-400">
+                    {result.failed.map((f) => (
+                      <li key={f.row}>
+                        Fila {f.row} ({f.email ?? "sin correo"}): {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export function AdminUsersPage() {
   const [search, setSearch] = useState("");
@@ -559,6 +824,7 @@ export function AdminUsersPage() {
 
   const query = useAdminUsers({ search: debouncedSearch, page, pageSize: PAGE_SIZE });
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [creds, setCreds] = useState<{ title: string; email: string; password: string } | null>(
     null,
   );
@@ -573,15 +839,26 @@ export function AdminUsersPage() {
         title="Usuarios"
         description="Crea cuentas, asigna roles, activa/desactiva y restablece contraseñas."
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              setShowCreate(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
-          >
-            <UserPlus className="size-4" /> Nuevo usuario
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBulkUpload(true);
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+            >
+              <Upload className="size-4" /> Cargar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreate(true);
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
+            >
+              <UserPlus className="size-4" /> Nuevo usuario
+            </button>
+          </div>
         }
       />
 
@@ -694,6 +971,14 @@ export function AdminUsersPage() {
           password={creds.password}
           onClose={() => {
             setCreds(null);
+          }}
+        />
+      )}
+
+      {showBulkUpload && (
+        <BulkUploadModal
+          onClose={() => {
+            setShowBulkUpload(false);
           }}
         />
       )}

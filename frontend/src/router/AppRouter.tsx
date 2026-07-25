@@ -69,7 +69,9 @@ const CollaboratorActivityPage = lazy(() =>
   })),
 );
 
-const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN];
+// developer también administra usuarios/cargos (ver MANAGEMENT_ROLES en el
+// backend: admin/super_admin/developer crean cuentas, ya no hay registro público).
+const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER];
 
 export const AppRouter = () => (
   <Routes>

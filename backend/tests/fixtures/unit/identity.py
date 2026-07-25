@@ -49,6 +49,24 @@ def build_identity_repository():
     return _make
 
 
+class FakePositionRepository:
+    """Todas las claves pasadas al constructor existen; el resto no."""
+
+    def __init__(self, existing_keys: list[str] | None = None):
+        self.existing_keys = set(existing_keys or ["sin_cargo", "desarrollador"])
+
+    async def key_exists(self, key: str) -> bool:
+        return key in self.existing_keys
+
+
+@pytest.fixture
+def build_position_repository():
+    def _make(existing_keys: list[str] | None = None):
+        return FakePositionRepository(existing_keys=existing_keys)
+
+    return _make
+
+
 @pytest.fixture
 def existing_users() -> list[CreateUserRequest]:
     return [

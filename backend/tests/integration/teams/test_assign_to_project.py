@@ -4,9 +4,9 @@ from app.modules.project.infrastructure.models import ProjectMember
 from app.modules.teams.infrastructure.enums import TeamRole
 
 
-async def _create_user(client, *, email: str, name: str = "Ana"):
+async def _create_user(client, admin_headers, *, email: str, name: str = "Ana"):
     response = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": email,
             "password": "password123",
@@ -15,6 +15,7 @@ async def _create_user(client, *, email: str, name: str = "Ana"):
             "role": "user",
             "position": "desarrollador",
         },
+        headers=admin_headers,
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -52,8 +53,12 @@ class TestAssignTeamToProject:
         assert project_response.status_code == 201
         project = project_response.json()
 
-        lider = await _create_user(client, email="lider@example.com", name="Luis")
-        integrante = await _create_user(client, email="int@example.com", name="Ana")
+        lider = await _create_user(
+            client, admin_headers, email="lider@example.com", name="Luis"
+        )
+        integrante = await _create_user(
+            client, admin_headers, email="int@example.com", name="Ana"
+        )
         team = await _create_team_with_members(
             client,
             admin_headers,
@@ -99,8 +104,12 @@ class TestAssignTeamToProject:
         )
         project = project_response.json()
 
-        existing = await _create_user(client, email="existing@example.com")
-        new_member = await _create_user(client, email="new@example.com", name="Carlos")
+        existing = await _create_user(
+            client, admin_headers, email="existing@example.com"
+        )
+        new_member = await _create_user(
+            client, admin_headers, email="new@example.com", name="Carlos"
+        )
 
         # El usuario ya es miembro del proyecto antes de asignar el equipo.
         await client.post(
@@ -160,7 +169,7 @@ class TestAssignTeamToProject:
         assert response.status_code == 404
 
     async def test_should_404_when_project_missing(self, client, admin_headers):
-        integrante = await _create_user(client, email="solo@example.com")
+        integrante = await _create_user(client, admin_headers, email="solo@example.com")
         team = await _create_team_with_members(
             client, admin_headers, [(integrante, TeamRole.INTEGRANTE)]
         )

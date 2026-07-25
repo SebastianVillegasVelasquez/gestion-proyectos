@@ -2,10 +2,10 @@ from app.modules.teams.infrastructure.enums import TeamRole
 
 
 async def _create_user(
-    client, *, email: str, name: str = "Ana", last_name: str = "Gomez"
+    client, admin_headers, *, email: str, name: str = "Ana", last_name: str = "Gomez"
 ):
     response = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": email,
             "password": "password123",
@@ -14,6 +14,7 @@ async def _create_user(
             "role": "user",
             "position": "desarrollador",
         },
+        headers=admin_headers,
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -117,7 +118,7 @@ class TestTeamCrudRoutes:
 class TestTeamMemberRoutes:
     async def test_should_add_member_with_default_role(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="ana@example.com")
+        user = await _create_user(client, admin_headers, email="ana@example.com")
 
         response = await client.post(
             f"/api/v1/teams/{team['id']}/members",
@@ -133,7 +134,9 @@ class TestTeamMemberRoutes:
 
     async def test_should_add_member_with_explicit_role(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="lider@example.com", name="Luis")
+        user = await _create_user(
+            client, admin_headers, email="lider@example.com", name="Luis"
+        )
 
         response = await client.post(
             f"/api/v1/teams/{team['id']}/members",
@@ -146,7 +149,7 @@ class TestTeamMemberRoutes:
 
     async def test_should_reject_duplicate_member(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="dup@example.com")
+        user = await _create_user(client, admin_headers, email="dup@example.com")
 
         await client.post(
             f"/api/v1/teams/{team['id']}/members",
@@ -174,7 +177,7 @@ class TestTeamMemberRoutes:
 
     async def test_should_change_member_role(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="role@example.com")
+        user = await _create_user(client, admin_headers, email="role@example.com")
 
         await client.post(
             f"/api/v1/teams/{team['id']}/members",
@@ -193,7 +196,7 @@ class TestTeamMemberRoutes:
 
     async def test_should_remove_member(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="remove@example.com")
+        user = await _create_user(client, admin_headers, email="remove@example.com")
 
         await client.post(
             f"/api/v1/teams/{team['id']}/members",
@@ -216,8 +219,12 @@ class TestTeamMemberRoutes:
 
     async def test_should_list_members(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user1 = await _create_user(client, email="m1@example.com", name="Ana")
-        user2 = await _create_user(client, email="m2@example.com", name="Carlos")
+        user1 = await _create_user(
+            client, admin_headers, email="m1@example.com", name="Ana"
+        )
+        user2 = await _create_user(
+            client, admin_headers, email="m2@example.com", name="Carlos"
+        )
 
         for user in (user1, user2):
             await client.post(
@@ -237,7 +244,7 @@ class TestTeamMemberRoutes:
 
     async def test_member_count_reflects_members(self, client, admin_headers):
         team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="count@example.com")
+        user = await _create_user(client, admin_headers, email="count@example.com")
 
         await client.post(
             f"/api/v1/teams/{team['id']}/members",

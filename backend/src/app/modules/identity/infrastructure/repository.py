@@ -3,8 +3,7 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.infrastructure.enums import UserPosition
-from app.modules.identity.infrastructure.models import User
+from app.modules.identity.infrastructure.models import Position, User
 from app.shared.base_repository import BaseRepository
 
 
@@ -22,7 +21,7 @@ class UserRepository(BaseRepository[User]):
     async def search_directory(
         self,
         search: str | None,
-        position: UserPosition | None,
+        position: str | None,
         limit: int,
         offset: int,
     ) -> tuple[list[User], int]:
@@ -115,3 +114,29 @@ class UserRepository(BaseRepository[User]):
         user.is_active = False
 
         return await self.save(user)
+
+
+class PositionRepository(BaseRepository[Position]):
+    """Catálogo mutable de cargos: admin/super_admin/developer agregan filas
+    nuevas en caliente (ver ``POST /identity/positions``), sin migraciones.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(model=Position, session=session)
+
+    async def list_active(self) -> list[Position]:
+        query = (
+            select(Position)
+            .where(Position.is_active.is_(True))
+            .order_by(Position.label)
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_by_key(self, key: str) -> Position | None:
+        query = select(Position).where(Position.key == key)
+        result = await self._session.execute(query)
+        return result.scalars().first()
+
+    async def key_exists(self, key: str) -> bool:
+        return await self.get_by_key(key) is not None

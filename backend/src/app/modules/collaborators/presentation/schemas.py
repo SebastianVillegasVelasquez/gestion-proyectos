@@ -1,7 +1,6 @@
 import datetime
 from uuid import UUID
 
-from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.shared.base_model import BaseModelConfig
 
@@ -12,7 +11,7 @@ class CollaboratorListItem(BaseModelConfig):
     user_id: UUID
     name: str
     last_name: str
-    position: UserPosition
+    position: str
     assigned_tasks: int
     completed_tasks: int
     completion_pct: int
@@ -49,7 +48,7 @@ class CollaboratorActivityResponse(BaseModelConfig):
     name: str
     last_name: str
     email: str
-    position: UserPosition
+    position: str
     assigned_tasks: int
     completed_tasks: int
     in_progress_tasks: int

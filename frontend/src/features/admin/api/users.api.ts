@@ -17,6 +17,27 @@ export interface CreateUserPayload {
   name: string;
   last_name: string;
   role: Role;
+  position?: string;
+}
+
+export interface BulkUserRowError {
+  row: number;
+  email: string | null;
+  error: string;
+}
+
+export interface BulkCreatedUser {
+  id: string;
+  email: string;
+  name: string;
+  last_name: string;
+  temporary_password: string | null;
+}
+
+export interface BulkCreateUsersResult {
+  created: BulkCreatedUser[];
+  failed: BulkUserRowError[];
+  total_rows: number;
 }
 
 export type UpdateUserChanges = Partial<
@@ -49,6 +70,18 @@ export const adminUsersApi = {
 
   create: (payload: CreateUserPayload) =>
     http.post<AdminUser>("/identity/users", payload).then((r) => r.data),
+
+  // Carga masiva desde CSV (primera vez usando la plataforma: alta de muchos
+  // usuarios de una sola vez).
+  createBulk: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return http
+      .post<BulkCreateUsersResult>("/identity/users/bulk", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 
   // PATCH requiere los datos base; reenviamos los actuales + el cambio.
   update: (user: AdminUser, changes: UpdateUserChanges) =>

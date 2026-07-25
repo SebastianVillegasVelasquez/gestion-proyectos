@@ -1,13 +1,12 @@
 from uuid import UUID
 
-from app.modules.identity.infrastructure.enums import UserPosition
 from app.shared.base_model import BaseModelConfig
 
 
 class AreaProgress(BaseModelConfig):
     """Avance de un área (cargo) dentro del proyecto."""
 
-    position: UserPosition
+    position: str
     member_count: int
     assigned_tasks: int
     completed_tasks: int
