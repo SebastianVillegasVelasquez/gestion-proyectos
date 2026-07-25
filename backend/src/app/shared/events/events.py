@@ -53,6 +53,15 @@ class TaskReturned(DomainEvent):
 
 
 @dataclass(frozen=True)
+class UserCreated(DomainEvent):
+    """Se creó una cuenta nueva (alta individual o carga masiva por CSV)."""
+
+    user_id: uuid.UUID
+    email: str
+    name: str
+
+
+@dataclass(frozen=True)
 class MemberAssigned(DomainEvent):
     """Un usuario fue agregado como miembro de un proyecto."""
 

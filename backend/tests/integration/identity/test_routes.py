@@ -1,18 +1,22 @@
 from uuid import UUID
 
 
-class TestCreateUserRoute:
-    async def test_should_create_user_successfully(self, client):
+class TestCreateUserAdminRoute:
+    """La plataforma es privada: no hay registro público, solo alta por
+    administración (admin/super_admin/developer)."""
+
+    async def test_should_create_user_successfully(self, client, admin_headers):
         response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
-                "email": "admin@example.com",
+                "email": "nuevo@example.com",
                 "password": "password123",
                 "name": "John",
                 "last_name": "Doe",
-                "role": "admin",
+                "role": "user",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         assert response.status_code == 201
@@ -29,18 +33,28 @@ class TestCreateUserRoute:
         assert isinstance(body["id"], str)
         UUID(body["id"])
 
-        assert body["email"] == "admin@example.com"
+        assert body["email"] == "nuevo@example.com"
         assert body["name"] == "John"
         assert body["last_name"] == "Doe"
-        # Seguridad: el registro PÚBLICO ignora el rol enviado y crea siempre USER
-        # (la creación con rol vive en POST /identity/users, solo admin).
         assert body["role"] == "user"
-
         assert body["is_active"] is True
 
-    async def test_should_return_422_when_email_is_invalid(self, client):
+    async def test_should_require_authentication(self, client):
         response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
+            json={
+                "email": "sinauth@example.com",
+                "password": "password123",
+                "name": "John",
+                "last_name": "Doe",
+                "position": "desarrollador",
+            },
+        )
+        assert response.status_code in (401, 403)
+
+    async def test_should_return_422_when_email_is_invalid(self, client, admin_headers):
+        response = await client.post(
+            "/api/v1/identity/users",
             json={
                 "email": "invalid-email",
                 "password": "password123",
@@ -49,83 +63,142 @@ class TestCreateUserRoute:
                 "role": "admin",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         assert response.status_code == 422
 
-    async def test_should_return_422_when_password_is_missing(self, client):
+    async def test_should_return_422_when_password_is_missing(
+        self, client, admin_headers
+    ):
         response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
-                "email": "admin@example.com",
+                "email": "sinpassword@example.com",
                 "name": "John",
                 "last_name": "Doe",
                 "role": "admin",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         assert response.status_code == 422
 
-    async def test_should_return_422_when_role_is_invalid(self, client):
+    async def test_should_return_422_when_role_is_invalid(self, client, admin_headers):
         response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
-                "email": "admin@example.com",
+                "email": "rolinvalido@example.com",
                 "password": "password123",
                 "name": "John",
                 "last_name": "Doe",
                 "role": "super-admin",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         assert response.status_code == 422
 
+    async def test_should_return_404_when_position_does_not_exist(
+        self, client, admin_headers
+    ):
+        response = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "cargoinvalido@example.com",
+                "password": "password123",
+                "name": "John",
+                "last_name": "Doe",
+                "role": "user",
+                "position": "cargo_que_no_existe",
+            },
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+
     async def test_should_return_conflict_when_email_already_exists(
         self,
         client,
+        admin_headers,
     ):
         payload = {
-            "email": "admin@example.com",
+            "email": "duplicado@example.com",
             "password": "password123",
             "name": "John",
             "last_name": "Doe",
-            "role": "admin",
+            "role": "user",
             "position": "desarrollador",
         }
 
         await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json=payload,
+            headers=admin_headers,
         )
 
         response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json=payload,
+            headers=admin_headers,
         )
 
         assert response.status_code == 409
 
-
-class TestLoginRoute:
-    async def test_should_login_successfully(self, client):
-        await client.post(
-            "/api/v1/identity/",
+    async def test_developer_can_create_user(self, client, developer_headers):
+        response = await client.post(
+            "/api/v1/identity/users",
             json={
-                "email": "admin@example.com",
+                "email": "creado.por.developer@example.com",
+                "password": "password123",
+                "name": "Dev",
+                "last_name": "Created",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=developer_headers,
+        )
+
+        assert response.status_code == 201, response.text
+
+    async def test_regular_user_cannot_create_user(self, client, member_headers):
+        response = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "sinpermiso@example.com",
                 "password": "password123",
                 "name": "John",
                 "last_name": "Doe",
-                "role": "admin",
+                "role": "user",
                 "position": "desarrollador",
             },
+            headers=member_headers,
+        )
+
+        assert response.status_code == 403
+
+
+class TestLoginRoute:
+    async def test_should_login_successfully(self, client, admin_headers):
+        await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "login@example.com",
+                "password": "password123",
+                "name": "John",
+                "last_name": "Doe",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
         )
 
         response = await client.post(
             "/api/v1/identity/auth/login",
             json={
-                "email": "admin@example.com",
+                "email": "login@example.com",
                 "password": "password123",
             },
         )
@@ -152,33 +225,34 @@ class TestLoginRoute:
         # User validation
         user = body["user"]
 
-        assert user["email"] == "admin@example.com"
+        assert user["email"] == "login@example.com"
         assert user["name"] == "John"
         assert user["last_name"] == "Doe"
-        # El registro público crea USER (ver nota de seguridad arriba).
         assert user["role"] == "user"
         assert user["is_active"] is True
 
     async def test_should_return_401_when_password_is_invalid(
         self,
         client,
+        admin_headers,
     ):
         await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
-                "email": "admin@example.com",
+                "email": "malacontra@example.com",
                 "password": "password123",
                 "name": "John",
                 "last_name": "Doe",
-                "role": "admin",
+                "role": "user",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         response = await client.post(
             "/api/v1/identity/auth/login",
             json={
-                "email": "admin@example.com",
+                "email": "malacontra@example.com",
                 "password": "wrong-password",
             },
         )
@@ -224,3 +298,21 @@ class TestLoginRoute:
         )
 
         assert response.status_code == 422
+
+
+class TestPublicRegisterRemoved:
+    """La plataforma es de uso interno/privado: el registro público ya no existe."""
+
+    async def test_public_register_endpoint_is_gone(self, client):
+        response = await client.post(
+            "/api/v1/identity/",
+            json={
+                "email": "hacker@example.com",
+                "password": "password123",
+                "name": "Mal",
+                "last_name": "Actor",
+                "role": "user",
+                "position": "desarrollador",
+            },
+        )
+        assert response.status_code == 404

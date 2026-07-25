@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import StringConstraints, model_validator
 
-from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.shared.base_model import BaseModelConfig
@@ -65,7 +64,7 @@ class ProjectMemberResponse(BaseModelConfig):
     name: str
     last_name: str
     email: str
-    position: UserPosition
+    position: str
     project_role: ProjectRole
 
 

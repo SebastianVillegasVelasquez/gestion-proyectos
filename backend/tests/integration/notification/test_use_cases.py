@@ -19,7 +19,7 @@ class TestNotificationUseCases:
         db_session,
     ):
         user = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
                 "email": "test@obj.com",
                 "password": "secret123",
@@ -28,6 +28,7 @@ class TestNotificationUseCases:
                 "role": "user",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
         assert user.status_code == 201, user.text
         assignee_id = user.json()["id"]

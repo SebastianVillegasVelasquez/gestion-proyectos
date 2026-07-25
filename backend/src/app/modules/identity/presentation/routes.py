@@ -1,18 +1,25 @@
+import csv
+import io
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, UploadFile
 from fastapi.routing import APIRouter
 
 from app.core.dependencies import (
+    event_bus_dependency,
     get_current_user,
+    position_repo_dependency,
     user_repo_dependency,
     require_role,
 )
 from app.modules.identity.application.use_cases import (
+    BulkCreateUsersUseCase,
     ChangeMyPasswordUseCase,
+    CreatePositionUseCase,
     CreateUserUseCase,
     DeleteUserUseCase,
     GetUserByIdUseCase,
+    ListPositionsUseCase,
     LoginUseCase,
     RefreshTokenUseCase,
     ResetUserPasswordUseCase,
@@ -20,12 +27,17 @@ from app.modules.identity.application.use_cases import (
     SearchUsersUseCase,
     UpdateUserUseCase,
 )
+from app.shared.events import EventBus
 from app.shared.pagination import Pagination, pagination_params
 from app.shared.rate_limit import rate_limiter
-from app.modules.identity.infrastructure.repository import UserRepository
-from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
+from app.modules.identity.infrastructure.repository import (
+    PositionRepository,
+    UserRepository,
+)
 from app.modules.identity.presentation.schemas import (
+    BulkCreateUsersResponse,
     ChangePasswordRequest,
+    CreatePositionRequest,
     CreateUserRequest,
     DirectoryUserResponse,
     LoginRequest,
@@ -37,46 +49,91 @@ from app.modules.identity.presentation.schemas import (
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
-    position_options,
 )
 
+# Roles con acceso a la administración de usuarios: gestión de cuentas y
+# cargos es cosa de admin/super_admin/developer (rol técnico, tope de la
+# jerarquía). Ya no existe registro público: toda cuenta nueva la crea alguien
+# de estos roles (ver create_user_admin más abajo).
+MANAGEMENT_ROLES = ("admin", "super_admin", "developer")
+
 router = APIRouter(prefix="/identity", tags=["Identity"])
-
-
-@router.post("/", response_model=UserResponse, status_code=201)
-async def create(
-    data: CreateUserRequest,
-    repo: UserRepository = Depends(user_repo_dependency),
-):
-    """Registro PÚBLICO (sin autenticación).
-
-    Seguridad: forzamos role=USER aunque el cliente envíe otro. Si no, cualquiera
-    podría auto-asignarse super_admin. La creación con rol vive en POST /users
-    (solo administración).
-    """
-    data.role = SystemRole.USER
-    return await CreateUserUseCase(user_repo=repo).execute(data)
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
 async def create_user_admin(
     data: CreateUserRequest,
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    position_repo: PositionRepository = Depends(position_repo_dependency),
+    event_bus: EventBus = Depends(event_bus_dependency),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
-    """Creación de usuarios por administración: honra el rol indicado."""
-    return await CreateUserUseCase(user_repo=repo).execute(data)
+    """Creación de usuarios por administración: honra el rol indicado.
+
+    Única vía para crear cuentas (la plataforma es privada, de uso interno;
+    no hay registro público).
+    """
+    return await CreateUserUseCase(
+        user_repo=repo, position_repo=position_repo, event_bus=event_bus
+    ).execute(data)
+
+
+@router.post("/users/bulk", response_model=BulkCreateUsersResponse, status_code=201)
+async def create_users_bulk(
+    file: UploadFile,
+    repo: UserRepository = Depends(user_repo_dependency),
+    position_repo: PositionRepository = Depends(position_repo_dependency),
+    event_bus: EventBus = Depends(event_bus_dependency),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
+):
+    """Carga masiva de usuarios desde un CSV (columnas: email, name, last_name,
+    role, position, password). `role`/`position`/`password` son opcionales:
+    por defecto `user`, `sin_cargo` y una contraseña temporal generada.
+
+    Procesa cada fila de forma independiente: una fila inválida no bloquea
+    al resto del archivo (ver BulkCreateUsersUseCase).
+    """
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="El archivo debe ser UTF-8")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise HTTPException(status_code=422, detail="El CSV está vacío")
+
+    rows = [row for row in reader]
+    return await BulkCreateUsersUseCase(
+        user_repo=repo, position_repo=position_repo, event_bus=event_bus
+    ).execute(rows)
 
 
 @router.get("/positions", response_model=list[PositionOption])
-async def positions():
-    """Cargos disponibles para poblar el selector del registro.
+async def positions(
+    position_repo: PositionRepository = Depends(position_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Cargos activos para poblar los selectores de administración.
 
-    Público (la pantalla de registro no está autenticada). Es la única fuente de
-    verdad de los cargos: si más adelante se migran a una tabla, este contrato
-    (value/label) no cambia y el frontend no se toca.
+    Fuente de verdad: la tabla `positions` (mutable). Un cargo nuevo dado de
+    alta con POST /identity/positions aparece aquí de inmediato.
     """
-    return position_options()
+    return await ListPositionsUseCase(position_repo).execute()
+
+
+@router.post("/positions", response_model=PositionOption, status_code=201)
+async def create_position(
+    data: CreatePositionRequest,
+    position_repo: PositionRepository = Depends(position_repo_dependency),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
+):
+    """Da de alta un cargo que la empresa nunca había tenido.
+
+    Queda persistido de inmediato (sin migración ni reinicio): el próximo
+    usuario que se cree ya puede usarlo.
+    """
+    return await CreatePositionUseCase(position_repo).execute(data)
 
 
 @router.post("/auth/login", response_model=TokenResponse)
@@ -118,7 +175,7 @@ async def change_my_password(
 async def reset_user_password(
     user_id: UUID,
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
     """Administración genera una contraseña temporal para entregar al usuario."""
     return await ResetUserPasswordUseCase(repo).execute(user_id)
@@ -126,7 +183,7 @@ async def reset_user_password(
 
 @router.get("/directory", response_model=list[DirectoryUserResponse])
 async def directory(
-    position: UserPosition | None = None,
+    position: str | None = None,
     repo: UserRepository = Depends(user_repo_dependency),
     current_user: UserResponse = Depends(get_current_user),
 ):
@@ -144,7 +201,7 @@ async def directory(
 @router.get("/users", response_model=list[UserResponse])
 async def get_users(
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
     return await repo.get_all()
 
@@ -152,7 +209,7 @@ async def get_users(
 @router.get("/users/search", response_model=PaginatedDirectoryResponse)
 async def search_users(
     search: str | None = None,
-    position: UserPosition | None = None,
+    position: str | None = None,
     pagination: Pagination = Depends(pagination_params),
     repo: UserRepository = Depends(user_repo_dependency),
     current_user: UserResponse = Depends(get_current_user),
@@ -166,7 +223,7 @@ async def manage_users(
     search: str | None = None,
     pagination: Pagination = Depends(pagination_params),
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(require_role("admin", "super_admin")),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
     """Lista paginada de usuarios (con rol e is_active) para la gestión admin."""
     return await SearchUsersAdminUseCase(repo).execute(search, pagination)
@@ -183,6 +240,7 @@ async def get_user_by_id(
         require_role(
             "admin",
             "super_admin",
+            "developer",
             "member",
         )
     ),
@@ -198,12 +256,7 @@ async def patch_user(
     user_id: UUID,
     data: UpdateUserRequest,
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(
-        require_role(
-            "admin",
-            "super_admin",
-        )
-    ),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
     return await UpdateUserUseCase(repo).execute(
         user_id=user_id,
@@ -219,12 +272,7 @@ async def update_user(
     user_id: UUID,
     data: UpdateUserRequest,
     repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(
-        require_role(
-            "admin",
-            "super_admin",
-        )
-    ),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
     return await UpdateUserUseCase(repo).execute(
         user_id=user_id,

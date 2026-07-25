@@ -1,6 +1,6 @@
-async def _register_and_login(client) -> dict:
+async def _register_and_login(client, admin_headers) -> dict:
     await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": "refresh@example.com",
             "password": "password123",
@@ -9,6 +9,7 @@ async def _register_and_login(client) -> dict:
             "role": "admin",
             "position": "desarrollador",
         },
+        headers=admin_headers,
     )
     res = await client.post(
         "/api/v1/identity/auth/login",
@@ -19,8 +20,10 @@ async def _register_and_login(client) -> dict:
 
 
 class TestRefreshRoute:
-    async def test_should_issue_new_tokens_from_valid_refresh(self, client):
-        tokens = await _register_and_login(client)
+    async def test_should_issue_new_tokens_from_valid_refresh(
+        self, client, admin_headers
+    ):
+        tokens = await _register_and_login(client, admin_headers)
 
         res = await client.post(
             "/api/v1/identity/auth/refresh",
@@ -33,8 +36,10 @@ class TestRefreshRoute:
         assert body["refresh_token"]
         assert body["user"]["email"] == "refresh@example.com"
 
-    async def test_new_access_token_works_on_protected_route(self, client):
-        tokens = await _register_and_login(client)
+    async def test_new_access_token_works_on_protected_route(
+        self, client, admin_headers
+    ):
+        tokens = await _register_and_login(client, admin_headers)
         refreshed = (
             await client.post(
                 "/api/v1/identity/auth/refresh",
@@ -55,8 +60,10 @@ class TestRefreshRoute:
         )
         assert res.status_code == 401
 
-    async def test_should_reject_access_token_used_as_refresh(self, client):
-        tokens = await _register_and_login(client)
+    async def test_should_reject_access_token_used_as_refresh(
+        self, client, admin_headers
+    ):
+        tokens = await _register_and_login(client, admin_headers)
         # Mandar el access_token donde se espera un refresh_token → debe fallar
         res = await client.post(
             "/api/v1/identity/auth/refresh",

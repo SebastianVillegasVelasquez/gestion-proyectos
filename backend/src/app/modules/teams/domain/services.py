@@ -122,6 +122,6 @@ class TeamService:
             user_id=member.user_id,
             name=member.user.name,
             last_name=member.user.last_name,
-            position=str(member.user.position.value),
+            position=member.user.position,
             team_role=member.team_role,
         )

@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.modules.areas.infrastructure.repository import (
@@ -23,8 +24,12 @@ from app.modules.feedback.domain.repository import FeedbackRepository
 from app.modules.feedback.infrastructure.repository import (
     SqlAlchemyFeedbackRepository,
 )
+from app.modules.identity.application.handlers import NotifyUserCreatedByEmail
 from app.modules.identity.infrastructure.enums import SystemRole
-from app.modules.identity.infrastructure.repository import UserRepository
+from app.modules.identity.infrastructure.repository import (
+    PositionRepository,
+    UserRepository,
+)
 from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.notifications.application.registry import (
     register_notification_handlers,
@@ -55,7 +60,9 @@ from app.modules.traceability.infrastructure.repository import (
 )
 from app.shared.authz import role_satisfies
 from app.shared.broadcasting.broadcaster import Broadcaster
+from app.shared.email.sender import SmtpEmailSender
 from app.shared.events import EventBus
+from app.shared.events.events import UserCreated
 from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
@@ -65,6 +72,12 @@ def project_repo_dependency(db: AsyncSession = Depends(get_db)) -> ProjectReposi
 
 def user_repo_dependency(db: AsyncSession = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
+
+
+def position_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> PositionRepository:
+    return PositionRepository(db)
 
 
 def project_members_repo_dependency(
@@ -147,6 +160,9 @@ def event_bus_dependency(
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
     register_notification_handlers(bus, notification_repo, broadcaster, db)
+    bus.subscribe(
+        UserCreated, NotifyUserCreatedByEmail(SmtpEmailSender(get_settings()))
+    )
     return bus
 
 

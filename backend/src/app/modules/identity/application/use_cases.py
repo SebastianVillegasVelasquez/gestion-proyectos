@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from jose import JWTError
@@ -12,19 +13,32 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from pydantic import ValidationError
+
 from app.modules.identity.domain.services import UserService
-from app.modules.identity.infrastructure.enums import UserPosition
+from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.models import Position
 from app.modules.identity.presentation.schemas import (
+    BulkCreatedUser,
+    BulkCreateUsersResponse,
+    BulkUserRowError,
+    CreatePositionRequest,
     CreateUserRequest,
     DirectoryUserResponse,
     PaginatedDirectoryResponse,
     PaginatedUsersResponse,
+    PositionOption,
     ResetPasswordResponse,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
 )
-from app.modules.identity.infrastructure.repository import UserRepository
+from app.modules.identity.infrastructure.repository import (
+    PositionRepository,
+    UserRepository,
+)
+from app.shared.events import EventBus
+from app.shared.events.events import UserCreated
 from app.shared.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.shared.pagination import Pagination
 
@@ -55,15 +69,35 @@ def _token_response(user) -> TokenResponse:
 
 
 class CreateUserUseCase:
-    def __init__(self, user_repo: UserRepository):
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        position_repo: PositionRepository,
+        event_bus: EventBus | None = None,
+    ):
         self.user_repo = user_repo
+        self.position_repo = position_repo
         self.user_service = UserService(user_repo)
+        self.event_bus = event_bus
 
     async def execute(self, data: CreateUserRequest) -> UserResponse:
         if not await self.user_repo.is_email_available(data.email):
             raise ConflictError("El correo ya se encuentra registrado")
 
+        if not await self.position_repo.key_exists(data.position):
+            raise NotFoundError(f"El cargo '{data.position}' no existe")
+
         result = await self.user_service.create_user(data)
+
+        if self.event_bus is not None:
+            await self.event_bus.publish(
+                UserCreated(
+                    occurred_at=datetime.now(timezone.utc),
+                    user_id=result.id,
+                    email=result.email,
+                    name=result.name,
+                )
+            )
 
         return result
 
@@ -126,7 +160,7 @@ class SearchUsersUseCase:
     async def execute(
         self,
         search: str | None,
-        position: UserPosition | None,
+        position: str | None,
         pagination: Pagination,
     ) -> PaginatedDirectoryResponse:
         items, total = await self.user_repo.search_directory(
@@ -224,3 +258,128 @@ class ResetUserPasswordUseCase:
         user.password = hash_password(temp)
         await self.user_repo.save(user)
         return ResetPasswordResponse(user_id=user_id, temporary_password=temp)
+
+
+class ListPositionsUseCase:
+    """Cargos activos disponibles para asignar a un usuario."""
+
+    def __init__(self, position_repo: PositionRepository):
+        self.position_repo = position_repo
+
+    async def execute(self) -> list[PositionOption]:
+        positions = await self.position_repo.list_active()
+        return [PositionOption(value=p.key, label=p.label) for p in positions]
+
+
+class CreatePositionUseCase:
+    """Alta de un cargo nuevo (admin/super_admin/developer): queda persistido
+    de inmediato, sin migración, para que el próximo usuario ya pueda usarlo."""
+
+    def __init__(self, position_repo: PositionRepository):
+        self.position_repo = position_repo
+
+    async def execute(self, data: CreatePositionRequest) -> PositionOption:
+        if await self.position_repo.key_exists(data.key):
+            raise ConflictError(f"Ya existe un cargo con la clave '{data.key}'")
+
+        position = await self.position_repo.add(
+            Position(key=data.key, label=data.label)
+        )
+        return PositionOption(value=position.key, label=position.label)
+
+
+class BulkCreateUsersUseCase:
+    """Alta masiva desde un CSV: el primer uso de la plataforma puede traer
+    decenas de personas de una vez.
+
+    Procesamos cada fila de forma independiente (best effort): una fila mala
+    (correo repetido, cargo inexistente, rol inválido) queda reportada en
+    `failed` con el motivo, pero no bloquea la creación del resto del archivo.
+    """
+
+    REQUIRED_COLUMNS = ("email", "name", "last_name")
+
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        position_repo: PositionRepository,
+        event_bus: EventBus | None = None,
+    ):
+        self.user_repo = user_repo
+        self.position_repo = position_repo
+        self.user_service = UserService(user_repo)
+        self.event_bus = event_bus
+
+    async def execute(self, rows: list[dict[str, str]]) -> BulkCreateUsersResponse:
+        created: list[BulkCreatedUser] = []
+        failed: list[BulkUserRowError] = []
+
+        for index, row in enumerate(rows, start=1):
+            email = (row.get("email") or "").strip()
+            try:
+                for column in self.REQUIRED_COLUMNS:
+                    if not (row.get(column) or "").strip():
+                        raise ValueError(f"Falta la columna '{column}'")
+
+                if not await self.user_repo.is_email_available(email):
+                    raise ValueError("El correo ya se encuentra registrado")
+
+                position_key = (row.get("position") or "sin_cargo").strip()
+                if not await self.position_repo.key_exists(position_key):
+                    raise ValueError(f"El cargo '{position_key}' no existe")
+
+                role_raw = (row.get("role") or "user").strip()
+                try:
+                    role = SystemRole(role_raw)
+                except ValueError:
+                    raise ValueError(f"El rol '{role_raw}' no es válido")
+
+                raw_password = (row.get("password") or "").strip()
+                generated_password = not raw_password
+                password = raw_password or _generate_temp_password()
+
+                data = CreateUserRequest(
+                    email=email,
+                    password=password,
+                    name=row["name"].strip(),
+                    last_name=row["last_name"].strip(),
+                    role=role,
+                    position=position_key,
+                )
+                user = await self.user_service.create_user(data)
+
+                if self.event_bus is not None:
+                    await self.event_bus.publish(
+                        UserCreated(
+                            occurred_at=datetime.now(timezone.utc),
+                            user_id=user.id,
+                            email=user.email,
+                            name=user.name,
+                        )
+                    )
+
+                created.append(
+                    BulkCreatedUser(
+                        id=user.id,
+                        email=user.email,
+                        name=user.name,
+                        last_name=user.last_name,
+                        temporary_password=(password if generated_password else None),
+                    )
+                )
+            except ValidationError as exc:
+                failed.append(
+                    BulkUserRowError(
+                        row=index,
+                        email=email or None,
+                        error="; ".join(e["msg"] for e in exc.errors()),
+                    )
+                )
+            except ValueError as exc:
+                failed.append(
+                    BulkUserRowError(row=index, email=email or None, error=str(exc))
+                )
+
+        return BulkCreateUsersResponse(
+            created=created, failed=failed, total_rows=len(rows)
+        )

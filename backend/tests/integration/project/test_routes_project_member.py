@@ -17,7 +17,7 @@ class TestRoutesProjectMember:
         assert project_response.status_code == 201
 
         user_response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
                 "email": "admin@example.com",
                 "password": "password123",
@@ -26,6 +26,7 @@ class TestRoutesProjectMember:
                 "role": "admin",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
 
         assert user_response.status_code == 201
@@ -66,7 +67,7 @@ class TestRoutesProjectMember:
         project = project_response.json()
 
         user1_response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
                 "email": "ana.gomez@example.com",
                 "password": "password123",
@@ -75,9 +76,10 @@ class TestRoutesProjectMember:
                 "role": "user",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
         user2_response = await client.post(
-            "/api/v1/identity/",
+            "/api/v1/identity/users",
             json={
                 "email": "carlos.perez@example.com",
                 "password": "password123",
@@ -86,6 +88,7 @@ class TestRoutesProjectMember:
                 "role": "user",
                 "position": "desarrollador",
             },
+            headers=admin_headers,
         )
         assert user1_response.status_code == 201
         assert user2_response.status_code == 201

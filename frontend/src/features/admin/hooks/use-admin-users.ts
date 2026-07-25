@@ -32,6 +32,14 @@ export function useCreateUser() {
   });
 }
 
+export function useBulkCreateUsers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => adminUsersApi.createBulk(file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminUserKeys.all }),
+  });
+}
+
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({

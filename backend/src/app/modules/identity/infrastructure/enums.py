@@ -17,13 +17,18 @@ class SystemRole(str, Enum):
 
 
 class UserPosition(str, Enum):
-    """Cargos operativos o perfiles profesionales del usuario.
+    """Catálogo SEMILLA de cargos (histórico).
 
-    Se almacena en el modelo User y sirve exclusivamente para filtrado y asignación de recursos.
+    Ya NO es la fuente de verdad en runtime: ``users.position`` es un string
+    validado contra la tabla mutable ``positions`` (ver
+    ``app.modules.identity.infrastructure.models.Position``), poblada a partir
+    de estos mismos valores por la migración ``g1h2i3j4k5l6``. Admin/super_admin/
+    developer pueden agregar cargos nuevos en caliente vía
+    ``POST /identity/positions`` sin tocar código ni migraciones.
 
-    Vocabulario controlado por desarrollo (no gestionable en runtime). Para añadir un
-    cargo: agregar el miembro aquí y crear una migración Alembic con
-    ``ALTER TYPE user_position ADD VALUE`` (el tipo nativo de Postgres almacena por NOMBRE).
+    Este enum se conserva solo como referencia legible y para los seeds de
+    desarrollo (``app/core/seed.py``, ``seed_demo.py``), que siguen funcionando
+    porque sus miembros son instancias de ``str``.
     """
 
     # ── Existentes ──
