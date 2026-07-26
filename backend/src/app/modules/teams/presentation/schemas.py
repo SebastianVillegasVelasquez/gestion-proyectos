@@ -19,6 +19,7 @@ class UpdateTeamRequest(BaseModelConfig):
 
 class TeamResponse(BaseModelConfig):
     id: UUID
+    project_id: UUID
     name: str
     description: Optional[str] = None
     member_count: int = 0

@@ -19,9 +19,17 @@ import {
 import type { TeamMember, TeamRole } from "../../types/api.types";
 import { AddTeamMemberModal } from "./AddTeamMemberModal";
 
-function MemberRow({ member, teamId }: { member: TeamMember; teamId: string }) {
-  const changeRole = useChangeTeamMemberRole(teamId);
-  const removeMember = useRemoveTeamMember(teamId);
+function MemberRow({
+  member,
+  projectId,
+  teamId,
+}: {
+  member: TeamMember;
+  projectId: string;
+  teamId: string;
+}) {
+  const changeRole = useChangeTeamMemberRole(projectId, teamId);
+  const removeMember = useRemoveTeamMember(projectId, teamId);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
@@ -100,8 +108,8 @@ function MemberRow({ member, teamId }: { member: TeamMember; teamId: string }) {
 }
 
 // Gestión de integrantes de un equipo: listar, agregar, cambiar rol y quitar.
-export function TeamMembersManager({ teamId }: { teamId: string }) {
-  const membersQuery = useTeamMembers(teamId);
+export function TeamMembersManager({ projectId, teamId }: { projectId: string; teamId: string }) {
+  const membersQuery = useTeamMembers(projectId, teamId);
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const existingIds = useMemo(() => members.map((m) => m.user_id), [members]);
   const [showAdd, setShowAdd] = useState(false);
@@ -142,13 +150,14 @@ export function TeamMembersManager({ teamId }: { teamId: string }) {
       ) : (
         <div className="flex flex-col gap-2">
           {members.map((m) => (
-            <MemberRow key={m.user_id} member={m} teamId={teamId} />
+            <MemberRow key={m.user_id} member={m} projectId={projectId} teamId={teamId} />
           ))}
         </div>
       )}
 
       {showAdd && (
         <AddTeamMemberModal
+          projectId={projectId}
           teamId={teamId}
           existingIds={existingIds}
           onClose={() => {

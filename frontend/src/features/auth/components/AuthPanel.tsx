@@ -1,16 +1,17 @@
-const LOGIN_FEATURES = [
-  {
-    d: "M3 7h18M3 12h18M3 17h18",
-    title: "Centraliza todos tus proyectos",
-  },
-  {
-    d: "M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zM21 16a3 3 0 11-6 0 3 3 0 016 0z",
-    title: "Seguimiento en tiempo real y Gantt",
-  },
-  {
-    d: "M13 10V3L4 14h7v7l9-11h-7z",
-    title: "Reportes ejecutivos con IA",
-  },
+import { motion } from "framer-motion";
+
+// Formas ambientales: solo transform/opacity (GPU-friendly), en bucle infinito
+// y desfasadas entre sí para que el movimiento no se sienta mecánico.
+const ORBS = [
+  { size: 260, top: "8%", left: "12%", color: "var(--brand-gold)", duration: 12, delay: 0 },
+  { size: 200, top: "58%", left: "62%", color: "var(--brand-teal)", duration: 15, delay: 1.2 },
+  { size: 150, top: "68%", left: "8%", color: "var(--brand-gold)", duration: 10, delay: 0.6 },
+  { size: 120, top: "14%", left: "68%", color: "var(--brand-teal)", duration: 13, delay: 2 },
+];
+
+const RINGS = [
+  { size: 340, top: "30%", left: "38%", duration: 26 },
+  { size: 220, top: "42%", left: "48%", duration: 34 },
 ];
 
 export function AuthPanel() {
@@ -25,11 +26,45 @@ export function AuthPanel() {
           color: "#475569",
         }}
       />
-      {/* Resplandor dorado ambiental */}
-      <div
-        className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-20 blur-3xl"
-        style={{ background: "radial-gradient(circle, var(--brand-gold) 0%, transparent 70%)" }}
-      />
+
+      {/* Composición animada */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {ORBS.map((orb, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full blur-3xl"
+            style={{
+              width: orb.size,
+              height: orb.size,
+              top: orb.top,
+              left: orb.left,
+              background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
+              opacity: 0.22,
+            }}
+            animate={{
+              y: [0, -22, 0, 18, 0],
+              x: [0, 16, 0, -14, 0],
+              scale: [1, 1.08, 1, 0.95, 1],
+            }}
+            transition={{
+              duration: orb.duration,
+              delay: orb.delay,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
+
+        {RINGS.map((ring, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full border border-brand-gold/20"
+            style={{ width: ring.size, height: ring.size, top: ring.top, left: ring.left }}
+            animate={{ rotate: 360, scale: [1, 1.04, 1] }}
+            transition={{ duration: ring.duration, repeat: Infinity, ease: "linear" }}
+          />
+        ))}
+      </div>
 
       <div className="relative z-10">
         <div className="flex items-center gap-3">
@@ -42,31 +77,6 @@ export function AuthPanel() {
             Bitácora OBJ
           </span>
         </div>
-
-        <h2 className="mt-6 max-w-md text-balance text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl">
-          Gestiona tus proyectos con precisión
-        </h2>
-
-        <ul className="mt-10 space-y-5">
-          {LOGIN_FEATURES.map((item, i) => (
-            <li key={i} className="flex items-start gap-3.5">
-              <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-brand-gold/30 bg-brand-gold/10 text-brand-gold">
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d={item.d} />
-                </svg>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-slate-100">{item.title}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
       </div>
 
       <div className="relative z-10 mt-10">

@@ -15,17 +15,26 @@ if TYPE_CHECKING:
 
 
 class Team(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
-    """Equipo de trabajo reutilizable, independiente de los proyectos."""
+    """Equipo de trabajo: vive dentro de un proyecto y no existe fuera de él."""
 
     __tablename__ = "teams"
 
-    name: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     members: Mapped[list["TeamMember"]] = relationship(
         "TeamMember",
         back_populates="team",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_team_name_per_project"),
     )
 
 

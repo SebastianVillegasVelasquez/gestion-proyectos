@@ -45,11 +45,6 @@ const ProjectDetailPage = lazy(() =>
     default: m.ProjectDetailPage,
   })),
 );
-const TeamDetailPage = lazy(() =>
-  import("@/features/projects/components/TeamDetailPage.tsx").then((m) => ({
-    default: m.TeamDetailPage,
-  })),
-);
 const TaskDashboardPage = lazy(() =>
   import("@/features/projects/gantt/components/TaskDashboardPage.tsx").then((m) => ({
     default: m.TaskDashboardPage,
@@ -66,6 +61,31 @@ const CollaboratorsPage = lazy(() =>
 const CollaboratorActivityPage = lazy(() =>
   import("@/features/collaborators/components/CollaboratorActivityPage.tsx").then((m) => ({
     default: m.CollaboratorActivityPage,
+  })),
+);
+const ProjectEstructuraPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectEstructuraPage.tsx").then((m) => ({
+    default: m.ProjectEstructuraPage,
+  })),
+);
+const ProjectIntegrantesPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectIntegrantesPage.tsx").then((m) => ({
+    default: m.ProjectIntegrantesPage,
+  })),
+);
+const ProjectEquiposPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectEquiposPage.tsx").then((m) => ({
+    default: m.ProjectEquiposPage,
+  })),
+);
+const ProjectAreasPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectAreasPage.tsx").then((m) => ({
+    default: m.ProjectAreasPage,
+  })),
+);
+const ProjectTrazabilidadPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectTrazabilidadPage.tsx").then((m) => ({
+    default: m.ProjectTrazabilidadPage,
   })),
 );
 
@@ -106,10 +126,16 @@ export const AppRouter = () => (
         <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
           <Route path="/projects" element={<AllProjectsPage />} />
           <Route path="/projects/builder" element={<CreateProjectPage />} />
-          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />}>
+            <Route index element={<Navigate to="estructura" replace />} />
+            <Route path="estructura" element={<ProjectEstructuraPage />} />
+            <Route path="integrantes" element={<ProjectIntegrantesPage />} />
+            <Route path="equipos" element={<ProjectEquiposPage />} />
+            <Route path="areas" element={<ProjectAreasPage />} />
+            <Route path="trazabilidad" element={<ProjectTrazabilidadPage />} />
+          </Route>
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-          <Route path="/teams/:teamId" element={<TeamDetailPage />} />
           <Route path="/collaborators" element={<CollaboratorsPage />} />
           <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />

@@ -49,7 +49,7 @@ export function CreateTaskModal({
   const [clientError, setClientError] = useState<string | null>(null);
 
   const directoryQuery = useDirectory(position || undefined);
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(projectId);
   const teams = teamsQuery.data?.items ?? [];
 
   const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) => {

@@ -60,7 +60,7 @@ export function TaskDetailPanel({
   const depsQuery = useTaskDependencies(task.id);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId);
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(projectId);
   const treeQuery = useWorkTree(projectId);
   const attachTask = useAttachTask(projectId);
   const detachTask = useDetachTask(projectId);

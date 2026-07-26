@@ -1,22 +1,22 @@
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useDeleteTeam, useTeams } from "../../hooks/use-teams";
 import { filterTeams } from "../../utils/filter-teams";
 import type { Team } from "../../types/api.types";
-import { TeamFormModal } from "./TeamFormModal";
-import { TeamMembersManager } from "./TeamMembersManager";
+import { TeamFormModal } from "../teams/TeamFormModal";
+import { TeamMembersManager } from "../teams/TeamMembersManager";
 
-// Vista de gestión de equipos para administración (rol admin/super_admin).
-// Master-detail: a la izquierda la lista de equipos (buscar, crear, seleccionar);
-// a la derecha la configuración del equipo elegido (editar, eliminar, integrantes).
-export function TeamsManagementPage() {
-  const teamsQuery = useTeams();
-  const deleteTeam = useDeleteTeam();
+// Equipos de trabajo del proyecto: se crean dentro de este proyecto y no
+// existen fuera de él (otro proyecto arma los suyos desde cero). Master-detail:
+// a la izquierda la lista de equipos (buscar, crear, seleccionar); a la
+// derecha la configuración del equipo elegido (editar, eliminar, integrantes).
+export function ProjectTeamsPage({ projectId }: { projectId: string }) {
+  const teamsQuery = useTeams(projectId);
+  const deleteTeam = useDeleteTeam(projectId);
 
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -46,22 +46,26 @@ export function TeamsManagementPage() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-4 sm:p-6">
-      <PageHeader
-        title="Equipos de trabajo"
-        description="Crea, configura y administra los equipos del sistema y sus integrantes."
-        actions={
-          <button
-            type="button"
-            onClick={() => {
-              setShowCreate(true);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
-          >
-            <Plus className="size-4" /> Nuevo equipo
-          </button>
-        }
-      />
+    <div className="flex h-full flex-col gap-4 overflow-hidden">
+      <div className="flex shrink-0 items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Equipos de trabajo
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Crea y administra los equipos de este proyecto y sus integrantes.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowCreate(true);
+          }}
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
+        >
+          <Plus className="size-4" /> Nuevo equipo
+        </button>
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
         {/* Master: lista de equipos */}
@@ -90,7 +94,7 @@ export function TeamsManagementPage() {
           ) : teams.length === 0 ? (
             <EmptyState
               icon={UsersRound}
-              title="Aún no hay equipos"
+              title="Este proyecto aún no tiene equipos"
               hint="Crea el primer equipo con «Nuevo equipo»."
             />
           ) : filtered.length === 0 ? (
@@ -172,7 +176,7 @@ export function TeamsManagementPage() {
                 </div>
               </header>
 
-              <TeamMembersManager teamId={selected.id} />
+              <TeamMembersManager projectId={projectId} teamId={selected.id} />
             </div>
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -188,6 +192,7 @@ export function TeamsManagementPage() {
 
       {showCreate && (
         <TeamFormModal
+          projectId={projectId}
           onClose={() => {
             setShowCreate(false);
           }}
@@ -199,6 +204,7 @@ export function TeamsManagementPage() {
 
       {editing && (
         <TeamFormModal
+          projectId={projectId}
           team={editing}
           onClose={() => {
             setEditing(null);
@@ -210,7 +216,7 @@ export function TeamsManagementPage() {
         <ConfirmDialog
           destructive
           title="Eliminar equipo"
-          message={`¿Seguro que quieres eliminar «${deleting.name}»? Los proyectos que ya lo usaron conservan sus integrantes; el equipo dejará de estar disponible para nuevas asignaciones.`}
+          message={`¿Seguro que quieres eliminar «${deleting.name}»? Esta acción no se puede deshacer.`}
           confirmLabel="Eliminar"
           loading={deleteTeam.isPending}
           errorMessage={

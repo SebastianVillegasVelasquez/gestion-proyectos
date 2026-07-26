@@ -20,9 +20,13 @@ def _day(offset: int) -> str:
     return (BASE + timedelta(days=offset)).isoformat()
 
 
-async def _create_team(client, admin_headers, name="Equipo de Diseño") -> str:
+async def _create_team(
+    client, admin_headers, project_id, name="Equipo de Diseño"
+) -> str:
     resp = await client.post(
-        "/api/v1/teams/", json={"name": name}, headers=admin_headers
+        f"/api/v1/projects/{project_id}/teams",
+        json={"name": name},
+        headers=admin_headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
@@ -37,7 +41,7 @@ class TestTeamTasks:
         modulo = await _create_item(
             client, admin_headers, project_id, tipo_id, "Módulo 1"
         )
-        team_id = await _create_team(client, admin_headers)
+        team_id = await _create_team(client, admin_headers, project_id)
 
         # Tarea general delegada al equipo (sin responsable todavía).
         created = await client.post(
@@ -75,7 +79,7 @@ class TestTeamTasks:
         modulo = await _create_item(
             client, admin_headers, project_id, tipo_id, "Módulo 1"
         )
-        team_id = await _create_team(client, admin_headers)
+        team_id = await _create_team(client, admin_headers, project_id)
 
         # Tarea normal del proyecto, SIN equipo (no debe romperse ni aparecer).
         created = await client.post(
@@ -106,7 +110,7 @@ class TestTeamTasks:
         modulo = await _create_item(
             client, admin_headers, project_id, tipo_id, "Módulo 1"
         )
-        team_id = await _create_team(client, admin_headers)
+        team_id = await _create_team(client, admin_headers, project_id)
 
         parent_id = (
             await client.post(
@@ -156,7 +160,7 @@ class TestTeamTasks:
         modulo = await _create_item(
             client, admin_headers, project_id, tipo_id, "Módulo 1"
         )
-        team_id = await _create_team(client, admin_headers)
+        team_id = await _create_team(client, admin_headers, project_id)
 
         task_id = (
             await client.post(

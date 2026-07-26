@@ -9,11 +9,12 @@ import type {
 } from "@/features/projects/types/api.types";
 import { teamKeys } from "./query-keys";
 
-/** Lista paginada de equipos de trabajo (con búsqueda opcional por nombre). */
-export function useTeams(params: TeamSearchParams = {}) {
+/** Lista paginada de equipos de un proyecto (con búsqueda opcional por nombre). */
+export function useTeams(projectId: string, params: TeamSearchParams = {}) {
   return useQuery({
-    queryKey: teamKeys.list(params),
-    queryFn: () => teamsApi.list(params),
+    queryKey: teamKeys.list(projectId, params),
+    queryFn: () => teamsApi.list(projectId, params),
+    enabled: Boolean(projectId),
     // Mantiene los resultados previos visibles mientras llega la nueva búsqueda.
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -21,93 +22,97 @@ export function useTeams(params: TeamSearchParams = {}) {
 }
 
 /** Detalle de un equipo concreto. */
-export function useTeam(teamId: string | undefined) {
+export function useTeam(projectId: string, teamId: string | undefined) {
   return useQuery({
-    queryKey: teamKeys.detail(teamId ?? ""),
-    queryFn: () => teamsApi.get(teamId!),
-    enabled: Boolean(teamId),
+    queryKey: teamKeys.detail(projectId, teamId ?? ""),
+    queryFn: () => teamsApi.get(projectId, teamId!),
+    enabled: Boolean(projectId) && Boolean(teamId),
   });
 }
 
 /** Integrantes de un equipo. */
-export function useTeamMembers(teamId: string | undefined) {
+export function useTeamMembers(projectId: string, teamId: string | undefined) {
   return useQuery({
-    queryKey: teamKeys.members(teamId ?? ""),
-    queryFn: () => teamsApi.members(teamId!),
-    enabled: Boolean(teamId),
+    queryKey: teamKeys.members(projectId, teamId ?? ""),
+    queryFn: () => teamsApi.members(projectId, teamId!),
+    enabled: Boolean(projectId) && Boolean(teamId),
   });
 }
 
-/** Crea un equipo e invalida la lista de equipos. */
-export function useCreateTeam() {
+/** Crea un equipo dentro del proyecto e invalida su lista. */
+export function useCreateTeam(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateTeamPayload) => teamsApi.create(payload),
+    mutationFn: (payload: CreateTeamPayload) => teamsApi.create(projectId, payload),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: teamKeys.all });
+      void qc.invalidateQueries({ queryKey: teamKeys.byProject(projectId) });
     },
   });
 }
 
 /** Edita un equipo (nombre/descripción) e invalida su detalle y la lista. */
-export function useUpdateTeam(teamId: string) {
+export function useUpdateTeam(projectId: string, teamId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateTeamPayload) => teamsApi.update(teamId, payload),
+    mutationFn: (payload: UpdateTeamPayload) => teamsApi.update(projectId, teamId, payload),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: teamKeys.detail(teamId) });
-      void qc.invalidateQueries({ queryKey: teamKeys.all });
+      void qc.invalidateQueries({ queryKey: teamKeys.detail(projectId, teamId) });
+      void qc.invalidateQueries({ queryKey: teamKeys.byProject(projectId) });
     },
   });
 }
 
-/** Elimina (soft delete) un equipo e invalida la lista de equipos. */
-export function useDeleteTeam() {
+/** Elimina (soft delete) un equipo e invalida la lista de equipos del proyecto. */
+export function useDeleteTeam(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (teamId: string) => teamsApi.remove(teamId),
+    mutationFn: (teamId: string) => teamsApi.remove(projectId, teamId),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: teamKeys.all });
+      void qc.invalidateQueries({ queryKey: teamKeys.byProject(projectId) });
     },
   });
 }
 
 /** Invalida los integrantes de un equipo y la lista (cambia el member_count). */
-function invalidateTeamMembers(qc: ReturnType<typeof useQueryClient>, teamId: string) {
-  void qc.invalidateQueries({ queryKey: teamKeys.members(teamId) });
-  void qc.invalidateQueries({ queryKey: teamKeys.all });
+function invalidateTeamMembers(
+  qc: ReturnType<typeof useQueryClient>,
+  projectId: string,
+  teamId: string,
+) {
+  void qc.invalidateQueries({ queryKey: teamKeys.members(projectId, teamId) });
+  void qc.invalidateQueries({ queryKey: teamKeys.byProject(projectId) });
 }
 
 /** Agrega un integrante a un equipo. */
-export function useAddTeamMember(teamId: string) {
+export function useAddTeamMember(projectId: string, teamId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: AddTeamMemberPayload) => teamsApi.addMember(teamId, payload),
+    mutationFn: (payload: AddTeamMemberPayload) => teamsApi.addMember(projectId, teamId, payload),
     onSuccess: () => {
-      invalidateTeamMembers(qc, teamId);
+      invalidateTeamMembers(qc, projectId, teamId);
     },
   });
 }
 
 /** Cambia el rol de un integrante dentro del equipo. */
-export function useChangeTeamMemberRole(teamId: string) {
+export function useChangeTeamMemberRole(projectId: string, teamId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { userId: string; teamRole: TeamRole }) =>
-      teamsApi.changeMemberRole(teamId, vars.userId, vars.teamRole),
+      teamsApi.changeMemberRole(projectId, teamId, vars.userId, vars.teamRole),
     onSuccess: () => {
-      invalidateTeamMembers(qc, teamId);
+      invalidateTeamMembers(qc, projectId, teamId);
     },
   });
 }
 
 /** Quita un integrante del equipo. */
-export function useRemoveTeamMember(teamId: string) {
+export function useRemoveTeamMember(projectId: string, teamId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) => teamsApi.removeMember(teamId, userId),
+    mutationFn: (userId: string) => teamsApi.removeMember(projectId, teamId, userId),
     onSuccess: () => {
-      invalidateTeamMembers(qc, teamId);
+      invalidateTeamMembers(qc, projectId, teamId);
     },
   });
 }

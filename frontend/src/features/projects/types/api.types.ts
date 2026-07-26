@@ -237,14 +237,15 @@ export interface IdentityUser {
 }
 
 // ── Teams (equipos de trabajo reutilizables) ─────────────────────────────────
-// Los equipos viven en su propio bounded context: son plantillas reutilizables
-// (ej. "Equipo de Desarrollo") que pueden asignarse a varios proyectos.
+// Los equipos de trabajo viven dentro de un proyecto: se crean para ese
+// proyecto y no existen fuera de él (otro proyecto tiene sus propios equipos).
 
 // Rol del integrante DENTRO del equipo (distinto del rol en un proyecto).
 export type TeamRole = "lider" | "supervisor" | "integrante";
 
 export interface Team {
   id: string;
+  project_id: string;
   name: string;
   description: string | null;
   member_count: number;

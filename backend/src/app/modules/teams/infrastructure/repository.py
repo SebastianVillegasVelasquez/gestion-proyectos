@@ -27,17 +27,25 @@ class SqlAlchemyTeamRepository(TeamRepository):
     async def save_team(self, team: Team) -> Team:
         return await self._persist(team)
 
-    async def get_team(self, team_id: UUID) -> Team | None:
-        return await self._session.get(Team, team_id)
+    async def get_team(self, project_id: UUID, team_id: UUID) -> Team | None:
+        result = await self._session.execute(
+            select(Team).where(Team.id == team_id, Team.project_id == project_id)
+        )
+        return result.scalars().first()
 
-    async def get_team_by_name(self, name: str) -> Team | None:
-        result = await self._session.execute(select(Team).where(Team.name == name))
+    async def get_team_by_name(self, project_id: UUID, name: str) -> Team | None:
+        result = await self._session.execute(
+            select(Team).where(Team.project_id == project_id, Team.name == name)
+        )
         return result.scalars().first()
 
     async def search_teams(
-        self, search: str | None, limit: int, offset: int
+        self, project_id: UUID, search: str | None, limit: int, offset: int
     ) -> tuple[list[Team], int]:
-        conditions: list[ColumnElement[bool]] = [Team.deleted_at.is_(None)]
+        conditions: list[ColumnElement[bool]] = [
+            Team.project_id == project_id,
+            Team.deleted_at.is_(None),
+        ]
         if search:
             like = f"%{search.strip()}%"
             conditions.append(or_(Team.name.ilike(like), Team.description.ilike(like)))

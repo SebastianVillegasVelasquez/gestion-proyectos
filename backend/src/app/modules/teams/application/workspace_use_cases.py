@@ -11,6 +11,7 @@ from app.modules.teams.infrastructure.workspace_models import (
     DeliverableComment,
     DeliverableVersion,
 )
+from app.modules.teams.presentation.schemas import TeamMemberResponse
 from app.modules.teams.presentation.workspace_schemas import (
     AddCommentRequest,
     AddVersionRequest,
@@ -71,6 +72,23 @@ class WorkspaceService:
         return deliverable
 
     # ── lectura (privacidad: admin o integrante del equipo) ──────────────────
+    async def list_members(
+        self, team_id: UUID, current_user
+    ) -> list[TeamMemberResponse]:
+        if not (await self._access(team_id, current_user)).can_view:
+            raise ForbiddenError("No tienes acceso al espacio de este equipo")
+        members = await self._repo.list_members(team_id)
+        return [
+            TeamMemberResponse(
+                user_id=m.user_id,
+                name=m.user.name,
+                last_name=m.user.last_name,
+                position=m.user.position,
+                team_role=m.team_role,
+            )
+            for m in members
+        ]
+
     async def list_deliverables(
         self, team_id: UUID, current_user
     ) -> list[DeliverableResponse]:
