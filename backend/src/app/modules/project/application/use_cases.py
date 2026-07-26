@@ -160,7 +160,7 @@ class AssignTeamToProjectUseCase:
         if not project or project.is_deleted:
             raise HTTPException(status_code=404, detail="El proyecto no existe")
 
-        team = await self.team_repo.get_team(team_id)
+        team = await self.team_repo.get_team(project_id, team_id)
         if not team or team.is_deleted:
             raise HTTPException(status_code=404, detail="El equipo no existe")
 

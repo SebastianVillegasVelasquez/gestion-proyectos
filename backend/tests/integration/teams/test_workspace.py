@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest_asyncio
@@ -5,10 +6,24 @@ import pytest_asyncio
 from app.core.security import create_access_token, hash_password
 from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.modules.identity.infrastructure.models import User
+from app.modules.project.infrastructure.models import Project
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
 
 BASE = "/api/v1/teams"
+
+
+async def _make_project(db) -> Project:
+    project = Project(
+        name=f"Proj {uuid4()}",
+        description="Workspace scenario",
+        client_name="Test",
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=60),
+    )
+    db.add(project)
+    await db.flush()
+    return project
 
 
 async def _make_user(db, role=SystemRole.USER):
@@ -50,7 +65,8 @@ async def scenario(db_session) -> _Scenario:
     admin = await _make_user(db_session, role=SystemRole.ADMIN)
     outsider = await _make_user(db_session)
 
-    team = Team(name=f"Equipo {uuid4()}")
+    project = await _make_project(db_session)
+    team = Team(project_id=project.id, name=f"Equipo {uuid4()}")
     db_session.add(team)
     await db_session.flush()
     db_session.add_all(
@@ -72,6 +88,32 @@ async def _create_deliverable(client, team_id, headers, assignee_id):
         headers=headers,
     )
     return res
+
+
+class TestWorkspaceMembers:
+    """GET /teams/{id}/members: usado por el espacio de trabajo (team_id-only,
+    sin project_id en el path) para pintar la lista de integrantes."""
+
+    async def test_member_can_list_teammates(self, client, scenario):
+        s = scenario
+        r = await client.get(
+            f"{BASE}/{s.team.id}/members", headers=_headers(s.integrante)
+        )
+        assert r.status_code == 200
+        names = {m["name"] for m in r.json()}
+        assert names == {s.integrante.name, s.lider.name}
+
+    async def test_admin_can_list_members(self, client, scenario):
+        s = scenario
+        r = await client.get(f"{BASE}/{s.team.id}/members", headers=_headers(s.admin))
+        assert r.status_code == 200
+
+    async def test_outsider_cannot_list_members(self, client, scenario):
+        s = scenario
+        r = await client.get(
+            f"{BASE}/{s.team.id}/members", headers=_headers(s.outsider)
+        )
+        assert r.status_code == 403
 
 
 class TestWorkspaceAccess:
@@ -139,7 +181,8 @@ class TestWorkspacePrivacy:
         )
         deliverable_id = created.json()["id"]
 
-        other_team = Team(name=f"Otro {uuid4()}")
+        other_project = await _make_project(db_session)
+        other_team = Team(project_id=other_project.id, name=f"Otro {uuid4()}")
         db_session.add(other_team)
         await db_session.flush()
         db_session.add(

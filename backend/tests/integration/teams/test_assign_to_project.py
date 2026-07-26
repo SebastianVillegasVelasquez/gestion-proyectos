@@ -21,9 +21,9 @@ async def _create_user(client, admin_headers, *, email: str, name: str = "Ana"):
     return response.json()
 
 
-async def _create_team_with_members(client, admin_headers, users):
+async def _create_team_with_members(client, admin_headers, project_id, users):
     team_response = await client.post(
-        "/api/v1/teams/",
+        f"/api/v1/projects/{project_id}/teams",
         json={"name": "Equipo de Desarrollo"},
         headers=admin_headers,
     )
@@ -32,7 +32,7 @@ async def _create_team_with_members(client, admin_headers, users):
 
     for user, role in users:
         member_response = await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"], "team_role": role.value},
             headers=admin_headers,
         )
@@ -62,6 +62,7 @@ class TestAssignTeamToProject:
         team = await _create_team_with_members(
             client,
             admin_headers,
+            project["id"],
             [(lider, TeamRole.LIDER), (integrante, TeamRole.INTEGRANTE)],
         )
 
@@ -125,6 +126,7 @@ class TestAssignTeamToProject:
         team = await _create_team_with_members(
             client,
             admin_headers,
+            project["id"],
             [(existing, TeamRole.INTEGRANTE), (new_member, TeamRole.INTEGRANTE)],
         )
 
@@ -168,10 +170,19 @@ class TestAssignTeamToProject:
 
         assert response.status_code == 404
 
-    async def test_should_404_when_project_missing(self, client, admin_headers):
+    async def test_should_404_when_project_missing(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_response = await client.post(
+            "/api/v1/projects/",
+            json=valid_project_payload,
+            headers=admin_headers,
+        )
+        project = project_response.json()
+
         integrante = await _create_user(client, admin_headers, email="solo@example.com")
         team = await _create_team_with_members(
-            client, admin_headers, [(integrante, TeamRole.INTEGRANTE)]
+            client, admin_headers, project["id"], [(integrante, TeamRole.INTEGRANTE)]
         )
 
         response = await client.post(

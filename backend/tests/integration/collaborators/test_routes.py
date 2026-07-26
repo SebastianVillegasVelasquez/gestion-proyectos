@@ -58,7 +58,7 @@ async def collaborator(db_session):
         )
     )
 
-    team = Team(id=uuid.uuid4(), name=f"Equipo {uuid.uuid4()}")
+    team = Team(id=uuid.uuid4(), project_id=project.id, name=f"Equipo {uuid.uuid4()}")
     db_session.add(team)
     await db_session.flush()
     db_session.add(

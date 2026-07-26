@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import {
   Calendar,
   ChevronLeft,
@@ -13,17 +12,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import type { Project } from "../types/api.types";
 import { ProjectActions } from "./detail/ProjectActions";
 import { ClientAccessCard } from "./detail/ClientAccessCard";
-import { StructurePanel } from "./detail/StructurePanel";
-import { MembersPanel } from "./detail/MembersPanel";
-import { WorkTeamsPanel } from "./detail/WorkTeamsPanel";
-import { TraceabilityPanel } from "./detail/TraceabilityPanel";
-import { AreasPanel } from "./detail/AreasPanel";
 
-type Tab = "estructura" | "integrantes" | "equipos" | "areas" | "trazabilidad";
+const SECTION_TABS = [
+  { to: "estructura", label: "Estructura", icon: FolderTree },
+  { to: "integrantes", label: "Integrantes", icon: Users },
+  { to: "equipos", label: "Equipos de trabajo", icon: UsersRound },
+  { to: "areas", label: "Progreso por equipo", icon: Layers },
+  { to: "trazabilidad", label: "Trazabilidad", icon: History },
+] as const;
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -43,7 +42,6 @@ export function ProjectDetailView({
   onToggleDark: () => void;
 }) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("estructura");
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
@@ -109,49 +107,29 @@ export function ProjectDetailView({
       {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
       <ClientAccessCard projectId={project.id} />
 
-      {/* Tabs: Estructura | Integrantes | Equipos | Progreso por equipo | Trazabilidad */}
+      {/* Secciones: cada una es una vista/ruta independiente */}
       <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-b border-border px-1">
-        {(
-          [
-            { id: "estructura", label: "Estructura", icon: FolderTree },
-            { id: "integrantes", label: "Integrantes", icon: Users },
-            { id: "equipos", label: "Equipos de trabajo", icon: UsersRound },
-            { id: "areas", label: "Progreso por equipo", icon: Layers },
-            { id: "trazabilidad", label: "Trazabilidad", icon: History },
-          ] as const
-        ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setTab(id);
-            }}
-            className={cn(
-              "-mb-px flex items-center gap-2 border-b-[2.5px] py-3 text-[15px] transition-colors",
-              tab === id
-                ? "border-brand-blue font-semibold text-brand-blue-dark dark:text-brand-blue"
-                : "border-transparent font-medium text-muted-foreground hover:text-foreground",
-            )}
+        {SECTION_TABS.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                "-mb-px flex items-center gap-2 border-b-[2.5px] py-3 text-[15px] transition-colors",
+                isActive
+                  ? "border-brand-blue font-semibold text-brand-blue-dark dark:text-brand-blue"
+                  : "border-transparent font-medium text-muted-foreground hover:text-foreground",
+              )
+            }
           >
             <Icon className="size-4" />
             {label}
-          </button>
+          </NavLink>
         ))}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {tab === "estructura" && <StructurePanel projectId={project.id} />}
-        {tab === "integrantes" && <MembersPanel projectId={project.id} />}
-        {tab === "equipos" && (
-          <ErrorBoundary
-            fallbackTitle="No se pudo mostrar el apartado de equipos"
-            fallbackHint="Ocurrió un error al renderizar los equipos de trabajo. Intenta recargar."
-          >
-            <WorkTeamsPanel />
-          </ErrorBoundary>
-        )}
-        {tab === "areas" && <AreasPanel projectId={project.id} />}
-        {tab === "trazabilidad" && <TraceabilityPanel projectId={project.id} />}
+        <Outlet />
       </div>
     </div>
   );

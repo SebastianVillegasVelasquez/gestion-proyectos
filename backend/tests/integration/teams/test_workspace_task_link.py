@@ -197,7 +197,18 @@ class TestDeliverableLinkedToTask:
         other_team_id = uuid4()
         from app.modules.teams.infrastructure.models import Team
 
-        db_session.add(Team(id=other_team_id, name=f"Otro {uuid4()}"))
+        other_project = Project(
+            name=f"Proj {uuid4()}",
+            description="Otro proyecto",
+            client_name="Test",
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=60),
+        )
+        db_session.add(other_project)
+        await db_session.flush()
+        db_session.add(
+            Team(id=other_team_id, project_id=other_project.id, name=f"Otro {uuid4()}")
+        )
         await db_session.commit()
         task = await _make_task(db_session, other_team_id, s.integrante.id)
         integrante_h = await _headers_for(s.integrante)

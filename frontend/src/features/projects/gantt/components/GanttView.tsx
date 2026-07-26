@@ -161,7 +161,7 @@ export function GanttView({
   const treeQuery = useWorkTree(project.id);
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(project.id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {

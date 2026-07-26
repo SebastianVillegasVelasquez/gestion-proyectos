@@ -53,17 +53,28 @@ class FakeTeamRepository(TeamRepository):
         self._teams[team.id] = team
         return team
 
-    async def get_team(self, team_id):
-        return self._teams.get(team_id)
+    async def get_team(self, project_id, team_id):
+        team = self._teams.get(team_id)
+        if team is None or team.project_id != project_id:
+            return None
+        return team
 
-    async def get_team_by_name(self, name):
+    async def get_team_by_name(self, project_id, name):
         for team in self._teams.values():
-            if team.name == name and not team.is_deleted:
+            if (
+                team.project_id == project_id
+                and team.name == name
+                and not team.is_deleted
+            ):
                 return team
         return None
 
-    async def search_teams(self, search, limit, offset):
-        teams = [t for t in self._teams.values() if not t.is_deleted]
+    async def search_teams(self, project_id, search, limit, offset):
+        teams = [
+            t
+            for t in self._teams.values()
+            if t.project_id == project_id and not t.is_deleted
+        ]
         if search:
             teams = [t for t in teams if search.lower() in t.name.lower()]
         total = len(teams)
@@ -147,6 +158,11 @@ def user_repo() -> FakeUserRepository:
     return FakeUserRepository()
 
 
+@pytest.fixture
+def project_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _register(team_repo, user_repo, **kwargs):
     """Crea un usuario y lo hace visible tanto al stub de usuarios como al
     directorio interno del fake de equipos (para reconstruir respuestas)."""
@@ -156,51 +172,81 @@ def _register(team_repo, user_repo, **kwargs):
 
 
 class TestTeamUseCases:
-    async def test_create_team(self, team_repo):
+    async def test_create_team(self, team_repo, project_id):
         response = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo de Desarrollo", description="Backend")
+            project_id,
+            CreateTeamRequest(name="Equipo de Desarrollo", description="Backend"),
         )
 
         assert response.name == "Equipo de Desarrollo"
+        assert response.project_id == project_id
         assert response.member_count == 0
 
-    async def test_create_team_rejects_duplicate_name(self, team_repo):
-        await CreateTeamUseCase(team_repo).execute(CreateTeamRequest(name="Diseño"))
+    async def test_create_team_rejects_duplicate_name_in_same_project(
+        self, team_repo, project_id
+    ):
+        await CreateTeamUseCase(team_repo).execute(
+            project_id, CreateTeamRequest(name="Diseño")
+        )
 
         with pytest.raises(ConflictError):
-            await CreateTeamUseCase(team_repo).execute(CreateTeamRequest(name="Diseño"))
+            await CreateTeamUseCase(team_repo).execute(
+                project_id, CreateTeamRequest(name="Diseño")
+            )
 
-    async def test_update_team(self, team_repo):
+    async def test_allows_same_name_in_different_projects(self, team_repo, project_id):
+        other_project_id = uuid.uuid4()
+        await CreateTeamUseCase(team_repo).execute(
+            project_id, CreateTeamRequest(name="Diseño")
+        )
+
         created = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            other_project_id, CreateTeamRequest(name="Diseño")
+        )
+
+        assert created.name == "Diseño"
+
+    async def test_update_team(self, team_repo, project_id):
+        created = await CreateTeamUseCase(team_repo).execute(
+            project_id, CreateTeamRequest(name="Equipo A")
         )
 
         updated = await UpdateTeamUseCase(team_repo).execute(
-            created.id, UpdateTeamRequest(name="Equipo B")
+            project_id, created.id, UpdateTeamRequest(name="Equipo B")
         )
 
         assert updated.name == "Equipo B"
 
-    async def test_get_team_not_found(self, team_repo):
+    async def test_get_team_not_found(self, team_repo, project_id):
         with pytest.raises(NotFoundError):
-            await GetTeamUseCase(team_repo).execute(uuid.uuid4())
+            await GetTeamUseCase(team_repo).execute(project_id, uuid.uuid4())
 
-    async def test_delete_team_is_soft(self, team_repo):
+    async def test_get_team_from_another_project_not_found(self, team_repo, project_id):
         created = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
 
-        await DeleteTeamUseCase(team_repo).execute(created.id)
+        with pytest.raises(NotFoundError):
+            await GetTeamUseCase(team_repo).execute(uuid.uuid4(), created.id)
+
+    async def test_delete_team_is_soft(self, team_repo, project_id):
+        created = await CreateTeamUseCase(team_repo).execute(
+            project_id, CreateTeamRequest(name="Equipo A")
+        )
+
+        await DeleteTeamUseCase(team_repo).execute(project_id, created.id)
 
         with pytest.raises(NotFoundError):
-            await GetTeamUseCase(team_repo).execute(created.id)
+            await GetTeamUseCase(team_repo).execute(project_id, created.id)
 
-    async def test_list_teams_paginated(self, team_repo):
+    async def test_list_teams_paginated(self, team_repo, project_id):
         for name in ("Equipo A", "Equipo B", "Equipo C"):
-            await CreateTeamUseCase(team_repo).execute(CreateTeamRequest(name=name))
+            await CreateTeamUseCase(team_repo).execute(
+                project_id, CreateTeamRequest(name=name)
+            )
 
         result = await ListTeamsUseCase(team_repo).execute(
-            None, Pagination.of(page=1, page_size=2)
+            project_id, None, Pagination.of(page=1, page_size=2)
         )
 
         assert result.total == 3
@@ -209,91 +255,93 @@ class TestTeamUseCases:
 
 
 class TestTeamMemberUseCases:
-    async def test_add_member_defaults_to_integrante(self, team_repo, user_repo):
+    async def test_add_member_defaults_to_integrante(
+        self, team_repo, user_repo, project_id
+    ):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
         user = _register(team_repo, user_repo)
 
         member = await AddTeamMemberUseCase(team_repo, user_repo).execute(
-            team.id, user.id, TeamRole.INTEGRANTE
+            project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
         assert member.user_id == user.id
         assert member.team_role == TeamRole.INTEGRANTE
         assert member.name == "Ana"
 
-    async def test_add_member_unknown_user(self, team_repo, user_repo):
+    async def test_add_member_unknown_user(self, team_repo, user_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
 
         with pytest.raises(NotFoundError):
             await AddTeamMemberUseCase(team_repo, user_repo).execute(
-                team.id, uuid.uuid4(), TeamRole.INTEGRANTE
+                project_id, team.id, uuid.uuid4(), TeamRole.INTEGRANTE
             )
 
-    async def test_add_member_rejects_duplicate(self, team_repo, user_repo):
+    async def test_add_member_rejects_duplicate(self, team_repo, user_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
         user = _register(team_repo, user_repo)
         add = AddTeamMemberUseCase(team_repo, user_repo)
 
-        await add.execute(team.id, user.id, TeamRole.INTEGRANTE)
+        await add.execute(project_id, team.id, user.id, TeamRole.INTEGRANTE)
 
         with pytest.raises(ConflictError):
-            await add.execute(team.id, user.id, TeamRole.INTEGRANTE)
+            await add.execute(project_id, team.id, user.id, TeamRole.INTEGRANTE)
 
-    async def test_change_member_role(self, team_repo, user_repo):
+    async def test_change_member_role(self, team_repo, user_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
         user = _register(team_repo, user_repo)
         await AddTeamMemberUseCase(team_repo, user_repo).execute(
-            team.id, user.id, TeamRole.INTEGRANTE
+            project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
         member = await ChangeTeamMemberRoleUseCase(team_repo).execute(
-            team.id, user.id, TeamRole.LIDER
+            project_id, team.id, user.id, TeamRole.LIDER
         )
 
         assert member.team_role == TeamRole.LIDER
 
-    async def test_change_role_of_unknown_member(self, team_repo):
+    async def test_change_role_of_unknown_member(self, team_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
 
         with pytest.raises(NotFoundError):
             await ChangeTeamMemberRoleUseCase(team_repo).execute(
-                team.id, uuid.uuid4(), TeamRole.LIDER
+                project_id, team.id, uuid.uuid4(), TeamRole.LIDER
             )
 
-    async def test_remove_member(self, team_repo, user_repo):
+    async def test_remove_member(self, team_repo, user_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
         user = _register(team_repo, user_repo)
         await AddTeamMemberUseCase(team_repo, user_repo).execute(
-            team.id, user.id, TeamRole.INTEGRANTE
+            project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
-        await RemoveTeamMemberUseCase(team_repo).execute(team.id, user.id)
+        await RemoveTeamMemberUseCase(team_repo).execute(project_id, team.id, user.id)
 
-        members = await ListTeamMembersUseCase(team_repo).execute(team.id)
+        members = await ListTeamMembersUseCase(team_repo).execute(project_id, team.id)
         assert members == []
 
-    async def test_list_members(self, team_repo, user_repo):
+    async def test_list_members(self, team_repo, user_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
-            CreateTeamRequest(name="Equipo A")
+            project_id, CreateTeamRequest(name="Equipo A")
         )
         ana = _register(team_repo, user_repo, name="Ana")
         luis = _register(team_repo, user_repo, name="Luis")
         add = AddTeamMemberUseCase(team_repo, user_repo)
-        await add.execute(team.id, ana.id, TeamRole.INTEGRANTE)
-        await add.execute(team.id, luis.id, TeamRole.LIDER)
+        await add.execute(project_id, team.id, ana.id, TeamRole.INTEGRANTE)
+        await add.execute(project_id, team.id, luis.id, TeamRole.LIDER)
 
-        members = await ListTeamMembersUseCase(team_repo).execute(team.id)
+        members = await ListTeamMembersUseCase(team_repo).execute(project_id, team.id)
 
         assert {m.name for m in members} == {"Ana", "Luis"}

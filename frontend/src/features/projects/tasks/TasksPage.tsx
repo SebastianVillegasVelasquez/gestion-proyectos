@@ -97,7 +97,7 @@ export function TasksPage() {
   const projectQuery = useProject(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const directoryQuery = useDirectory();
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(projectId);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);

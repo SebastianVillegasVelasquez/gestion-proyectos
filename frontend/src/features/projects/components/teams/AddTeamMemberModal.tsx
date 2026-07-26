@@ -12,17 +12,19 @@ const inputCls =
 // Agrega un usuario del directorio a un equipo, con su rol dentro del equipo.
 // El selector de usuario (búsqueda + lista paginada) vive en DirectoryUserPicker.
 export function AddTeamMemberModal({
+  projectId,
   teamId,
   existingIds,
   onClose,
 }: {
+  projectId: string;
   teamId: string;
   existingIds: string[];
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState<DirectoryUser | null>(null);
   const [role, setRole] = useState<TeamRole>("integrante");
-  const addMember = useAddTeamMember(teamId);
+  const addMember = useAddTeamMember(projectId, teamId);
 
   const handleAdd = () => {
     if (!selected) {

@@ -5,6 +5,7 @@ from starlette import status
 
 from app.core.dependencies import get_current_user, workspace_repo_dependency
 from app.modules.teams.application.workspace_use_cases import WorkspaceService
+from app.modules.teams.presentation.schemas import TeamMemberResponse
 from app.modules.teams.presentation.workspace_schemas import (
     AddCommentRequest,
     AddVersionRequest,
@@ -25,6 +26,15 @@ async def list_my_teams(
     current_user=Depends(get_current_user),
 ):
     return await WorkspaceService(repo).list_my_teams(current_user)
+
+
+@router.get("/{team_id}/members", response_model=list[TeamMemberResponse])
+async def list_team_members(
+    team_id: UUID,
+    repo=Depends(workspace_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await WorkspaceService(repo).list_members(team_id, current_user)
 
 
 @router.get("/{team_id}/workspace/access", response_model=WorkspaceAccessResponse)

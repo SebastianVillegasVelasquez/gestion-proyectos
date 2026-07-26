@@ -33,16 +33,19 @@ export const taskKeys = {
 
 export const teamKeys = {
   all: ["teams"] as const,
-  list: (params: { search?: string; page?: number; pageSize?: number }) =>
+  byProject: (projectId: string) => [...teamKeys.all, "project", projectId] as const,
+  list: (projectId: string, params: { search?: string; page?: number; pageSize?: number }) =>
     [
-      ...teamKeys.all,
+      ...teamKeys.byProject(projectId),
       "list",
       params.search ?? "",
       params.page ?? 1,
       params.pageSize ?? 50,
     ] as const,
-  detail: (id: string) => [...teamKeys.all, "detail", id] as const,
-  members: (id: string) => [...teamKeys.detail(id), "members"] as const,
+  detail: (projectId: string, id: string) =>
+    [...teamKeys.byProject(projectId), "detail", id] as const,
+  members: (projectId: string, id: string) =>
+    [...teamKeys.detail(projectId, id), "members"] as const,
 };
 
 export const directoryKeys = {
