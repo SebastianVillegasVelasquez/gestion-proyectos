@@ -1,5 +1,6 @@
 import http from "@/lib/http";
 import type {
+  AttachTaskPayload,
   CreateTaskPayload,
   Task,
   TaskDependency,
@@ -23,6 +24,13 @@ export const tasksApi = {
     http.patch<Task>(`/tasks/${taskId}`, payload).then((r) => r.data),
 
   remove: (taskId: string) => http.delete(`/tasks/${taskId}`).then(() => undefined),
+
+  // Adjunta una tarea suelta (o cambia de elemento) a un nodo de la estructura.
+  attach: (taskId: string, payload: AttachTaskPayload) =>
+    http.patch<Task>(`/tasks/${taskId}/attach`, payload).then((r) => r.data),
+
+  // Quita la tarea de la estructura; vuelve a quedar suelta en el proyecto.
+  detach: (taskId: string) => http.patch<Task>(`/tasks/${taskId}/detach`).then((r) => r.data),
 
   changeStatus: (taskId: string, status: TaskStatus, reason?: string) =>
     http

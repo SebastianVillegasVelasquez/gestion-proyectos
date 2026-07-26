@@ -83,6 +83,7 @@ async def collaborator(db_session):
             id=uuid.uuid4(),
             title=f"Tarea {i}",
             status=st,
+            project_id=project.id,
             work_item_id=node.id,
             assignee_id=user.id,
             start_date=today,

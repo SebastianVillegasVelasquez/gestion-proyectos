@@ -15,9 +15,11 @@ from app.core.dependencies import (
 )
 from app.modules.tasks.application.use_cases import (
     AddTaskDependencyUseCase,
+    AttachTaskToWorkItemUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
     DeleteTaskUseCase,
+    DetachTaskUseCase,
     GetTaskByIdUseCase,
     GetTaskDependenciesUseCase,
     GetTasksByProjectUseCase,
@@ -26,6 +28,7 @@ from app.modules.tasks.application.use_cases import (
     UpdateTaskUseCase,
 )
 from app.modules.tasks.presentation.schemas import (
+    AttachTaskRequest,
     CreateTaskDependencyRequest,
     CreateTaskRequest,
     TaskDependencyResponse,
@@ -50,11 +53,12 @@ async def create_task(
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
     bus: EventBus = Depends(event_bus_dependency),
 ):
-    return await CreateTaskUseCase(task_repo, work_tree_repo, user_repo, bus).execute(
-        payload
-    )
+    return await CreateTaskUseCase(
+        task_repo, work_tree_repo, user_repo, project_repo, bus
+    ).execute(payload)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -154,11 +158,35 @@ async def change_task_status(
     bus: EventBus = Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
     task_repo=Depends(task_repo_dependency),
-    work_tree_repo=Depends(worktree_repo_dependency),
     member_repo=Depends(project_members_repo_dependency),
 ):
     """El responsable entrega y el líder aprueba o devuelve. Ver
     `ChangeTaskStatusUseCase` para el detalle del flujo."""
-    return await ChangeTaskStatusUseCase(
-        task_repo, work_tree_repo, member_repo, bus
-    ).execute(task_id, payload, current_user_id=current_user.id)
+    return await ChangeTaskStatusUseCase(task_repo, member_repo, bus).execute(
+        task_id, payload, current_user_id=current_user.id
+    )
+
+
+# ── Estructura: adjuntar / quitar una tarea de un elemento ─────────────────────
+@router.patch("/tasks/{task_id}/attach", response_model=TaskResponse)
+async def attach_task(
+    task_id: UUID,
+    payload: AttachTaskRequest,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+):
+    """Adjunta una tarea (suelta o ya adjunta) al elemento indicado."""
+    return await AttachTaskToWorkItemUseCase(task_repo, work_tree_repo).execute(
+        task_id, payload.work_item_id
+    )
+
+
+@router.patch("/tasks/{task_id}/detach", response_model=TaskResponse)
+async def detach_task(
+    task_id: UUID,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Quita la tarea de la estructura; vuelve a quedar suelta."""
+    return await DetachTaskUseCase(task_repo).execute(task_id)

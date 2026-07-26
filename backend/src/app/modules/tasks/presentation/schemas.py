@@ -23,8 +23,11 @@ class TaskBase(BaseModelConfig):
 
 
 class CreateTaskRequest(TaskBase):
-    # Las tareas cuelgan del árbol flexible: de un WorkItem (cualquier nivel).
-    work_item_id: UUID
+    # Las tareas pueden colgar del árbol flexible (un WorkItem, cualquier
+    # nivel) o crearse sueltas, sin estructura todavía. `project_id` es
+    # obligatorio salvo que se indique `work_item_id`, del que se deriva.
+    project_id: Optional[UUID] = None
+    work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
 
@@ -43,10 +46,17 @@ class CreateTaskRequest(TaskBase):
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
         return self
 
+    @model_validator(mode="after")
+    def require_project_or_work_item(self) -> "CreateTaskRequest":
+        if self.project_id is None and self.work_item_id is None:
+            raise ValueError("Indica el proyecto o el elemento de la estructura")
+        return self
+
 
 class TaskResponse(TaskBase):
     id: UUID
-    work_item_id: UUID
+    project_id: UUID
+    work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     start_date: date
     due_date: date
@@ -54,6 +64,10 @@ class TaskResponse(TaskBase):
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
+
+
+class AttachTaskRequest(BaseModelConfig):
+    work_item_id: UUID
 
 
 class CreateTaskDependencyRequest(BaseModelConfig):
@@ -94,8 +108,8 @@ class TeamTaskItemResponse(BaseModelConfig):
     title: str
     status: TaskStatus
     priority: TaskPriority
-    work_item_id: UUID
-    work_item_name: str
+    work_item_id: Optional[UUID] = None
+    work_item_name: Optional[str] = None
     project_id: UUID
     project_name: str
     assignee_id: Optional[UUID] = None

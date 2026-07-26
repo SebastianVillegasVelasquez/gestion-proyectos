@@ -115,7 +115,9 @@ export interface WorkItemDependency {
 
 export interface Task {
   id: string;
-  work_item_id: string;
+  project_id: string;
+  // null = tarea suelta, todavía sin adjuntar a un elemento de la estructura.
+  work_item_id: string | null;
   parent_task_id: string | null;
   title: string;
   description: string | null;
@@ -137,8 +139,10 @@ export interface CreateTaskPayload {
   assignee_id?: string | null;
   // Equipo al que se delega la tarea (opcional).
   team_id?: string | null;
-  // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
-  work_item_id: string;
+  // El proyecto es obligatorio salvo que se indique work_item_id (del que se
+  // deriva). La tarea puede colgar de un elemento o crearse suelta.
+  project_id?: string | null;
+  work_item_id?: string | null;
   start_date: string;
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;
@@ -156,6 +160,10 @@ export interface UpdateTaskPayload {
   team_id?: string | null;
   start_date?: string;
   due_date?: string;
+}
+
+export interface AttachTaskPayload {
+  work_item_id: string;
 }
 
 export interface TaskDependency {

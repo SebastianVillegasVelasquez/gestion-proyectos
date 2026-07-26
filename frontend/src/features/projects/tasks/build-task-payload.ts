@@ -36,8 +36,10 @@ function nullIfEmpty(value: string): string | null {
   return value.trim() === "" ? null : value;
 }
 
-/** Construye el payload de creación a partir del formulario (puro y testeable). */
-export function buildTaskPayload(form: TaskFormState): CreateTaskPayload {
+/** Construye el payload de creación a partir del formulario (puro y testeable).
+ * `projectId` ancla la tarea al proyecto cuando se crea suelta (sin elemento). */
+export function buildTaskPayload(form: TaskFormState, projectId: string): CreateTaskPayload {
+  const workItemId = nullIfEmpty(form.workItemId);
   const payload: CreateTaskPayload = {
     title: form.title.trim(),
     description: nullIfEmpty(form.description),
@@ -45,7 +47,8 @@ export function buildTaskPayload(form: TaskFormState): CreateTaskPayload {
     assignee_id: nullIfEmpty(form.assigneeId),
     team_id: nullIfEmpty(form.teamId),
     depends_on_id: nullIfEmpty(form.dependsOnId),
-    work_item_id: form.workItemId,
+    work_item_id: workItemId,
+    project_id: workItemId ? undefined : projectId,
     start_date: form.startDate,
   };
 
@@ -62,9 +65,6 @@ export function buildTaskPayload(form: TaskFormState): CreateTaskPayload {
 export function validateTaskForm(form: TaskFormState): string | null {
   if (form.title.trim().length < 2) {
     return "El título debe tener al menos 2 caracteres";
-  }
-  if (!form.workItemId) {
-    return "Selecciona la ubicación en el proyecto";
   }
   if (!form.startDate) {
     return "Indica la fecha de inicio";

@@ -100,9 +100,15 @@ export function TasksPage() {
   const teamsQuery = useTeams();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [selected, setSelected] = useState<Task | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  // Deriva del listado en vivo (no una copia local) para que el panel refleje
+  // cambios como adjuntar/quitar de la estructura sin cerrarse y reabrirse.
+  const selected = useMemo(
+    () => tasks.find((t) => t.id === selectedId) ?? null,
+    [tasks, selectedId],
+  );
 
   const assigneeName = useMemo(() => {
     const map = new Map<string, string>();
@@ -200,7 +206,7 @@ export function TasksPage() {
                         assignee={task.assignee_id ? assigneeName.get(task.assignee_id) : undefined}
                         teamName={task.team_id ? teamName.get(task.team_id) : undefined}
                         onClick={() => {
-                          setSelected(task);
+                          setSelectedId(task.id);
                         }}
                       />
                     ))
@@ -226,7 +232,7 @@ export function TasksPage() {
           projectId={projectId}
           task={selected}
           onClose={() => {
-            setSelected(null);
+            setSelectedId(null);
           }}
         />
       )}

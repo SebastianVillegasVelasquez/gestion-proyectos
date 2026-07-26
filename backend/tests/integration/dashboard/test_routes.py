@@ -38,8 +38,8 @@ async def _seed(db_session, tasks: list[dict]) -> None:
     today = datetime.date.today()
     insert_stmt = text(
         """
-        INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date)
-        VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date)
+        INSERT INTO tasks (id, title, status, project_id, work_item_id, start_date, due_date)
+        VALUES (:id, :title, :status, :project_id, :work_item_id, :start_date, :due_date)
         """
     )
     for t in tasks:
@@ -49,6 +49,7 @@ async def _seed(db_session, tasks: list[dict]) -> None:
                 "id": uuid.uuid4(),
                 "title": t.get("title", "Task"),
                 "status": t["status"].name,
+                "project_id": project.id,
                 "work_item_id": item.id,
                 "start_date": today,
                 "due_date": t.get("due_date", today + datetime.timedelta(days=7)),
@@ -133,8 +134,8 @@ async def _seed_panels(db_session, admin_user) -> Project:
     today = datetime.date.today()
     insert_stmt = text(
         """
-        INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date)
-        VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date)
+        INSERT INTO tasks (id, title, status, project_id, work_item_id, start_date, due_date)
+        VALUES (:id, :title, :status, :project_id, :work_item_id, :start_date, :due_date)
         """
     )
     rows = [
@@ -158,6 +159,7 @@ async def _seed_panels(db_session, admin_user) -> Project:
                 "id": uuid.uuid4(),
                 "title": title,
                 "status": status.name,
+                "project_id": project.id,
                 "work_item_id": item.id,
                 "start_date": today - datetime.timedelta(days=10),
                 "due_date": due,
@@ -203,19 +205,24 @@ class TestDashboardPanelsRoute:
         assert project["client_name"] == "Cliente OBJ"
 
 
-async def _insert_task(db_session, work_item_id, title, status, due, assignee_id=None):
+async def _insert_task(
+    db_session, project_id, work_item_id, title, status, due, assignee_id=None
+):
     today = datetime.date.today()
     await db_session.execute(
         text(
             """
-            INSERT INTO tasks (id, title, status, work_item_id, start_date, due_date, assignee_id)
-            VALUES (:id, :title, :status, :work_item_id, :start_date, :due_date, :assignee_id)
+            INSERT INTO tasks
+                (id, title, status, project_id, work_item_id, start_date, due_date, assignee_id)
+            VALUES
+                (:id, :title, :status, :project_id, :work_item_id, :start_date, :due_date, :assignee_id)
             """
         ),
         {
             "id": uuid.uuid4(),
             "title": title,
             "status": status.name,
+            "project_id": project_id,
             "work_item_id": work_item_id,
             "start_date": today,
             "due_date": due,
@@ -246,10 +253,17 @@ async def _seed_user_scope(db_session, member, other):
 
     # Proyecto A: 2 tareas del member + 1 de "other" (progreso general = 3 tareas).
     await _insert_task(
-        db_session, item_a.id, "Mía completada", TaskStatus.COMPLETADA, today, member.id
+        db_session,
+        project_a.id,
+        item_a.id,
+        "Mía completada",
+        TaskStatus.COMPLETADA,
+        today,
+        member.id,
     )
     await _insert_task(
         db_session,
+        project_a.id,
         item_a.id,
         "Mía vencida",
         TaskStatus.EN_PROGRESO,
@@ -258,6 +272,7 @@ async def _seed_user_scope(db_session, member, other):
     )
     await _insert_task(
         db_session,
+        project_a.id,
         item_a.id,
         "De otro",
         TaskStatus.PENDIENTE_POR_INICIAR,
@@ -266,7 +281,13 @@ async def _seed_user_scope(db_session, member, other):
     )
     # Proyecto B: tarea de "other"; el member no debe verla.
     await _insert_task(
-        db_session, item_b.id, "Ajena", TaskStatus.EN_PROGRESO, today, other.id
+        db_session,
+        project_b.id,
+        item_b.id,
+        "Ajena",
+        TaskStatus.EN_PROGRESO,
+        today,
+        other.id,
     )
     await db_session.commit()
     return project_a, project_b
