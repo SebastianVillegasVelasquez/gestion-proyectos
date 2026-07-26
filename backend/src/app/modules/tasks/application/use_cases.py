@@ -28,7 +28,7 @@ from app.shared.events.events import (
     TaskReturned,
     TaskSubmitted,
 )
-from app.shared.exceptions import ForbiddenError, NotFoundError
+from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
 
 # Roles del proyecto que pueden aprobar o devolver una entrega.
 _REVIEW_ROLES = {ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR}
@@ -49,16 +49,32 @@ class CreateTaskUseCase:
         task_repo: TaskRepository,
         work_tree_repo: WorkTreeRepository,
         user_repo: Repository,
+        project_repo: Repository,
         bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
         self.work_tree_repo = work_tree_repo
         self.user_repo = user_repo
+        self.project_repo = project_repo
         self.service = TaskService(task_repo)
         self._bus = bus
 
     async def execute(self, data: CreateTaskRequest) -> TaskResponse:
-        await _get_work_item(self.work_tree_repo, data.work_item_id)
+        # La tarea puede colgar de un elemento existente (se deriva el
+        # proyecto de ahí) o crearse suelta apuntando directo al proyecto.
+        if data.work_item_id is not None:
+            work_item = await _get_work_item(self.work_tree_repo, data.work_item_id)
+            if data.project_id is not None and data.project_id != work_item.proyecto_id:
+                raise ValidationError(
+                    "El elemento indicado no pertenece a ese proyecto"
+                )
+            data.project_id = work_item.proyecto_id
+        else:
+            # El validador del schema exige project_id cuando no hay work_item_id.
+            assert data.project_id is not None
+            project = await self.project_repo.get_by_id(data.project_id)
+            if not project or project.is_deleted:
+                raise NotFoundError("El proyecto no existe")
 
         if data.assignee_id:
             user = await self.user_repo.get_by_id(data.assignee_id)
@@ -177,6 +193,47 @@ class DeleteTaskUseCase:
         await self.service.delete_task(task_id)
 
 
+async def _get_active_task(task_repo: TaskRepository, task_id: UUID):
+    task = await task_repo.get_by_id(task_id)
+    if not task or task.is_deleted:
+        raise NotFoundError("La tarea no existe")
+    return task
+
+
+class AttachTaskToWorkItemUseCase:
+    """Adjunta una tarea suelta (o cambia de elemento) a un WorkItem existente.
+
+    El elemento debe pertenecer al mismo proyecto que la tarea: la estructura
+    y las tareas sueltas del proyecto conviven, pero no se cruzan entre
+    proyectos.
+    """
+
+    def __init__(self, task_repo: TaskRepository, work_tree_repo: WorkTreeRepository):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+
+    async def execute(self, task_id: UUID, work_item_id: UUID) -> TaskResponse:
+        task = await _get_active_task(self.task_repo, task_id)
+        work_item = await _get_work_item(self.work_tree_repo, work_item_id)
+        if work_item.proyecto_id != task.project_id:
+            raise ValidationError("El elemento pertenece a otro proyecto")
+
+        updated = await self.task_repo.set_work_item(task, work_item_id)
+        return TaskService._to_response(updated)
+
+
+class DetachTaskUseCase:
+    """Quita una tarea de la estructura; vuelve a quedar suelta en el proyecto."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, task_id: UUID) -> TaskResponse:
+        task = await _get_active_task(self.task_repo, task_id)
+        updated = await self.task_repo.set_work_item(task, None)
+        return TaskService._to_response(updated)
+
+
 class AddTaskDependencyUseCase:
     def __init__(self, task_repo: TaskRepository):
         self.service = TaskDependencyService(task_repo)
@@ -210,12 +267,10 @@ class ChangeTaskStatusUseCase:
     def __init__(
         self,
         task_repo: TaskRepository,
-        work_tree_repo: WorkTreeRepository,
         member_repo: ProjectMemberRepository | None = None,
         bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
-        self.work_tree_repo = work_tree_repo
         self.member_repo = member_repo
         self.service = TaskStatusService(task_repo)
         self._bus = bus
@@ -230,9 +285,7 @@ class ChangeTaskStatusUseCase:
         if task is None or task.is_deleted:
             raise NotFoundError("La tarea no existe")
 
-        work_item = await self.work_tree_repo.get_item(task.work_item_id)
-        assert work_item is not None, "La tarea debe colgar de un nodo existente"
-        project_id = work_item.proyecto_id
+        project_id = task.project_id
 
         # Autorización: quién puede pedir qué transición.
         if current_user_id is not None:

@@ -29,7 +29,8 @@ class TaskSubmitted(DomainEvent):
 
 @dataclass(frozen=True)
 class TaskCreated(DomainEvent):
-    work_item_id: uuid.UUID
+    # None cuando la tarea se crea suelta, sin estructura todavía.
+    work_item_id: uuid.UUID | None
     task_id: uuid.UUID
     assigned_id: uuid.UUID
 

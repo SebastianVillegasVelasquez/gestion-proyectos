@@ -60,6 +60,7 @@ class TaskService:
     def _to_response(task: "Task") -> "TaskResponse":
         return TaskResponse(
             id=task.id,
+            project_id=task.project_id,
             work_item_id=task.work_item_id,
             parent_task_id=task.parent_task_id,
             title=task.title,

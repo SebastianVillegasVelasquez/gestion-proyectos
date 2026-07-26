@@ -37,6 +37,7 @@ async def _make_task(db, team_id, assignee_id) -> Task:
     await db.flush()
     task = Task(
         title="Banner del Módulo 1",
+        project_id=project.id,
         work_item_id=modulo.id,
         team_id=team_id,
         assignee_id=assignee_id,

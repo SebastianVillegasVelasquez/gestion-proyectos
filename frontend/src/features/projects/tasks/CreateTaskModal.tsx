@@ -6,21 +6,14 @@ import { useWorkTree } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
-import type { Task, TaskPriority, UserPosition, WorkItemTree } from "../types/api.types";
+import type { Task, TaskPriority, UserPosition } from "../types/api.types";
+import { flattenWorkTree } from "../utils/flatten-work-tree";
 import {
   buildTaskPayload,
   emptyTaskForm,
   validateTaskForm,
   type TaskFormState,
 } from "./build-task-payload";
-
-/** Aplana el árbol a una lista con profundidad, para el selector de nodo. */
-function flatten(nodes: WorkItemTree[], depth = 0): { id: string; label: string }[] {
-  return nodes.flatMap((n) => [
-    { id: n.id, label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}` },
-    ...flatten(n.children, depth + 1),
-  ]);
-}
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
@@ -39,16 +32,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function CreateTaskModal({
   projectId,
   tasks,
+  initialWorkItemId,
   onClose,
 }: {
   projectId: string;
   tasks: Task[];
+  /** Preselecciona el elemento (p. ej. al crear desde un nodo de la estructura). */
+  initialWorkItemId?: string;
   onClose: () => void;
 }) {
   const treeQuery = useWorkTree(projectId);
   const createTask = useCreateTask(projectId);
 
-  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm());
+  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm(initialWorkItemId));
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
 
@@ -60,7 +56,7 @@ export function CreateTaskModal({
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const nodeOptions = useMemo(() => flatten(treeQuery.data ?? []), [treeQuery.data]);
+  const nodeOptions = useMemo(() => flattenWorkTree(treeQuery.data ?? []), [treeQuery.data]);
 
   const handleSubmit = () => {
     const error = validateTaskForm(form);
@@ -69,7 +65,7 @@ export function CreateTaskModal({
       return;
     }
     setClientError(null);
-    createTask.mutate(buildTaskPayload(form), { onSuccess: onClose });
+    createTask.mutate(buildTaskPayload(form, projectId), { onSuccess: onClose });
   };
 
   return (
@@ -116,8 +112,9 @@ export function CreateTaskModal({
             />
           </Field>
 
-          {/* Nodo del árbol de trabajo al que cuelga la tarea */}
-          <Field label="Ubicación en el proyecto *">
+          {/* Nodo del árbol de trabajo al que cuelga la tarea (opcional: la
+              tarea puede crearse suelta y adjuntarse después). */}
+          <Field label="Ubicación en la estructura (opcional)">
             <select
               className={inputCls}
               value={form.workItemId}
@@ -125,13 +122,19 @@ export function CreateTaskModal({
                 set("workItemId", e.target.value);
               }}
             >
-              <option value="">Selecciona la ubicación…</option>
+              <option value="">Sin asignar (tarea independiente)</option>
               {nodeOptions.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.label}
                 </option>
               ))}
             </select>
+            {nodeOptions.length === 0 && (
+              <span className="text-[11px] text-slate-400">
+                Aún no hay estructura en este proyecto. Podrás adjuntar esta tarea a un elemento
+                cuando la crees.
+              </span>
+            )}
           </Field>
 
           {/* Responsable: filtro por cargo + persona */}

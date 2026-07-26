@@ -104,7 +104,7 @@ class NotifyOnTaskCreated:
             notification_type=NotificationType.TAREA_ASIGNADA,
             message="Te asignaron una nueva tarea. Revisa los detalles antes de iniciarla.",
             payload={
-                "work_item_id": str(event.work_item_id),
+                "work_item_id": str(event.work_item_id) if event.work_item_id else None,
                 "task_id": str(event.task_id),
             },
         )

@@ -11,6 +11,7 @@ import {
   Copy,
   Pencil,
   Link2,
+  ListChecks,
   Maximize2,
   X,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { tipoStyle } from "../../utils/tipo-style";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
+import { NodeTasksModal } from "./NodeTasksModal";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
 
 function fmt(iso: string | null): string {
@@ -71,6 +73,7 @@ interface TreeNodeProps {
   onDeps: (node: WorkItemTree) => void;
   onClone: (node: WorkItemTree) => void;
   onDelete: (node: WorkItemTree) => void;
+  onTasks: (node: WorkItemTree) => void;
 }
 
 function TreeNode({
@@ -82,6 +85,7 @@ function TreeNode({
   onDeps,
   onClone,
   onDelete,
+  onTasks,
 }: TreeNodeProps) {
   const [open, setOpen] = useState(true);
   const style = tipoStyle(node.tipo_id);
@@ -178,6 +182,15 @@ function TreeNode({
             </button>
             <button
               onClick={() => {
+                onTasks(node);
+              }}
+              title="Ver y adjuntar tareas de este elemento"
+              className="rounded-md p-1 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30"
+            >
+              <ListChecks className="size-3.5" />
+            </button>
+            <button
+              onClick={() => {
                 onClone(node);
               }}
               title="Duplicar este elemento con todo lo que contiene"
@@ -211,6 +224,7 @@ function TreeNode({
               onDeps={onDeps}
               onClone={onClone}
               onDelete={onDelete}
+              onTasks={onTasks}
             />
           ))}
         </div>
@@ -294,6 +308,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
   const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
+  const [tasksNode, setTasksNode] = useState<WorkItemTree | null>(null);
   const [expandedViewOpen, setExpandedViewOpen] = useState(false);
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
@@ -383,6 +398,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setCloneSource(n);
                   }}
                   onDelete={handleDelete}
+                  onTasks={(n) => {
+                    setTasksNode(n);
+                  }}
                 />
               </div>
             ))}
@@ -431,6 +449,16 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           tree={tree}
           onClose={() => {
             setCloneSource(null);
+          }}
+        />
+      )}
+
+      {tasksNode && (
+        <NodeTasksModal
+          projectId={projectId}
+          node={tasksNode}
+          onClose={() => {
+            setTasksNode(null);
           }}
         />
       )}

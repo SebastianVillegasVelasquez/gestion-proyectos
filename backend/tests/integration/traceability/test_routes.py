@@ -42,6 +42,7 @@ async def project_with_history(db_session):
         id=uuid.uuid4(),
         title="Guion Unidad 1",
         status=TaskStatus.EN_PROGRESO,
+        project_id=project.id,
         work_item_id=node.id,
         start_date=datetime.date(2026, 1, 1),
         due_date=due,

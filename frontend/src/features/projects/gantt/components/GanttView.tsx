@@ -95,6 +95,7 @@ function synthesizeFromStructure(tree: WorkItemTree[], realTasks: Task[]): Task[
     if (node.fecha_inicio_plan && node.fecha_fin_plan && !workItemsWithTasks.has(node.id)) {
       acc.push({
         id: `wi-${node.id}`,
+        project_id: node.proyecto_id,
         work_item_id: node.id,
         parent_task_id: null,
         title: node.nombre,
@@ -161,7 +162,7 @@ export function GanttView({
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
   const teamsQuery = useTeams();
-  const [selected, setSelected] = useState<Task | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -189,6 +190,12 @@ export function GanttView({
   );
 
   const allTasks = useMemo(() => [...realTasks, ...syntheticTasks], [realTasks, syntheticTasks]);
+  // Deriva del listado en vivo para que el panel refleje adjuntar/quitar de
+  // la estructura sin cerrarse y reabrirse.
+  const selected = useMemo(
+    () => allTasks.find((t) => t.id === selectedId) ?? null,
+    [allTasks, selectedId],
+  );
 
   // Mapa user_id → cargo, para poder filtrar por responsabilidad.
   const positionByUser = useMemo(() => {
@@ -285,7 +292,12 @@ export function GanttView({
 
   const groups = useMemo<NodeGroup[]>(() => {
     const byItem = new Map<string, Task[]>();
+    // El cronograma agrupa por elemento de la estructura; las tareas sueltas
+    // (sin work_item_id todavía) no tienen fila aquí.
     for (const task of tasks) {
+      if (!task.work_item_id) {
+        continue;
+      }
       const arr = byItem.get(task.work_item_id) ?? [];
       arr.push(task);
       byItem.set(task.work_item_id, arr);
@@ -789,7 +801,7 @@ export function GanttView({
                                     if (task.id.startsWith("wi-")) {
                                       return;
                                     }
-                                    setSelected(task);
+                                    setSelectedId(task.id);
                                   }}
                                   title={[
                                     task.title,
@@ -845,7 +857,7 @@ export function GanttView({
           projectId={project.id}
           task={selected}
           onClose={() => {
-            setSelected(null);
+            setSelectedId(null);
           }}
         />
       )}

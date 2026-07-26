@@ -27,7 +27,35 @@ export function useCreateTask(projectId: string) {
     mutationFn: (payload: CreateTaskPayload) => tasksApi.create(payload),
     onSuccess: (task) => {
       void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
-      void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+      if (task.work_item_id) {
+        void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+      }
+    },
+  });
+}
+
+/** Adjunta una tarea suelta (o la cambia de elemento) a un nodo de la estructura. */
+export function useAttachTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, workItemId }: { taskId: string; workItemId: string }) =>
+      tasksApi.attach(taskId, { work_item_id: workItemId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      // Cualquier vista "tareas por elemento" puede haber cambiado.
+      void qc.invalidateQueries({ queryKey: [...taskKeys.all, "work-item"] });
+    },
+  });
+}
+
+/** Quita la tarea de la estructura; vuelve a quedar suelta en el proyecto. */
+export function useDetachTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) => tasksApi.detach(taskId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: [...taskKeys.all, "work-item"] });
     },
   });
 }
