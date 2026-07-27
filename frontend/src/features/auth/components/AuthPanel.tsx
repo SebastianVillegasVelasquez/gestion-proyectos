@@ -1,20 +1,35 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
-// Formas ambientales: solo transform/opacity (GPU-friendly), en bucle infinito
-// y desfasadas entre sí para que el movimiento no se sienta mecánico.
+// Toda la composición usa solo transform/opacity (compositables por GPU) para
+// que la animación sea fluida sin repaints. Los tiempos están desfasados entre
+// figuras para que el conjunto no se sienta mecánico ni sincronizado.
+
+// Orbes difuminados de fondo: dan color y profundidad, no son el foco.
 const ORBS = [
-  { size: 260, top: "8%", left: "12%", color: "var(--brand-gold)", duration: 12, delay: 0 },
-  { size: 200, top: "58%", left: "62%", color: "var(--brand-teal)", duration: 15, delay: 1.2 },
-  { size: 150, top: "68%", left: "8%", color: "var(--brand-gold)", duration: 10, delay: 0.6 },
-  { size: 120, top: "14%", left: "68%", color: "var(--brand-teal)", duration: 13, delay: 2 },
+  { size: 300, top: "-6%", left: "6%", color: "var(--brand-gold)", duration: 14, delay: 0 },
+  { size: 240, top: "56%", left: "58%", color: "var(--brand-teal)", duration: 17, delay: 1.4 },
+  { size: 180, top: "72%", left: "2%", color: "var(--brand-gold)", duration: 12, delay: 0.6 },
 ];
 
+// Anillos nítidos que rotan y laten: la "figura que se mueve" más evidente.
 const RINGS = [
-  { size: 340, top: "30%", left: "38%", duration: 26 },
-  { size: 220, top: "42%", left: "48%", duration: 34 },
+  { size: 360, top: "24%", left: "30%", duration: 28, color: "var(--brand-gold)", opacity: 0.35 },
+  { size: 240, top: "34%", left: "44%", duration: 22, color: "var(--brand-teal)", opacity: 0.3 },
+  { size: 150, top: "58%", left: "18%", duration: 34, color: "var(--brand-gold)", opacity: 0.25 },
 ];
+
+// Formas geométricas sólidas que flotan (círculo, cuadrado rotado, triángulo).
+const SHAPES = [
+  { kind: "circle", size: 18, top: "20%", left: "72%", color: "var(--brand-gold)", duration: 7 },
+  { kind: "square", size: 22, top: "70%", left: "70%", color: "var(--brand-teal)", duration: 9 },
+  { kind: "circle", size: 12, top: "82%", left: "40%", color: "var(--brand-teal)", duration: 6 },
+  { kind: "square", size: 14, top: "12%", left: "44%", color: "var(--brand-gold)", duration: 8 },
+  { kind: "circle", size: 10, top: "46%", left: "80%", color: "var(--brand-gold)", duration: 5.5 },
+] as const;
 
 export function AuthPanel() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <aside className="relative flex w-full md:w-1/2 flex-col justify-between overflow-hidden bg-sidebar text-sidebar-foreground px-8 py-12 md:px-14 md:py-16">
       {/* Malla de puntos */}
@@ -31,7 +46,7 @@ export function AuthPanel() {
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {ORBS.map((orb, i) => (
           <motion.div
-            key={i}
+            key={`orb-${i}`}
             className="absolute rounded-full blur-3xl"
             style={{
               width: orb.size,
@@ -39,13 +54,13 @@ export function AuthPanel() {
               top: orb.top,
               left: orb.left,
               background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
-              opacity: 0.22,
+              opacity: 0.3,
             }}
-            animate={{
-              y: [0, -22, 0, 18, 0],
-              x: [0, 16, 0, -14, 0],
-              scale: [1, 1.08, 1, 0.95, 1],
-            }}
+            animate={
+              reduceMotion
+                ? undefined
+                : { y: [0, -26, 0, 20, 0], x: [0, 18, 0, -16, 0], scale: [1, 1.1, 1, 0.94, 1] }
+            }
             transition={{
               duration: orb.duration,
               delay: orb.delay,
@@ -57,11 +72,50 @@ export function AuthPanel() {
 
         {RINGS.map((ring, i) => (
           <motion.div
-            key={i}
-            className="absolute rounded-full border border-brand-gold/20"
-            style={{ width: ring.size, height: ring.size, top: ring.top, left: ring.left }}
-            animate={{ rotate: 360, scale: [1, 1.04, 1] }}
+            key={`ring-${i}`}
+            className="absolute rounded-full"
+            style={{
+              width: ring.size,
+              height: ring.size,
+              top: ring.top,
+              left: ring.left,
+              border: `1.5px solid ${ring.color}`,
+              opacity: ring.opacity,
+            }}
+            animate={reduceMotion ? undefined : { rotate: 360, scale: [1, 1.06, 1] }}
             transition={{ duration: ring.duration, repeat: Infinity, ease: "linear" }}
+          />
+        ))}
+
+        {SHAPES.map((shape, i) => (
+          <motion.div
+            key={`shape-${i}`}
+            className="absolute"
+            style={{
+              width: shape.size,
+              height: shape.size,
+              top: shape.top,
+              left: shape.left,
+              background: shape.color,
+              borderRadius: shape.kind === "circle" ? "9999px" : "5px",
+              opacity: 0.55,
+            }}
+            animate={
+              reduceMotion
+                ? undefined
+                : {
+                    y: [0, -18, 0, 14, 0],
+                    x: [0, 10, 0, -8, 0],
+                    rotate: shape.kind === "square" ? [0, 90, 180, 270, 360] : 0,
+                    opacity: [0.55, 0.85, 0.55],
+                  }
+            }
+            transition={{
+              duration: shape.duration,
+              delay: i * 0.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
           />
         ))}
       </div>

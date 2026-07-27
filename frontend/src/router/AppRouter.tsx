@@ -126,14 +126,15 @@ export const AppRouter = () => (
         <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
           <Route path="/projects" element={<AllProjectsPage />} />
           <Route path="/projects/builder" element={<CreateProjectPage />} />
-          <Route path="/projects/:projectId" element={<ProjectDetailPage />}>
-            <Route index element={<Navigate to="estructura" replace />} />
-            <Route path="estructura" element={<ProjectEstructuraPage />} />
-            <Route path="integrantes" element={<ProjectIntegrantesPage />} />
-            <Route path="equipos" element={<ProjectEquiposPage />} />
-            <Route path="areas" element={<ProjectAreasPage />} />
-            <Route path="trazabilidad" element={<ProjectTrazabilidadPage />} />
-          </Route>
+          {/* Detalle del proyecto = vista principal. Cada sección vive en su
+              propia pantalla independiente (con botón para volver al detalle),
+              ya no como pestañas embebidas dentro del detalle. */}
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId/estructura" element={<ProjectEstructuraPage />} />
+          <Route path="/projects/:projectId/integrantes" element={<ProjectIntegrantesPage />} />
+          <Route path="/projects/:projectId/equipos" element={<ProjectEquiposPage />} />
+          <Route path="/projects/:projectId/areas" element={<ProjectAreasPage />} />
+          <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
           <Route path="/collaborators" element={<CollaboratorsPage />} />
