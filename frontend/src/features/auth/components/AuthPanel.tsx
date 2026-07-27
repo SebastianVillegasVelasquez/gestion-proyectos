@@ -46,7 +46,7 @@ export function AuthPanel() {
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {ORBS.map((orb, i) => (
           <motion.div
-            key={`orb-${i}`}
+            key={`orb-${String(i)}`}
             className="absolute rounded-full blur-3xl"
             style={{
               width: orb.size,
@@ -72,7 +72,7 @@ export function AuthPanel() {
 
         {RINGS.map((ring, i) => (
           <motion.div
-            key={`ring-${i}`}
+            key={`ring-${String(i)}`}
             className="absolute rounded-full"
             style={{
               width: ring.size,
@@ -89,7 +89,7 @@ export function AuthPanel() {
 
         {SHAPES.map((shape, i) => (
           <motion.div
-            key={`shape-${i}`}
+            key={`shape-${String(i)}`}
             className="absolute"
             style={{
               width: shape.size,

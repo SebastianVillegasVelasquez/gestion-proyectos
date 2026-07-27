@@ -116,21 +116,22 @@ function SummaryCard({
 function TimelineEvent({ event }: { event: TraceabilityEvent }) {
   const meta = KIND_META[event.kind];
   const Icon = event.is_delay ? AlertTriangle : meta.icon;
-  const dot = event.is_delay ? DELAY_META.dot : meta.dot;
   const badge = event.is_delay ? DELAY_META.badge : meta.badge;
 
   return (
-    <li className="group relative flex gap-3 pb-4 last:pb-0">
+    <li className="group relative flex gap-4 pb-5 last:pb-0">
       <div className="relative flex flex-col items-center">
+        {/* Círculo de ícono tintado suave por tipo de evento (mismo mapeo que
+            los badges) + conector vertical al siguiente evento. */}
         <span
           className={cn(
-            "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white shadow-sm",
-            dot,
+            "z-10 flex size-8 shrink-0 items-center justify-center rounded-full",
+            badge,
           )}
         >
-          <Icon className="size-3.5" />
+          <Icon className="size-4" />
         </span>
-        <span className="absolute top-7 h-full w-px bg-slate-200 group-last:hidden dark:bg-slate-700" />
+        <span className="absolute top-8 h-full w-px bg-border group-last:hidden" />
       </div>
 
       <div className="min-w-0 flex-1 pb-1">
@@ -310,11 +311,17 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
           hint="No hay eventos de retraso en este proyecto."
         />
       ) : (
-        <ol className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
-          {visible.map((event) => (
-            <TimelineEvent key={event.id} event={event} />
-          ))}
-        </ol>
+        <div className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
+          <Card className="rounded-2xl">
+            <CardContent className="py-6">
+              <ol>
+                {visible.map((event) => (
+                  <TimelineEvent key={event.id} event={event} />
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
