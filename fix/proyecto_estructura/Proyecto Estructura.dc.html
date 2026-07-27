@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:oklch(97.3% 0.004 80);font-family:'Manrope',system-ui,sans-serif;color:oklch(22% 0.01 260);}
+  a{color:oklch(50% 0.14 265);text-decoration:none;}
+  a:hover{color:oklch(42% 0.15 265);text-decoration:underline;}
+  *{box-sizing:border-box;}
+</style>
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:32px 32px 60px;display:flex;flex-direction:column;gap:22px;">
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <a href="#" style="font-size:13px;color:oklch(52% 0.01 260);font-weight:600;display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Diplomado en Transformación Digital
+      </a>
+      <button style="width:38px;height:38px;border-radius:10px;border:1px solid oklch(90% 0.005 80);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:oklch(45% 0.01 260);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(50% 0.14 265)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/></svg>
+      <div>
+        <h1 style="margin:0;font-size:26px;font-weight:800;letter-spacing:-0.01em;">Estructura del proyecto</h1>
+        <div style="font-size:13.5px;color:oklch(52% 0.01 260);font-weight:500;margin-top:2px;">Fases, módulos y contenidos del diplomado</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:7px;background:#fff;border:1px solid oklch(90% 0.005 80);border-radius:10px;padding:8px 12px 8px 10px;color:oklch(50% 0.01 260);flex:1;min-width:200px;max-width:280px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <span style="font-size:13.5px;font-weight:500;color:oklch(60% 0.008 260);">Buscar en la estructura…</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:2px;background:#fff;border:1px solid oklch(90% 0.005 80);border-radius:10px;padding:3px;">
+      <span style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;background:oklch(50% 0.14 265);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/></svg>
+        Árbol
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;color:oklch(55% 0.01 260);font-size:12.5px;font-weight:700;cursor:pointer;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        Lista
+      </span>
+    </div>
+    <button style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid oklch(90% 0.005 80);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:600;color:oklch(35% 0.01 260);cursor:pointer;font-family:inherit;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M5 7h14M11 17h2"/></svg>
+      Colapsar todo
+    </button>
+    <span style="flex:1;"></span>
+    <button style="display:flex;align-items:center;gap:7px;background:oklch(50% 0.14 265);color:#fff;border:none;border-radius:11px;padding:11px 18px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;transition:background .15s;" style-hover="background:oklch(43% 0.14 265);">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Añadir elemento
+    </button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:800;letter-spacing:0.08em;color:oklch(58% 0.008 260);">TIPOS</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;background:oklch(94% 0.06 155);color:oklch(38% 0.1 155);border:1.5px solid oklch(85% 0.07 155);cursor:pointer;">Fase</span>
+      <span style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;background:oklch(94% 0.045 265);color:oklch(40% 0.12 265);border:1.5px solid oklch(85% 0.05 265);cursor:pointer;">Módulo</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;background:transparent;color:oklch(52% 0.01 260);border:1.5px dashed oklch(82% 0.005 80);cursor:pointer;transition:border-color .15s,color .15s;" style-hover="border-color:oklch(60% 0.01 260);color:oklch(30% 0.01 260);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        nuevo
+      </span>
+    </div>
+  </div>
+
+  <div style="background:#fff;border:1px solid oklch(90% 0.005 80);border-radius:18px;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;transition:background .12s;border-bottom:1px solid oklch(94% 0.004 80);" style-hover="background:oklch(97.5% 0.003 80);">
+      <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:oklch(50% 0.01 260);flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <span style="width:7px;height:7px;border-radius:50%;background:oklch(55% 0.13 155);flex-shrink:0;"></span>
+      <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.06 155);color:oklch(38% 0.1 155);flex-shrink:0;">FASE</span>
+      <span style="font-size:15px;font-weight:700;color:oklch(20% 0.01 260);">Planeación</span>
+      <span style="flex:1;"></span>
+      <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:oklch(95% 0.004 80);color:oklch(48% 0.008 260);min-width:44px;text-align:center;">15 d</span>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;transition:background .12s;border-bottom:1px solid oklch(94% 0.004 80);" style-hover="background:oklch(97.5% 0.003 80);">
+      <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:oklch(50% 0.01 260);flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <span style="width:7px;height:7px;border-radius:50%;background:oklch(55% 0.13 155);flex-shrink:0;"></span>
+      <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.06 155);color:oklch(38% 0.1 155);flex-shrink:0;">FASE</span>
+      <span style="font-size:15px;font-weight:700;color:oklch(20% 0.01 260);">Producción</span>
+      <span style="flex:1;"></span>
+      <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:oklch(95% 0.004 80);color:oklch(48% 0.008 260);min-width:44px;text-align:center;">30 d</span>
+    </div>
+
+    <div style="margin-left:31px;padding-left:16px;border-left:1.5px solid oklch(91% 0.005 80);">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 20px 12px 0;position:relative;cursor:pointer;transition:background .12s;border-bottom:1px solid oklch(96% 0.004 80);" style-hover="background:oklch(97.5% 0.003 80);">
+        <span style="position:absolute;left:-16px;top:50%;width:16px;height:1.5px;background:oklch(91% 0.005 80);"></span>
+        <span style="width:20px;flex-shrink:0;"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:oklch(55% 0.15 265);flex-shrink:0;"></span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.045 265);color:oklch(40% 0.12 265);flex-shrink:0;">MÓDULO</span>
+        <span style="font-size:14px;font-weight:600;color:oklch(28% 0.01 260);">Unidad 1</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:12.5px;color:oklch(78% 0.005 80);font-weight:600;font-style:italic;">sin fechas</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 20px 12px 0;position:relative;cursor:pointer;transition:background .12s;border-bottom:1px solid oklch(96% 0.004 80);" style-hover="background:oklch(97.5% 0.003 80);">
+        <span style="position:absolute;left:-16px;top:50%;width:16px;height:1.5px;background:oklch(91% 0.005 80);"></span>
+        <span style="width:20px;flex-shrink:0;"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:oklch(55% 0.15 265);flex-shrink:0;"></span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.045 265);color:oklch(40% 0.12 265);flex-shrink:0;">MÓDULO</span>
+        <span style="font-size:14px;font-weight:600;color:oklch(28% 0.01 260);">Unidad 2</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:12.5px;color:oklch(78% 0.005 80);font-weight:600;font-style:italic;">sin fechas</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 20px 12px 0;position:relative;cursor:pointer;transition:background .12s;" style-hover="background:oklch(97.5% 0.003 80);">
+        <span style="position:absolute;left:-16px;top:50%;width:16px;height:1.5px;background:oklch(91% 0.005 80);"></span>
+        <span style="width:20px;flex-shrink:0;"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:oklch(55% 0.15 265);flex-shrink:0;"></span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.045 265);color:oklch(40% 0.12 265);flex-shrink:0;">MÓDULO</span>
+        <span style="font-size:14px;font-weight:600;color:oklch(28% 0.01 260);">Unidad 3</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:12.5px;color:oklch(78% 0.005 80);font-weight:600;font-style:italic;">sin fechas</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;transition:background .12s;border-top:1px solid oklch(94% 0.004 80);" style-hover="background:oklch(97.5% 0.003 80);">
+      <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:oklch(50% 0.01 260);flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <span style="width:7px;height:7px;border-radius:50%;background:oklch(55% 0.13 155);flex-shrink:0;"></span>
+      <span style="font-size:11px;font-weight:800;letter-spacing:0.04em;padding:3px 9px;border-radius:6px;background:oklch(94% 0.06 155);color:oklch(38% 0.1 155);flex-shrink:0;">FASE</span>
+      <span style="font-size:15px;font-weight:700;color:oklch(20% 0.01 260);">Publicación</span>
+      <span style="flex:1;"></span>
+      <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:oklch(95% 0.004 80);color:oklch(48% 0.008 260);min-width:44px;text-align:center;">10 d</span>
+    </div>
+
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>
