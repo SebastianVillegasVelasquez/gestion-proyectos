@@ -14,9 +14,10 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
  *   - Timing global: ajustar TIMING (todo lo demás se deriva de ahí).
  *   - Colores: COLORS usa los tokens de marca de App.css con fallback hex;
  *     el naranja no tiene token, es el color del punto del logo original.
- *   - Forma de las piezas: SPIRAL_PATH y GOLD_PATH aproximan el logo.webp
- *     (trazo a mano alzada); retocar los puntos de control del path dorado
- *     o los radios de spiralPath() si el diseño entrega un SVG oficial.
+ *   - Forma de las piezas: los paths aproximan logo-as-svg.svg (que es un
+ *     JPEG incrustado, sin vectores reutilizables): TEAL_* forman el "6"
+ *     (ascendente + anillo alrededor del ojo), GOLD_* el remolino grande y
+ *     la "j". Retocar puntos de control o tealRingPath() para iterar.
  *
  * Rendimiento: solo se animan transform y opacity (compositables por GPU,
  * no disparan layout). SVG inline, sin canvas ni libs nuevas. Con
@@ -40,8 +41,8 @@ const COLORS = {
 } as const;
 
 // Centro del "ojo" dentro del viewBox 0 0 200 200.
-const CX = 104;
-const CY = 92;
+const CX = 100;
+const CY = 94;
 
 const PARTICLE_COUNT = 16;
 const PARTICLE_COLORS = [COLORS.teal, COLORS.gold, COLORS.orange, COLORS.gold, COLORS.teal];
@@ -101,13 +102,20 @@ const PARTICLES: Particle[] = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
   };
 });
 
-/** Espiral teal: generada como polilínea suave (radio creciente, ~1.6 vueltas). */
-function spiralPath(rStart: number, rEnd: number, turns: number, steps = 72): string {
+/**
+ * Anillo teal alrededor del ojo: ~1.15 vueltas desde arriba-izquierda
+ * (donde aterriza el ascendente), con el radio creciendo al final para
+ * formar el remolino que sobresale abajo-izquierda en el logo original.
+ */
+function tealRingPath(radius: number, steps = 90): string {
   const parts: string[] = [];
+  const startAngle = (215 / 180) * Math.PI;
+  const turns = 1.15;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    const a = -Math.PI / 2 + t * turns * Math.PI * 2;
-    const r = rStart + (rEnd - rStart) * t;
+    const a = startAngle + t * turns * Math.PI * 2;
+    const grow = Math.max(0, (t - 0.78) / 0.22); // último tramo se abre hacia afuera
+    const r = radius + grow * 11;
     const x = CX + r * Math.cos(a);
     const y = CY + r * Math.sin(a);
     parts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
@@ -115,12 +123,15 @@ function spiralPath(rStart: number, rEnd: number, turns: number, steps = 72): st
   return parts.join(" ");
 }
 
-const SPIRAL_PATH = spiralPath(14, 34, 1.6);
-
-// Trazo dorado tipo "6": ascendente arriba-izquierda, envuelve por debajo
-// y sube por la derecha hacia el punto naranja (aproximación del logo.webp).
-const GOLD_PATH =
-  "M 86 8 C 68 34 46 62 44 100 C 42 146 74 174 112 170 C 150 166 172 138 168 104 C 165 76 152 58 156 34";
+const TEAL_RING_PATH = tealRingPath(38);
+// Ascendente del "6" teal: baja desde arriba y conecta con el anillo.
+const TEAL_ASCENDER_PATH = "M 64 10 C 60 28 62 48 71 66";
+// Remolino dorado grande: rodea al ojo, abierto arriba-derecha, la punta
+// final se curva hacia adentro a media altura derecha.
+const GOLD_SWIRL_PATH =
+  "M 90 28 C 55 30 28 60 24 96 C 20 138 48 168 92 170 C 128 172 148 150 146 120";
+// "J" dorada (trazo más delgado): baja por la derecha bajo el punto naranja.
+const GOLD_J_PATH = "M 148 44 C 158 58 162 82 160 106 C 158 136 148 160 126 176";
 
 // ── Variants por fase ────────────────────────────────────────────────────────
 
@@ -202,47 +213,64 @@ function LogoPieces({ animated }: { animated: boolean }) {
       initial={animated ? "hidden" : false}
       animate={animated ? "assembled" : false}
     >
-      {/* Forma dorada tipo "6" (envuelve por debajo) */}
-      <motion.path
+      {/* Dorado: remolino grande + "j" (envuelve al ojo) */}
+      <motion.g
         variants={animated ? goldPiece : undefined}
-        d={GOLD_PATH}
-        fill="none"
-        stroke={COLORS.gold}
-        strokeWidth={22}
-        strokeLinecap="round"
         style={{ transformOrigin: "100px 100px" }}
-      />
-      {/* Ojo: fondo claro + espiral teal */}
+      >
+        <path
+          d={GOLD_SWIRL_PATH}
+          fill="none"
+          stroke={COLORS.gold}
+          strokeWidth={26}
+          strokeLinecap="round"
+        />
+        <path
+          d={GOLD_J_PATH}
+          fill="none"
+          stroke={COLORS.gold}
+          strokeWidth={17}
+          strokeLinecap="round"
+        />
+      </motion.g>
+      {/* Ojo: fondo claro + "6" teal (ascendente y anillo con remolino) */}
       <motion.g
         variants={animated ? spiralPiece : undefined}
         style={{ transformOrigin: `${String(CX)}px ${String(CY)}px` }}
       >
-        <circle cx={CX} cy={CY} r={40} fill={COLORS.eyeWhite} />
+        <circle cx={CX} cy={CY} r={33} fill={COLORS.eyeWhite} />
         <path
-          d={SPIRAL_PATH}
+          d={TEAL_ASCENDER_PATH}
           fill="none"
           stroke={COLORS.teal}
-          strokeWidth={9}
+          strokeWidth={12.5}
+          strokeLinecap="round"
+        />
+        <path
+          d={TEAL_RING_PATH}
+          fill="none"
+          stroke={COLORS.teal}
+          strokeWidth={12.5}
           strokeLinecap="round"
         />
       </motion.g>
       {/* Pupila */}
       <motion.circle
         variants={animated ? pupilPiece : undefined}
-        cx={CX}
-        cy={CY}
-        r={12}
+        cx={97}
+        cy={91}
+        r={15.5}
         fill={COLORS.pupil}
-        style={{ transformOrigin: `${String(CX)}px ${String(CY)}px` }}
+        style={{ transformOrigin: "97px 91px" }}
       />
       {/* Punto naranja (toque final) */}
       <motion.circle
         variants={animated ? orangePiece : undefined}
-        cx={168}
-        cy={22}
-        r={9}
+        cx={166}
+        cy={18}
+        r={9.5}
         fill={COLORS.orange}
-        style={{ transformOrigin: "168px 22px" }}
+        style={{ transformOrigin: "166px 18px" }}
       />
     </motion.g>
   );
