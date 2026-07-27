@@ -6,29 +6,10 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useDeleteTeam, useTeams } from "../../hooks/use-teams";
 import { filterTeams } from "../../utils/filter-teams";
+import { colorForName } from "../../utils/entity-color";
 import type { Team } from "../../types/api.types";
 import { TeamFormModal } from "../teams/TeamFormModal";
 import { TeamMembersManager } from "../teams/TeamMembersManager";
-
-// Color determinístico por nombre de equipo: el mismo equipo se reconoce con el
-// mismo acento en cualquier pantalla (patrón pedido en el handoff). Se usan los
-// tintes de la paleta de la marca, no índigo del prototipo.
-const TEAM_PALETTE = [
-  "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300",
-  "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300",
-  "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300",
-  "bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300",
-];
-
-function teamColor(name: string): string {
-  let hash = 0;
-  for (const ch of name) {
-    hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  }
-  return TEAM_PALETTE[hash % TEAM_PALETTE.length];
-}
 
 function TeamCard({ team, onOpen }: { team: Team; onOpen: () => void }) {
   return (
@@ -41,7 +22,7 @@ function TeamCard({ team, onOpen }: { team: Team; onOpen: () => void }) {
         <span
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-xl",
-            teamColor(team.name),
+            colorForName(team.name),
           )}
         >
           <UsersRound className="size-[18px]" />
@@ -111,7 +92,7 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
             <div
               className={cn(
                 "flex size-12 shrink-0 items-center justify-center rounded-2xl",
-                teamColor(open.name),
+                colorForName(open.name),
               )}
             >
               <UsersRound className="size-6" />

@@ -12,8 +12,11 @@ import {
   Pencil,
   Link2,
   ListChecks,
-  Maximize2,
-  X,
+  Search,
+  ListTree,
+  List,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +39,35 @@ function fmt(iso: string | null): string {
   }
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y.slice(2)}`;
+}
+
+function nodeMatches(node: WorkItemTree, query: string): boolean {
+  return node.nombre.toLowerCase().includes(query);
+}
+
+/** ids de todos los nodos que tienen hijos (para "colapsar todo"). */
+function collectParentIds(nodes: WorkItemTree[], acc: Set<string>): Set<string> {
+  for (const node of nodes) {
+    if (node.children.length > 0) {
+      acc.add(node.id);
+      collectParentIds(node.children, acc);
+    }
+  }
+  return acc;
+}
+
+/** Poda el árbol a los nodos que coinciden con la búsqueda o tienen un
+ * descendiente que coincide. Los ancestros de un match quedan siempre
+ * visibles: el llamador fuerza su expansión mientras hay búsqueda activa. */
+function pruneForSearch(nodes: WorkItemTree[], query: string): WorkItemTree[] {
+  const result: WorkItemTree[] = [];
+  for (const node of nodes) {
+    const children = pruneForSearch(node.children, query);
+    if (nodeMatches(node, query) || children.length > 0) {
+      result.push({ ...node, children });
+    }
+  }
+  return result;
 }
 
 function DateBadge({ node }: { node: WorkItemTree }) {
@@ -68,30 +100,37 @@ interface TreeNodeProps {
   node: WorkItemTree;
   depth: number;
   typeNameById: Map<string, string>;
+  isExpanded: (id: string) => boolean;
+  onToggle: (id: string) => void;
   onAddChild: (parent: WorkItemTree) => void;
   onEdit: (node: WorkItemTree) => void;
   onDeps: (node: WorkItemTree) => void;
   onClone: (node: WorkItemTree) => void;
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
+  activeTypeIds: Set<string>;
 }
 
 function TreeNode({
   node,
   depth,
   typeNameById,
+  isExpanded,
+  onToggle,
   onAddChild,
   onEdit,
   onDeps,
   onClone,
   onDelete,
   onTasks,
+  activeTypeIds,
 }: TreeNodeProps) {
-  const [open, setOpen] = useState(true);
+  const open = isExpanded(node.id);
   const style = tipoStyle(node.tipo_id);
   const hasChildren = node.children.length > 0;
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
+  const nodeDimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
 
   const nameSize =
     depth === 0
@@ -108,10 +147,15 @@ function TreeNode({
           "before:absolute before:left-[-16px] before:top-[22px] before:h-[1.5px] before:w-4 before:bg-border before:content-['']",
       )}
     >
-      <div className="group flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40">
+      <div
+        className={cn(
+          "group flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
+          nodeDimmed && "opacity-40",
+        )}
+      >
         <button
           onClick={() => {
-            setOpen((o) => !o);
+            onToggle(node.id);
           }}
           className={cn(
             "flex size-5 shrink-0 items-center justify-center text-muted-foreground",
@@ -219,12 +263,15 @@ function TreeNode({
               node={child}
               depth={depth + 1}
               typeNameById={typeNameById}
+              isExpanded={isExpanded}
+              onToggle={onToggle}
               onAddChild={onAddChild}
               onEdit={onEdit}
               onDeps={onDeps}
               onClone={onClone}
               onDelete={onDelete}
               onTasks={onTasks}
+              activeTypeIds={activeTypeIds}
             />
           ))}
         </div>
@@ -233,7 +280,17 @@ function TreeNode({
   );
 }
 
-function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo[] }) {
+function NodeTypesBar({
+  projectId,
+  types,
+  activeTypeIds,
+  onToggleType,
+}: {
+  projectId: string;
+  types: TipoNodo[];
+  activeTypeIds: Set<string>;
+  onToggleType: (id: string) => void;
+}) {
   const createType = useCreateNodeType(projectId);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -254,16 +311,25 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
       </span>
       {types.map((t) => {
         const style = tipoStyle(t.id);
+        const active = activeTypeIds.has(t.id);
         return (
-          <span
+          <button
             key={t.id}
+            type="button"
+            onClick={() => {
+              onToggleType(t.id);
+            }}
+            aria-pressed={active}
+            title="Filtrar / atenuar por este tipo"
             className={cn(
-              "rounded-full border-[1.5px] border-transparent px-3 py-1 text-[12.5px] font-bold",
+              "rounded-full border-[1.5px] px-3 py-1 text-[12.5px] font-bold transition-opacity",
               style.chip,
+              active ? "border-current" : "border-transparent",
+              activeTypeIds.size > 0 && !active && "opacity-40",
             )}
           >
             {t.nombre}
-          </span>
+          </button>
         );
       })}
       {adding ? (
@@ -299,6 +365,74 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
   );
 }
 
+/** Vista de lista: tabla plana (sin jerarquía visual) de todos los nodos, para
+ * cuando el volumen de elementos hace incómodo navegar el árbol. */
+function ListRows({
+  nodes,
+  typeNameById,
+  activeTypeIds,
+}: {
+  nodes: WorkItemTree[];
+  typeNameById: Map<string, string>;
+  activeTypeIds: Set<string>;
+}) {
+  const rows: WorkItemTree[] = [];
+  const collect = (list: WorkItemTree[]) => {
+    for (const n of list) {
+      rows.push(n);
+      collect(n.children);
+    }
+  };
+  collect(nodes);
+
+  return (
+    <table className="w-full text-left text-sm">
+      <thead className="sticky top-0 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <tr>
+          <th className="px-4 py-3">Nombre</th>
+          <th className="px-4 py-3">Tipo</th>
+          <th className="px-4 py-3">Fechas</th>
+          <th className="px-4 py-3">Duración</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((node) => {
+          const style = tipoStyle(node.tipo_id);
+          const dimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
+          return (
+            <tr
+              key={node.id}
+              className={cn("border-b border-accent/60 last:border-0", dimmed && "opacity-40")}
+            >
+              <td className="px-4 py-2.5 font-semibold text-foreground">{node.nombre}</td>
+              <td className="px-4 py-2.5">
+                <span
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider",
+                    style.chip,
+                  )}
+                >
+                  {typeNameById.get(node.tipo_id) ?? "elemento"}
+                </span>
+              </td>
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                {node.fecha_inicio_plan || node.fecha_fin_plan
+                  ? `${fmt(node.fecha_inicio_plan)} → ${fmt(node.fecha_fin_plan)}`
+                  : "—"}
+              </td>
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                {node.duracion_valor != null
+                  ? `${node.duracion_valor} ${node.duracion_unidad === "semanas" ? "sem" : "d"}`
+                  : "—"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 export function StructurePanel({ projectId }: { projectId: string }) {
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
@@ -309,7 +443,11 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
   const [tasksNode, setTasksNode] = useState<WorkItemTree | null>(null);
-  const [expandedViewOpen, setExpandedViewOpen] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"arbol" | "lista">("arbol");
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(new Set());
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
   const typeNameById = useMemo(() => {
@@ -318,7 +456,47 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     return map;
   }, [types]);
 
-  const tree = treeQuery.data ?? [];
+  const tree = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
+
+  const query = search.trim().toLowerCase();
+  const visibleTree = useMemo(() => {
+    if (!query) {
+      return tree;
+    }
+    return pruneForSearch(tree, query);
+  }, [tree, query]);
+
+  // Con búsqueda activa, todo lo que sobrevive a la poda queda expandido
+  // (ya son solo los matches y sus ancestros); sin búsqueda, respeta lo que
+  // el usuario colapsó manualmente.
+  const isExpanded = (id: string): boolean => (query ? true : !collapsedIds.has(id));
+
+  const toggleNode = (id: string) => {
+    if (query) {
+      return;
+    }
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleType = (id: string) => {
+    setActiveTypeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   function openAdd(parent: WorkItemTree | null) {
     setModalParent(parent);
@@ -333,23 +511,80 @@ export function StructurePanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Fila combinada: TIPOS + botón "Añadir elemento" + beta botón alineados */}
-      <div className="flex shrink-0 flex-wrap items-center gap-4">
-        <NodeTypesBar projectId={projectId} types={types} />
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => {
-              setExpandedViewOpen(true);
+      {/* Toolbar: buscador, vista árbol/lista, colapsar-expandir todo, + añadir */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
             }}
-            title="Vista expandida de la estructura (beta)"
-            aria-label="Vista expandida de la estructura"
-            className="flex items-center justify-center rounded-lg border border-border bg-card p-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            placeholder="Buscar elemento…"
+            aria-label="Buscar elemento de la estructura"
+            className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
+          />
+        </div>
+
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setView("arbol");
+            }}
+            aria-pressed={view === "arbol"}
+            aria-label="Vista de árbol"
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-colors",
+              view === "arbol"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <Maximize2 className="size-4" />
-            <span className="ml-1 hidden text-xs font-bold text-amber-600 dark:text-amber-400 sm:inline">
-              BETA
-            </span>
+            <ListTree className="size-3.5" /> Árbol
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setView("lista");
+            }}
+            aria-pressed={view === "lista"}
+            aria-label="Vista de lista"
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-colors",
+              view === "lista"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <List className="size-3.5" /> Lista
+          </button>
+        </div>
+
+        {view === "arbol" && (
+          <button
+            type="button"
+            onClick={() => {
+              setCollapsedIds((prev) =>
+                prev.size > 0 ? new Set() : collectParentIds(tree, new Set()),
+              );
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {collapsedIds.size > 0 ? (
+              <>
+                <ChevronsUpDown className="size-3.5" /> Expandir todo
+              </>
+            ) : (
+              <>
+                <ChevronsDownUp className="size-3.5" /> Colapsar todo
+              </>
+            )}
+          </button>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => {
               openAdd(null);
@@ -361,6 +596,13 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       </div>
+
+      <NodeTypesBar
+        projectId={projectId}
+        types={types}
+        activeTypeIds={activeTypeIds}
+        onToggleType={toggleType}
+      />
 
       {treeQuery.isLoading ? (
         <div className="min-h-[400px] flex-1 animate-pulse rounded-2xl bg-accent" />
@@ -376,15 +618,32 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             </p>
           </div>
         </div>
+      ) : query && visibleTree.length === 0 ? (
+        <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <Search className="size-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Ningún elemento coincide con «{search}».</p>
+        </div>
+      ) : view === "lista" ? (
+        <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+          <CardContent className="flex-1 overflow-auto p-0">
+            <ListRows
+              nodes={visibleTree}
+              typeNameById={typeNameById}
+              activeTypeIds={activeTypeIds}
+            />
+          </CardContent>
+        </Card>
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
-            {tree.map((node, idx) => (
+            {visibleTree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode
                   node={node}
                   depth={0}
                   typeNameById={typeNameById}
+                  isExpanded={isExpanded}
+                  onToggle={toggleNode}
                   onAddChild={(p) => {
                     openAdd(p);
                   }}
@@ -401,6 +660,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onTasks={(n) => {
                     setTasksNode(n);
                   }}
+                  activeTypeIds={activeTypeIds}
                 />
               </div>
             ))}
@@ -461,117 +721,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             setTasksNode(null);
           }}
         />
-      )}
-
-      {/* Expanded structure view (beta) */}
-      {expandedViewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <div className="flex items-center gap-3">
-                <FolderTree className="size-5 text-brand-blue" />
-                <h2 className="text-lg font-semibold text-foreground">Estructura del Proyecto</h2>
-                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  BETA
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setExpandedViewOpen(false);
-                }}
-                aria-label="Cerrar"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {tree.length === 0 ? (
-                <div className="flex items-center justify-center py-12 text-center">
-                  <div>
-                    <FolderTree className="mx-auto mb-3 size-8 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      No hay elementos en la estructura
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {tree.map((node) => (
-                    <ExpandedTreeNode
-                      key={node.id}
-                      node={node}
-                      depth={0}
-                      typeNameById={typeNameById}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ExpandedTreeNode({
-  node,
-  depth,
-  typeNameById,
-}: {
-  node: WorkItemTree;
-  depth: number;
-  typeNameById: Map<string, string>;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const typeName = typeNameById.get(node.tipo_id) ?? "Elemento";
-  const style = tipoStyle(node.tipo_id);
-  const hasChildren = node.children.length > 0;
-
-  return (
-    <div>
-      <div
-        className={cn(
-          "flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-          depth === 0 && "bg-accent/40",
-        )}
-      >
-        {hasChildren && (
-          <button
-            onClick={() => {
-              setExpanded(!expanded);
-            }}
-            type="button"
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-background"
-          >
-            <ChevronRight className={cn("size-4 transition-transform", expanded && "rotate-90")} />
-          </button>
-        )}
-        {!hasChildren && <div className="w-5" />}
-
-        <div className="flex flex-1 items-start gap-2">
-          <span className={cn("mt-1 inline-block h-2 w-2 rounded-full shrink-0", style.dot)} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-foreground">{node.nombre}</p>
-            <p className="text-xs text-muted-foreground">{typeName}</p>
-          </div>
-        </div>
-      </div>
-
-      {expanded && hasChildren && (
-        <div className="ml-6 border-l border-border/50 py-1">
-          {node.children.map((child) => (
-            <ExpandedTreeNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              typeNameById={typeNameById}
-            />
-          ))}
-        </div>
       )}
     </div>
   );
