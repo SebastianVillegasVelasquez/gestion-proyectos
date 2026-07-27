@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { LogoAssembly } from "./LogoAssembly";
 
 // Toda la composición usa solo transform/opacity (compositables por GPU) para
 // que la animación sea fluida sin repaints. Los tiempos están desfasados entre
@@ -131,6 +132,11 @@ export function AuthPanel() {
             Bitácora OBJ
           </span>
         </div>
+      </div>
+
+      {/* Ensamblaje animado del logo: corre una vez al montar, luego idle */}
+      <div className="relative z-10 hidden flex-1 items-center justify-center md:flex">
+        <LogoAssembly size={260} />
       </div>
 
       <div className="relative z-10 mt-10">
