@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   FolderTree,
   Plus,
@@ -17,6 +17,8 @@ import {
   List,
   ChevronsDownUp,
   ChevronsUpDown,
+  MoreVertical,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,6 +70,104 @@ function pruneForSearch(nodes: WorkItemTree[], query: string): WorkItemTree[] {
     }
   }
   return result;
+}
+
+/** Nº de descendientes (hijos, nietos…) de un nodo. Se muestra en los nodos
+ * colapsados para saber cuánto contenido queda oculto en árboles grandes. */
+function descendantCount(node: WorkItemTree): number {
+  return node.children.reduce((total, child) => total + 1 + descendantCount(child), 0);
+}
+
+/** Nº total de elementos en una lista de árboles (raíces + descendientes). */
+function totalNodes(nodes: WorkItemTree[]): number {
+  return nodes.reduce((total, node) => total + 1 + descendantCount(node), 0);
+}
+
+interface NodeAction {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  /** Estilo destructivo (rojo) para acciones como eliminar. */
+  danger?: boolean;
+}
+
+/** Menú de opciones por nodo (kebab). Concentra todas las acciones en un solo
+ * botón para no saturar cada fila —clave con muchos elementos—. Se posiciona
+ * con `fixed` anclado al botón, así no lo recorta el scroll del contenedor. */
+function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen(true);
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-label="Opciones del elemento"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cn(
+          "rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          open && "bg-accent text-foreground",
+        )}
+      >
+        <MoreVertical className="size-4" />
+      </button>
+
+      {open && pos && (
+        <>
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => {
+              setOpen(false);
+            }}
+          />
+          <div
+            role="menu"
+            style={{ position: "fixed", top: pos.top, right: pos.right }}
+            className="z-50 flex w-48 flex-col rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100 dark:border-slate-700 dark:bg-slate-900"
+          >
+            {actions.map(({ label, icon: Icon, onClick, danger }) => (
+              <button
+                key={label}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onClick();
+                }}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
+                  danger
+                    ? "text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/30"
+                    : "text-slate-700 hover:bg-accent dark:text-slate-200",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 function DateBadge({ node }: { node: WorkItemTree }) {
@@ -165,6 +265,17 @@ function TreeNode({
           {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
 
+        {/* Cuántos elementos hay dentro cuando el nodo está colapsado: da idea
+            del tamaño oculto en árboles grandes sin tener que expandir. */}
+        {hasChildren && !open && (
+          <span
+            className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-muted-foreground"
+            title={`${descendantCount(node)} elementos dentro`}
+          >
+            {descendantCount(node)}
+          </span>
+        )}
+
         <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
         <span
           className={cn(
@@ -196,62 +307,64 @@ function TreeNode({
             </div>
           )}
           <DateBadge node={node} />
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              onClick={() => {
-                onAddChild(node);
-              }}
-              title="Añadir un elemento dentro de este"
-              className="rounded-md p-1 text-muted-foreground hover:bg-brand-blue/10 hover:text-brand-blue-dark"
-            >
-              <Plus className="size-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                onEdit(node);
-              }}
-              title="Editar este elemento"
-              className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <Pencil className="size-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                onDeps(node);
-              }}
-              title="Ordenar: qué debe terminar antes de este"
-              className="rounded-md p-1 text-muted-foreground hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/30"
-            >
-              <Link2 className="size-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                onTasks(node);
-              }}
-              title="Ver y adjuntar tareas de este elemento"
-              className="rounded-md p-1 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30"
-            >
-              <ListChecks className="size-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                onClone(node);
-              }}
-              title="Duplicar este elemento con todo lo que contiene"
-              className="rounded-md p-1 text-muted-foreground hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-900/30"
-            >
-              <Copy className="size-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                onDelete(node);
-              }}
-              title="Eliminar este elemento y todo lo que contiene"
-              className="rounded-md p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
+          {/* Acción rápida (añadir dentro) visible al hover + resto en el menú.
+              Un solo botón por fila mantiene limpia la vista con muchos nodos. */}
+          <button
+            onClick={() => {
+              onAddChild(node);
+            }}
+            title="Añadir un elemento dentro de este"
+            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100"
+          >
+            <Plus className="size-3.5" />
+          </button>
+          <NodeActionsMenu
+            actions={[
+              {
+                label: "Añadir dentro",
+                icon: Plus,
+                onClick: () => {
+                  onAddChild(node);
+                },
+              },
+              {
+                label: "Editar",
+                icon: Pencil,
+                onClick: () => {
+                  onEdit(node);
+                },
+              },
+              {
+                label: "Ordenar (dependencias)",
+                icon: Link2,
+                onClick: () => {
+                  onDeps(node);
+                },
+              },
+              {
+                label: "Tareas",
+                icon: ListChecks,
+                onClick: () => {
+                  onTasks(node);
+                },
+              },
+              {
+                label: "Duplicar / pegar",
+                icon: Copy,
+                onClick: () => {
+                  onClone(node);
+                },
+              },
+              {
+                label: "Eliminar",
+                icon: Trash2,
+                danger: true,
+                onClick: () => {
+                  onDelete(node);
+                },
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -466,6 +579,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     return pruneForSearch(tree, query);
   }, [tree, query]);
 
+  const totalCount = useMemo(() => totalNodes(tree), [tree]);
+  const visibleCount = useMemo(() => totalNodes(visibleTree), [visibleTree]);
+
   // Con búsqueda activa, todo lo que sobrevive a la poda queda expandido
   // (ya son solo los matches y sus ancestros); sin búsqueda, respeta lo que
   // el usuario colapsó manualmente.
@@ -582,6 +698,14 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               </>
             )}
           </button>
+        )}
+
+        {totalCount > 0 && (
+          <span className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            <FolderTree className="size-3.5" />
+            {query ? `${visibleCount} de ${totalCount}` : totalCount}
+            <span className="font-normal">{totalCount === 1 ? "elemento" : "elementos"}</span>
+          </span>
         )}
 
         <div className="ml-auto flex items-center gap-2">
