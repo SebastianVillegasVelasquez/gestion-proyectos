@@ -197,6 +197,8 @@ async def get_current_user(
         role=user.role,
         position=user.position,
         is_active=user.is_active,
+        document_type=user.document_type,
+        document_number=user.document_number,
     )
 
 

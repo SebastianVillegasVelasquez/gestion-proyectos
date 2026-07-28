@@ -17,6 +17,8 @@ class FakeUser:
         self.role = SystemRole.ADMIN
         self.position = UserPosition.SIN_CARGO
         self.is_active = is_active
+        self.document_type = None
+        self.document_number = None
 
 
 class FakeUserRepo:

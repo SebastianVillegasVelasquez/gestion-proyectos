@@ -18,6 +18,20 @@ class UserRepository(BaseRepository[User]):
 
         return result.scalars().first()
 
+    async def get_by_document_number(self, document_number: str) -> User | None:
+        query = select(User).where(User.document_number == document_number)
+        result = await self._session.execute(query)
+        return result.scalars().first()
+
+    async def is_document_available(
+        self, document_number: str, exclude_id: UUID | None = None
+    ) -> bool:
+        """True si el documento no lo tiene otro usuario (permite reusar el propio)."""
+        user = await self.get_by_document_number(document_number)
+        if user is None:
+            return True
+        return exclude_id is not None and user.id == exclude_id
+
     async def search_directory(
         self,
         search: str | None,
@@ -43,6 +57,7 @@ class UserRepository(BaseRepository[User]):
                     User.name.ilike(like),
                     User.last_name.ilike(like),
                     User.email.ilike(like),
+                    User.document_number.ilike(like),
                 )
             )
 
@@ -81,6 +96,7 @@ class UserRepository(BaseRepository[User]):
                     User.name.ilike(like),
                     User.last_name.ilike(like),
                     User.email.ilike(like),
+                    User.document_number.ilike(like),
                 )
             )
 

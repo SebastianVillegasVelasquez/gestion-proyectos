@@ -1,5 +1,12 @@
 async def _create_user(
-    client, headers, email, name, last_name, position="desarrollador"
+    client,
+    headers,
+    email,
+    name,
+    last_name,
+    position="desarrollador",
+    document_type=None,
+    document_number=None,
 ):
     res = await client.post(
         "/api/v1/identity/users",
@@ -10,6 +17,8 @@ async def _create_user(
             "last_name": last_name,
             "role": "user",
             "position": position,
+            "document_type": document_type,
+            "document_number": document_number,
         },
         headers=headers,
     )
@@ -60,6 +69,51 @@ class TestUserSearch:
         assert any(
             u["email"] == "ana.busqueda@test.com" for u in by_email.json()["items"]
         )
+
+    async def test_should_filter_by_document_number(self, client, admin_headers):
+        await _create_user(
+            client,
+            admin_headers,
+            "cedula@test.com",
+            "Cami",
+            "Cédula",
+            document_type="cedula_ciudadania",
+            document_number="1098765432",
+        )
+        await _create_user(client, admin_headers, "sindoc@test.com", "Sin", "Doc")
+
+        res = await client.get(
+            "/api/v1/identity/users/search?search=1098765432", headers=admin_headers
+        )
+        assert res.status_code == 200
+        items = res.json()["items"]
+        assert any(u["document_number"] == "1098765432" for u in items)
+        assert all(u["name"] != "Sin" for u in items)
+
+    async def test_should_reject_duplicate_document(self, client, admin_headers):
+        await _create_user(
+            client,
+            admin_headers,
+            "primero@test.com",
+            "Primero",
+            "Persona",
+            document_number="555000111",
+        )
+        # Otro usuario con el mismo documento: es la misma persona → rechazado.
+        res = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "segundo@test.com",
+                "password": "password123",
+                "name": "Segundo",
+                "last_name": "Intento",
+                "role": "user",
+                "position": "desarrollador",
+                "document_number": "555000111",
+            },
+            headers=admin_headers,
+        )
+        assert res.status_code == 409, res.text
 
     async def test_should_filter_by_position(self, client, admin_headers):
         await _create_user(

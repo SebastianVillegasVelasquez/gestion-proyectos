@@ -1,5 +1,6 @@
 import http from "@/lib/http";
 import type { Role } from "@/features/auth/types";
+import type { DocumentType } from "@/features/projects/types/api.types";
 
 export interface AdminUser {
   id: string;
@@ -9,6 +10,8 @@ export interface AdminUser {
   role: Role;
   position: string;
   is_active: boolean;
+  document_type: DocumentType | null;
+  document_number: string | null;
 }
 
 export interface CreateUserPayload {
@@ -18,6 +21,9 @@ export interface CreateUserPayload {
   last_name: string;
   role: Role;
   position?: string;
+  // Documento de identidad opcional (tipo + número).
+  document_type?: DocumentType | null;
+  document_number?: string | null;
 }
 
 export interface BulkUserRowError {
@@ -41,7 +47,17 @@ export interface BulkCreateUsersResult {
 }
 
 export type UpdateUserChanges = Partial<
-  Pick<AdminUser, "role" | "is_active" | "name" | "last_name" | "email" | "position">
+  Pick<
+    AdminUser,
+    | "role"
+    | "is_active"
+    | "name"
+    | "last_name"
+    | "email"
+    | "position"
+    | "document_type"
+    | "document_number"
+  >
 >;
 
 export interface PaginatedUsers {
@@ -93,6 +109,8 @@ export const adminUsersApi = {
         role: changes.role ?? user.role,
         is_active: changes.is_active ?? user.is_active,
         position: changes.position ?? user.position,
+        document_type: changes.document_type ?? user.document_type,
+        document_number: changes.document_number ?? user.document_number,
       })
       .then((r) => r.data),
 

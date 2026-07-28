@@ -16,6 +16,8 @@ class FakeUser:
     last_name: str
     role: SystemRole
     is_active: bool
+    document_type: str | None = None
+    document_number: str | None = None
 
 
 class FakeIdentityRepository:
@@ -29,6 +31,11 @@ class FakeIdentityRepository:
     async def is_email_available(self, email: str) -> bool:
         return not any(u.email == email for u in self.users)
 
+    async def is_document_available(self, document_number: str) -> bool:
+        return not any(
+            getattr(u, "document_number", None) == document_number for u in self.users
+        )
+
     async def add(self, user: CreateUserRequest) -> FakeUser:
         self.saved_users.append(user)
         return FakeUser(
@@ -38,6 +45,8 @@ class FakeIdentityRepository:
             last_name=user.last_name,
             role=user.role,
             is_active=True,
+            document_type=(user.document_type.value if user.document_type else None),
+            document_number=user.document_number,
         )
 
 

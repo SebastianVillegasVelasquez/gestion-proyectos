@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useAddMember } from "../../hooks/use-members";
+import { useAddMember, useProjectMembers } from "../../hooks/use-members";
 import { PROJECT_ROLE_LABELS, PROJECT_ROLE_ORDER } from "../../types/labels";
 import type { DirectoryUser, ProjectRole } from "../../types/api.types";
 import { DirectoryUserPicker } from "../DirectoryUserPicker";
@@ -16,9 +16,17 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
   const [selected, setSelected] = useState<DirectoryUser | null>(null);
   const [role, setRole] = useState<ProjectRole>("integrante");
   const addMember = useAddMember(projectId);
+  const membersQuery = useProjectMembers(projectId);
+
+  // Integrantes ya presentes: se ocultan del selector para no duplicar a nadie.
+  const existingIds = useMemo(
+    () => (membersQuery.data ?? []).map((m) => m.user_id),
+    [membersQuery.data],
+  );
 
   const handleAdd = () => {
-    if (!selected) {
+    // No agregamos a alguien que ya es integrante (el picker además lo bloquea).
+    if (!selected || existingIds.includes(selected.id)) {
       return;
     }
     addMember.mutate({ userId: selected.id, role }, { onSuccess: onClose });
@@ -47,7 +55,12 @@ export function AddMemberModal({ projectId, onClose }: { projectId: string; onCl
         </div>
 
         <div className="flex flex-col gap-3 px-5 py-4">
-          <DirectoryUserPicker selected={selected} onSelect={setSelected} showPositionFilter />
+          <DirectoryUserPicker
+            selected={selected}
+            onSelect={setSelected}
+            excludeIds={existingIds}
+            showPositionFilter
+          />
 
           {/* Rol del integrante seleccionado */}
           <label className="flex flex-col gap-1">

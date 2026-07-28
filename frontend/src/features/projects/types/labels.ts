@@ -1,4 +1,22 @@
-import type { ProjectRole, TaskPriority, TaskStatus, TeamRole, UserPosition } from "./api.types";
+import type {
+  DocumentType,
+  ProjectRole,
+  TaskPriority,
+  TaskStatus,
+  TeamRole,
+  UserPosition,
+} from "./api.types";
+
+// Tipos de documento de identidad (es-CO), en orden de presentación del selector.
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  cedula_ciudadania: "Cédula de ciudadanía",
+  cedula_extranjeria: "Cédula de extranjería",
+  pasaporte: "Pasaporte",
+  tarjeta_identidad: "Tarjeta de identidad",
+  nit: "NIT",
+};
+
+export const DOCUMENT_TYPES: DocumentType[] = Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[];
 
 export const USER_POSITION_LABELS: Record<UserPosition, string> = {
   desarrollador: "Desarrollador",

@@ -66,7 +66,7 @@ export function DirectoryUserPicker({
             onChange={(e) => {
               setSearch(e.target.value);
             }}
-            placeholder="Nombre o correo…"
+            placeholder="Nombre, correo o cédula…"
             aria-label="Buscar usuario"
           />
         </div>
@@ -132,6 +132,7 @@ export function DirectoryUserPicker({
                       </span>
                       <span className="block truncate text-[11px] text-slate-400">
                         {u.email} · {USER_POSITION_LABELS[u.position]}
+                        {u.document_number ? ` · ${u.document_number}` : ""}
                       </span>
                     </span>
                     {isExcluded ? (

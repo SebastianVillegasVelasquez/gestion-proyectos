@@ -212,8 +212,10 @@ class CloneWorkItemUseCase:
                 assignee_id=task.assignee_id,
                 team_id=task.team_id,
                 parent_task_id=None,
-                start_date=task.start_date + offset,
-                due_date=task.due_date + offset,
+                # Las fechas son opcionales: si la tarea original no tiene, el
+                # clon tampoco; solo desplazamos las que existen.
+                start_date=task.start_date + offset if task.start_date else None,
+                due_date=task.due_date + offset if task.due_date else None,
                 completed_at=None,
             )
             saved = await self.task_repo.add(clone)

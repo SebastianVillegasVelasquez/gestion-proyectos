@@ -75,8 +75,10 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
 
-    start_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
-    due_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    # Fechas opcionales: una tarea puede nacer como borrador (solo título) y
+    # planificarse — inicio, fin y responsable — más tarde.
+    start_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    due_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
 
     completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

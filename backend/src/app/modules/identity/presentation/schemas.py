@@ -1,10 +1,14 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
 from pydantic import EmailStr, StringConstraints, field_validator
 
-from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.enums import DocumentType, SystemRole
 from app.shared.base_model import BaseModelConfig
+
+# Documento de identidad: opcional, pero cuando viene lo normalizamos a una
+# cadena corta sin espacios. `None`/"" se tratan como "sin documento".
+DocumentNumber = Annotated[str, StringConstraints(min_length=3, max_length=32)]
 
 
 class LoginRequest(BaseModelConfig):
@@ -42,6 +46,21 @@ class CreateUserRequest(BaseModelConfig):
         "sin_cargo"
     )
 
+    # Documento de identidad (opcional): tipo + número. El número, si viene, es
+    # único en el sistema (se valida en el use case).
+    document_type: Optional[DocumentType] = None
+    document_number: Optional[DocumentNumber] = None
+
+    @field_validator("document_number", mode="before")
+    @classmethod
+    def normalize_document(cls, v: object) -> Optional[str]:
+        # Espacios en blanco cuentan como "sin documento" para no chocar contra
+        # la unicidad con cadenas vacías.
+        if v is None:
+            return None
+        cleaned = str(v).strip()
+        return cleaned or None
+
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
@@ -68,6 +87,16 @@ class UpdateUserRequest(BaseModelConfig):
     position: Annotated[str, StringConstraints(min_length=1, max_length=64)] | None = (
         None
     )
+    document_type: Optional[DocumentType] = None
+    document_number: Optional[DocumentNumber] = None
+
+    @field_validator("document_number", mode="before")
+    @classmethod
+    def normalize_document(cls, v: object) -> Optional[str]:
+        if v is None:
+            return None
+        cleaned = str(v).strip()
+        return cleaned or None
 
 
 class RefreshRequest(BaseModelConfig):
@@ -110,6 +139,8 @@ class UserResponse(BaseModelConfig):
     role: SystemRole
     position: str
     is_active: bool
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
 
 
 class PaginatedUsersResponse(BaseModelConfig):
@@ -157,6 +188,8 @@ class DirectoryUserResponse(BaseModelConfig):
     last_name: str
     email: str
     position: str
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
 
 
 class PaginatedDirectoryResponse(BaseModelConfig):

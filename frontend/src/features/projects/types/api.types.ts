@@ -128,8 +128,9 @@ export interface Task {
   priority: TaskPriority;
   assignee_id: string | null;
   team_id: string | null;
-  start_date: string;
-  due_date: string;
+  // Fechas opcionales: una tarea puede crearse como borrador y planificarse luego.
+  start_date: string | null;
+  due_date: string | null;
   status: TaskStatus;
   completed_at: string | null;
   created_at: string;
@@ -147,7 +148,8 @@ export interface CreateTaskPayload {
   // deriva). La tarea puede colgar de un elemento o crearse suelta.
   project_id?: string | null;
   work_item_id?: string | null;
-  start_date: string;
+  // Fecha de inicio opcional (la tarea puede quedar sin planificar).
+  start_date?: string | null;
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;
   duration_days?: number | null;
@@ -207,6 +209,14 @@ export type UserPosition =
   | "diseñador_grafico"
   | "administrador_moodle";
 
+// Tipo de documento de identidad (opcional en el perfil del usuario).
+export type DocumentType =
+  | "cedula_ciudadania"
+  | "cedula_extranjeria"
+  | "pasaporte"
+  | "tarjeta_identidad"
+  | "nit";
+
 // Usuario del directorio (para asignar tareas / agregar al equipo).
 export interface DirectoryUser {
   id: string;
@@ -214,6 +224,8 @@ export interface DirectoryUser {
   last_name: string;
   email: string;
   position: UserPosition;
+  document_type: DocumentType | null;
+  document_number: string | null;
 }
 
 export interface PaginatedDirectory {

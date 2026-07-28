@@ -68,11 +68,16 @@ function isOverdue(task: Task): boolean {
   return (
     task.status !== "completada" &&
     task.status !== "cancelada" &&
+    task.due_date != null &&
     task.due_date < new Date().toISOString().slice(0, 10)
   );
 }
 
-function formatDate(iso: string): string {
+// Las tareas sin planificar no tienen fecha: mostramos un guion en su lugar.
+function formatDate(iso: string | null): string {
+  if (!iso) {
+    return "Sin fecha";
+  }
   const [, m, d] = iso.split("-");
   return `${d} ${["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][Number(m) - 1]}`;
 }

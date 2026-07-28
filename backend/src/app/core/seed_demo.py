@@ -329,6 +329,9 @@ async def ensure_demo_traceability() -> None:
             for t in tasks:
                 actor = t.assignee_id or lead_id
                 start, due = t.start_date, t.due_date
+                # El seed siempre planifica sus tareas con fechas; lo afirmamos
+                # para el tipado (las columnas ya admiten tareas sin fechas).
+                assert start is not None and due is not None
 
                 evt(
                     t,

@@ -28,7 +28,7 @@ class CollaboratorTaskItem(BaseModelConfig):
     id: UUID
     title: str
     status: TaskStatus
-    due_date: datetime.date
+    due_date: datetime.date | None = None
     completed_at: datetime.datetime | None = None
 
 

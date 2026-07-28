@@ -28,6 +28,8 @@ import {
   useUpdateUser,
 } from "../hooks/use-admin-users";
 import type { AdminUser, BulkCreateUsersResult } from "../api/users.api";
+import type { DocumentType } from "@/features/projects/types/api.types";
+import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/projects/types/labels";
 
 const PAGE_SIZE = 20;
 
@@ -195,6 +197,8 @@ function CreateUserModal({
     password: "",
     role: Role.USER as Role,
     position: "sin_cargo",
+    document_type: "" as DocumentType | "",
+    document_number: "",
   });
   const [addingPosition, setAddingPosition] = useState(false);
   const { data: positions, isLoading: positionsLoading } = usePositions();
@@ -217,7 +221,17 @@ function CreateUserModal({
       return;
     }
     createUser.mutate(
-      { ...form, email: form.email.trim() },
+      {
+        name: form.name.trim(),
+        last_name: form.last_name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+        position: form.position,
+        // El documento es opcional: enviamos null cuando queda vacío.
+        document_type: form.document_type || null,
+        document_number: form.document_number.trim() || null,
+      },
       {
         onSuccess: () => {
           onCreated(form.email.trim(), form.password);
@@ -286,6 +300,38 @@ function CreateUserModal({
             value={form.password}
             onChange={set("password")}
           />
+          {/* Documento de identidad (opcional): tipo + número */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Tipo de documento</span>
+              <select
+                className={inputCls}
+                value={form.document_type}
+                onChange={set("document_type")}
+                aria-label="Tipo de documento"
+              >
+                <option value="">Sin especificar</option>
+                {DOCUMENT_TYPES.map((d) => (
+                  <option key={d} value={d}>
+                    {DOCUMENT_TYPE_LABELS[d]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                Documento de identidad
+              </span>
+              <input
+                className={inputCls}
+                type="text"
+                placeholder="Número (opcional)"
+                aria-label="Documento de identidad"
+                value={form.document_number}
+                onChange={set("document_number")}
+              />
+            </label>
+          </div>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Rol</span>
             <select className={inputCls} value={form.role} onChange={set("role")} aria-label="Rol">
