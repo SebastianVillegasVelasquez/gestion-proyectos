@@ -11,7 +11,6 @@ import {
   PanelLeftOpen,
   Settings,
   Sun,
-  User,
   UserCog,
   Users2,
   X,
@@ -67,10 +66,7 @@ const SECTIONS: NavSection[] = [
   {
     id: "collaborators",
     title: "Colaboradores",
-    items: [
-      { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
-      { id: "collab-individual", label: "Individual", icon: User, href: "/collaborators" },
-    ],
+    items: [{ id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" }],
   },
   {
     id: "general",
@@ -131,7 +127,6 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/projects": "all-projects",
   "/projects/builder": "project-builder",
   "/workspace": "workspace",
-  "/collaborators": "collab-individual",
   "/settings": "settings",
   "/feedback": "feedback",
   "/portal": "portal",

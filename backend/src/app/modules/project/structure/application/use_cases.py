@@ -1,3 +1,4 @@
+import datetime
 from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
@@ -13,6 +14,9 @@ from app.modules.project.structure.presentation.schemas import (
     WorkItemResponse,
     WorkItemTreeResponse,
 )
+from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.tasks.infrastructure.models import Task
+from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.base_repository import Repository
 from app.shared.exceptions import NotFoundError
 
@@ -112,13 +116,116 @@ class GetWorkTreeUseCase:
 
 
 class CloneWorkItemUseCase:
-    def __init__(self, repo: WorkTreeRepository):
+    """Duplica un subárbol (una o varias veces) y, opcionalmente, sus tareas.
+
+    La estructura la clona el dominio (`WorkTreeService`); aquí, en la capa de
+    aplicación, se orquesta además la copia profunda de las tareas colgadas del
+    subárbol, porque cruzan el límite del módulo de tareas.
+    """
+
+    def __init__(self, repo: WorkTreeRepository, task_repo: TaskRepository):
         self.service = WorkTreeService(repo)
+        self.task_repo = task_repo
 
     async def execute(
         self, source_id: UUID, data: CloneWorkItemRequest
     ) -> WorkItemResponse:
-        return await self.service.clone_subtree(source_id, data)
+        response, id_maps = await self.service.clone_subtree_with_maps(source_id, data)
+        if data.include_tasks:
+            await self._copy_tasks(
+                project_id=response.proyecto_id,
+                id_maps=id_maps,
+                offset_days=data.offset_days,
+            )
+        return response
+
+    async def _copy_tasks(
+        self,
+        *,
+        project_id: UUID,
+        id_maps: list[dict[UUID, UUID]],
+        offset_days: int,
+    ) -> None:
+        """Replica, por cada pegada, las tareas colgadas del subárbol origen.
+
+        Se copian las tareas adjuntas a los elementos copiados y sus subtareas
+        (aunque cuelguen por `parent_task_id` sin elemento propio). Se conserva
+        responsable/equipo, prioridad y duración; se RESETEA el estado y las
+        fechas reales, y se desplazan `start_date`/`due_date` igual que la
+        estructura. Las dependencias FtS entre tareas no se copian.
+        """
+        source_work_item_ids = {old for m in id_maps for old in m}
+        if not source_work_item_ids:
+            return
+
+        all_tasks = await self.task_repo.get_all_by_project(project_id)
+        scoped = self._tasks_in_scope(all_tasks, source_work_item_ids)
+        if not scoped:
+            return
+
+        offset = datetime.timedelta(days=offset_days)
+        for id_map in id_maps:
+            await self._paste_tasks(scoped, id_map, offset)
+
+    @staticmethod
+    def _tasks_in_scope(
+        all_tasks: list[Task], source_work_item_ids: set[UUID]
+    ) -> list[Task]:
+        """Tareas adjuntas al subárbol más sus subtareas (por `parent_task_id`)."""
+        children_by_parent: dict[UUID, list[Task]] = {}
+        for task in all_tasks:
+            if task.parent_task_id is not None:
+                children_by_parent.setdefault(task.parent_task_id, []).append(task)
+
+        roots = [t for t in all_tasks if t.work_item_id in source_work_item_ids]
+        scoped: dict[UUID, Task] = {}
+        stack = list(roots)
+        while stack:
+            task = stack.pop()
+            if task.id in scoped:
+                continue
+            scoped[task.id] = task
+            stack.extend(children_by_parent.get(task.id, []))
+        return list(scoped.values())
+
+    async def _paste_tasks(
+        self,
+        scoped: list[Task],
+        id_map: dict[UUID, UUID],
+        offset: datetime.timedelta,
+    ) -> None:
+        scoped_ids = {t.id for t in scoped}
+        new_task_id_by_old: dict[UUID, UUID] = {}
+
+        # Pasada 1: crear cada clon sin padre (el padre puede no existir aún).
+        clones_by_old: dict[UUID, Task] = {}
+        for task in scoped:
+            clone = Task(
+                title=task.title,
+                description=task.description,
+                priority=task.priority,
+                status=TaskStatus.PENDIENTE_POR_INICIAR,
+                project_id=task.project_id,
+                work_item_id=id_map.get(task.work_item_id, task.work_item_id)
+                if task.work_item_id is not None
+                else None,
+                assignee_id=task.assignee_id,
+                team_id=task.team_id,
+                parent_task_id=None,
+                start_date=task.start_date + offset,
+                due_date=task.due_date + offset,
+                completed_at=None,
+            )
+            saved = await self.task_repo.add(clone)
+            new_task_id_by_old[task.id] = saved.id
+            clones_by_old[task.id] = saved
+
+        # Pasada 2: reconectar subtareas cuyo padre también se copió.
+        for old_id, clone in clones_by_old.items():
+            parent_old = next(t.parent_task_id for t in scoped if t.id == old_id)
+            if parent_old is not None and parent_old in scoped_ids:
+                clone.parent_task_id = new_task_id_by_old[parent_old]
+                await self.task_repo.add(clone)
 
 
 # ── Dependencias Finish-to-Start ────────────────────────────────────────────────

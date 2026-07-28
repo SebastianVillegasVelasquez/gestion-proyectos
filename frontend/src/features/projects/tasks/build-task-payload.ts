@@ -1,10 +1,15 @@
 import type { CreateTaskPayload, TaskPriority } from "@/features/projects/types/api.types";
 
+// A quién se le asigna la tarea. Excluyente: o una persona, o un equipo, o nadie
+// (por ahora). Si va a un equipo, es el líder quien reparte subtareas.
+export type AssignmentMode = "none" | "person" | "team";
+
 export interface TaskFormState {
   title: string;
   description: string;
   // La tarea cuelga de un elemento del árbol de trabajo (cualquier nivel).
   workItemId: string;
+  assignmentMode: AssignmentMode;
   assigneeId: string;
   // Equipo al que se delega la tarea (opcional).
   teamId: string;
@@ -21,6 +26,7 @@ export function emptyTaskForm(workItemId = ""): TaskFormState {
     title: "",
     description: "",
     workItemId,
+    assignmentMode: "none",
     assigneeId: "",
     teamId: "",
     dependsOnId: "",
@@ -40,12 +46,14 @@ function nullIfEmpty(value: string): string | null {
  * `projectId` ancla la tarea al proyecto cuando se crea suelta (sin elemento). */
 export function buildTaskPayload(form: TaskFormState, projectId: string): CreateTaskPayload {
   const workItemId = nullIfEmpty(form.workItemId);
+  // Exclusividad persona/equipo: solo se envía el que corresponde al modo, el
+  // otro va en null aunque el formulario tuviera un valor viejo seleccionado.
   const payload: CreateTaskPayload = {
     title: form.title.trim(),
     description: nullIfEmpty(form.description),
     priority: form.priority,
-    assignee_id: nullIfEmpty(form.assigneeId),
-    team_id: nullIfEmpty(form.teamId),
+    assignee_id: form.assignmentMode === "person" ? nullIfEmpty(form.assigneeId) : null,
+    team_id: form.assignmentMode === "team" ? nullIfEmpty(form.teamId) : null,
     depends_on_id: nullIfEmpty(form.dependsOnId),
     work_item_id: workItemId,
     project_id: workItemId ? undefined : projectId,

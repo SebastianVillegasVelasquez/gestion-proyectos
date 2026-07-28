@@ -52,6 +52,14 @@ class CreateTaskRequest(TaskBase):
             raise ValueError("Indica el proyecto o el elemento de la estructura")
         return self
 
+    @model_validator(mode="after")
+    def assignee_or_team_exclusive(self) -> "CreateTaskRequest":
+        # Una tarea se delega a UNA persona O a UN equipo, nunca a ambos: si va a
+        # un equipo, es el líder quien reparte subtareas entre sus integrantes.
+        if self.assignee_id is not None and self.team_id is not None:
+            raise ValueError("Asigna la tarea a una persona o a un equipo, no a ambos")
+        return self
+
 
 class TaskResponse(TaskBase):
     id: UUID
@@ -95,6 +103,13 @@ class UpdateTaskRequest(BaseModelConfig):
     team_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
+
+    @model_validator(mode="after")
+    def assignee_or_team_exclusive(self) -> "UpdateTaskRequest":
+        # Coherencia persona/equipo: no se pueden fijar ambos en el mismo cambio.
+        if self.assignee_id is not None and self.team_id is not None:
+            raise ValueError("Asigna la tarea a una persona o a un equipo, no a ambos")
+        return self
 
 
 class TeamTaskItemResponse(BaseModelConfig):

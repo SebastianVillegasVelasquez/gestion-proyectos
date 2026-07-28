@@ -53,16 +53,6 @@ const TaskDashboardPage = lazy(() =>
 const TasksPage = lazy(() =>
   import("@/features/projects/tasks/TasksPage.tsx").then((m) => ({ default: m.TasksPage })),
 );
-const CollaboratorsPage = lazy(() =>
-  import("@/features/collaborators/components/CollaboratorsPage.tsx").then((m) => ({
-    default: m.CollaboratorsPage,
-  })),
-);
-const CollaboratorActivityPage = lazy(() =>
-  import("@/features/collaborators/components/CollaboratorActivityPage.tsx").then((m) => ({
-    default: m.CollaboratorActivityPage,
-  })),
-);
 const ProjectEstructuraPage = lazy(() =>
   import("@/features/projects/components/detail/ProjectEstructuraPage.tsx").then((m) => ({
     default: m.ProjectEstructuraPage,
@@ -137,8 +127,6 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-          <Route path="/collaborators" element={<CollaboratorsPage />} />
-          <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Route>
