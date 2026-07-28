@@ -137,58 +137,102 @@ export function CreateTaskModal({
             )}
           </Field>
 
-          {/* Responsable: filtro por cargo + persona */}
-          <Field label="Responsable">
-            <div className="flex gap-2">
-              <select
-                className={`${inputCls} w-1/2`}
-                value={position}
-                onChange={(e) => {
-                  setPosition(e.target.value as UserPosition | "");
-                  set("assigneeId", "");
-                }}
-              >
-                <option value="">Todos los cargos</option>
-                {USER_POSITIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {USER_POSITION_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={`${inputCls} w-1/2`}
-                value={form.assigneeId}
-                onChange={(e) => {
-                  set("assigneeId", e.target.value);
-                }}
-              >
-                <option value="">Sin asignar</option>
-                {directoryQuery.data?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} {u.last_name}
-                  </option>
-                ))}
-              </select>
+          {/* Asignación: excluyente. Una tarea se da a una persona O a un equipo
+              (o a nadie por ahora). Si va a un equipo, su líder reparte subtareas. */}
+          <Field label="Asignar a">
+            <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/50">
+              {(
+                [
+                  ["none", "Nadie aún"],
+                  ["person", "Una persona"],
+                  ["team", "Un equipo"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    set("assignmentMode", mode);
+                    // Al cambiar de modo, limpiamos la selección del otro para no
+                    // arrastrar valores incoherentes.
+                    set("assigneeId", "");
+                    set("teamId", "");
+                    setPosition("");
+                  }}
+                  aria-pressed={form.assignmentMode === mode}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                    form.assignmentMode === mode
+                      ? "bg-white text-brand-teal-dark shadow-sm dark:bg-slate-900 dark:text-brand-teal"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </Field>
 
+          {/* Responsable individual: filtro por cargo + persona */}
+          {form.assignmentMode === "person" && (
+            <Field label="Responsable">
+              <div className="flex gap-2">
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={position}
+                  onChange={(e) => {
+                    setPosition(e.target.value as UserPosition | "");
+                    set("assigneeId", "");
+                  }}
+                >
+                  <option value="">Todos los cargos</option>
+                  {USER_POSITIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {USER_POSITION_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={form.assigneeId}
+                  onChange={(e) => {
+                    set("assigneeId", e.target.value);
+                  }}
+                >
+                  <option value="">Sin asignar</option>
+                  {directoryQuery.data?.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Field>
+          )}
+
           {/* Delegar a un equipo: el líder repartirá subtareas dentro del equipo */}
-          <Field label="Delegar a equipo (opcional)">
-            <select
-              className={inputCls}
-              value={form.teamId}
-              onChange={(e) => {
-                set("teamId", e.target.value);
-              }}
-            >
-              <option value="">Sin equipo</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {form.assignmentMode === "team" && (
+            <Field label="Equipo responsable">
+              <select
+                className={inputCls}
+                value={form.teamId}
+                onChange={(e) => {
+                  set("teamId", e.target.value);
+                }}
+              >
+                <option value="">Selecciona un equipo…</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {teams.length === 0 && (
+                <span className="text-[11px] text-slate-400">
+                  Este proyecto aún no tiene equipos. Créalos en la sección «Equipos de trabajo».
+                </span>
+              )}
+            </Field>
+          )}
 
           {/* Dependencia */}
           <Field label="Depende de (opcional)">

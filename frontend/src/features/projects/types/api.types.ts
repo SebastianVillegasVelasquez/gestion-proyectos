@@ -103,6 +103,10 @@ export interface CloneWorkItemPayload {
   offset_days?: number;
   /** Renombra solo el elemento principal del clon; lo que contiene conserva su nombre. */
   rename_root_to?: string | null;
+  /** Cuántas copias pegar de una sola vez (por defecto 1). */
+  times?: number;
+  /** Copiar también las tareas del subárbol con su responsable/equipo (deep copy). */
+  include_tasks?: boolean;
 }
 
 export interface WorkItemDependency {

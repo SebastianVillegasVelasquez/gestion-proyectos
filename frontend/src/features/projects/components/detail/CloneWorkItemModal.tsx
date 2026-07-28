@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X, Copy, ArrowDown, CalendarPlus } from "lucide-react";
+import { X, Copy, ArrowDown, CalendarPlus, Repeat, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCloneWorkItem } from "../../hooks/use-structure";
 import type { DuracionUnidad, WorkItemTree } from "../../types/api.types";
@@ -52,6 +52,8 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
   const [offsetValue, setOffsetValue] = useState("0");
   const [offsetUnidad, setOffsetUnidad] = useState<DuracionUnidad>("dias");
   const [renameTo, setRenameTo] = useState(`${source.nombre} (copia)`);
+  const [times, setTimes] = useState("1");
+  const [includeTasks, setIncludeTasks] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const forbidden = useMemo(() => {
@@ -69,6 +71,11 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
       setError("Indica un desplazamiento válido (puede ser 0 o negativo).");
       return;
     }
+    const copies = Math.trunc(Number(times));
+    if (Number.isNaN(copies) || copies < 1 || copies > 100) {
+      setError("La cantidad de copias debe estar entre 1 y 100.");
+      return;
+    }
     const offsetDays = offsetUnidad === "semanas" ? raw * 7 : raw;
 
     try {
@@ -78,6 +85,8 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
           target_parent_id: targetParentId || null,
           offset_days: offsetDays,
           rename_root_to: renameTo.trim() || null,
+          times: copies,
+          include_tasks: includeTasks,
         },
       });
       onClose();
@@ -168,6 +177,26 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
             </span>
           </div>
 
+          <div className="flex flex-col gap-1">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Repeat className="size-3.5" /> Cantidad de copias
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={times}
+              onChange={(e) => {
+                setTimes(e.target.value);
+              }}
+              className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+            <span className="text-[11px] text-slate-400">
+              Pega el contenido varias veces de una sola acción (p. ej. 32 cursos idénticos). Con
+              más de una copia se numera el nombre («{renameTo.trim() || source.nombre} 1», « 2»…).
+            </span>
+          </div>
+
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Nombre del elemento copiado
@@ -182,6 +211,26 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
             />
           </label>
 
+          <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50">
+            <input
+              type="checkbox"
+              checked={includeTasks}
+              onChange={(e) => {
+                setIncludeTasks(e.target.checked);
+              }}
+              className="mt-0.5 size-4 accent-violet-600"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <ListChecks className="size-3.5" /> Copiar también las tareas
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Duplica las tareas colgadas del contenido con su responsable o equipo. El estado y
+                las fechas reales se reinician; las fechas plan se desplazan igual.
+              </span>
+            </span>
+          </label>
+
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <ArrowDown className="size-3" /> qué se copia
@@ -190,12 +239,13 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               <li>
                 <span className="font-medium text-slate-700 dark:text-slate-200">Sí</span>:
                 jerarquía completa, fechas plan (desplazadas), duraciones, tipos y dependencias FtS
-                internas al contenido copiado.
+                internas al contenido copiado
+                {includeTasks && ", y las tareas con su responsable o equipo"}.
               </li>
               <li>
                 <span className="font-medium text-rose-600 dark:text-rose-400">No</span>: fechas
-                reales, porcentaje completado, ni dependencias hacia elementos fuera del contenido
-                copiado.
+                reales, porcentaje completado, estado de las tareas, ni dependencias hacia elementos
+                fuera del contenido copiado.
               </li>
             </ul>
           </div>
