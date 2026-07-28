@@ -32,7 +32,8 @@ class CollaboratorTaskRead(BaseModelConfig):
     id: UUID
     title: str
     status: TaskStatus
-    due_date: datetime.date
+    # Opcional: una tarea puede seguir sin planificar (sin fecha de entrega).
+    due_date: datetime.date | None = None
     completed_at: datetime.datetime | None = None
 
 

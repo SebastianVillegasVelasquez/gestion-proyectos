@@ -57,13 +57,17 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     depends_on_id: nullIfEmpty(form.dependsOnId),
     work_item_id: workItemId,
     project_id: workItemId ? undefined : projectId,
-    start_date: form.startDate,
+    // Las fechas son opcionales: la tarea puede quedar como borrador y
+    // planificarse después. Solo enviamos lo que el usuario haya completado.
+    start_date: nullIfEmpty(form.startDate),
   };
 
-  if (form.dateMode === "duration") {
-    payload.duration_days = Number(form.durationDays);
-  } else {
-    payload.due_date = form.dueDate;
+  if (form.startDate) {
+    if (form.dateMode === "duration" && form.durationDays.trim() !== "") {
+      payload.duration_days = Number(form.durationDays);
+    } else if (form.dateMode === "end") {
+      payload.due_date = nullIfEmpty(form.dueDate);
+    }
   }
 
   return payload;
@@ -74,14 +78,19 @@ export function validateTaskForm(form: TaskFormState): string | null {
   if (form.title.trim().length < 2) {
     return "El título debe tener al menos 2 caracteres";
   }
-  if (!form.startDate) {
-    return "Indica la fecha de inicio";
-  }
-  if (form.dateMode === "duration" && Number(form.durationDays) <= 0) {
-    return "La duración debe ser mayor a 0 días";
-  }
-  if (form.dateMode === "end" && !form.dueDate) {
-    return "Indica la fecha de fin";
+  // Las fechas son opcionales, pero si el usuario abre la duración/fin sobre una
+  // fecha de inicio, validamos coherencia mínima.
+  if (form.startDate) {
+    if (
+      form.dateMode === "duration" &&
+      form.durationDays.trim() !== "" &&
+      Number(form.durationDays) <= 0
+    ) {
+      return "La duración debe ser mayor a 0 días";
+    }
+    if (form.dateMode === "end" && form.dueDate && form.dueDate < form.startDate) {
+      return "La fecha de fin no puede ser anterior al inicio";
+    }
   }
   return null;
 }

@@ -40,6 +40,22 @@ class TestCreateStandaloneTask:
         assert body["project_id"] == project_id
         assert body["work_item_id"] is None
 
+    async def test_create_task_without_dates(
+        self, client, admin_headers, valid_project_payload
+    ):
+        # Una tarea puede nacer como borrador: solo título + ancla, sin fechas.
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+
+        created = await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={"title": "Por planificar", "project_id": project_id},
+        )
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["start_date"] is None
+        assert body["due_date"] is None
+
     async def test_create_requires_project_or_work_item(self, client, admin_headers):
         response = await client.post(
             "/api/v1/tasks",

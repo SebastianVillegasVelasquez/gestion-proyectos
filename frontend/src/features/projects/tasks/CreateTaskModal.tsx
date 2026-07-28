@@ -269,9 +269,10 @@ export function CreateTaskModal({
             </select>
           </Field>
 
-          {/* Fechas: inicio + (fin o duración) */}
+          {/* Fechas: inicio + (fin o duración). Opcionales: la tarea puede
+              crearse sin planificar y ajustarse después. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Inicio *">
+            <Field label="Inicio (opcional)">
               <input
                 type="date"
                 className={inputCls}

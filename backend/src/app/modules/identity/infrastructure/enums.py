@@ -16,6 +16,21 @@ class SystemRole(str, Enum):
     CLIENT = "client"  # Acceso restringido: solo ve el resumen de su(s) proyecto(s).
 
 
+class DocumentType(str, Enum):
+    """Tipo de documento de identidad (opcional en el perfil del usuario).
+
+    Se guarda como texto (columna ``users.document_type``) y se valida contra
+    este catálogo en el schema. Es opcional: un usuario puede existir sin
+    documento y completarlo después.
+    """
+
+    CEDULA_CIUDADANIA = "cedula_ciudadania"
+    CEDULA_EXTRANJERIA = "cedula_extranjeria"
+    PASAPORTE = "pasaporte"
+    TARJETA_IDENTIDAD = "tarjeta_identidad"
+    NIT = "nit"
+
+
 class UserPosition(str, Enum):
     """Catálogo SEMILLA de cargos (histórico).
 

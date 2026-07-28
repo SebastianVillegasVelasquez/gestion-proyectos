@@ -61,6 +61,22 @@ describe("buildTaskPayload", () => {
     expect(payload.work_item_id).toBeNull();
     expect(payload.project_id).toBe("p1");
   });
+
+  it("creates a draft task without dates", () => {
+    const payload = buildTaskPayload({ ...emptyTaskForm("wi1"), title: "Borrador" }, "p1");
+    expect(payload.start_date).toBeNull();
+    expect(payload.due_date).toBeUndefined();
+    expect(payload.duration_days).toBeUndefined();
+  });
+
+  it("omits duration when there is no start date", () => {
+    const payload = buildTaskPayload(
+      { ...emptyTaskForm("wi1"), title: "Sin inicio", dateMode: "duration", durationDays: "5" },
+      "p1",
+    );
+    expect(payload.start_date).toBeNull();
+    expect(payload.duration_days).toBeUndefined();
+  });
 });
 
 describe("validateTaskForm", () => {
@@ -86,5 +102,19 @@ describe("validateTaskForm", () => {
 
   it("requires positive duration", () => {
     expect(validateTaskForm({ ...base, durationDays: "0" })).toMatch(/duración/i);
+  });
+
+  it("allows a task with no dates (draft)", () => {
+    expect(validateTaskForm({ ...emptyTaskForm("wi1"), title: "Borrador" })).toBeNull();
+  });
+
+  it("rejects an end date before the start date", () => {
+    expect(
+      validateTaskForm({
+        ...base,
+        dateMode: "end",
+        dueDate: "2026-06-01",
+      }),
+    ).toMatch(/fin/i);
   });
 });

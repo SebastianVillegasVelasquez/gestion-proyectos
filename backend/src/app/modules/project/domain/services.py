@@ -140,6 +140,17 @@ class ProjectMemberService:
         if not user or user.is_deleted:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+        # Un usuario no puede figurar dos veces en el mismo proyecto: si ya es
+        # integrante, es un alta duplicada (el frontend además lo oculta del
+        # selector, pero la regla vive aquí para cualquier vía de entrada).
+        existing = await self.project_member_repo.get_member_by_project_id_and_user_id(
+            project_id=data.project_id, user_id=data.user_id
+        )
+        if existing is not None and not existing.is_deleted:
+            raise HTTPException(
+                status_code=409, detail="El usuario ya es integrante del proyecto"
+            )
+
         persisted = await self.project_member_repo.add(
             ProjectMember(**data.model_dump())
         )

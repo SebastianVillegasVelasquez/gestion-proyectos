@@ -36,9 +36,13 @@ export function NewSubtaskModal({
 
   const [title, setTitle] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("");
-  const [startDate, setStartDate] = useState(parent.start_date);
+  // El padre puede estar sin planificar: precargamos sus fechas si existen,
+  // pero dejamos que el líder las complete cuando falten.
+  const [startDate, setStartDate] = useState(parent.start_date ?? "");
   const [durationDays, setDurationDays] = useState(
-    String(daysBetween(parent.start_date, parent.due_date)),
+    parent.start_date && parent.due_date
+      ? String(daysBetween(parent.start_date, parent.due_date))
+      : "1",
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +54,7 @@ export function NewSubtaskModal({
       return;
     }
     const duration = Number(durationDays);
-    if (!Number.isFinite(duration) || duration <= 0) {
+    if (startDate && (!Number.isFinite(duration) || duration <= 0)) {
       setError("La duración debe ser mayor a 0 días.");
       return;
     }
@@ -62,8 +66,9 @@ export function NewSubtaskModal({
         parent_task_id: parent.id,
         // team_id lo hereda el backend del padre; no hace falta enviarlo.
         assignee_id: assigneeId || null,
-        start_date: startDate,
-        duration_days: duration,
+        // Sin fecha de inicio, la subtarea queda sin planificar (como el padre).
+        start_date: startDate || null,
+        duration_days: startDate ? duration : undefined,
       });
       onClose();
     } catch (e) {

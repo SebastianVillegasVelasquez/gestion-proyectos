@@ -46,6 +46,14 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Documento de identidad (opcional). El número es único cuando está presente
+    # —así una misma persona no se registra dos veces— pero puede quedar vacío:
+    # Postgres admite múltiples NULL en un índice único.
+    document_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    document_number: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, unique=True, index=True
+    )
+
     role: Mapped[SystemRole] = mapped_column(
         Enum(SystemRole, name="user_role"),
         nullable=False,

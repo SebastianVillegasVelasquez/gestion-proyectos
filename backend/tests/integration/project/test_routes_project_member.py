@@ -52,6 +52,51 @@ class TestRoutesProjectMember:
         assert member["project_role"] == "integrante"
         assert member["name"] == user["name"]
 
+    async def test_should_reject_duplicate_member(
+        self,
+        client,
+        admin_headers,
+        valid_project_payload,
+    ):
+        project = (
+            await client.post(
+                "/api/v1/projects/",
+                json=valid_project_payload,
+                headers=admin_headers,
+            )
+        ).json()
+
+        user = (
+            await client.post(
+                "/api/v1/identity/users",
+                json={
+                    "email": "dup@example.com",
+                    "password": "password123",
+                    "name": "Dup",
+                    "last_name": "Licado",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+                headers=admin_headers,
+            )
+        ).json()
+
+        payload = {
+            "user_id": user["id"],
+            "project_id": project["id"],
+            "project_role": ProjectRole.INTEGRANTE.value,
+        }
+        first = await client.post(
+            "/api/v1/projects/members/", json=payload, headers=admin_headers
+        )
+        assert first.status_code == 201
+
+        # Segundo intento con el mismo usuario: alta duplicada rechazada.
+        second = await client.post(
+            "/api/v1/projects/members/", json=payload, headers=admin_headers
+        )
+        assert second.status_code == 409, second.text
+
     async def test_should_get_all_members_from_project(
         self,
         client,

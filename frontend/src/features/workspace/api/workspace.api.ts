@@ -93,8 +93,9 @@ export interface ApiTeamTask {
   assignee_id: string | null;
   assignee_name: string | null;
   parent_task_id: string | null;
-  start_date: string;
-  due_date: string;
+  // Fechas opcionales: una tarea delegada puede estar aún sin planificar.
+  start_date: string | null;
+  due_date: string | null;
 }
 
 export interface NewVersionBody {

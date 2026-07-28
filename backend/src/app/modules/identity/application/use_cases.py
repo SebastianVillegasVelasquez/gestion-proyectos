@@ -16,7 +16,7 @@ from app.core.security import (
 from pydantic import ValidationError
 
 from app.modules.identity.domain.services import UserService
-from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.enums import DocumentType, SystemRole
 from app.modules.identity.infrastructure.models import Position
 from app.modules.identity.presentation.schemas import (
     BulkCreatedUser,
@@ -64,6 +64,8 @@ def _token_response(user) -> TokenResponse:
             role=user.role,
             position=user.position,
             is_active=user.is_active,
+            document_type=user.document_type,
+            document_number=user.document_number,
         ),
     )
 
@@ -83,6 +85,11 @@ class CreateUserUseCase:
     async def execute(self, data: CreateUserRequest) -> UserResponse:
         if not await self.user_repo.is_email_available(data.email):
             raise ConflictError("El correo ya se encuentra registrado")
+
+        if data.document_number and not await self.user_repo.is_document_available(
+            data.document_number
+        ):
+            raise ConflictError("El documento ya está registrado para otra persona")
 
         if not await self.position_repo.key_exists(data.position):
             raise NotFoundError(f"El cargo '{data.position}' no existe")
@@ -324,6 +331,12 @@ class BulkCreateUsersUseCase:
                 if not await self.user_repo.is_email_available(email):
                     raise ValueError("El correo ya se encuentra registrado")
 
+                document_number = (row.get("document_number") or "").strip() or None
+                if document_number and not await self.user_repo.is_document_available(
+                    document_number
+                ):
+                    raise ValueError("El documento ya está registrado")
+
                 position_key = (row.get("position") or "sin_cargo").strip()
                 if not await self.position_repo.key_exists(position_key):
                     raise ValueError(f"El cargo '{position_key}' no existe")
@@ -333,6 +346,16 @@ class BulkCreateUsersUseCase:
                     role = SystemRole(role_raw)
                 except ValueError:
                     raise ValueError(f"El rol '{role_raw}' no es válido")
+
+                document_type_raw = (row.get("document_type") or "").strip()
+                try:
+                    document_type = (
+                        DocumentType(document_type_raw) if document_type_raw else None
+                    )
+                except ValueError:
+                    raise ValueError(
+                        f"El tipo de documento '{document_type_raw}' no es válido"
+                    )
 
                 raw_password = (row.get("password") or "").strip()
                 generated_password = not raw_password
@@ -345,6 +368,8 @@ class BulkCreateUsersUseCase:
                     last_name=row["last_name"].strip(),
                     role=role,
                     position=position_key,
+                    document_type=document_type,
+                    document_number=document_number,
                 )
                 user = await self.user_service.create_user(data)
 

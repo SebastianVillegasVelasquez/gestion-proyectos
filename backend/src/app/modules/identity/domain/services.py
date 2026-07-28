@@ -51,11 +51,14 @@ class UserService:
         if "password" in update_data:
             update_data["password"] = self.hash_password(update_data.pop("password"))
 
+        # `document_type` es un enum; la columna guarda el texto plano.
+        if update_data.get("document_type") is not None:
+            update_data["document_type"] = update_data["document_type"].value
+
         for field, value in update_data.items():
             setattr(existing_user, field, value)
 
         updated_user = await self._repo.update(existing_user)
-        print(updated_user)
         return self._to_response(updated_user)
 
     async def delete(self, user_id: UUID) -> None:
@@ -74,6 +77,8 @@ class UserService:
             last_name=data.last_name,
             role=data.role,
             position=data.position,
+            document_type=data.document_type.value if data.document_type else None,
+            document_number=data.document_number,
         )
 
     @staticmethod
@@ -94,4 +99,6 @@ class UserService:
             role=user.role,
             position=user.position,
             is_active=user.is_active,
+            document_type=user.document_type,
+            document_number=user.document_number,
         )
