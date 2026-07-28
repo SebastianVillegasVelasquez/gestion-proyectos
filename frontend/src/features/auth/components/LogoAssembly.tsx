@@ -41,8 +41,15 @@ const COLORS = {
 } as const;
 
 // Centro del "ojo" dentro del viewBox 0 0 200 200.
-const CX = 100;
-const CY = 94;
+const CX = 90;
+const CY = 97;
+
+// Centro/radios del aro dorado grande — el resto de piezas ("ojo" teal,
+// pupila) se dimensionan en función de estos valores para llenar su hueco.
+const GOLD_CX = 86;
+const GOLD_CY = 100;
+const GOLD_RX = 72;
+const GOLD_RY = 65;
 
 const PARTICLE_COUNT = 16;
 const PARTICLE_COLORS = [COLORS.teal, COLORS.gold, COLORS.orange, COLORS.gold, COLORS.teal];
@@ -103,11 +110,12 @@ const PARTICLES: Particle[] = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
 });
 
 /**
- * Anillo teal alrededor del ojo: ~1.15 vueltas desde arriba-izquierda
+ * Anillo teal ovalado alrededor del ojo: ~1.15 vueltas desde arriba-izquierda
  * (donde aterriza el ascendente), con el radio creciendo al final para
- * formar el remolino que sobresale abajo-izquierda en el logo original.
+ * formar el remolino que sobresale hacia el aro dorado en el logo original.
+ * rx/ry grandes a propósito: el aro debe llenar el hueco de GOLD_SWIRL_PATH.
  */
-function tealRingPath(radius: number, steps = 90): string {
+function tealRingPath(rx: number, ry: number, steps = 90): string {
   const parts: string[] = [];
   const startAngle = (215 / 180) * Math.PI;
   const turns = 1.15;
@@ -115,23 +123,23 @@ function tealRingPath(radius: number, steps = 90): string {
     const t = i / steps;
     const a = startAngle + t * turns * Math.PI * 2;
     const grow = Math.max(0, (t - 0.78) / 0.22); // último tramo se abre hacia afuera
-    const r = radius + grow * 11;
-    const x = CX + r * Math.cos(a);
-    const y = CY + r * Math.sin(a);
+    const x = CX + (rx + grow * 16) * Math.cos(a);
+    const y = CY + (ry + grow * 12) * Math.sin(a);
     parts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return parts.join(" ");
 }
 
-const TEAL_RING_PATH = tealRingPath(38);
-// Ascendente del "6" teal: baja desde arriba y conecta con el anillo.
-const TEAL_ASCENDER_PATH = "M 64 10 C 60 28 62 48 71 66";
-// Remolino dorado grande: rodea al ojo, abierto arriba-derecha, la punta
-// final se curva hacia adentro a media altura derecha.
-const GOLD_SWIRL_PATH =
-  "M 90 28 C 55 30 28 60 24 96 C 20 138 48 168 92 170 C 128 172 148 150 146 120";
-// "J" dorada (trazo más delgado): baja por la derecha bajo el punto naranja.
-const GOLD_J_PATH = "M 148 44 C 158 58 162 82 160 106 C 158 136 148 160 126 176";
+const TEAL_RING_PATH = tealRingPath(38, 33);
+// Ascendente del "6" teal: baja desde arriba y conecta con el inicio del
+// anillo (calculado para el nuevo rx/ry de tealRingPath).
+const TEAL_ASCENDER_PATH = "M 55 8 C 51 30 52 56 59 79";
+// Óvalo dorado grande (achatado en Y), trazado con dos arcos SVG para que
+// cierre sobre sí mismo en vez de dejar la abertura del remolino original.
+const GOLD_SWIRL_PATH = `M ${String(GOLD_CX - GOLD_RX)} ${String(GOLD_CY)} A ${String(GOLD_RX)} ${String(GOLD_RY)} 0 1 0 ${String(GOLD_CX + GOLD_RX)} ${String(GOLD_CY)} A ${String(GOLD_RX)} ${String(GOLD_RY)} 0 1 0 ${String(GOLD_CX - GOLD_RX)} ${String(GOLD_CY)}`;
+// "J" dorada (trazo más delgado): baja por la derecha bajo el punto naranja,
+// movida un poco más a la derecha para despegarse del aro grande.
+const GOLD_J_PATH = "M 153 44 C 163 58 167 82 165 106 C 163 136 153 160 131 176";
 
 // ── Variants por fase ────────────────────────────────────────────────────────
 
@@ -216,7 +224,7 @@ function LogoPieces({ animated }: { animated: boolean }) {
       {/* Dorado: remolino grande + "j" (envuelve al ojo) */}
       <motion.g
         variants={animated ? goldPiece : undefined}
-        style={{ transformOrigin: "100px 100px" }}
+        style={{ transformOrigin: `${String(GOLD_CX)}px ${String(GOLD_CY)}px` }}
       >
         <path
           d={GOLD_SWIRL_PATH}
@@ -238,7 +246,7 @@ function LogoPieces({ animated }: { animated: boolean }) {
         variants={animated ? spiralPiece : undefined}
         style={{ transformOrigin: `${String(CX)}px ${String(CY)}px` }}
       >
-        <circle cx={CX} cy={CY} r={33} fill={COLORS.eyeWhite} />
+        <ellipse cx={CX} cy={CY} rx={50} ry={44} fill={COLORS.eyeWhite} />
         <path
           d={TEAL_ASCENDER_PATH}
           fill="none"
@@ -257,11 +265,11 @@ function LogoPieces({ animated }: { animated: boolean }) {
       {/* Pupila */}
       <motion.circle
         variants={animated ? pupilPiece : undefined}
-        cx={97}
-        cy={91}
-        r={15.5}
+        cx={CX}
+        cy={CY}
+        r={17}
         fill={COLORS.pupil}
-        style={{ transformOrigin: "97px 91px" }}
+        style={{ transformOrigin: `${String(CX)}px ${String(CY)}px` }}
       />
       {/* Punto naranja (toque final) */}
       <motion.circle
