@@ -29,8 +29,12 @@ coverage
 .DS_Store
 Thumbs.db
 
+# Archivos de test (el builder no los necesita para compilar)
 **/*.test.ts
 **/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+src/test
 
 # Logs
 *.log
@@ -43,11 +47,13 @@ yarn-error.log*
 Dockerfile
 .dockerignore
 
+# Configuración de herramientas de desarrollo (no afectan el build de Vite)
+eslint.config.js
+components.json
+
 # Documentación
 README.md
+*.md
 
 # Lockfile alternativo (el Dockerfile usa pnpm-lock.yaml)
 package-lock.json
-
-# Mock data
-
