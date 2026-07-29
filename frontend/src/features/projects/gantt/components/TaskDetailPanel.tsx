@@ -1,11 +1,19 @@
-import { useMemo } from "react";
-import { X, Info } from "lucide-react";
+import { useMemo, useState } from "react";
+import { X, Info, FolderTree } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_PRIORITY_LABELS } from "../../types/labels";
 import type { Task, TaskStatus } from "../../types/api.types";
-import { useChangeTaskStatus, useProjectTasks, useTaskDependencies } from "../../hooks/use-tasks";
+import {
+  useAttachTask,
+  useChangeTaskStatus,
+  useDetachTask,
+  useProjectTasks,
+  useTaskDependencies,
+} from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
+import { useWorkTree } from "../../hooks/use-structure";
+import { flattenWorkTree } from "../../utils/flatten-work-tree";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
 
@@ -52,8 +60,26 @@ export function TaskDetailPanel({
   const depsQuery = useTaskDependencies(task.id);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId);
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(projectId);
+  const treeQuery = useWorkTree(projectId);
+  const attachTask = useAttachTask(projectId);
+  const detachTask = useDetachTask(projectId);
+  const [selectedNodeId, setSelectedNodeId] = useState("");
   const { user } = useAuth();
+
+  const nodeOptions = useMemo(() => flattenWorkTree(treeQuery.data ?? []), [treeQuery.data]);
+  const currentNodeLabel = useMemo(
+    () => nodeOptions.find((n) => n.id === task.work_item_id)?.label.trim() ?? null,
+    [nodeOptions, task.work_item_id],
+  );
+
+  const assigneeName = useMemo(() => {
+    if (!task.assignee_id) {
+      return null;
+    }
+    const member = (membersQuery.data ?? []).find((m) => m.user_id === task.assignee_id);
+    return member ? `${member.name} ${member.last_name}` : null;
+  }, [task.assignee_id, membersQuery.data]);
 
   const teamName = useMemo(() => {
     if (!task.team_id) {
@@ -134,6 +160,12 @@ export function TaskDetailPanel({
               {TASK_PRIORITY_LABELS[task.priority]}
             </dd>
           </div>
+          <div className="col-span-2">
+            <dt className="text-xs text-slate-400">Responsable</dt>
+            <dd className="text-slate-700 dark:text-slate-200">
+              {assigneeName ?? <span className="italic text-slate-400">Sin asignar</span>}
+            </dd>
+          </div>
           {teamName && (
             <div className="col-span-2">
               <dt className="text-xs text-slate-400">Equipo delegado</dt>
@@ -143,6 +175,74 @@ export function TaskDetailPanel({
             </div>
           )}
         </dl>
+
+        {/* Ubicación en la estructura del proyecto: adjuntar, cambiar o quitar. */}
+        <div className="mt-5">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <FolderTree className="size-3.5" /> Ubicación en la estructura
+          </p>
+          {currentNodeLabel ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+              <span className="truncate text-slate-700 dark:text-slate-200">
+                {currentNodeLabel}
+              </span>
+              <button
+                type="button"
+                disabled={detachTask.isPending}
+                onClick={() => {
+                  detachTask.mutate(task.id);
+                }}
+                className="shrink-0 text-xs text-slate-400 underline-offset-2 hover:text-rose-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Quitar
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedNodeId}
+                onChange={(e) => {
+                  setSelectedNodeId(e.target.value);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="">
+                  {nodeOptions.length === 0 ? "Sin estructura todavía" : "Selecciona un elemento…"}
+                </option>
+                {nodeOptions.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!selectedNodeId || attachTask.isPending}
+                onClick={() => {
+                  attachTask.mutate(
+                    { taskId: task.id, workItemId: selectedNodeId },
+                    {
+                      onSuccess: () => {
+                        setSelectedNodeId("");
+                      },
+                    },
+                  );
+                }}
+                className="shrink-0 rounded-lg border border-brand-blue/40 bg-brand-blue/10 px-3 py-2 text-xs font-medium text-brand-blue-dark transition hover:bg-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-brand-blue"
+              >
+                Adjuntar
+              </button>
+            </div>
+          )}
+          {(attachTask.isError || detachTask.isError) && (
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+              {getErrorMessage(
+                attachTask.error ?? detachTask.error,
+                "No se pudo actualizar la ubicación",
+              )}
+            </p>
+          )}
+        </div>
 
         {/* Acciones de flujo — sólo visibles para responsable o líder. El admin
             no puede pisar el estado sin ver el avance real. */}

@@ -45,6 +45,15 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
         )
         return list(rows.scalars().all())
 
+    async def list_members(self, team_id: UUID) -> list[TeamMember]:
+        rows = await self._session.execute(
+            select(TeamMember)
+            .where(TeamMember.team_id == team_id)
+            .options(selectinload(TeamMember.user))
+            .order_by(TeamMember.created_at)
+        )
+        return list(rows.scalars().all())
+
     def _with_children(self):
         return select(Deliverable).options(
             selectinload(Deliverable.versions),

@@ -142,10 +142,26 @@ class WorkTreeService:
     ) -> WorkItemResponse:
         """Copia el subárbol que cuelga de `source_id` y lo pega bajo el destino.
 
+        Ver `clone_subtree_with_maps`: este atajo devuelve solo la respuesta del
+        primer clon (compatibilidad con el resto del código y los tests).
+        """
+        response, _maps = await self.clone_subtree_with_maps(source_id, data)
+        return response
+
+    async def clone_subtree_with_maps(
+        self, source_id: UUID, data: CloneWorkItemRequest
+    ) -> tuple[WorkItemResponse, list[dict[UUID, UUID]]]:
+        """Clona el subárbol `data.times` veces y devuelve el mapa old→new de cada
+        pegada.
+
         Replica con nuevos UUIDs preservando la jerarquía interna, desplaza las
         fechas plan (`offset_days`), resetea fechas reales y avance, y preserva
         SOLO las dependencias FtS internas al subárbol (las externas se
         descartan). El nodo raíz puede recibir un nombre nuevo opcional.
+
+        Devuelve `(respuesta_del_primer_clon, [mapa_por_pegada])`. Los mapas
+        permiten a la capa de aplicación copiar las tareas del subárbol
+        redirigiéndolas a los nuevos elementos.
         """
         source = await self._get_active_item(source_id)
         proyecto_id = source.proyecto_id
@@ -165,15 +181,79 @@ class WorkTreeService:
         if target_parent is not None and target_parent.id in descendant_ids:
             raise ValidationError("No se puede pegar el subárbol dentro de sí mismo")
 
+        # Snapshot del origen: se clona SIEMPRE desde el original, no desde una
+        # pegada previa, aunque se pegue varias veces.
         items_by_id = {item.id: item for item in all_items if item.id in descendant_ids}
         offset = datetime.timedelta(days=data.offset_days)
+        edges = await self.repo.list_dependency_edges(proyecto_id)
+        internal_edges = [
+            (s, p) for s, p in edges if s in descendant_ids and p in descendant_ids
+        ]
 
-        # Primera pasada: clonar cada nodo en orden BFS desde la raíz, para que
-        # el padre del clon ya exista cuando se cree el hijo.
+        base_orden = await self.repo.next_orden(proyecto_id, data.target_parent_id)
+        maps: list[dict[UUID, UUID]] = []
+        first_root: WorkItem | None = None
+
+        for paste_index in range(data.times):
+            rename_to = self._paste_root_name(
+                base_name=data.rename_root_to,
+                paste_index=paste_index,
+                times=data.times,
+            )
+            new_id_by_old, clone_root = await self._clone_once(
+                source_id=source_id,
+                target_parent_id=data.target_parent_id,
+                items_by_id=items_by_id,
+                offset=offset,
+                root_orden=base_orden + paste_index,
+                rename_root_to=rename_to,
+            )
+
+            # Copiar dependencias FtS *internas* al subárbol para esta pegada.
+            for successor, predecessor in internal_edges:
+                await self.repo.add_dependency(
+                    WorkItemDependency(
+                        work_item_id=new_id_by_old[successor],
+                        depends_on_id=new_id_by_old[predecessor],
+                    )
+                )
+
+            maps.append(new_id_by_old)
+            if first_root is None:
+                first_root = clone_root
+
+        assert first_root is not None
+        return await self._respond_item(first_root), maps
+
+    @staticmethod
+    def _paste_root_name(
+        *, base_name: str | None, paste_index: int, times: int
+    ) -> str | None:
+        """Nombre del nodo raíz de una pegada. Con varias copias se numera para
+        distinguirlas ("Curso 1", "Curso 2", …). Con una sola, respeta el nombre
+        pedido (o `None` = conserva el del origen)."""
+        if times <= 1:
+            return base_name or None
+        prefix = base_name if base_name else None
+        # Si no hay nombre base, el llamador dejará que _make_clone use el del
+        # origen; para numerar necesitamos un texto, así que se resuelve fuera.
+        return f"{prefix} {paste_index + 1}" if prefix else None
+
+    async def _clone_once(
+        self,
+        *,
+        source_id: UUID,
+        target_parent_id: UUID | None,
+        items_by_id: dict[UUID, WorkItem],
+        offset: datetime.timedelta,
+        root_orden: int,
+        rename_root_to: str | None,
+    ) -> tuple[dict[UUID, UUID], WorkItem]:
+        """Clona una vez el subárbol en BFS (padre antes que hijo) y devuelve el
+        mapa old→new y el nodo raíz clonado."""
         new_id_by_old: dict[UUID, UUID] = {}
-        next_orden = await self.repo.next_orden(proyecto_id, data.target_parent_id)
         queue: list[tuple[UUID, UUID | None, int]] = [
-            (source_id, data.target_parent_id, next_orden)
+            (source_id, target_parent_id, root_orden)
         ]
         clone_root: WorkItem | None = None
 
@@ -185,11 +265,7 @@ class WorkTreeService:
                 parent_id=new_parent_id,
                 orden=orden,
                 offset=offset,
-                rename_to=(
-                    data.rename_root_to
-                    if old_id == source_id and data.rename_root_to
-                    else None
-                ),
+                rename_to=(rename_root_to if old_id == source_id else None),
             )
             saved = await self.repo.add_item(clone)
             new_id_by_old[old_id] = saved.id
@@ -203,19 +279,7 @@ class WorkTreeService:
                 queue.append((child.id, saved.id, index))
 
         assert clone_root is not None
-
-        # Segunda pasada: copiar dependencias FtS *internas* al subárbol.
-        edges = await self.repo.list_dependency_edges(proyecto_id)
-        for successor, predecessor in edges:
-            if successor in descendant_ids and predecessor in descendant_ids:
-                await self.repo.add_dependency(
-                    WorkItemDependency(
-                        work_item_id=new_id_by_old[successor],
-                        depends_on_id=new_id_by_old[predecessor],
-                    )
-                )
-
-        return await self._respond_item(clone_root)
+        return new_id_by_old, clone_root
 
     @staticmethod
     def _make_clone(

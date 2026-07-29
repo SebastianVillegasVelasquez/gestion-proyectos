@@ -1,23 +1,14 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { type LoginRequest, type RegisterRequest, Role } from "@/features/auth/types";
-import {
-  type FieldName,
-  passwordStrength,
-  validateField,
-} from "@/features/auth/utils/security.utils.ts";
-import { useLogin, useRegister } from "@/features/auth/hooks/use-auth";
-import { usePositions } from "@/features/auth/hooks/use-positions";
+import type { LoginRequest } from "@/features/auth/types";
+import { type FieldName, validateField } from "@/features/auth/utils/security.utils.ts";
+import { useLogin } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { AuthPanel } from "./AuthPanel";
-import { Field } from "./Field";
 
-type Mode = "login" | "register";
-type Errors = Partial<Record<FieldName | "accepted", string>>;
+type Errors = Partial<Record<FieldName, string>>;
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>("login");
-  const [animating, setAnimating] = useState(false);
   const [dark, setDark] = useState(() => {
     const stored = localStorage.getItem("obj-theme");
     if (stored) {
@@ -25,42 +16,22 @@ export default function LoginPage() {
     }
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const [reduceMotion] = useState(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
   const [loginForm, setLoginForm] = useState<LoginRequest>({ email: "", password: "" });
-
-  const [registerForm, setRegisterForm] = useState<RegisterRequest>({
-    name: "",
-    last_name: "",
-    email: "",
-    password: "",
-    role: Role.USER,
-    position: "sin_cargo",
-  });
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
-  const [accepted, setAccepted] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [touched, setTouched] = useState<Partial<Record<string, boolean>>>({});
 
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const isRegister = mode === "register";
 
   const location = useLocation();
   const fromState = location.state as { from?: { pathname?: string } } | null;
   const redirectTo = fromState?.from?.pathname ?? "/dashboard";
 
   const loginMutation = useLogin(redirectTo);
-  const registerMutation = useRegister(redirectTo);
-  // Carga perezosa: los cargos solo se piden cuando se abre el registro.
-  const { data: positions, isLoading: positionsLoading } = usePositions(isRegister);
 
-  const isPending = loginMutation.isPending || registerMutation.isPending;
-  const isSuccess = isRegister ? registerMutation.isSuccess : loginMutation.isSuccess;
-  const activeError = isRegister ? registerMutation.error : loginMutation.error;
-  const formError = activeError
-    ? getErrorMessage(activeError, "Ocurrió un error, intenta de nuevo.")
+  const formError = loginMutation.error
+    ? getErrorMessage(loginMutation.error, "Ocurrió un error, intenta de nuevo.")
     : null;
 
   useEffect((): void => {
@@ -68,66 +39,27 @@ export default function LoginPage() {
   }, [dark]);
 
   useEffect((): void => {
-    if (!animating) {
-      firstFieldRef.current?.focus();
-    }
-  }, [mode, animating]);
-
-  const transitionMs = reduceMotion ? 0 : 300;
-
-  const switchMode = (next: Mode): void => {
-    if (animating || mode === next) {
-      return;
-    }
-    setErrors({});
-    setTouched({});
-    loginMutation.reset();
-    registerMutation.reset();
-    if (transitionMs === 0) {
-      setMode(next);
-      return;
-    }
-    setAnimating(true);
-    setTimeout((): void => {
-      setMode(next);
-      setAnimating(false);
-    }, transitionMs);
-  };
-
-  const currentForm = isRegister ? registerForm : loginForm;
+    firstFieldRef.current?.focus();
+  }, []);
 
   const setField = (name: FieldName, value: string): void => {
-    if (isRegister) {
-      setRegisterForm((f) => ({ ...f, [name]: value }));
-    } else {
-      setLoginForm((f) => ({ ...f, [name]: value }));
-    }
+    setLoginForm((f) => ({ ...f, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
   };
 
   const handleBlur = (name: FieldName) => {
     setTouched((t) => ({ ...t, [name]: true }));
-    const value = (currentForm as unknown as Record<string, string>)[name] ?? "";
-    setErrors((e) => ({ ...e, [name]: validateField(name, value, isRegister) }));
+    setErrors((e) => ({ ...e, [name]: validateField(name, loginForm[name]) }));
   };
 
   const validateAll = (): boolean => {
-    const fields: FieldName[] = isRegister
-      ? ["name", "last_name", "email", "password"]
-      : ["email", "password"];
+    const fields: FieldName[] = ["email", "password"];
     const next: Errors = {};
     for (const f of fields) {
-      const msg = validateField(
-        f,
-        (currentForm as unknown as Record<string, string>)[f] ?? "",
-        isRegister,
-      );
+      const msg = validateField(f, loginForm[f]);
       if (msg) {
         next[f] = msg;
       }
-    }
-    if (isRegister && !accepted) {
-      next.accepted = "Debes aceptar el tratamiento de datos.";
     }
     setErrors(next);
     setTouched(Object.fromEntries(fields.map((f) => [f, true])));
@@ -140,17 +72,8 @@ export default function LoginPage() {
     if (!validateAll()) {
       return;
     }
-    if (isRegister) {
-      registerMutation.mutate(registerForm);
-    } else {
-      loginMutation.mutate(loginForm);
-    }
+    loginMutation.mutate(loginForm);
   };
-
-  const pwStrength = useMemo(
-    () => passwordStrength(registerForm.password),
-    [registerForm.password],
-  );
 
   const fieldClasses = (hasError: boolean) =>
     `w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 ${
@@ -161,9 +84,7 @@ export default function LoginPage() {
 
   return (
     <div className={dark ? "dark" : ""}>
-      <div
-        className={`relative min-h-screen w-full flex flex-col md:flex-row ${isRegister ? "" : "md:flex-row-reverse"}`}
-      >
+      <div className="relative min-h-screen w-full flex flex-col md:flex-row-reverse">
         {/* Toggle dark mode */}
         <button
           type="button"
@@ -206,19 +127,11 @@ export default function LoginPage() {
         </button>
 
         {/* Panel informativo */}
-        <AuthPanel
-          isRegister={isRegister}
-          onSwitch={() => {
-            switchMode(isRegister ? "login" : "register");
-          }}
-        />
+        <AuthPanel />
 
         {/* Panel formulario */}
         <main className="flex w-full md:w-1/2 items-center justify-center bg-white px-6 py-12 md:px-14 dark:bg-slate-950">
-          <div
-            className="w-full max-w-sm"
-            style={{ opacity: animating ? 0 : 1, transition: `opacity ${transitionMs}ms` }}
-          >
+          <div className="w-full max-w-sm">
             <div className="mb-8">
               {/* Marca */}
               <div className="mb-6 flex items-center gap-3">
@@ -237,35 +150,12 @@ export default function LoginPage() {
                 </div>
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                {isRegister ? "Crear cuenta" : "Acceso al sistema"}
+                Acceso al sistema
               </h1>
               <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                {isRegister
-                  ? "Completa los datos para registrarte"
-                  : "Plataforma privada de gestión de proyectos"}
+                Plataforma privada de gestión de proyectos
               </p>
             </div>
-
-            {/* Banner éxito */}
-            {isSuccess && (
-              <div
-                role="status"
-                className="mb-5 flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-              >
-                <svg
-                  className="h-4 w-4 shrink-0 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                  {isRegister ? "Cuenta creada correctamente." : "Acceso verificado correctamente."}
-                </p>
-              </div>
-            )}
 
             {/* Banner error API */}
             {formError && (
@@ -289,38 +179,6 @@ export default function LoginPage() {
             )}
 
             <form noValidate onSubmit={handleSubmit} className="space-y-4">
-              {isRegister && (
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    ref={firstFieldRef}
-                    id="name"
-                    label="Nombre"
-                    placeholder="Juan"
-                    value={registerForm.name}
-                    error={touched.name ? errors.name : undefined}
-                    onChange={(e) => {
-                      setField("name", e.target.value);
-                    }}
-                    onBlur={() => {
-                      handleBlur("name");
-                    }}
-                  />
-                  <Field
-                    id="last_name"
-                    label="Apellido"
-                    placeholder="Pérez"
-                    value={registerForm.last_name}
-                    error={touched.last_name ? errors.last_name : undefined}
-                    onChange={(e) => {
-                      setField("last_name", e.target.value);
-                    }}
-                    onBlur={() => {
-                      handleBlur("last_name");
-                    }}
-                  />
-                </div>
-              )}
-
               {/* Email */}
               <div>
                 <label
@@ -346,13 +204,13 @@ export default function LoginPage() {
                     </svg>
                   </span>
                   <input
-                    ref={isRegister ? undefined : firstFieldRef}
+                    ref={firstFieldRef}
                     id="email"
                     name="email"
                     type="email"
                     inputMode="email"
                     placeholder="nombre@empresa.com"
-                    value={isRegister ? registerForm.email : loginForm.email}
+                    value={loginForm.email}
                     onChange={(e) => {
                       setField("email", e.target.value);
                     }}
@@ -404,7 +262,7 @@ export default function LoginPage() {
                     name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={isRegister ? registerForm.password : loginForm.password}
+                    value={loginForm.password}
                     onChange={(e) => {
                       setField("password", e.target.value);
                     }}
@@ -495,131 +353,23 @@ export default function LoginPage() {
                     {errors.password}
                   </p>
                 )}
-
-                {isRegister && registerForm.password.length > 0 && (
-                  <div className="mt-2.5">
-                    <div className="flex gap-1.5">
-                      {[0, 1, 2, 3].map((i) => (
-                        <span
-                          key={i}
-                          className={`h-1.5 flex-1 rounded-full transition-colors ${
-                            i < pwStrength.score
-                              ? pwStrength.color
-                              : "bg-slate-200 dark:bg-slate-700"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                      Seguridad: <span className="font-medium">{pwStrength.label}</span>
-                    </p>
-                  </div>
-                )}
               </div>
 
-              {!isRegister && (
-                <div className="flex justify-end -mt-1">
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-              )}
-
-              {isRegister && (
-                <div>
-                  <label
-                    htmlFor="position"
-                    className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
-                  >
-                    Cargo o posición
-                  </label>
-                  <select
-                    id="position"
-                    name="position"
-                    value={registerForm.position}
-                    onChange={(e) => {
-                      setRegisterForm((f) => ({ ...f, position: e.target.value }));
-                    }}
-                    disabled={positionsLoading}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition hover:border-slate-300 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/20 disabled:cursor-wait dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-600 dark:focus:border-brand-gold dark:focus:ring-brand-gold/25"
-                  >
-                    {positionsLoading ? (
-                      <option value="sin_cargo">Cargando cargos…</option>
-                    ) : (
-                      positions?.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
-                    Elige el cargo que mejor te describe. Podrás actualizarlo más adelante.
-                  </p>
-                </div>
-              )}
-
-              {isRegister && (
-                <div>
-                  <label className="group flex cursor-pointer items-start gap-3">
-                    <div className="relative mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={accepted}
-                        onChange={(e) => {
-                          setAccepted(e.target.checked);
-                          setErrors((er) => ({ ...er, accepted: undefined }));
-                        }}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`flex h-4 w-4 items-center justify-center rounded border-2 transition ${
-                          accepted
-                            ? "border-brand-gold bg-brand-gold"
-                            : "border-slate-300 group-hover:border-brand-gold dark:border-slate-500"
-                        }`}
-                      >
-                        {accepted && (
-                          <svg
-                            className="h-2.5 w-2.5 text-brand-black"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                      Acepto el{" "}
-                      <button
-                        type="button"
-                        className="font-medium text-brand-teal underline underline-offset-2 hover:text-brand-teal-dark"
-                      >
-                        tratamiento de datos personales
-                      </button>{" "}
-                      conforme a la política de privacidad de OBJ Digital S.A.S.
-                    </span>
-                  </label>
-                  {errors.accepted && (
-                    <p role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">
-                      {errors.accepted}
-                    </p>
-                  )}
-                </div>
-              )}
+              <div className="flex justify-end -mt-1">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-brand-teal transition hover:text-brand-teal-dark"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
 
               <button
                 type="submit"
-                disabled={isPending}
+                disabled={loginMutation.isPending}
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-gold py-2.5 text-sm font-semibold tracking-wide text-brand-black shadow-sm transition-all hover:bg-brand-gold-dark active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isPending ? (
+                {loginMutation.isPending ? (
                   <>
                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle
@@ -636,27 +386,16 @@ export default function LoginPage() {
                         d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"
                       />
                     </svg>
-                    {isRegister ? "Creando cuenta..." : "Verificando..."}
+                    Verificando...
                   </>
-                ) : isRegister ? (
-                  "Crear cuenta"
                 ) : (
                   "Ingresar"
                 )}
               </button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-              {isRegister ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  switchMode(isRegister ? "login" : "register");
-                }}
-                className="font-semibold text-brand-teal transition hover:text-brand-teal-dark"
-              >
-                {isRegister ? "Inicia sesión" : "Regístrate"}
-              </button>
+            <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+              Plataforma privada. Si necesitas una cuenta, contacta a tu administrador.
             </p>
           </div>
         </main>

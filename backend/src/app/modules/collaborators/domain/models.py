@@ -1,7 +1,6 @@
 import datetime
 from uuid import UUID
 
-from app.modules.identity.infrastructure.enums import UserPosition
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.shared.base_model import BaseModelConfig
 
@@ -11,7 +10,7 @@ class CollaboratorIdentity(BaseModelConfig):
     name: str
     last_name: str
     email: str
-    position: UserPosition
+    position: str
 
 
 class CollaboratorCounts(BaseModelConfig):
@@ -24,7 +23,7 @@ class CollaboratorRow(BaseModelConfig):
     user_id: UUID
     name: str
     last_name: str
-    position: UserPosition
+    position: str
     assigned_tasks: int = 0
     completed_tasks: int = 0
 
@@ -33,7 +32,8 @@ class CollaboratorTaskRead(BaseModelConfig):
     id: UUID
     title: str
     status: TaskStatus
-    due_date: datetime.date
+    # Opcional: una tarea puede seguir sin planificar (sin fecha de entrega).
+    due_date: datetime.date | None = None
     completed_at: datetime.datetime | None = None
 
 

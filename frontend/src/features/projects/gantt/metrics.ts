@@ -21,7 +21,7 @@ export function isOverdue(task: Pick<Task, "status" | "due_date">, today: string
   return (
     task.status !== "completada" &&
     task.status !== "cancelada" &&
-    Boolean(task.due_date) &&
+    task.due_date != null &&
     task.due_date < today
   );
 }

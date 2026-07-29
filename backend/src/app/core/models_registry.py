@@ -1,5 +1,5 @@
 # ── Identity models ───────────────────────────────────────────────────────────
-from app.modules.identity.infrastructure.models import User
+from app.modules.identity.infrastructure.models import Position, User
 
 # ── Project models ────────────────────────────────────────────────────────────
 from app.modules.project.infrastructure.models import Project, ProjectMember
@@ -34,6 +34,7 @@ from app.modules.feedback.infrastructure.models import Feedback
 __all__ = [
     # Identity
     "User",
+    "Position",
     # Project
     "Project",
     "ProjectMember",

@@ -60,6 +60,7 @@ async def project_with_areas(db_session):
                 id=uuid.uuid4(),
                 title="T",
                 status=status,
+                project_id=project.id,
                 work_item_id=node.id,
                 assignee_id=assignee_id,
                 start_date=today,

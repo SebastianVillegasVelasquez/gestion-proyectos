@@ -36,7 +36,10 @@ const STATUS_META: Record<ProjectTaskStatus, { label: string; badge: string }> =
   },
 };
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) {
+    return "sin fecha";
+  }
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }

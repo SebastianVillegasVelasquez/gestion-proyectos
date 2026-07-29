@@ -45,11 +45,6 @@ const ProjectDetailPage = lazy(() =>
     default: m.ProjectDetailPage,
   })),
 );
-const TeamDetailPage = lazy(() =>
-  import("@/features/projects/components/TeamDetailPage.tsx").then((m) => ({
-    default: m.TeamDetailPage,
-  })),
-);
 const TaskDashboardPage = lazy(() =>
   import("@/features/projects/gantt/components/TaskDashboardPage.tsx").then((m) => ({
     default: m.TaskDashboardPage,
@@ -58,18 +53,35 @@ const TaskDashboardPage = lazy(() =>
 const TasksPage = lazy(() =>
   import("@/features/projects/tasks/TasksPage.tsx").then((m) => ({ default: m.TasksPage })),
 );
-const CollaboratorsPage = lazy(() =>
-  import("@/features/collaborators/components/CollaboratorsPage.tsx").then((m) => ({
-    default: m.CollaboratorsPage,
+const ProjectEstructuraPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectEstructuraPage.tsx").then((m) => ({
+    default: m.ProjectEstructuraPage,
   })),
 );
-const CollaboratorActivityPage = lazy(() =>
-  import("@/features/collaborators/components/CollaboratorActivityPage.tsx").then((m) => ({
-    default: m.CollaboratorActivityPage,
+const ProjectIntegrantesPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectIntegrantesPage.tsx").then((m) => ({
+    default: m.ProjectIntegrantesPage,
+  })),
+);
+const ProjectEquiposPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectEquiposPage.tsx").then((m) => ({
+    default: m.ProjectEquiposPage,
+  })),
+);
+const ProjectAreasPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectAreasPage.tsx").then((m) => ({
+    default: m.ProjectAreasPage,
+  })),
+);
+const ProjectTrazabilidadPage = lazy(() =>
+  import("@/features/projects/components/detail/ProjectTrazabilidadPage.tsx").then((m) => ({
+    default: m.ProjectTrazabilidadPage,
   })),
 );
 
-const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN];
+// developer también administra usuarios/cargos (ver MANAGEMENT_ROLES en el
+// backend: admin/super_admin/developer crean cuentas, ya no hay registro público).
+const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER];
 
 export const AppRouter = () => (
   <Routes>
@@ -104,12 +116,17 @@ export const AppRouter = () => (
         <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
           <Route path="/projects" element={<AllProjectsPage />} />
           <Route path="/projects/builder" element={<CreateProjectPage />} />
+          {/* Detalle del proyecto = vista principal. Cada sección vive en su
+              propia pantalla independiente (con botón para volver al detalle),
+              ya no como pestañas embebidas dentro del detalle. */}
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId/estructura" element={<ProjectEstructuraPage />} />
+          <Route path="/projects/:projectId/integrantes" element={<ProjectIntegrantesPage />} />
+          <Route path="/projects/:projectId/equipos" element={<ProjectEquiposPage />} />
+          <Route path="/projects/:projectId/areas" element={<ProjectAreasPage />} />
+          <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-          <Route path="/teams/:teamId" element={<TeamDetailPage />} />
-          <Route path="/collaborators" element={<CollaboratorsPage />} />
-          <Route path="/collaborators/:userId" element={<CollaboratorActivityPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Route>

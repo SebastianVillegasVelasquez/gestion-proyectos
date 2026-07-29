@@ -105,11 +105,19 @@ class CloneWorkItemRequest(BaseModelConfig):
     El clonado replica solo dentro del mismo proyecto. Las dependencias FtS
     *internas* al subárbol se preservan; las externas se descartan. Se
     RESETEAN: fechas reales y porcentaje completado.
+
+    - `times`: cuántas copias pegar (por defecto 1). Útil para replicar la misma
+      estructura muchas veces (p. ej. 32 cursos idénticos) en una sola acción.
+    - `include_tasks`: si se copian también las tareas colgadas del subárbol, con
+      su responsable/equipo (deep copy). El estado y las fechas reales se
+      resetean; las fechas plan se desplazan igual que la estructura.
     """
 
     target_parent_id: Optional[UUID] = None
     offset_days: int = 0
     rename_root_to: Optional[Nombre] = None
+    times: int = Field(default=1, ge=1, le=100)
+    include_tasks: bool = True
 
 
 # ── Dependencias Finish-to-Start ──────────────────────────────────────────────

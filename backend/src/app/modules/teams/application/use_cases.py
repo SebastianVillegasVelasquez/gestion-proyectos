@@ -19,32 +19,34 @@ class CreateTeamUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, data: CreateTeamRequest) -> TeamResponse:
-        return await self.service.create_team(data)
+    async def execute(self, project_id: UUID, data: CreateTeamRequest) -> TeamResponse:
+        return await self.service.create_team(project_id, data)
 
 
 class UpdateTeamUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, team_id: UUID, data: UpdateTeamRequest) -> TeamResponse:
-        return await self.service.update_team(team_id, data)
+    async def execute(
+        self, project_id: UUID, team_id: UUID, data: UpdateTeamRequest
+    ) -> TeamResponse:
+        return await self.service.update_team(project_id, team_id, data)
 
 
 class DeleteTeamUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, team_id: UUID) -> None:
-        await self.service.delete_team(team_id)
+    async def execute(self, project_id: UUID, team_id: UUID) -> None:
+        await self.service.delete_team(project_id, team_id)
 
 
 class GetTeamUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, team_id: UUID) -> TeamResponse:
-        return await self.service.get_team(team_id)
+    async def execute(self, project_id: UUID, team_id: UUID) -> TeamResponse:
+        return await self.service.get_team(project_id, team_id)
 
 
 class ListTeamsUseCase:
@@ -52,10 +54,10 @@ class ListTeamsUseCase:
         self.service = TeamService(team_repo)
 
     async def execute(
-        self, search: str | None, pagination: Pagination
+        self, project_id: UUID, search: str | None, pagination: Pagination
     ) -> PaginatedTeamsResponse:
         items, total = await self.service.search_teams(
-            search, pagination.limit, pagination.offset
+            project_id, search, pagination.limit, pagination.offset
         )
         return PaginatedTeamsResponse(
             items=items,
@@ -73,12 +75,12 @@ class AddTeamMemberUseCase:
         self.user_repo = user_repo
 
     async def execute(
-        self, team_id: UUID, user_id: UUID, team_role: TeamRole
+        self, project_id: UUID, team_id: UUID, user_id: UUID, team_role: TeamRole
     ) -> TeamMemberResponse:
         user = await self.user_repo.get_by_id(user_id)
         if user is None or getattr(user, "is_deleted", False):
             raise NotFoundError("El usuario no existe")
-        return await self.service.add_member(team_id, user_id, team_role)
+        return await self.service.add_member(project_id, team_id, user_id, team_role)
 
 
 class ChangeTeamMemberRoleUseCase:
@@ -86,22 +88,26 @@ class ChangeTeamMemberRoleUseCase:
         self.service = TeamService(team_repo)
 
     async def execute(
-        self, team_id: UUID, user_id: UUID, team_role: TeamRole
+        self, project_id: UUID, team_id: UUID, user_id: UUID, team_role: TeamRole
     ) -> TeamMemberResponse:
-        return await self.service.change_member_role(team_id, user_id, team_role)
+        return await self.service.change_member_role(
+            project_id, team_id, user_id, team_role
+        )
 
 
 class RemoveTeamMemberUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, team_id: UUID, user_id: UUID) -> None:
-        await self.service.remove_member(team_id, user_id)
+    async def execute(self, project_id: UUID, team_id: UUID, user_id: UUID) -> None:
+        await self.service.remove_member(project_id, team_id, user_id)
 
 
 class ListTeamMembersUseCase:
     def __init__(self, team_repo: TeamRepository):
         self.service = TeamService(team_repo)
 
-    async def execute(self, team_id: UUID) -> list[TeamMemberResponse]:
-        return await self.service.list_members(team_id)
+    async def execute(
+        self, project_id: UUID, team_id: UUID
+    ) -> list[TeamMemberResponse]:
+        return await self.service.list_members(project_id, team_id)

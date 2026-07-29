@@ -29,7 +29,8 @@ class TaskSubmitted(DomainEvent):
 
 @dataclass(frozen=True)
 class TaskCreated(DomainEvent):
-    work_item_id: uuid.UUID
+    # None cuando la tarea se crea suelta, sin estructura todavía.
+    work_item_id: uuid.UUID | None
     task_id: uuid.UUID
     assigned_id: uuid.UUID
 
@@ -50,6 +51,15 @@ class TaskReturned(DomainEvent):
     project_id: uuid.UUID
     task_id: uuid.UUID
     assigned_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserCreated(DomainEvent):
+    """Se creó una cuenta nueva (alta individual o carga masiva por CSV)."""
+
+    user_id: uuid.UUID
+    email: str
+    name: str
 
 
 @dataclass(frozen=True)

@@ -103,6 +103,10 @@ export interface CloneWorkItemPayload {
   offset_days?: number;
   /** Renombra solo el elemento principal del clon; lo que contiene conserva su nombre. */
   rename_root_to?: string | null;
+  /** Cuántas copias pegar de una sola vez (por defecto 1). */
+  times?: number;
+  /** Copiar también las tareas del subárbol con su responsable/equipo (deep copy). */
+  include_tasks?: boolean;
 }
 
 export interface WorkItemDependency {
@@ -115,15 +119,18 @@ export interface WorkItemDependency {
 
 export interface Task {
   id: string;
-  work_item_id: string;
+  project_id: string;
+  // null = tarea suelta, todavía sin adjuntar a un elemento de la estructura.
+  work_item_id: string | null;
   parent_task_id: string | null;
   title: string;
   description: string | null;
   priority: TaskPriority;
   assignee_id: string | null;
   team_id: string | null;
-  start_date: string;
-  due_date: string;
+  // Fechas opcionales: una tarea puede crearse como borrador y planificarse luego.
+  start_date: string | null;
+  due_date: string | null;
   status: TaskStatus;
   completed_at: string | null;
   created_at: string;
@@ -137,9 +144,12 @@ export interface CreateTaskPayload {
   assignee_id?: string | null;
   // Equipo al que se delega la tarea (opcional).
   team_id?: string | null;
-  // La tarea cuelga de un nodo del árbol de trabajo (cualquier nivel).
-  work_item_id: string;
-  start_date: string;
+  // El proyecto es obligatorio salvo que se indique work_item_id (del que se
+  // deriva). La tarea puede colgar de un elemento o crearse suelta.
+  project_id?: string | null;
+  work_item_id?: string | null;
+  // Fecha de inicio opcional (la tarea puede quedar sin planificar).
+  start_date?: string | null;
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;
   duration_days?: number | null;
@@ -156,6 +166,10 @@ export interface UpdateTaskPayload {
   team_id?: string | null;
   start_date?: string;
   due_date?: string;
+}
+
+export interface AttachTaskPayload {
+  work_item_id: string;
 }
 
 export interface TaskDependency {
@@ -195,6 +209,14 @@ export type UserPosition =
   | "diseñador_grafico"
   | "administrador_moodle";
 
+// Tipo de documento de identidad (opcional en el perfil del usuario).
+export type DocumentType =
+  | "cedula_ciudadania"
+  | "cedula_extranjeria"
+  | "pasaporte"
+  | "tarjeta_identidad"
+  | "nit";
+
 // Usuario del directorio (para asignar tareas / agregar al equipo).
 export interface DirectoryUser {
   id: string;
@@ -202,6 +224,8 @@ export interface DirectoryUser {
   last_name: string;
   email: string;
   position: UserPosition;
+  document_type: DocumentType | null;
+  document_number: string | null;
 }
 
 export interface PaginatedDirectory {
@@ -229,14 +253,15 @@ export interface IdentityUser {
 }
 
 // ── Teams (equipos de trabajo reutilizables) ─────────────────────────────────
-// Los equipos viven en su propio bounded context: son plantillas reutilizables
-// (ej. "Equipo de Desarrollo") que pueden asignarse a varios proyectos.
+// Los equipos de trabajo viven dentro de un proyecto: se crean para ese
+// proyecto y no existen fuera de él (otro proyecto tiene sus propios equipos).
 
 // Rol del integrante DENTRO del equipo (distinto del rol en un proyecto).
 export type TeamRole = "lider" | "supervisor" | "integrante";
 
 export interface Team {
   id: string;
+  project_id: string;
   name: string;
   description: string | null;
   member_count: number;

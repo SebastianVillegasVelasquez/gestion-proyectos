@@ -71,11 +71,15 @@ const LEGEND_STATUSES: TaskStatus[] = [
   "cancelada",
 ];
 
+// El cronograma solo ubica tareas con inicio y fin; las tareas sin planificar
+// (fechas en null) no tienen barra y se excluyen de la línea de tiempo.
+type DatedTask = Task & { start_date: string; due_date: string };
+
 interface NodeGroup {
   id: string;
   name: string;
   order: number;
-  tasks: Task[];
+  tasks: DatedTask[];
 }
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -95,6 +99,7 @@ function synthesizeFromStructure(tree: WorkItemTree[], realTasks: Task[]): Task[
     if (node.fecha_inicio_plan && node.fecha_fin_plan && !workItemsWithTasks.has(node.id)) {
       acc.push({
         id: `wi-${node.id}`,
+        project_id: node.proyecto_id,
         work_item_id: node.id,
         parent_task_id: null,
         title: node.nombre,
@@ -160,8 +165,8 @@ export function GanttView({
   const treeQuery = useWorkTree(project.id);
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
-  const teamsQuery = useTeams();
-  const [selected, setSelected] = useState<Task | null>(null);
+  const teamsQuery = useTeams(project.id);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -189,6 +194,18 @@ export function GanttView({
   );
 
   const allTasks = useMemo(() => [...realTasks, ...syntheticTasks], [realTasks, syntheticTasks]);
+  // Solo las tareas con inicio y fin son ubicables en el cronograma; las que
+  // están sin planificar se dejan fuera de la escala y del agrupado.
+  const datedTasks = useMemo(
+    () => allTasks.filter((t): t is DatedTask => t.start_date != null && t.due_date != null),
+    [allTasks],
+  );
+  // Deriva del listado en vivo para que el panel refleje adjuntar/quitar de
+  // la estructura sin cerrarse y reabrirse.
+  const selected = useMemo(
+    () => allTasks.find((t) => t.id === selectedId) ?? null,
+    [allTasks, selectedId],
+  );
 
   // Mapa user_id → cargo, para poder filtrar por responsabilidad.
   const positionByUser = useMemo(() => {
@@ -204,21 +221,21 @@ export function GanttView({
     [statuses, assigneeId, position, onlyAtRisk],
   );
   const tasks = useMemo(
-    () => filterGanttTasks(allTasks, filters, TODAY, positionByUser),
-    [allTasks, filters, positionByUser],
+    () => filterGanttTasks(datedTasks, filters, TODAY, positionByUser),
+    [datedTasks, filters, positionByUser],
   );
 
   // El rango se calcula sobre TODAS las tareas (no las filtradas): así el eje
   // de tiempo es estable y filtrar no "salta" la escala. Se le agrega aire en
   // ambos extremos para que ninguna barra toque el borde del área.
   const range = useMemo(() => {
-    const raw = computeRange(allTasks);
+    const raw = computeRange(datedTasks);
     if (!raw) {
       return null;
     }
     const pad = Math.min(14, Math.max(2, Math.ceil(raw.totalDays * 0.04)));
     return padRange(raw, pad, pad + 1);
-  }, [allTasks]);
+  }, [datedTasks]);
 
   const todayPct = range ? dayOffsetPct(TODAY, range) : null;
   const ticks = useMemo(
@@ -284,8 +301,13 @@ export function GanttView({
   }, [treeQuery.data]);
 
   const groups = useMemo<NodeGroup[]>(() => {
-    const byItem = new Map<string, Task[]>();
+    const byItem = new Map<string, DatedTask[]>();
+    // El cronograma agrupa por elemento de la estructura; las tareas sueltas
+    // (sin work_item_id todavía) no tienen fila aquí.
     for (const task of tasks) {
+      if (!task.work_item_id) {
+        continue;
+      }
       const arr = byItem.get(task.work_item_id) ?? [];
       arr.push(task);
       byItem.set(task.work_item_id, arr);
@@ -538,7 +560,7 @@ export function GanttView({
 
       {tasksQuery.isLoading ? (
         <div className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-      ) : allTasks.length === 0 || !range ? (
+      ) : datedTasks.length === 0 || !range ? (
         <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center dark:border-slate-700">
           <GanttChartSquare className="size-8 text-slate-300 dark:text-slate-600" />
           <p className="text-sm text-slate-400 dark:text-slate-500">
@@ -789,7 +811,7 @@ export function GanttView({
                                     if (task.id.startsWith("wi-")) {
                                       return;
                                     }
-                                    setSelected(task);
+                                    setSelectedId(task.id);
                                   }}
                                   title={[
                                     task.title,
@@ -845,7 +867,7 @@ export function GanttView({
           projectId={project.id}
           task={selected}
           onClose={() => {
-            setSelected(null);
+            setSelectedId(null);
           }}
         />
       )}

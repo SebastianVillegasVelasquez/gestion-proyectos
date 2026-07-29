@@ -8,6 +8,7 @@ const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-violet-500/20";
 
 interface TeamFormModalProps {
+  projectId: string;
   /** Si se pasa un equipo, el modal edita; si no, crea uno nuevo. */
   team?: Team;
   onClose: () => void;
@@ -16,14 +17,15 @@ interface TeamFormModalProps {
 
 // Formulario de equipo (crear/editar) en un solo lugar: ambos modos comparten
 // los mismos campos (nombre + descripción) y validación. La unicidad del nombre
-// la valida el backend (409); aquí exigimos el mínimo (nombre de 2+ caracteres).
-export function TeamFormModal({ team, onClose, onCreated }: TeamFormModalProps) {
+// la valida el backend (409, único por proyecto); aquí exigimos el mínimo
+// (nombre de 2+ caracteres).
+export function TeamFormModal({ projectId, team, onClose, onCreated }: TeamFormModalProps) {
   const isEdit = Boolean(team);
   const [name, setName] = useState(team?.name ?? "");
   const [description, setDescription] = useState(team?.description ?? "");
 
-  const createTeam = useCreateTeam();
-  const updateTeam = useUpdateTeam(team?.id ?? "");
+  const createTeam = useCreateTeam(projectId);
+  const updateTeam = useUpdateTeam(projectId, team?.id ?? "");
   const mutation = isEdit ? updateTeam : createTeam;
 
   const trimmedName = name.trim();

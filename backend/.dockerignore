@@ -44,5 +44,9 @@ Thumbs.db
 Dockerfile
 .dockerignore
 
+# Scripts de desarrollo / seed (no van a producción)
+scripts
+
 # Documentación
 README.md
+*.md

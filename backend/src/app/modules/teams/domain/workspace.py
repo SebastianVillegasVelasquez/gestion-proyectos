@@ -5,7 +5,7 @@ from uuid import UUID
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
-from app.modules.teams.infrastructure.models import Team
+from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
@@ -69,6 +69,9 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def list_member_teams(self, user_id: UUID) -> list[Team]: ...
+
+    @abstractmethod
+    async def list_members(self, team_id: UUID) -> list[TeamMember]: ...
 
     @abstractmethod
     async def list_deliverables(self, team_id: UUID) -> list[Deliverable]: ...

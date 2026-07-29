@@ -2,10 +2,24 @@ import { describe, it, expect } from "vitest";
 import { filterTeams, teamInitials } from "./filter-teams";
 import type { Team } from "../types/api.types";
 
+const PROJECT_ID = "p1";
+
 const teams: Team[] = [
-  { id: "1", name: "Equipo de Desarrollo", description: "Backend y frontend", member_count: 5 },
-  { id: "2", name: "Diseño", description: "Identidad visual", member_count: 3 },
-  { id: "3", name: "Soporte", description: null, member_count: 0 },
+  {
+    id: "1",
+    project_id: PROJECT_ID,
+    name: "Equipo de Desarrollo",
+    description: "Backend y frontend",
+    member_count: 5,
+  },
+  {
+    id: "2",
+    project_id: PROJECT_ID,
+    name: "Diseño",
+    description: "Identidad visual",
+    member_count: 3,
+  },
+  { id: "3", project_id: PROJECT_ID, name: "Soporte", description: null, member_count: 0 },
 ];
 
 describe("filterTeams", () => {

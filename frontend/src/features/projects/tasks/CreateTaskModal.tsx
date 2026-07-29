@@ -6,21 +6,14 @@ import { useWorkTree } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
-import type { Task, TaskPriority, UserPosition, WorkItemTree } from "../types/api.types";
+import type { Task, TaskPriority, UserPosition } from "../types/api.types";
+import { flattenWorkTree } from "../utils/flatten-work-tree";
 import {
   buildTaskPayload,
   emptyTaskForm,
   validateTaskForm,
   type TaskFormState,
 } from "./build-task-payload";
-
-/** Aplana el árbol a una lista con profundidad, para el selector de nodo. */
-function flatten(nodes: WorkItemTree[], depth = 0): { id: string; label: string }[] {
-  return nodes.flatMap((n) => [
-    { id: n.id, label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}` },
-    ...flatten(n.children, depth + 1),
-  ]);
-}
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
@@ -39,28 +32,31 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function CreateTaskModal({
   projectId,
   tasks,
+  initialWorkItemId,
   onClose,
 }: {
   projectId: string;
   tasks: Task[];
+  /** Preselecciona el elemento (p. ej. al crear desde un nodo de la estructura). */
+  initialWorkItemId?: string;
   onClose: () => void;
 }) {
   const treeQuery = useWorkTree(projectId);
   const createTask = useCreateTask(projectId);
 
-  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm());
+  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm(initialWorkItemId));
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
 
   const directoryQuery = useDirectory(position || undefined);
-  const teamsQuery = useTeams();
+  const teamsQuery = useTeams(projectId);
   const teams = teamsQuery.data?.items ?? [];
 
   const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const nodeOptions = useMemo(() => flatten(treeQuery.data ?? []), [treeQuery.data]);
+  const nodeOptions = useMemo(() => flattenWorkTree(treeQuery.data ?? []), [treeQuery.data]);
 
   const handleSubmit = () => {
     const error = validateTaskForm(form);
@@ -69,7 +65,7 @@ export function CreateTaskModal({
       return;
     }
     setClientError(null);
-    createTask.mutate(buildTaskPayload(form), { onSuccess: onClose });
+    createTask.mutate(buildTaskPayload(form, projectId), { onSuccess: onClose });
   };
 
   return (
@@ -116,8 +112,9 @@ export function CreateTaskModal({
             />
           </Field>
 
-          {/* Nodo del árbol de trabajo al que cuelga la tarea */}
-          <Field label="Ubicación en el proyecto *">
+          {/* Nodo del árbol de trabajo al que cuelga la tarea (opcional: la
+              tarea puede crearse suelta y adjuntarse después). */}
+          <Field label="Ubicación en la estructura (opcional)">
             <select
               className={inputCls}
               value={form.workItemId}
@@ -125,67 +122,117 @@ export function CreateTaskModal({
                 set("workItemId", e.target.value);
               }}
             >
-              <option value="">Selecciona la ubicación…</option>
+              <option value="">Sin asignar (tarea independiente)</option>
               {nodeOptions.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.label}
                 </option>
               ))}
             </select>
+            {nodeOptions.length === 0 && (
+              <span className="text-[11px] text-slate-400">
+                Aún no hay estructura en este proyecto. Podrás adjuntar esta tarea a un elemento
+                cuando la crees.
+              </span>
+            )}
           </Field>
 
-          {/* Responsable: filtro por cargo + persona */}
-          <Field label="Responsable">
-            <div className="flex gap-2">
-              <select
-                className={`${inputCls} w-1/2`}
-                value={position}
-                onChange={(e) => {
-                  setPosition(e.target.value as UserPosition | "");
-                  set("assigneeId", "");
-                }}
-              >
-                <option value="">Todos los cargos</option>
-                {USER_POSITIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {USER_POSITION_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={`${inputCls} w-1/2`}
-                value={form.assigneeId}
-                onChange={(e) => {
-                  set("assigneeId", e.target.value);
-                }}
-              >
-                <option value="">Sin asignar</option>
-                {directoryQuery.data?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} {u.last_name}
-                  </option>
-                ))}
-              </select>
+          {/* Asignación: excluyente. Una tarea se da a una persona O a un equipo
+              (o a nadie por ahora). Si va a un equipo, su líder reparte subtareas. */}
+          <Field label="Asignar a">
+            <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/50">
+              {(
+                [
+                  ["none", "Nadie aún"],
+                  ["person", "Una persona"],
+                  ["team", "Un equipo"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    set("assignmentMode", mode);
+                    // Al cambiar de modo, limpiamos la selección del otro para no
+                    // arrastrar valores incoherentes.
+                    set("assigneeId", "");
+                    set("teamId", "");
+                    setPosition("");
+                  }}
+                  aria-pressed={form.assignmentMode === mode}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                    form.assignmentMode === mode
+                      ? "bg-white text-brand-teal-dark shadow-sm dark:bg-slate-900 dark:text-brand-teal"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </Field>
 
+          {/* Responsable individual: filtro por cargo + persona */}
+          {form.assignmentMode === "person" && (
+            <Field label="Responsable">
+              <div className="flex gap-2">
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={position}
+                  onChange={(e) => {
+                    setPosition(e.target.value as UserPosition | "");
+                    set("assigneeId", "");
+                  }}
+                >
+                  <option value="">Todos los cargos</option>
+                  {USER_POSITIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {USER_POSITION_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={form.assigneeId}
+                  onChange={(e) => {
+                    set("assigneeId", e.target.value);
+                  }}
+                >
+                  <option value="">Sin asignar</option>
+                  {directoryQuery.data?.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Field>
+          )}
+
           {/* Delegar a un equipo: el líder repartirá subtareas dentro del equipo */}
-          <Field label="Delegar a equipo (opcional)">
-            <select
-              className={inputCls}
-              value={form.teamId}
-              onChange={(e) => {
-                set("teamId", e.target.value);
-              }}
-            >
-              <option value="">Sin equipo</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {form.assignmentMode === "team" && (
+            <Field label="Equipo responsable">
+              <select
+                className={inputCls}
+                value={form.teamId}
+                onChange={(e) => {
+                  set("teamId", e.target.value);
+                }}
+              >
+                <option value="">Selecciona un equipo…</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {teams.length === 0 && (
+                <span className="text-[11px] text-slate-400">
+                  Este proyecto aún no tiene equipos. Créalos en la sección «Equipos de trabajo».
+                </span>
+              )}
+            </Field>
+          )}
 
           {/* Dependencia */}
           <Field label="Depende de (opcional)">
@@ -222,9 +269,10 @@ export function CreateTaskModal({
             </select>
           </Field>
 
-          {/* Fechas: inicio + (fin o duración) */}
+          {/* Fechas: inicio + (fin o duración). Opcionales: la tarea puede
+              crearse sin planificar y ajustarse después. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Inicio *">
+            <Field label="Inicio (opcional)">
               <input
                 type="date"
                 className={inputCls}

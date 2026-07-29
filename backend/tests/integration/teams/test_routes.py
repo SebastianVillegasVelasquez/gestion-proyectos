@@ -1,11 +1,12 @@
 from app.modules.teams.infrastructure.enums import TeamRole
+from tests.integration.worktree.test_routes import _create_project
 
 
 async def _create_user(
-    client, *, email: str, name: str = "Ana", last_name: str = "Gomez"
+    client, admin_headers, *, email: str, name: str = "Ana", last_name: str = "Gomez"
 ):
     response = await client.post(
-        "/api/v1/identity/",
+        "/api/v1/identity/users",
         json={
             "email": email,
             "password": "password123",
@@ -14,15 +15,18 @@ async def _create_user(
             "role": "user",
             "position": "desarrollador",
         },
+        headers=admin_headers,
     )
     assert response.status_code == 201, response.text
     return response.json()
 
 
-async def _create_team(client, admin_headers, *, name="Equipo de Desarrollo"):
+async def _create_team(
+    client, admin_headers, project_id, *, name="Equipo de Desarrollo"
+):
     response = await client.post(
-        "/api/v1/teams/",
-        json={"name": name, "description": "Equipo predefinido"},
+        f"/api/v1/projects/{project_id}/teams",
+        json={"name": name, "description": "Equipo del proyecto"},
         headers=admin_headers,
     )
     assert response.status_code == 201, response.text
@@ -30,39 +34,68 @@ async def _create_team(client, admin_headers, *, name="Equipo de Desarrollo"):
 
 
 class TestTeamCrudRoutes:
-    async def test_should_create_team(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
+    async def test_should_create_team(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
 
         assert team["name"] == "Equipo de Desarrollo"
-        assert team["description"] == "Equipo predefinido"
+        assert team["description"] == "Equipo del proyecto"
+        assert team["project_id"] == project_id
         assert team["member_count"] == 0
 
-    async def test_should_reject_duplicate_team_name(self, client, admin_headers):
-        await _create_team(client, admin_headers, name="Diseño")
+    async def test_should_reject_duplicate_team_name_in_same_project(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        await _create_team(client, admin_headers, project_id, name="Diseño")
 
         duplicate = await client.post(
-            "/api/v1/teams/",
+            f"/api/v1/projects/{project_id}/teams",
             json={"name": "Diseño"},
             headers=admin_headers,
         )
 
         assert duplicate.status_code == 409
 
-    async def test_should_forbid_non_admin_creating_team(self, client, member_headers):
+    async def test_should_allow_same_team_name_in_different_projects(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_a = await _create_project(client, admin_headers, valid_project_payload)
+        project_b = await _create_project(client, admin_headers, valid_project_payload)
+
+        await _create_team(client, admin_headers, project_a, name="Diseño")
+        second = await client.post(
+            f"/api/v1/projects/{project_b}/teams",
+            json={"name": "Diseño"},
+            headers=admin_headers,
+        )
+
+        assert second.status_code == 201, second.text
+
+    async def test_should_forbid_non_admin_creating_team(
+        self, client, member_headers, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+
         response = await client.post(
-            "/api/v1/teams/",
+            f"/api/v1/projects/{project_id}/teams",
             json={"name": "Equipo No Autorizado"},
             headers=member_headers,
         )
 
         assert response.status_code == 403
 
-    async def test_should_list_teams_paginated(self, client, admin_headers):
-        await _create_team(client, admin_headers, name="Equipo A")
-        await _create_team(client, admin_headers, name="Equipo B")
+    async def test_should_list_teams_paginated(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        await _create_team(client, admin_headers, project_id, name="Equipo A")
+        await _create_team(client, admin_headers, project_id, name="Equipo B")
 
         response = await client.get(
-            "/api/v1/teams/?page=1&page_size=10",
+            f"/api/v1/projects/{project_id}/teams?page=1&page_size=10",
             headers=admin_headers,
         )
 
@@ -72,12 +105,34 @@ class TestTeamCrudRoutes:
         assert body["page"] == 1
         assert {t["name"] for t in body["items"]} == {"Equipo A", "Equipo B"}
 
-    async def test_should_search_teams_by_name(self, client, admin_headers):
-        await _create_team(client, admin_headers, name="Equipo de Desarrollo")
-        await _create_team(client, admin_headers, name="Equipo de Diseño")
+    async def test_should_not_list_teams_from_other_projects(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_a = await _create_project(client, admin_headers, valid_project_payload)
+        project_b = await _create_project(client, admin_headers, valid_project_payload)
+        await _create_team(client, admin_headers, project_a, name="Equipo A")
+        await _create_team(client, admin_headers, project_b, name="Equipo B")
 
         response = await client.get(
-            "/api/v1/teams/?search=Desarrollo",
+            f"/api/v1/projects/{project_a}/teams", headers=admin_headers
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        assert body["items"][0]["name"] == "Equipo A"
+
+    async def test_should_search_teams_by_name(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        await _create_team(
+            client, admin_headers, project_id, name="Equipo de Desarrollo"
+        )
+        await _create_team(client, admin_headers, project_id, name="Equipo de Diseño")
+
+        response = await client.get(
+            f"/api/v1/projects/{project_id}/teams?search=Desarrollo",
             headers=admin_headers,
         )
 
@@ -86,11 +141,14 @@ class TestTeamCrudRoutes:
         assert body["total"] == 1
         assert body["items"][0]["name"] == "Equipo de Desarrollo"
 
-    async def test_should_update_team(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
+    async def test_should_update_team(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
 
         response = await client.patch(
-            f"/api/v1/teams/{team['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}",
             json={"name": "Equipo Renombrado"},
             headers=admin_headers,
         )
@@ -98,29 +156,35 @@ class TestTeamCrudRoutes:
         assert response.status_code == 200
         assert response.json()["name"] == "Equipo Renombrado"
 
-    async def test_should_soft_delete_team(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
+    async def test_should_soft_delete_team(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
 
         delete_response = await client.delete(
-            f"/api/v1/teams/{team['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}",
             headers=admin_headers,
         )
         assert delete_response.status_code == 204
 
         get_response = await client.get(
-            f"/api/v1/teams/{team['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}",
             headers=admin_headers,
         )
         assert get_response.status_code == 404
 
 
 class TestTeamMemberRoutes:
-    async def test_should_add_member_with_default_role(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="ana@example.com")
+    async def test_should_add_member_with_default_role(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(client, admin_headers, email="ana@example.com")
 
         response = await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
@@ -131,12 +195,17 @@ class TestTeamMemberRoutes:
         assert member["team_role"] == TeamRole.INTEGRANTE.value
         assert member["name"] == "Ana"
 
-    async def test_should_add_member_with_explicit_role(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="lider@example.com", name="Luis")
+    async def test_should_add_member_with_explicit_role(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(
+            client, admin_headers, email="lider@example.com", name="Luis"
+        )
 
         response = await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"], "team_role": TeamRole.LIDER.value},
             headers=admin_headers,
         )
@@ -144,46 +213,55 @@ class TestTeamMemberRoutes:
         assert response.status_code == 201
         assert response.json()["team_role"] == TeamRole.LIDER.value
 
-    async def test_should_reject_duplicate_member(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="dup@example.com")
+    async def test_should_reject_duplicate_member(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(client, admin_headers, email="dup@example.com")
 
         await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
         duplicate = await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
 
         assert duplicate.status_code == 409
 
-    async def test_should_reject_member_with_unknown_user(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
+    async def test_should_reject_member_with_unknown_user(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
 
         response = await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": "00000000-0000-0000-0000-000000000000"},
             headers=admin_headers,
         )
 
         assert response.status_code == 404
 
-    async def test_should_change_member_role(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="role@example.com")
+    async def test_should_change_member_role(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(client, admin_headers, email="role@example.com")
 
         await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
 
         response = await client.patch(
-            f"/api/v1/teams/{team['id']}/members/{user['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members/{user['id']}",
             json={"team_role": TeamRole.SUPERVISOR.value},
             headers=admin_headers,
         )
@@ -191,43 +269,53 @@ class TestTeamMemberRoutes:
         assert response.status_code == 200
         assert response.json()["team_role"] == TeamRole.SUPERVISOR.value
 
-    async def test_should_remove_member(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="remove@example.com")
+    async def test_should_remove_member(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(client, admin_headers, email="remove@example.com")
 
         await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
 
         remove_response = await client.delete(
-            f"/api/v1/teams/{team['id']}/members/{user['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members/{user['id']}",
             headers=admin_headers,
         )
         assert remove_response.status_code == 204
 
         list_response = await client.get(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             headers=admin_headers,
         )
         assert list_response.status_code == 200
         assert list_response.json() == []
 
-    async def test_should_list_members(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user1 = await _create_user(client, email="m1@example.com", name="Ana")
-        user2 = await _create_user(client, email="m2@example.com", name="Carlos")
+    async def test_should_list_members(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user1 = await _create_user(
+            client, admin_headers, email="m1@example.com", name="Ana"
+        )
+        user2 = await _create_user(
+            client, admin_headers, email="m2@example.com", name="Carlos"
+        )
 
         for user in (user1, user2):
             await client.post(
-                f"/api/v1/teams/{team['id']}/members",
+                f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
                 json={"user_id": user["id"]},
                 headers=admin_headers,
             )
 
         response = await client.get(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             headers=admin_headers,
         )
 
@@ -235,18 +323,21 @@ class TestTeamMemberRoutes:
         names = {m["name"] for m in response.json()}
         assert names == {"Ana", "Carlos"}
 
-    async def test_member_count_reflects_members(self, client, admin_headers):
-        team = await _create_team(client, admin_headers)
-        user = await _create_user(client, email="count@example.com")
+    async def test_member_count_reflects_members(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        user = await _create_user(client, admin_headers, email="count@example.com")
 
         await client.post(
-            f"/api/v1/teams/{team['id']}/members",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
             json={"user_id": user["id"]},
             headers=admin_headers,
         )
 
         response = await client.get(
-            f"/api/v1/teams/{team['id']}",
+            f"/api/v1/projects/{project_id}/teams/{team['id']}",
             headers=admin_headers,
         )
 

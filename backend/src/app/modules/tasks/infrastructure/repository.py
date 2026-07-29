@@ -21,18 +21,21 @@ class TaskRepository(BaseRepository[Task]):
         return list((await self._session.execute(query)).scalars().all())
 
     async def get_all_by_project(self, project_id: UUID) -> list[Task]:
-        """Todas las tareas del proyecto, vía su WorkItem."""
+        """Todas las tareas del proyecto: adjuntas a un elemento o sueltas."""
         query = (
             select(Task)
-            .join(WorkItem, Task.work_item_id == WorkItem.id)
-            .where(
-                Task.deleted_at.is_(None),
-                WorkItem.proyecto_id == project_id,
-                WorkItem.deleted_at.is_(None),
-            )
+            .where(Task.deleted_at.is_(None), Task.project_id == project_id)
             .order_by(Task.start_date)
         )
         return list((await self._session.execute(query)).scalars().all())
+
+    async def set_work_item(self, task: Task, work_item_id: UUID | None) -> Task:
+        """Adjunta/desadjunta la tarea de un elemento. `None` = tarea suelta."""
+        task.work_item_id = work_item_id
+        self._session.add(task)
+        await self._session.flush()
+        await self._session.refresh(task)
+        return task
 
     async def get_by_team(self, team_id: UUID) -> list[tuple]:
         """Tareas delegadas a un equipo, con nombre de módulo, proyecto y responsable.
@@ -54,11 +57,11 @@ class TaskRepository(BaseRepository[Task]):
                 Project.name.label("project_name"),
                 func.concat(User.name, " ", User.last_name).label("assignee_name"),
             )
-            .join(WorkItem, Task.work_item_id == WorkItem.id)
-            .join(Project, WorkItem.proyecto_id == Project.id)
+            .outerjoin(WorkItem, Task.work_item_id == WorkItem.id)
+            .join(Project, Task.project_id == Project.id)
             .outerjoin(User, Task.assignee_id == User.id)
             .where(Task.team_id == team_id, Task.deleted_at.is_(None))
-            .order_by(WorkItem.orden, Task.start_date)
+            .order_by(Task.start_date)
         )
         # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
         return [tuple(r) for r in (await self._session.execute(query)).all()]

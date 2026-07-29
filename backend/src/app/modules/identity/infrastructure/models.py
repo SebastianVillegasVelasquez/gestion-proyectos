@@ -2,17 +2,37 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, String
+from sqlalchemy import Boolean, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from .enums import SystemRole, UserPosition
+from .enums import SystemRole
 
 if TYPE_CHECKING:
     from app.modules.notifications.infrastructure.models import Notification
     from app.modules.project.infrastructure.models import ProjectMember
     from app.modules.tasks.infrastructure.models import Task, TaskHistory
+
+
+class Position(Base, UUIDMixin, TimestampMixin):
+    """Cargo/posición de la empresa: catálogo mutable y persistente.
+
+    Reemplaza al antiguo enum nativo de Postgres (``user_position``): admin,
+    super_admin y developer pueden agregar cargos nuevos en caliente (p. ej. un
+    perfil que la empresa nunca había contratado) sin necesitar una migración.
+    ``key`` es el identificador estable (usado por ``users.position`` y por el
+    contrato value/label de ``GET /identity/positions``); ``label`` es el
+    texto legible que ve el usuario.
+    """
+
+    __tablename__ = "positions"
+
+    key: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
+    label: Mapped[str] = mapped_column(String(150), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -26,14 +46,22 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Documento de identidad (opcional). El número es único cuando está presente
+    # —así una misma persona no se registra dos veces— pero puede quedar vacío:
+    # Postgres admite múltiples NULL en un índice único.
+    document_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    document_number: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, unique=True, index=True
+    )
+
     role: Mapped[SystemRole] = mapped_column(
         Enum(SystemRole, name="user_role"),
         nullable=False,
         default=SystemRole.USER,
     )
 
-    position: Mapped[UserPosition] = mapped_column(
-        Enum(UserPosition, name="user_position"), nullable=False
+    position: Mapped[str] = mapped_column(
+        String(64), ForeignKey("positions.key"), nullable=False
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

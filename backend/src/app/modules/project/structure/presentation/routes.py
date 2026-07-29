@@ -6,6 +6,7 @@ from starlette import status
 from app.core.dependencies import (
     project_repo_dependency,
     require_role,
+    task_repo_dependency,
     worktree_repo_dependency,
 )
 from app.modules.project.structure.application.use_cases import (
@@ -155,14 +156,16 @@ async def clone_work_item(
     item_id: UUID,
     data: CloneWorkItemRequest,
     repo=Depends(worktree_repo_dependency),
+    task_repo=Depends(task_repo_dependency),
     current_user=Depends(_admin),
 ):
     """Duplica el subárbol que cuelga del nodo bajo `target_parent_id`.
 
     Spec §9: desplaza fechas plan, resetea fechas reales y avance, preserva
-    dependencias FtS internas al subárbol.
+    dependencias FtS internas al subárbol. Puede pegarse varias veces (`times`)
+    y, con `include_tasks`, copia también las tareas con su responsable/equipo.
     """
-    return await CloneWorkItemUseCase(repo).execute(item_id, data)
+    return await CloneWorkItemUseCase(repo, task_repo).execute(item_id, data)
 
 
 # ── Dependencias Finish-to-Start ──────────────────────────────────────────────

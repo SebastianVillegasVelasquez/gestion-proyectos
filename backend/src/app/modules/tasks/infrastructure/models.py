@@ -19,6 +19,7 @@ from app.shared.base_entity import UUIDMixin, TimestampMixin, SoftDeleteMixin
 if TYPE_CHECKING:
     from app.modules.identity.infrastructure.models import User
     from app.modules.project.structure.infrastructure.models import WorkItem
+    from app.modules.project.infrastructure.models import Project
 
 
 class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -38,11 +39,21 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=False,
     )
 
-    # Las tareas cuelgan del árbol flexible: de un WorkItem (cualquier nivel:
-    # módulo, fase, componente, actividad…). El nivel lo decide el usuario al
-    # configurar la estructura del proyecto.
-    work_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("work_items.id"), nullable=False, index=True
+    # Toda tarea pertenece a un proyecto desde su creación, exista o no todavía
+    # una estructura para colgarla. Es la referencia estable para listarlas.
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Las tareas pueden colgar del árbol flexible: de un WorkItem (cualquier
+    # nivel: módulo, fase, componente, actividad…). Nullable: una tarea puede
+    # crearse suelta (independiente) y adjuntarse a un elemento más tarde,
+    # cuando la estructura del proyecto ya exista.
+    work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_items.id"), nullable=True, index=True
     )
     assignee_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -64,14 +75,17 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
 
-    start_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
-    due_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    # Fechas opcionales: una tarea puede nacer como borrador (solo título) y
+    # planificarse — inicio, fin y responsable — más tarde.
+    start_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    due_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
 
     completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
-    work_item: Mapped["WorkItem"] = relationship("WorkItem", lazy="raise")
+    project: Mapped["Project"] = relationship("Project", lazy="raise")
+    work_item: Mapped[Optional["WorkItem"]] = relationship("WorkItem", lazy="raise")
     assignee: Mapped["User"] = relationship("User")
     history: Mapped[list["TaskHistory"]] = relationship(
         "TaskHistory", back_populates="task", cascade="all, delete-orphan"

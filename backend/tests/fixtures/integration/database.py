@@ -106,6 +106,9 @@ async def client(db_session):
 async def clean_database(db_session):
     yield
 
+    # Reset any PendingRollback state from a failed flush/commit in the test.
+    await db_session.rollback()
+
     tables = ["users", "projects", "work_items", "tipos_nodo", "teams"]
 
     for table in tables:

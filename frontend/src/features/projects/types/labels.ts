@@ -1,4 +1,22 @@
-import type { ProjectRole, TaskPriority, TaskStatus, TeamRole, UserPosition } from "./api.types";
+import type {
+  DocumentType,
+  ProjectRole,
+  TaskPriority,
+  TaskStatus,
+  TeamRole,
+  UserPosition,
+} from "./api.types";
+
+// Tipos de documento de identidad (es-CO), en orden de presentación del selector.
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  cedula_ciudadania: "Cédula de ciudadanía",
+  cedula_extranjeria: "Cédula de extranjería",
+  pasaporte: "Pasaporte",
+  tarjeta_identidad: "Tarjeta de identidad",
+  nit: "NIT",
+};
+
+export const DOCUMENT_TYPES: DocumentType[] = Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[];
 
 export const USER_POSITION_LABELS: Record<UserPosition, string> = {
   desarrollador: "Desarrollador",
@@ -85,4 +103,12 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   media: "Media",
   alta: "Alta",
   urgente: "Urgente",
+};
+
+export const TASK_PRIORITY_COLORS: Record<TaskPriority, string> = {
+  no_definida: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  baja: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  media: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  alta: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  urgente: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };

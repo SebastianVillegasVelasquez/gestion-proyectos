@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Calendar,
   ChevronLeft,
+  ChevronRight,
   FolderTree,
   History,
   Layers,
@@ -10,20 +10,58 @@ import {
   Sun,
   Users,
   UsersRound,
+  type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import type { Project } from "../types/api.types";
 import { ProjectActions } from "./detail/ProjectActions";
 import { ClientAccessCard } from "./detail/ClientAccessCard";
-import { StructurePanel } from "./detail/StructurePanel";
-import { MembersPanel } from "./detail/MembersPanel";
-import { WorkTeamsPanel } from "./detail/WorkTeamsPanel";
-import { TraceabilityPanel } from "./detail/TraceabilityPanel";
-import { AreasPanel } from "./detail/AreasPanel";
 
-type Tab = "estructura" | "integrantes" | "equipos" | "areas" | "trazabilidad";
+// Cada sección es una vista/pantalla independiente (ruta propia), ya no una
+// pestaña embebida. Desde aquí se navega a ellas; cada una regresa al detalle.
+const SECTIONS: {
+  to: string;
+  label: string;
+  meta: string;
+  icon: LucideIcon;
+  accent: string;
+}[] = [
+  {
+    to: "estructura",
+    label: "Estructura",
+    meta: "Fases, cursos y temas del proyecto",
+    icon: FolderTree,
+    accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    to: "integrantes",
+    label: "Integrantes",
+    meta: "Personas asignadas al proyecto",
+    icon: Users,
+    accent: "bg-brand-blue/10 text-brand-blue",
+  },
+  {
+    to: "equipos",
+    label: "Equipos de trabajo",
+    meta: "Grupos de trabajo del proyecto",
+    icon: UsersRound,
+    accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    to: "areas",
+    label: "Progreso por equipo",
+    meta: "Avance agrupado por cargo",
+    icon: Layers,
+    accent: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+  },
+  {
+    to: "trazabilidad",
+    label: "Trazabilidad",
+    meta: "Historial de cambios y eventos",
+    icon: History,
+    accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  },
+];
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -43,11 +81,10 @@ export function ProjectDetailView({
   onToggleDark: () => void;
 }) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("estructura");
   const progress = Math.round(project.progress_pct ?? 0);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12">
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-y-auto p-4 sm:p-6 lg:px-12">
       {/* Encabezado */}
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
@@ -85,73 +122,63 @@ export function ProjectDetailView({
         </button>
       </header>
 
-      {/* Accesos: Cronograma + Tareas */}
-      <ProjectActions projectId={project.id} />
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.7fr_1fr]">
+        {/* Columna izquierda: accesos, progreso y compartir con el cliente */}
+        <div className="flex flex-col gap-5">
+          {/* Accesos: Cronograma + Tareas */}
+          <ProjectActions projectId={project.id} />
 
-      {/* Progreso */}
-      <Card className="shrink-0 rounded-2xl">
-        <CardContent className="flex flex-col gap-3 py-5">
-          <div className="flex items-center justify-between">
-            <span className="text-[15px] font-medium text-foreground">Progreso general</span>
-            <span className="text-xl font-semibold tabular-nums text-brand-blue-dark dark:text-brand-blue">
-              {progress}%
-            </span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-accent">
-            <div
-              className="h-full rounded-full bg-brand-blue transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          {/* Progreso */}
+          <Card className="shrink-0 rounded-2xl">
+            <CardContent className="flex flex-col gap-3 py-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-medium text-foreground">Progreso general</span>
+                <span className="text-xl font-semibold tabular-nums text-brand-blue-dark dark:text-brand-blue">
+                  {progress}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-accent">
+                <div
+                  className="h-full rounded-full bg-brand-blue transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
-      <ClientAccessCard projectId={project.id} />
+          {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
+          <ClientAccessCard projectId={project.id} />
+        </div>
 
-      {/* Tabs: Estructura | Integrantes | Equipos | Progreso por equipo | Trazabilidad */}
-      <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-b border-border px-1">
-        {(
-          [
-            { id: "estructura", label: "Estructura", icon: FolderTree },
-            { id: "integrantes", label: "Integrantes", icon: Users },
-            { id: "equipos", label: "Equipos de trabajo", icon: UsersRound },
-            { id: "areas", label: "Progreso por equipo", icon: Layers },
-            { id: "trazabilidad", label: "Trazabilidad", icon: History },
-          ] as const
-        ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setTab(id);
-            }}
-            className={cn(
-              "-mb-px flex items-center gap-2 border-b-[2.5px] py-3 text-[15px] transition-colors",
-              tab === id
-                ? "border-brand-blue font-semibold text-brand-blue-dark dark:text-brand-blue"
-                : "border-transparent font-medium text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="size-4" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {tab === "estructura" && <StructurePanel projectId={project.id} />}
-        {tab === "integrantes" && <MembersPanel projectId={project.id} />}
-        {tab === "equipos" && (
-          <ErrorBoundary
-            fallbackTitle="No se pudo mostrar el apartado de equipos"
-            fallbackHint="Ocurrió un error al renderizar los equipos de trabajo. Intenta recargar."
-          >
-            <WorkTeamsPanel />
-          </ErrorBoundary>
-        )}
-        {tab === "areas" && <AreasPanel projectId={project.id} />}
-        {tab === "trazabilidad" && <TraceabilityPanel projectId={project.id} />}
+        {/* Columna derecha: secciones del proyecto, cada una en su propia vista */}
+        <aside className="lg:sticky lg:top-1">
+          <Card className="rounded-2xl">
+            <CardContent className="flex flex-col gap-1 py-4">
+              <p className="px-1 pb-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Secciones del proyecto
+              </p>
+              {SECTIONS.map(({ to, label, meta, icon: Icon, accent }) => (
+                <button
+                  key={to}
+                  type="button"
+                  onClick={() => void navigate(`/projects/${project.id}/${to}`)}
+                  className="group flex items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-accent"
+                >
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${accent}`}
+                  >
+                    <Icon className="size-[18px]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">{label}</p>
+                    <p className="truncate text-xs text-muted-foreground">{meta}</p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </div>
   );
