@@ -4,10 +4,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { ClientProjectPortal } from "./ClientProjectPortal";
-import { portalApi, type PublicProjectProgress } from "../api/portal.api";
+import {
+  portalApi,
+  type PublicProjectProgress,
+  type PublicProjectSchedule,
+} from "../api/portal.api";
 
 vi.mock("../api/portal.api", () => ({
-  portalApi: { getProgress: vi.fn() },
+  portalApi: { getProgress: vi.fn(), getSchedule: vi.fn() },
 }));
 
 function renderPortal() {
@@ -72,5 +76,43 @@ describe("ClientProjectPortal", () => {
     submitToken("bad-token");
 
     expect(await screen.findByText(/Token no válido o expirado/)).toBeInTheDocument();
+  });
+
+  it("loads the structure schedule lazily only when the Cronograma tab is opened", async () => {
+    const schedule: PublicProjectSchedule = {
+      project_name: "Diplomado en Analítica",
+      items: [
+        {
+          key: "n0",
+          parent_key: null,
+          name: "Módulo 1",
+          depth: 0,
+          order: 0,
+          start_date: "2026-07-01",
+          due_date: "2026-07-20",
+          status: "en_progreso",
+          progress_pct: 45,
+        },
+      ],
+    };
+    vi.mocked(portalApi.getProgress).mockResolvedValue(progress);
+    vi.mocked(portalApi.getSchedule).mockResolvedValue(schedule);
+    renderPortal();
+
+    submitToken("tok-123");
+    await screen.findByText("Diplomado en Analítica");
+    // Aún en la pestaña Resumen: el cronograma no se ha pedido.
+    expect(portalApi.getSchedule).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /cronograma/i }));
+
+    // Muestra la estructura (componentes), no tareas ni responsables.
+    expect(await screen.findByText("Módulo 1")).toBeInTheDocument();
+    expect(portalApi.getSchedule).toHaveBeenCalledWith("tok-123");
+    expect(screen.queryByLabelText(/responsable/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/equipo/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/responsabilidad/i)).not.toBeInTheDocument();
+    // Sí conserva la búsqueda por componente.
+    expect(screen.getByLabelText(/buscar componente/i)).toBeInTheDocument();
   });
 });

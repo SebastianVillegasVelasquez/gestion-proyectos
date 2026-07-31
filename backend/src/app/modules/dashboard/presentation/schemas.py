@@ -89,3 +89,29 @@ class PublicProjectProgressResponse(BaseModelConfig):
     tasks_overdue: int
     tasks_pending: int
     progress_pct: int
+
+
+class PublicScheduleItemResponse(BaseModelConfig):
+    """Fila del cronograma público: un elemento de la estructura con su tiempo.
+
+    El cliente ve el flujo del proyecto por sus componentes/entregables, nunca
+    las tareas ni quién las ejecuta. `key`/`parent_key` son índices opacos (no
+    identificadores internos) que solo reconstruyen la jerarquía en la UI.
+    """
+
+    key: str
+    parent_key: str | None = None
+    name: str
+    depth: int
+    order: int
+    start_date: datetime.date
+    due_date: datetime.date
+    status: str  # value del enum de tareas (para el color de la barra)
+    progress_pct: int
+
+
+class PublicProjectScheduleResponse(BaseModelConfig):
+    """Cronograma del proyecto para el portal público del cliente (solo lectura)."""
+
+    project_name: str
+    items: list[PublicScheduleItemResponse]

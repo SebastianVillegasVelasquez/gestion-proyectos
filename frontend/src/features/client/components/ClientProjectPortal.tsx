@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { ArrowRight, KeyRound, Loader2, Sparkles } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  ArrowRight,
+  GanttChartSquare,
+  KeyRound,
+  LayoutDashboard,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { portalApi, type PublicProjectProgress } from "../api/portal.api";
+import { ClientScheduleView } from "./ClientScheduleView";
 
 const STATUS_META: Record<PublicProjectProgress["status"], { label: string; badge: string }> = {
   active: {
@@ -119,30 +127,39 @@ export function ClientProjectPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-8">
-        <header className="flex items-center gap-3">
-          <img
-            src="/logo.webp"
-            alt="Bitácora OBJ"
-            className="h-10 w-10 shrink-0 rounded-lg object-contain"
-          />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Bitácora OBJ · Portal del cliente
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Seguimiento de tu proyecto en tiempo real
-            </p>
-          </div>
-        </header>
+    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+      {/* Encabezado full-width: el logo se ancla arriba a la izquierda, con aire
+          respecto al borde (no pegado). */}
+      <header className="flex items-center gap-3 px-4 py-4 sm:px-8">
+        <img
+          src="/logo.webp"
+          alt="Bitácora OBJ"
+          className="h-10 w-10 shrink-0 rounded-lg object-contain"
+        />
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Bitácora OBJ · Portal del cliente
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Seguimiento de tu proyecto en tiempo real
+          </p>
+        </div>
+      </header>
 
-        {mutation.data ? (
-          <Portal data={mutation.data} />
-        ) : (
+      {mutation.data ? (
+        // Con datos: contenedor ancho para que el cronograma respire.
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
+          <Portal data={mutation.data} token={mutation.variables ?? token.trim()} />
+          <p className="mt-auto text-center text-xs text-slate-400 dark:text-slate-600">
+            Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
+          </p>
+        </main>
+      ) : (
+        // Sin datos: el formulario de acceso queda centrado en la pantalla.
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16 sm:px-8">
           <form
             onSubmit={submit}
-            className="mx-auto flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="mb-1 text-center">
               <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
@@ -185,17 +202,84 @@ export function ClientProjectPortal() {
               )}
             </button>
           </form>
-        )}
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-600">
-          Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
-        </p>
-      </div>
+          <p className="text-center text-xs text-slate-400 dark:text-slate-600">
+            Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
+          </p>
+        </main>
+      )}
     </div>
   );
 }
 
-function Portal({ data }: { data: PublicProjectProgress }) {
+type PortalTab = "resumen" | "cronograma";
+
+function Portal({ data, token }: { data: PublicProjectProgress; token: string }) {
+  const [tab, setTab] = useState<PortalTab>("resumen");
+
+  // El cronograma puede crecer bastante: se carga solo cuando el cliente abre
+  // su pestaña (lazy), no al validar el token.
+  const scheduleQuery = useQuery({
+    queryKey: ["portal-schedule", token],
+    queryFn: () => portalApi.getSchedule(token),
+    enabled: tab === "cronograma",
+    staleTime: 60_000,
+  });
+
+  const tabs: { id: PortalTab; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: "resumen", label: "Resumen", icon: LayoutDashboard },
+    { id: "cronograma", label: "Cronograma", icon: GanttChartSquare },
+  ];
+
+  return (
+    <>
+      {/* Pestañas: el resumen del avance y el cronograma detallado. Se centran a
+          un ancho cómodo aunque el contenedor sea ancho. */}
+      <div className="mx-auto flex w-full max-w-md items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setTab(t.id);
+              }}
+              aria-pressed={active}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+              )}
+            >
+              <t.icon className="size-4" /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "resumen" ? (
+        // El resumen es texto: se limita a un ancho legible y se centra.
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <ResumenTab data={data} />
+        </div>
+      ) : scheduleQuery.isLoading ? (
+        <div className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+      ) : scheduleQuery.isError || !scheduleQuery.data ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          No pudimos cargar el cronograma. Actualiza la página o vuelve a intentarlo.
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+          <ClientScheduleView schedule={scheduleQuery.data} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ResumenTab({ data }: { data: PublicProjectProgress }) {
   const status = STATUS_META[data.status];
   const progress = Math.round(data.progress_pct);
 
