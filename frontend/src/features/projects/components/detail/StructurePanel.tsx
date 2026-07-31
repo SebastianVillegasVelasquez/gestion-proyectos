@@ -43,6 +43,24 @@ function fmt(iso: string | null): string {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
+/** Duración legible de un elemento. Usa la duración capturada si existe; si el
+ * elemento se definió con fechas exactas (sin duración), la calcula a partir del
+ * rango inicio→fin (en días, inclusivo) para que la lista nunca la deje vacía. */
+function durationLabel(node: WorkItemTree): string {
+  if (node.duracion_valor != null) {
+    return `${node.duracion_valor} ${node.duracion_unidad === "semanas" ? "sem" : "d"}`;
+  }
+  if (node.fecha_inicio_plan && node.fecha_fin_plan) {
+    const start = Date.parse(node.fecha_inicio_plan);
+    const end = Date.parse(node.fecha_fin_plan);
+    if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+      const days = Math.round((end - start) / 86400000) + 1;
+      return `${days} d`;
+    }
+  }
+  return "—";
+}
+
 function nodeMatches(node: WorkItemTree, query: string): boolean {
   return node.nombre.toLowerCase().includes(query);
 }
@@ -533,11 +551,7 @@ function ListRows({
                   ? `${fmt(node.fecha_inicio_plan)} → ${fmt(node.fecha_fin_plan)}`
                   : "—"}
               </td>
-              <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                {node.duracion_valor != null
-                  ? `${node.duracion_valor} ${node.duracion_unidad === "semanas" ? "sem" : "d"}`
-                  : "—"}
-              </td>
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">{durationLabel(node)}</td>
             </tr>
           );
         })}
