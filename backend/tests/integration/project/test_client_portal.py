@@ -36,8 +36,10 @@ class TestClientPortal:
             )
         ).json()["token"]
 
-        # Sin cabeceras de autenticación: el token en la ruta es la única credencial.
-        resp = await client.get(f"/api/v1/public/projects/{token}")
+        # Sin cabeceras de autenticación: el token en el cuerpo es la única credencial.
+        resp = await client.post(
+            "/api/v1/public/projects/progress", json={"token": token}
+        )
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["name"] == valid_project_payload["name"]
@@ -47,7 +49,9 @@ class TestClientPortal:
         assert "my_tasks" not in body
 
     async def test_invalid_token_returns_404(self, client):
-        resp = await client.get("/api/v1/public/projects/token-que-no-existe")
+        resp = await client.post(
+            "/api/v1/public/projects/progress", json={"token": "token-que-no-existe"}
+        )
         assert resp.status_code == 404
 
     async def test_regenerate_revokes_previous_link(
@@ -70,10 +74,14 @@ class TestClientPortal:
         assert new_token != old_token
         # El enlace viejo deja de funcionar; el nuevo sí.
         assert (
-            await client.get(f"/api/v1/public/projects/{old_token}")
+            await client.post(
+                "/api/v1/public/projects/progress", json={"token": old_token}
+            )
         ).status_code == 404
         assert (
-            await client.get(f"/api/v1/public/projects/{new_token}")
+            await client.post(
+                "/api/v1/public/projects/progress", json={"token": new_token}
+            )
         ).status_code == 200
 
     async def test_client_access_requires_admin(
