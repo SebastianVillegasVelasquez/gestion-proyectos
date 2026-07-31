@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router";
-import { FolderKanban, Loader2, Sparkles } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  ArrowRight,
+  GanttChartSquare,
+  KeyRound,
+  LayoutDashboard,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { portalApi, type PublicProjectProgress } from "../api/portal.api";
+import { ClientScheduleView } from "./ClientScheduleView";
 
 const STATUS_META: Record<PublicProjectProgress["status"], { label: string; badge: string }> = {
   active: {
@@ -98,66 +105,181 @@ function useStreamingText(text: string, charsPerTick = 4, tickMs = 22): string {
   return shown;
 }
 
+/**
+ * Portal del cliente: pantalla ÚNICA y pública. El cliente recibe el enlace y el
+ * token por separado; introduce el token aquí y, con un POST (nunca en la URL),
+ * carga el avance de su proyecto en la misma pantalla. Mientras no hay datos,
+ * muestra el formulario de acceso; tras un token válido, el resumen del proyecto.
+ */
 export function ClientProjectPortal() {
-  const { token = "" } = useParams<{ token: string }>();
+  const [token, setToken] = useState("");
 
-  const query = useQuery({
-    queryKey: ["public-project", token],
-    queryFn: () => portalApi.getProgress(token),
-    enabled: Boolean(token),
-    retry: false,
-    staleTime: 60_000,
+  const mutation = useMutation({
+    mutationFn: (t: string) => portalApi.getProgress(t),
   });
 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = token.trim();
+    if (clean) {
+      mutation.mutate(clean);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-8">
-        <header className="flex items-center gap-3">
-          <img
-            src="/logo.webp"
-            alt="Bitácora OBJ"
-            className="h-10 w-10 shrink-0 rounded-lg object-contain"
-          />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Bitácora OBJ · Portal del cliente
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Seguimiento de tu proyecto en tiempo real
-            </p>
-          </div>
-        </header>
+    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+      {/* Encabezado full-width: el logo se ancla arriba a la izquierda, con aire
+          respecto al borde (no pegado). */}
+      <header className="flex items-center gap-3 px-4 py-4 sm:px-8">
+        <img
+          src="/logo.webp"
+          alt="Bitácora OBJ"
+          className="h-10 w-10 shrink-0 rounded-lg object-contain"
+        />
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Bitácora OBJ · Portal del cliente
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Seguimiento de tu proyecto en tiempo real
+          </p>
+        </div>
+      </header>
 
-        {query.isLoading ? (
-          <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            <Loader2 className="size-6 animate-spin text-slate-300" />
-          </div>
-        ) : query.isError || !query.data ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800">
-              <FolderKanban className="size-6" />
+      {mutation.data ? (
+        // Con datos: contenedor ancho para que el cronograma respire.
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
+          <Portal data={mutation.data} token={mutation.variables ?? token.trim()} />
+          <p className="mt-auto text-center text-xs text-slate-400 dark:text-slate-600">
+            Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
+          </p>
+        </main>
+      ) : (
+        // Sin datos: el formulario de acceso queda centrado en la pantalla.
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16 sm:px-8">
+          <form
+            onSubmit={submit}
+            className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="mb-1 text-center">
+              <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                Introduce tu token de acceso
+              </h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                El equipo del proyecto te compartió un token. Pégalo aquí para ver el avance.
+              </p>
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200">
-              Enlace no válido o expirado
-            </p>
-            <p className="max-w-sm text-sm text-slate-400 dark:text-slate-500">
-              Este enlace de seguimiento no es correcto o fue revocado. Solicita uno nuevo al equipo
-              del proyecto.
-            </p>
-          </div>
-        ) : (
-          <Portal data={query.data} />
-        )}
+            <label className="flex flex-col gap-1.5">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <KeyRound className="size-3.5" /> Token de acceso
+              </span>
+              <input
+                value={token}
+                autoFocus
+                onChange={(e) => {
+                  setToken(e.target.value);
+                }}
+                placeholder="Pega aquí tu token"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+            {mutation.isError && (
+              <p className="text-sm text-rose-600 dark:text-rose-400">
+                Token no válido o expirado. Verifícalo o solicita uno nuevo al equipo del proyecto.
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={!token.trim() || mutation.isPending}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-50"
+            >
+              {mutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  Ver mi proyecto <ArrowRight className="size-4" />
+                </>
+              )}
+            </button>
+          </form>
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-600">
-          Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
-        </p>
-      </div>
+          <p className="text-center text-xs text-slate-400 dark:text-slate-600">
+            Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
+          </p>
+        </main>
+      )}
     </div>
   );
 }
 
-function Portal({ data }: { data: PublicProjectProgress }) {
+type PortalTab = "resumen" | "cronograma";
+
+function Portal({ data, token }: { data: PublicProjectProgress; token: string }) {
+  const [tab, setTab] = useState<PortalTab>("resumen");
+
+  // El cronograma puede crecer bastante: se carga solo cuando el cliente abre
+  // su pestaña (lazy), no al validar el token.
+  const scheduleQuery = useQuery({
+    queryKey: ["portal-schedule", token],
+    queryFn: () => portalApi.getSchedule(token),
+    enabled: tab === "cronograma",
+    staleTime: 60_000,
+  });
+
+  const tabs: { id: PortalTab; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: "resumen", label: "Resumen", icon: LayoutDashboard },
+    { id: "cronograma", label: "Cronograma", icon: GanttChartSquare },
+  ];
+
+  return (
+    <>
+      {/* Pestañas: el resumen del avance y el cronograma detallado. Se centran a
+          un ancho cómodo aunque el contenedor sea ancho. */}
+      <div className="mx-auto flex w-full max-w-md items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setTab(t.id);
+              }}
+              aria-pressed={active}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+              )}
+            >
+              <t.icon className="size-4" /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "resumen" ? (
+        // El resumen es texto: se limita a un ancho legible y se centra.
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <ResumenTab data={data} />
+        </div>
+      ) : scheduleQuery.isLoading ? (
+        <div className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+      ) : scheduleQuery.isError || !scheduleQuery.data ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          No pudimos cargar el cronograma. Actualiza la página o vuelve a intentarlo.
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+          <ClientScheduleView schedule={scheduleQuery.data} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ResumenTab({ data }: { data: PublicProjectProgress }) {
   const status = STATUS_META[data.status];
   const progress = Math.round(data.progress_pct);
 

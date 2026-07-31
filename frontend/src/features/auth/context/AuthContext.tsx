@@ -6,8 +6,12 @@ import {
   writeSession,
   type Session,
 } from "@/features/auth/utils/session.utils";
-import { decodeJwt, isTokenExpired } from "@/features/auth/utils/jwt.utils";
-import { SESSION_REFRESHED_EVENT } from "@/features/auth/api/refresh";
+import { decodeJwt } from "@/features/auth/utils/jwt.utils";
+import { SESSION_REFRESHED_EVENT, refreshAccessToken } from "@/features/auth/api/refresh";
+
+// Margen para renovar el token ANTES de que expire y no dejar una ventana en la
+// que las peticiones fallen con 401.
+const REFRESH_SKEW_MS = 30_000;
 
 export { AuthContext } from "./auth-context";
 
@@ -43,6 +47,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Al montar: si no hay sesión válida (access token vencido) pero aún queda un
+  // refresh token, renovamos en silencio en vez de exigir un nuevo login. Cubre
+  // recargar la página tras más de una hora inactivo.
+  useEffect(() => {
+    if (session || !localStorage.getItem("refresh_token")) {
+      return;
+    }
+    void refreshAccessToken().then((token) => {
+      if (token) {
+        setSession(readSession());
+      }
+    });
+    // Solo al montar: el resto del ciclo lo maneja el temporizador de renovación.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Renueva el access token de forma proactiva un poco antes de que expire, para
+  // mantener la sesión viva mientras el refresh token siga vigente (30 días). Si
+  // la renovación falla (refresh token vencido/revocado), recién ahí cerramos.
   useEffect(() => {
     if (!session) {
       return;
@@ -51,12 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!payload?.exp) {
       return;
     }
-    const msUntilExpiry = Math.max(0, payload.exp * 1000 - Date.now());
+    const msUntilRefresh = Math.max(0, payload.exp * 1000 - Date.now() - REFRESH_SKEW_MS);
     const timer = setTimeout(() => {
-      if (isTokenExpired(session.accessToken)) {
-        logout();
-      }
-    }, msUntilExpiry);
+      void refreshAccessToken().then((token) => {
+        if (!token) {
+          logout();
+        }
+        // En éxito, SESSION_REFRESHED_EVENT reajusta la sesión y reprograma el timer.
+      });
+    }, msUntilRefresh);
     return () => {
       clearTimeout(timer);
     };

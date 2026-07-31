@@ -61,6 +61,17 @@ class MyProjectProgressResponse(BaseModelConfig):
     my_tasks: list[TaskBoardItemResponse]
 
 
+class PublicProjectAccessRequest(BaseModelConfig):
+    """Credencial del portal del cliente: el token viaja en el cuerpo, no en la URL.
+
+    Enviarlo por POST evita que el token quede registrado en historiales del
+    navegador, logs de servidor o cabeceras `Referer`, y permite entregar enlace
+    y token por separado (el cliente introduce el token en la pantalla de acceso).
+    """
+
+    token: str
+
+
 class PublicProjectProgressResponse(BaseModelConfig):
     """Progreso del proyecto para el portal público del cliente (solo lectura).
 
@@ -78,3 +89,29 @@ class PublicProjectProgressResponse(BaseModelConfig):
     tasks_overdue: int
     tasks_pending: int
     progress_pct: int
+
+
+class PublicScheduleItemResponse(BaseModelConfig):
+    """Fila del cronograma público: un elemento de la estructura con su tiempo.
+
+    El cliente ve el flujo del proyecto por sus componentes/entregables, nunca
+    las tareas ni quién las ejecuta. `key`/`parent_key` son índices opacos (no
+    identificadores internos) que solo reconstruyen la jerarquía en la UI.
+    """
+
+    key: str
+    parent_key: str | None = None
+    name: str
+    depth: int
+    order: int
+    start_date: datetime.date
+    due_date: datetime.date
+    status: str  # value del enum de tareas (para el color de la barra)
+    progress_pct: int
+
+
+class PublicProjectScheduleResponse(BaseModelConfig):
+    """Cronograma del proyecto para el portal público del cliente (solo lectura)."""
+
+    project_name: str
+    items: list[PublicScheduleItemResponse]

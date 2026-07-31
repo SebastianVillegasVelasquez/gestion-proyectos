@@ -23,7 +23,6 @@ const ClientPortal = lazy(() => import("@/features/client/components/ClientPorta
 const ClientProjectPortal = lazy(
   () => import("@/features/client/components/ClientProjectPortal.tsx"),
 );
-const ClientPortalEntry = lazy(() => import("@/features/client/components/ClientPortalEntry.tsx"));
 const AdminUsersPage = lazy(() => import("@/features/admin/components/AdminUsersPage.tsx"));
 const ProjectProgressPage = lazy(() =>
   import("@/features/dashboard/components/ProjectProgressPage.tsx").then((m) => ({
@@ -87,12 +86,10 @@ export const AppRouter = () => (
   <Routes>
     {/* Rutas públicas */}
     <Route path="/login" element={<LoginPage />} />
-    {/* Portal del cliente: enlace público por token, sin sesión. La única
-        credencial es el token secreto de la URL (validado en el backend).
-        /portal/entrar (segmento estático → prioritario sobre :token) es la
-        entrada donde el cliente pega su token si no tiene el enlace completo. */}
-    <Route path="/portal/entrar" element={<ClientPortalEntry />} />
-    <Route path="/portal/:token" element={<ClientProjectPortal />} />
+    {/* Portal del cliente: pantalla pública única, sin sesión. El token NO viaja
+        en la URL: el cliente lo introduce en la pantalla y se envía por POST
+        (validado en el backend). Enlace y token se entregan por separado. */}
+    <Route path="/portal/entrar" element={<ClientProjectPortal />} />
 
     {/* Rutas protegidas — requieren sesión */}
     <Route element={<ProtectedRoute />}>

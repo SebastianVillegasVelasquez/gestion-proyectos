@@ -18,8 +18,10 @@ from app.modules.tasks.presentation.schemas import (
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import (
@@ -280,6 +282,7 @@ class ChangeTaskStatusUseCase:
         task_id: UUID,
         data: UpdateTaskStatusRequest,
         current_user_id: UUID | None = None,
+        current_user_role: str | None = None,
     ) -> TaskResponse:
         task = await self.task_repo.get_by_id(task_id)
         if task is None or task.is_deleted:
@@ -291,15 +294,18 @@ class ChangeTaskStatusUseCase:
         if current_user_id is not None:
             await self._authorize(
                 current_user_id=current_user_id,
+                current_user_role=current_user_role,
                 assignee_id=task.assignee_id,
                 project_id=project_id,
                 new_status=data.status,
             )
 
         new_status = await self.service.change_status(task_id, data)
-        assert new_status.assignee_id, "El usuario asignado debe de existir"
 
-        if self._bus:
+        # Los eventos de flujo asumen una tarea con responsable (entrega/aprobación).
+        # Con el override de gestión el estado puede cambiar en tareas sin asignar:
+        # en ese caso no hay a quién notificar, así que se omite el evento.
+        if self._bus and new_status.assignee_id:
             await self._emit_status_event(new_status, data.status, project_id)
         return new_status
 
@@ -309,7 +315,16 @@ class ChangeTaskStatusUseCase:
         assignee_id: UUID | None,
         project_id: UUID,
         new_status: TaskStatus,
+        current_user_role: str | None = None,
     ) -> None:
+        # Override de gestión: admin / super_admin / developer pueden fijar cualquier
+        # estado (corrección administrativa). role_satisfies ya trata a developer
+        # como tope de la jerarquía.
+        if current_user_role is not None and role_satisfies(
+            current_user_role, [SystemRole.ADMIN, SystemRole.SUPER_ADMIN]
+        ):
+            return
+
         # El responsable puede entregar o retomar; nunca autoaprobarse.
         is_assignee = assignee_id is not None and assignee_id == current_user_id
         if new_status not in _REVIEW_TARGET_STATUSES and is_assignee:

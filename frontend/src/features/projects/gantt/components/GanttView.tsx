@@ -178,9 +178,28 @@ export function GanttView({
   const [zoom, setZoom] = useState<Zoom>("semana");
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(() => new Set(LEGEND_STATUSES));
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
+  // si dejas todo colapsado, así lo encuentras la próxima vez.
+  const collapsedStorageKey = `gantt-collapsed:${project.id}`;
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(collapsedStorageKey);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(collapsedStorageKey, JSON.stringify([...collapsedGroups]));
+    } catch {
+      // Sin persistencia si el almacenamiento no está disponible; no es crítico.
+    }
+  }, [collapsedGroups, collapsedStorageKey]);
 
   const realTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 
@@ -217,8 +236,8 @@ export function GanttView({
   }, [membersQuery.data]);
 
   const filters: GanttFilters = useMemo(
-    () => ({ statuses, assigneeId, position, onlyAtRisk }),
-    [statuses, assigneeId, position, onlyAtRisk],
+    () => ({ statuses, assigneeId, teamId, position, onlyAtRisk }),
+    [statuses, assigneeId, teamId, position, onlyAtRisk],
   );
   const tasks = useMemo(
     () => filterGanttTasks(datedTasks, filters, TODAY, positionByUser),
@@ -486,6 +505,25 @@ export function GanttView({
               </option>
             ))}
           </select>
+
+          {/* Equipo delegado */}
+          {(teamsQuery.data?.items ?? []).length > 0 && (
+            <select
+              className={inputCls}
+              value={teamId ?? ""}
+              onChange={(e) => {
+                setTeamId(e.target.value || null);
+              }}
+              aria-label="Filtrar por equipo"
+            >
+              <option value="">Todos los equipos</option>
+              {(teamsQuery.data?.items ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Cargo / responsabilidad */}
           <select
@@ -770,9 +808,22 @@ export function GanttView({
                               className="group/row flex items-stretch border-b border-slate-50 last:border-b-0 dark:border-slate-900"
                               style={{ height: ROW_H }}
                             >
-                              <div
+                              <button
+                                type="button"
+                                disabled={task.id.startsWith("wi-")}
+                                onClick={() => {
+                                  // Las sintéticas (id `wi-…`) vienen de la estructura,
+                                  // no del listado real: no abren el panel de detalle.
+                                  if (task.id.startsWith("wi-")) {
+                                    return;
+                                  }
+                                  setSelectedId(task.id);
+                                }}
+                                title={
+                                  task.id.startsWith("wi-") ? undefined : "Ver y editar la tarea"
+                                }
                                 style={{ width: LABEL_W }}
-                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-slate-200 bg-white px-3 transition-colors group-hover/row:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900"
+                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-slate-200 bg-white px-3 text-left transition-colors group-hover/row:bg-slate-50 enabled:cursor-pointer enabled:hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900 dark:enabled:hover:bg-slate-900"
                               >
                                 <span
                                   className={cn(
@@ -801,7 +852,7 @@ export function GanttView({
                                 >
                                   {assignee?.initials ?? "—"}
                                 </span>
-                              </div>
+                              </button>
                               <div className="relative flex-1 transition-colors group-hover/row:bg-slate-50/60 dark:group-hover/row:bg-slate-900/40">
                                 <button
                                   type="button"
