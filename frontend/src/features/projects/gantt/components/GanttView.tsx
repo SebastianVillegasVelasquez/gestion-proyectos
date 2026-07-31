@@ -181,7 +181,25 @@ export function GanttView({
   const [teamId, setTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
+  // si dejas todo colapsado, así lo encuentras la próxima vez.
+  const collapsedStorageKey = `gantt-collapsed:${project.id}`;
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(collapsedStorageKey);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(collapsedStorageKey, JSON.stringify([...collapsedGroups]));
+    } catch {
+      // Sin persistencia si el almacenamiento no está disponible; no es crítico.
+    }
+  }, [collapsedGroups, collapsedStorageKey]);
 
   const realTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 
