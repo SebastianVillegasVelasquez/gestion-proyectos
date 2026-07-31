@@ -17,10 +17,11 @@ export interface PublicProjectProgress {
   progress_pct: number;
 }
 
-// Endpoint PÚBLICO: no requiere sesión. El token de la ruta es la credencial.
-// Reutiliza el cliente http compartido (si no hay token de sesión, no manda
-// Authorization; un 404 no dispara el flujo de refresh).
+// Endpoint PÚBLICO: no requiere sesión. El token viaja en el cuerpo (no en la
+// URL) para no filtrarlo en logs ni en el historial del navegador. Reutiliza el
+// cliente http compartido (si no hay token de sesión, no manda Authorization; un
+// 404 no dispara el flujo de refresh).
 export const portalApi = {
   getProgress: (token: string) =>
-    http.get<PublicProjectProgress>(`/public/projects/${token}`).then((r) => r.data),
+    http.post<PublicProjectProgress>("/public/projects/progress", { token }).then((r) => r.data),
 };

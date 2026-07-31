@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/features/projects/api/tasks.api";
 import { taskKeys } from "./query-keys";
-import type { CreateTaskPayload, TaskStatus } from "@/features/projects/types/api.types";
+import type {
+  CreateTaskPayload,
+  TaskStatus,
+  UpdateTaskPayload,
+} from "@/features/projects/types/api.types";
 
 /** Todas las tareas del proyecto (resueltas vía su WorkItem). */
 export function useProjectTasks(projectId: string | undefined) {
@@ -56,6 +60,26 @@ export function useDetachTask(projectId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
       void qc.invalidateQueries({ queryKey: [...taskKeys.all, "work-item"] });
+    },
+  });
+}
+
+/**
+ * Edita los datos de una tarea (título, prioridad, fechas, responsable/equipo).
+ * Es una acción de administración: PATCH /tasks/{id}. Para reasignar de persona a
+ * equipo (o viceversa) el llamador envía el otro campo en null, ya que el backend
+ * exige responsable XOR equipo.
+ */
+export function useUpdateTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateTaskPayload }) =>
+      tasksApi.update(taskId, payload),
+    onSuccess: (task) => {
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      if (task.work_item_id) {
+        void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+      }
     },
   });
 }

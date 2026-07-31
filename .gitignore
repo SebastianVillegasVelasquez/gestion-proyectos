@@ -60,4 +60,9 @@ htmlcov/
 
 postgres_data/
 /.todo/tasks.json
-./fix
+
+# =========================
+# Carpeta local de notas/fixes (no versionar)
+# =========================
+
+/fix/

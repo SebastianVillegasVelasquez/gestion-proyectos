@@ -6,6 +6,8 @@ export interface GanttFilters {
   statuses: Set<TaskStatus>;
   /** Responsable a filtrar (null = todos). */
   assigneeId: string | null;
+  /** Equipo delegado a filtrar (null = todos). */
+  teamId: string | null;
   /** Cargo/responsabilidad a filtrar (null = todos). Requiere `positionByUser`. */
   position: UserPosition | null;
   /** Mostrar solo tareas en riesgo (vencidas y abiertas). */
@@ -13,10 +15,12 @@ export interface GanttFilters {
 }
 
 /**
- * Filtra las tareas del cronograma por estado, responsable, cargo y riesgo.
- * Pura: sin React ni red, fácil de testear y de razonar.
+ * Filtra las tareas del cronograma por estado, responsable, equipo, cargo y
+ * riesgo. Pura: sin React ni red, fácil de testear y de razonar.
  */
-export function filterGanttTasks<T extends Pick<Task, "status" | "assignee_id" | "due_date">>(
+export function filterGanttTasks<
+  T extends Pick<Task, "status" | "assignee_id" | "team_id" | "due_date">,
+>(
   tasks: T[],
   filters: GanttFilters,
   today: string,
@@ -27,6 +31,9 @@ export function filterGanttTasks<T extends Pick<Task, "status" | "assignee_id" |
       return false;
     }
     if (filters.assigneeId && task.assignee_id !== filters.assigneeId) {
+      return false;
+    }
+    if (filters.teamId && task.team_id !== filters.teamId) {
       return false;
     }
     if (filters.position) {

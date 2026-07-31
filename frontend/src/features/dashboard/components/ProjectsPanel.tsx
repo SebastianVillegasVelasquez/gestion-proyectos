@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -96,7 +97,8 @@ interface ProjectsPanelProps {
 }
 
 export function ProjectsPanel({ projects, getProjectHref }: ProjectsPanelProps) {
-  const visible = projects.slice(0, MAX_VISIBLE);
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? projects : projects.slice(0, MAX_VISIBLE);
   const hasMore = projects.length > MAX_VISIBLE;
 
   return (
@@ -112,10 +114,13 @@ export function ProjectsPanel({ projects, getProjectHref }: ProjectsPanelProps) 
         {hasMore && (
           <button
             type="button"
+            onClick={() => {
+              setExpanded((v) => !v);
+            }}
             className="mt-1 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
           >
-            Ver más
-            <ChevronDown className="size-3" />
+            {expanded ? "Ver menos" : "Ver más"}
+            {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
           </button>
         )}
       </CardContent>

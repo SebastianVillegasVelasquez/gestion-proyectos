@@ -61,6 +61,17 @@ class MyProjectProgressResponse(BaseModelConfig):
     my_tasks: list[TaskBoardItemResponse]
 
 
+class PublicProjectAccessRequest(BaseModelConfig):
+    """Credencial del portal del cliente: el token viaja en el cuerpo, no en la URL.
+
+    Enviarlo por POST evita que el token quede registrado en historiales del
+    navegador, logs de servidor o cabeceras `Referer`, y permite entregar enlace
+    y token por separado (el cliente introduce el token en la pantalla de acceso).
+    """
+
+    token: str
+
+
 class PublicProjectProgressResponse(BaseModelConfig):
     """Progreso del proyecto para el portal público del cliente (solo lectura).
 
