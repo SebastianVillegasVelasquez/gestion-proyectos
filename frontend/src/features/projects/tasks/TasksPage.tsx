@@ -17,14 +17,15 @@ import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useProject } from "../hooks/use-projects";
 import { useProjectTasks, useChangeTaskStatus } from "../hooks/use-tasks";
-import { useDirectory } from "../hooks/use-members";
+import { useDirectory, useProjectMembers } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { useWorkTree } from "../hooks/use-structure";
 import { tipoStyle } from "../utils/tipo-style";
 import { colorForName } from "../utils/entity-color";
-import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "../types/labels";
+import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS } from "../types/labels";
 import type { Task, TaskStatus, WorkItemTree } from "../types/api.types";
 import { CreateTaskModal } from "./CreateTaskModal";
+import { TasksTable } from "./TasksTable";
 import { TaskDetailPanel } from "../gantt/components/TaskDetailPanel";
 
 const COLUMNS: { id: TaskStatus; label: string; dot: string; badge: string }[] = [
@@ -240,6 +241,7 @@ export function TasksPage() {
   const projectQuery = useProject(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const directoryQuery = useDirectory();
+  const membersQuery = useProjectMembers(projectId);
   const teamsQuery = useTeams(projectId);
   const treeQuery = useWorkTree(projectId);
   const changeStatus = useChangeTaskStatus(projectId);
@@ -247,7 +249,8 @@ export function TasksPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"kanban" | "lista">("kanban");
+  // La tabla editable es la vista principal de tareas (más flexible que el kanban).
+  const [view, setView] = useState<"kanban" | "lista">("lista");
   const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
@@ -412,75 +415,16 @@ export function TasksPage() {
           ))}
         </div>
       ) : view === "lista" ? (
-        <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Tarea</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Prioridad</th>
-                <th className="px-4 py-3">Ubicación</th>
-                <th className="px-4 py-3">Vence</th>
-                <th className="px-4 py-3">Responsable</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((task) => {
-                const location = task.work_item_id
-                  ? locationById.get(task.work_item_id)
-                  : undefined;
-                const overdue = isOverdue(task);
-                return (
-                  <tr
-                    key={task.id}
-                    onClick={() => {
-                      setSelectedId(task.id);
-                    }}
-                    className="cursor-pointer border-b border-accent/60 transition-colors last:border-0 hover:bg-accent/40"
-                  >
-                    <td className="max-w-xs truncate px-4 py-2.5 font-semibold text-foreground">
-                      {task.title}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        {TASK_STATUS_LABELS[task.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={cn(
-                          "rounded-md px-2 py-0.5 text-[10.5px] font-extrabold uppercase",
-                          TASK_PRIORITY_COLORS[task.priority],
-                        )}
-                      >
-                        {TASK_PRIORITY_LABELS[task.priority]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {location?.name ?? "—"}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-4 py-2.5 text-xs font-semibold",
-                        overdue ? "text-rose-500" : "text-muted-foreground",
-                      )}
-                    >
-                      {formatDate(task.due_date)}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {task.assignee_id ? (assigneeName.get(task.assignee_id) ?? "—") : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm italic text-muted-foreground">
-              Sin tareas que coincidan.
-            </p>
-          )}
-        </div>
+        <TasksTable
+          projectId={projectId}
+          tasks={filtered}
+          members={membersQuery.data ?? []}
+          teams={teamsQuery.data?.items ?? []}
+          locationById={locationById}
+          onOpenDetail={(id) => {
+            setSelectedId(id);
+          }}
+        />
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-4">
           {COLUMNS.map((col) => {
