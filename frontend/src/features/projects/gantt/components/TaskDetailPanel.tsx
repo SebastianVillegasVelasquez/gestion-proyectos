@@ -40,6 +40,9 @@ const LEADER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   cancelada: [],
 };
 
+// Todos los estados, para el override de gestión (admin/super_admin/developer).
+const ALL_STATUSES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
+
 // Textos "acción" para los botones (más claros que el nombre plano del estado).
 const ACTION_LABEL: Partial<Record<TaskStatus, string>> = {
   en_progreso: "Iniciar / retomar",
@@ -118,6 +121,11 @@ export function TaskDetailPanel({
       : actorRole === "leader"
         ? LEADER_TRANSITIONS[task.status]
         : [];
+
+  // Roles de gestión pueden fijar cualquier estado (corrección administrativa),
+  // en paralelo al flujo normal de responsable/líder. El backend lo autoriza.
+  const isManagement =
+    user?.role === "developer" || user?.role === "super_admin" || user?.role === "admin";
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -320,6 +328,39 @@ export function TaskDetailPanel({
                         : task.status === "completada"
                           ? "Esta tarea ya fue aprobada. No hay más acciones sobre ella."
                           : "Sin acciones disponibles en este estado."}
+                  </p>
+                </div>
+              )}
+
+              {isManagement && (
+                <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-2.5 dark:border-slate-700">
+                  <label
+                    htmlFor="mgmt-status"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400"
+                  >
+                    Cambiar estado (gestión)
+                  </label>
+                  <select
+                    id="mgmt-status"
+                    value={task.status}
+                    disabled={changeStatus.isPending}
+                    onChange={(e) => {
+                      changeStatus.mutate({
+                        taskId: task.id,
+                        status: e.target.value as TaskStatus,
+                      });
+                    }}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {TASK_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Como administrador puedes corregir el estado directamente, sin pasar por el
+                    flujo.
                   </p>
                 </div>
               )}

@@ -163,7 +163,10 @@ async def change_task_status(
     """El responsable entrega y el líder aprueba o devuelve. Ver
     `ChangeTaskStatusUseCase` para el detalle del flujo."""
     return await ChangeTaskStatusUseCase(task_repo, member_repo, bus).execute(
-        task_id, payload, current_user_id=current_user.id
+        task_id,
+        payload,
+        current_user_id=current_user.id,
+        current_user_role=current_user.role,
     )
 
 
