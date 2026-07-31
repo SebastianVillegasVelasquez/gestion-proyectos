@@ -12,11 +12,12 @@ const ALL: TaskStatus[] = [
 ];
 
 function task(
-  over: Partial<Pick<Task, "status" | "assignee_id" | "due_date">> = {},
-): Pick<Task, "status" | "assignee_id" | "due_date"> {
+  over: Partial<Pick<Task, "status" | "assignee_id" | "team_id" | "due_date">> = {},
+): Pick<Task, "status" | "assignee_id" | "team_id" | "due_date"> {
   return {
     status: "en_progreso",
     assignee_id: "u1",
+    team_id: null,
     due_date: "2026-06-30",
     ...over,
   };
@@ -26,6 +27,7 @@ function filters(over: Partial<GanttFilters> = {}): GanttFilters {
   return {
     statuses: new Set(ALL),
     assigneeId: null,
+    teamId: null,
     position: null,
     onlyAtRisk: false,
     ...over,
@@ -50,6 +52,12 @@ describe("filterGanttTasks", () => {
     const tasks = [task({ assignee_id: "u1" }), task({ assignee_id: "u2" })];
     const result = filterGanttTasks(tasks, filters({ assigneeId: "u2" }), today);
     expect(result.map((t) => t.assignee_id)).toEqual(["u2"]);
+  });
+
+  it("filters by delegated team", () => {
+    const tasks = [task({ team_id: "t1" }), task({ team_id: "t2" }), task({ team_id: null })];
+    const result = filterGanttTasks(tasks, filters({ teamId: "t2" }), today);
+    expect(result.map((t) => t.team_id)).toEqual(["t2"]);
   });
 
   it("keeps only at-risk tasks when requested", () => {
