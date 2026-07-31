@@ -48,7 +48,5 @@ export const portalApi = {
   getProgress: (token: string) =>
     http.post<PublicProjectProgress>("/public/projects/progress", { token }).then((r) => r.data),
   getSchedule: (token: string) =>
-    http
-      .post<PublicProjectSchedule>("/public/projects/schedule", { token })
-      .then((r) => r.data),
+    http.post<PublicProjectSchedule>("/public/projects/schedule", { token }).then((r) => r.data),
 };

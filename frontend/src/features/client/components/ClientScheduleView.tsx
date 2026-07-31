@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  ChevronDown,
-  Crosshair,
-  GanttChartSquare,
-  Search,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, Crosshair, GanttChartSquare, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   computeRange,
@@ -228,7 +222,9 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                       : "border-transparent text-slate-300 line-through dark:text-slate-600",
                   )}
                 >
-                  <span className={cn("size-2 rounded-full", STATUS_DOT[s], !active && "opacity-40")} />
+                  <span
+                    className={cn("size-2 rounded-full", STATUS_DOT[s], !active && "opacity-40")}
+                  />
                   {TASK_STATUS_LABELS[s]}
                 </button>
               );
@@ -468,7 +464,9 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                           ) : (
                             <span className="w-3.5 shrink-0" aria-hidden />
                           )}
-                          <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[item.status])} />
+                          <span
+                            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[item.status])}
+                          />
                           <p
                             className={cn(
                               "min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300",
