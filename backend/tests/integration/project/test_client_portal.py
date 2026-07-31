@@ -93,3 +93,34 @@ class TestClientPortal:
             f"/api/v1/projects/{project_id}/client-access", headers=member_headers
         )
         assert resp.status_code == 403
+
+    async def test_public_schedule_needs_no_auth(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        token = (
+            await client.get(
+                f"/api/v1/projects/{project_id}/client-access", headers=admin_headers
+            )
+        ).json()["token"]
+
+        # Sin cabeceras de autenticación: el token en el cuerpo es la única credencial.
+        resp = await client.post(
+            "/api/v1/public/projects/schedule", json={"token": token}
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["project_name"] == valid_project_payload["name"]
+        # Proyecto recién creado: sin estructura fechada todavía.
+        assert body["items"] == []
+        # El cronograma es la estructura, no las tareas ni quién las ejecuta.
+        assert "tasks" not in body
+        assert "assignee" not in body
+        assert "team" not in body
+
+    async def test_public_schedule_invalid_token_returns_404(self, client):
+        resp = await client.post(
+            "/api/v1/public/projects/schedule",
+            json={"token": "token-que-no-existe"},
+        )
+        assert resp.status_code == 404

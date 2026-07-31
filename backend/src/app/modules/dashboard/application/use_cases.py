@@ -8,6 +8,8 @@ from app.modules.dashboard.presentation.schemas import (
     MyProjectProgressResponse,
     ProjectOverviewItemResponse,
     PublicProjectProgressResponse,
+    PublicProjectScheduleResponse,
+    PublicScheduleItemResponse,
     TaskBoardItemResponse,
 )
 from app.shared.exceptions import NotFoundError
@@ -189,4 +191,34 @@ class GetPublicProjectProgressUseCase:
             tasks_overdue=detail.tasks_overdue,
             tasks_pending=detail.tasks_pending,
             progress_pct=detail.progress_pct,
+        )
+
+
+class GetPublicProjectScheduleUseCase:
+    """Cronograma público de un proyecto por token de cliente (sin autenticación)."""
+
+    def __init__(self, repo: DashboardRepository) -> None:
+        self._repo = repo
+
+    async def execute(self, token: str) -> PublicProjectScheduleResponse:
+        schedule = await self._repo.get_project_schedule_by_token(token)
+        if schedule is None:
+            # 404 indistinto: no revela si el token existió alguna vez.
+            raise NotFoundError("Proyecto no encontrado")
+        return PublicProjectScheduleResponse(
+            project_name=schedule.project_name,
+            items=[
+                PublicScheduleItemResponse(
+                    key=item.key,
+                    parent_key=item.parent_key,
+                    name=item.name,
+                    depth=item.depth,
+                    order=item.order,
+                    start_date=item.start_date,
+                    due_date=item.due_date,
+                    status=item.status,
+                    progress_pct=item.progress_pct,
+                )
+                for item in schedule.items
+            ],
         )

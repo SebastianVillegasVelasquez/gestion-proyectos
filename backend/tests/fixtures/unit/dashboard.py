@@ -7,6 +7,7 @@ from app.modules.dashboard.infrastructure.repository import (
     DashboardRepository,
     DashboardSummary,
     ProjectProgressDetail,
+    ProjectSchedule,
 )
 
 
@@ -16,10 +17,12 @@ class FakeDashboardRepository(DashboardRepository):
         summary: DashboardSummary,
         panels: DashboardPanels | None = None,
         project_progress: ProjectProgressDetail | None = None,
+        project_schedule: ProjectSchedule | None = None,
     ) -> None:
         self._summary = summary
         self._panels = panels or DashboardPanels()
         self._project_progress = project_progress
+        self._project_schedule = project_schedule
 
     async def get_summary(self) -> DashboardSummary:
         return self._summary
@@ -51,6 +54,9 @@ class FakeDashboardRepository(DashboardRepository):
         self, token: str
     ) -> ProjectProgressDetail | None:
         return self._project_progress
+
+    async def get_project_schedule_by_token(self, token: str) -> ProjectSchedule | None:
+        return self._project_schedule
 
 
 @pytest.fixture

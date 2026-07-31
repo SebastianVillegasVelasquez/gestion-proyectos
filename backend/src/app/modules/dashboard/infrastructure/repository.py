@@ -60,6 +60,36 @@ class DashboardPanels:
 
 
 @dataclass
+class ScheduleItem:
+    """Fila del cronograma público: un ELEMENTO de la estructura con su tiempo.
+
+    El portal del cliente muestra el flujo del proyecto por sus componentes o
+    entregables, nunca las tareas individuales ni quién las ejecuta. Cada ítem
+    lleva su rango agregado (de sus propias fechas plan, sus tareas y las de sus
+    descendientes) y un avance derivado. `key`/`parent_key` son índices opacos
+    (no UUIDs internos) que solo sirven para reconstruir la jerarquía en la UI.
+    """
+
+    key: str
+    parent_key: str | None
+    name: str
+    depth: int
+    order: int
+    start_date: datetime.date
+    due_date: datetime.date
+    status: str  # value del enum de tareas (para el color de la barra)
+    progress_pct: int
+
+
+@dataclass
+class ProjectSchedule:
+    """Cronograma público de un proyecto: nombre + estructura fechada (sin tareas)."""
+
+    project_name: str
+    items: list[ScheduleItem] = field(default_factory=list)
+
+
+@dataclass
 class ProjectProgressDetail:
     """Progreso general de un proyecto + las tareas propias del usuario en él.
 
@@ -141,6 +171,11 @@ class DashboardRepository(ABC):
     async def get_project_progress_by_token(
         self, token: str
     ) -> ProjectProgressDetail | None: ...
+
+    @abstractmethod
+    async def get_project_schedule_by_token(
+        self, token: str
+    ) -> ProjectSchedule | None: ...
 
 
 class SqlAlchemyDashboardRepository(DashboardRepository):
@@ -598,6 +633,21 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
 
         return self._build_progress(project, counts, coordinator, my_tasks)
 
+    async def _project_by_token(self, token: str) -> Project | None:
+        """Proyecto activo cuyo token de cliente coincide, o None.
+
+        Fuente única de la traducción token → proyecto para todo el portal
+        público (progreso y cronograma comparten esta puerta de entrada).
+        """
+        return (
+            await self._session.execute(
+                select(Project).where(
+                    Project.client_access_token == token,
+                    Project.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+
     async def get_project_progress_by_token(
         self, token: str
     ) -> ProjectProgressDetail | None:
@@ -607,17 +657,150 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         agregado. Devuelve None si el token no corresponde a ningún proyecto
         activo (el endpoint lo traduce a 404, sin revelar si el token existió).
         """
-        project = (
-            await self._session.execute(
-                select(Project).where(
-                    Project.client_access_token == token,
-                    Project.deleted_at.is_(None),
-                )
-            )
-        ).scalar_one_or_none()
+        project = await self._project_by_token(token)
         if project is None:
             return None
 
         counts = await self._project_counts(project.id)
         coordinator = await self._project_coordinator(project.id)
         return self._build_progress(project, counts, coordinator, my_tasks=[])
+
+    async def get_project_schedule_by_token(self, token: str) -> ProjectSchedule | None:
+        """Cronograma público de un proyecto por su token de cliente (sin login).
+
+        Muestra la ESTRUCTURA del proyecto (sus componentes/entregables) con su
+        tiempo, no las tareas: cada fila es un elemento del árbol y su barra abarca
+        el rango agregado de sus propias fechas plan, sus tareas y las de sus
+        descendientes. Así el cliente ve el flujo del proyecto por sus componentes,
+        con su avance derivado, sin exponer tareas individuales ni quién las ejecuta.
+        Devuelve None si el token no corresponde a ningún proyecto activo.
+        """
+        project = await self._project_by_token(token)
+        if project is None:
+            return None
+
+        # Elementos de la estructura del proyecto: jerarquía + fechas plan.
+        work_items = (
+            (
+                await self._session.execute(
+                    select(WorkItem).where(
+                        WorkItem.proyecto_id == project.id,
+                        WorkItem.deleted_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        # Hijos por padre, ordenados por `orden` (igual que el árbol del frontend).
+        children: dict[uuid.UUID | None, list[WorkItem]] = {}
+        for wi in work_items:
+            children.setdefault(wi.parent_id, []).append(wi)
+        for siblings in children.values():
+            siblings.sort(key=lambda w: (w.orden, str(w.id)))
+
+        # Tareas del proyecto agrupadas por elemento. Las fechadas aportan al rango;
+        # todas (fechadas o no) cuentan para el avance completadas/total.
+        task_rows = (
+            (
+                await self._session.execute(
+                    select(Task)
+                    .join(WorkItem, Task.work_item_id == WorkItem.id)
+                    .where(
+                        WorkItem.proyecto_id == project.id,
+                        Task.deleted_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        tasks_by_item: dict[uuid.UUID, list[Task]] = {}
+        for task in task_rows:
+            if task.work_item_id is not None:
+                tasks_by_item.setdefault(task.work_item_id, []).append(task)
+
+        # Agregado de subárbol (memoizado): fechas para el rango + conteos de avance.
+        subtree_cache: dict[
+            uuid.UUID, tuple[list[datetime.date], list[datetime.date], int, int]
+        ] = {}
+
+        def subtree(node: WorkItem):
+            cached = subtree_cache.get(node.id)
+            if cached is not None:
+                return cached
+            starts: list[datetime.date] = []
+            ends: list[datetime.date] = []
+            total = 0
+            completed = 0
+            if node.fecha_inicio_plan is not None:
+                starts.append(node.fecha_inicio_plan)
+            if node.fecha_fin_plan is not None:
+                ends.append(node.fecha_fin_plan)
+            for task in tasks_by_item.get(node.id, []):
+                total += 1
+                if task.status == _COMPLETED:
+                    completed += 1
+                if task.start_date is not None and task.due_date is not None:
+                    starts.append(task.start_date)
+                    ends.append(task.due_date)
+            for child in children.get(node.id, []):
+                c_starts, c_ends, c_total, c_completed = subtree(child)
+                starts += c_starts
+                ends += c_ends
+                total += c_total
+                completed += c_completed
+            result = (starts, ends, total, completed)
+            subtree_cache[node.id] = result
+            return result
+
+        def derive_status(progress: int) -> str:
+            if progress >= 100:
+                return TaskStatus.COMPLETADA.value
+            if progress > 0:
+                return TaskStatus.EN_PROGRESO.value
+            return TaskStatus.PENDIENTE_POR_INICIAR.value
+
+        items: list[ScheduleItem] = []
+        counter = 0
+
+        # DFS: un elemento sin rango resoluble no dibuja barra, pero sus hijos sí
+        # pueden tenerlo; en ese caso se reasignan al ancestro incluido más cercano
+        # para que la jerarquía quede consistente.
+        def walk(node: WorkItem, parent_key: str | None, depth: int) -> None:
+            nonlocal counter
+            starts, ends, total, completed = subtree(node)
+            child_parent = parent_key
+            child_depth = depth
+            if starts and ends:
+                if total > 0:
+                    progress = round(completed / total * 100)
+                elif node.porcentaje_completado is not None:
+                    progress = round(float(node.porcentaje_completado) * 100)
+                else:
+                    progress = 0
+                key = f"n{counter}"
+                counter += 1
+                items.append(
+                    ScheduleItem(
+                        key=key,
+                        parent_key=parent_key,
+                        name=node.nombre,
+                        depth=depth,
+                        order=len(items),
+                        start_date=min(starts),
+                        due_date=max(ends),
+                        status=derive_status(progress),
+                        progress_pct=progress,
+                    )
+                )
+                child_parent = key
+                child_depth = depth + 1
+            for child in children.get(node.id, []):
+                walk(child, child_parent, child_depth)
+
+        for root in children.get(None, []):
+            walk(root, None, 0)
+
+        return ProjectSchedule(project_name=project.name, items=items)
