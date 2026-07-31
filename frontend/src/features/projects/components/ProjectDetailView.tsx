@@ -1,19 +1,24 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
   FolderTree,
   History,
   Layers,
   Moon,
+  Pencil,
   Sun,
   Users,
   UsersRound,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Project } from "../types/api.types";
+import { useUpdateProject } from "../hooks/use-projects";
 import { ProjectActions } from "./detail/ProjectActions";
 import { ClientAccessCard } from "./detail/ClientAccessCard";
 
@@ -83,6 +88,33 @@ export function ProjectDetailView({
   const navigate = useNavigate();
   const progress = Math.round(project.progress_pct ?? 0);
 
+  // Edición inline del nombre: el CRUD ya existe en el backend (PATCH /projects/{id}),
+  // aquí solo se expone. Mientras no se edita, se muestra el título normal.
+  const updateProject = useUpdateProject(project.id);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(project.name);
+
+  const startEditName = () => {
+    setNameDraft(project.name);
+    setEditingName(true);
+  };
+
+  const saveName = () => {
+    const clean = nameDraft.trim();
+    if (!clean || clean === project.name) {
+      setEditingName(false);
+      return;
+    }
+    updateProject.mutate(
+      { name: clean },
+      {
+        onSuccess: () => {
+          setEditingName(false);
+        },
+      },
+    );
+  };
+
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-y-auto p-4 sm:p-6 lg:px-12">
       {/* Encabezado */}
@@ -96,9 +128,66 @@ export function ProjectDetailView({
             <ChevronLeft className="size-3.5" />
             Proyectos
           </button>
-          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">
-            {project.name}
-          </h1>
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                value={nameDraft}
+                autoFocus
+                disabled={updateProject.isPending}
+                onChange={(e) => {
+                  setNameDraft(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    saveName();
+                  } else if (e.key === "Escape") {
+                    setEditingName(false);
+                  }
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-2xl font-semibold tracking-tight text-foreground outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 disabled:opacity-60 sm:text-[28px]"
+              />
+              <button
+                type="button"
+                onClick={saveName}
+                disabled={updateProject.isPending}
+                aria-label="Guardar nombre"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue text-white transition-colors hover:bg-brand-blue-dark disabled:opacity-50"
+              >
+                <Check className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingName(false);
+                }}
+                disabled={updateProject.isPending}
+                aria-label="Cancelar"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="group flex items-center gap-2">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">
+                {project.name}
+              </h1>
+              <button
+                type="button"
+                onClick={startEditName}
+                aria-label="Editar nombre del proyecto"
+                title="Editar nombre"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+              >
+                <Pencil className="size-4" />
+              </button>
+            </div>
+          )}
+          {updateProject.isError && editingName && (
+            <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">
+              No se pudo guardar el nombre. Inténtalo de nuevo.
+            </p>
+          )}
           <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[15px] text-muted-foreground">
             <Calendar className="size-4" />
             <span>
