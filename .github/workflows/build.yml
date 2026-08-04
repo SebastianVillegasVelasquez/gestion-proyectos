@@ -1,155 +1,171 @@
-name: build
+  name: build
 
-# Flujo: en PR a main se corren tests y se VALIDA que las imágenes construyen
-# (sin publicar). Al hacer push a main (merge del PR), además se publican al
-# registry. Así nunca se publica una imagen cuyo código no pasó los tests.
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  # Flujo: en PR a main se corren tests y se VALIDA que las imágenes construyen
+  # (sin publicar). Al hacer push a main (merge del PR), además se publican al
+  # registry. Así nunca se publica una imagen cuyo código no pasó los tests.
+  on:
+    push:
+      branches:
+        - main
+    pull_request:
+      branches:
+        - main
 
-permissions:
-  contents: read
-  packages: write
+  permissions:
+    contents: read
+    packages: write
 
-jobs:
-  # ── Tests del backend (con Postgres real para los E2E de integración) ────────
-  backend-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: db_test
-        # El conftest de integración espera la BD de test en localhost:5433.
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      # Necesaria para firmar/verificar tokens en los tests (no es secreto de prod).
-      SECRET_KEY: ci-test-secret-key-not-for-production-0123456789
-    steps:
-      - uses: actions/checkout@v5
+  jobs:
+    # ── Tests del backend (con Postgres real para los E2E de integración) ────────
+    backend-tests:
+      runs-on: ubuntu-latest
+      defaults:
+        run:
+          working-directory: ./backend
+      services:
+        postgres:
+          image: postgres:17-alpine
+          env:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: db_test
+          # El conftest de integración espera la BD de test en localhost:5433.
+          ports:
+            - 5433:5432
+          options: >-
+            --health-cmd "pg_isready -U postgres"
+            --health-interval 5s
+            --health-timeout 5s
+            --health-retries 10
+      env:
+        # Necesaria para firmar/verificar tokens en los tests (no es secreto de prod).
+        SECRET_KEY: ci-test-secret-key-not-for-production-0123456789
+      steps:
+        - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
+        - uses: actions/setup-python@v5
+          with:
+            python-version: "3.13"
 
-      - name: Instalar Poetry
-        run: pipx install poetry
+        - name: Instalar Poetry
+          run: pipx install poetry
 
-      - name: Instalar dependencias
-        run: poetry install --no-interaction --no-ansi
+        - name: Instalar dependencias
+          run: poetry install --no-interaction --no-ansi
 
-      - name: Ruff (lint)
-        run: poetry run ruff check src tests
+        - name: Ruff (lint)
+          run: poetry run ruff check src tests
 
-      - name: Mypy (tipos)
-        run: poetry run mypy src
+        - name: Mypy (tipos)
+          run: poetry run mypy src
 
-      # Rutas separadas: pytest 9 no permite un pytest_plugins compartido entre
-      # árboles, y así los unitarios no levantan la BD de integración.
-      - name: Pytest unit
-        run: poetry run pytest tests/unit
+        # Rutas separadas: pytest 9 no permite un pytest_plugins compartido entre
+        # árboles, y así los unitarios no levantan la BD de integración.
+        - name: Pytest unit
+          run: poetry run pytest tests/unit
 
-      - name: Pytest integración (E2E)
-        run: poetry run pytest tests/integration
+        - name: Pytest integración (E2E)
+          run: poetry run pytest tests/integration
 
-  # ── Tests del frontend ───────────────────────────────────────────────────────
-  frontend-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-    steps:
-      - uses: actions/checkout@v5
+    # ── Tests del frontend ───────────────────────────────────────────────────────
+    frontend-tests:
+      runs-on: ubuntu-latest
+      defaults:
+        run:
+          working-directory: ./frontend
+      steps:
+        - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        - uses: pnpm/action-setup@v4
+          with:
+            version: 10
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+        - uses: actions/setup-node@v4
+          with:
+            node-version: 22
+            cache: pnpm
+            cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Instalar dependencias
-        run: pnpm install --frozen-lockfile
+        - name: Instalar dependencias
+          run: pnpm install --frozen-lockfile
 
-      - name: Typecheck + build (tsc -b && vite build)
-        run: pnpm run build
+        - name: Typecheck + build (tsc -b && vite build)
+          run: pnpm run build
 
-      - name: Tests (vitest)
-        run: pnpm test
+        - name: Tests (vitest)
+          run: pnpm test
 
-  # ── Imagen del backend (solo si pasaron sus tests) ───────────────────────────
-  backend:
-    name: backend build image
-    needs: backend-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+    # ── Imagen del backend (solo si pasaron sus tests) ───────────────────────────
+    backend:
+      name: backend build image
+      needs: backend-tests
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v5
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        - name: Login to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
 
-      - name: Build backend image and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          # Publica solo en push a main; en PR construye para validar, sin publicar.
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ghcr.io/sebastianvillegasvelasquez/bitacora-backend:latest
-            ghcr.io/sebastianvillegasvelasquez/bitacora-backend:${{ github.sha }}
+        - name: Build backend image and push
+          uses: docker/build-push-action@v6
+          with:
+            context: ./backend
+            # Publica solo en push a main; en PR construye para validar, sin publicar.
+            push: ${{ github.event_name == 'push' }}
+            tags: |
+              ghcr.io/sebastianvillegasvelasquez/bitacora-backend:latest
+              ghcr.io/sebastianvillegasvelasquez/bitacora-backend:${{ github.sha }}
 
-  # ── Imagen del frontend (solo si pasaron sus tests) ──────────────────────────
-  frontend:
-    name: frontend build image
-    needs: frontend-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+    # ── Imagen del frontend (solo si pasaron sus tests) ──────────────────────────
+    frontend:
+      name: frontend build image
+      needs: frontend-tests
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v5
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        - name: Login to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
 
-      - name: Build frontend image and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: ${{ github.event_name == 'push' }}
-          build-args: |
-            VITE_API_URL=/api/v1
-          tags: |
-            ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
-            ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:${{ github.sha }}
+        - name: Build frontend image and push
+          uses: docker/build-push-action@v6
+          with:
+            context: ./frontend
+            push: ${{ github.event_name == 'push' }}
+            build-args: |
+              VITE_API_URL=/api/v1
+            tags: |
+              ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
+              ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:${{ github.sha }}
+    deploy:
+      name: deploy to production
+      needs: [ backend, frontend ]
+      runs-on: ubuntu-latest
+      if: github.event_name == 'push'
+      steps:
+        - name: Deploy via SSH
+          uses: appleboy/ssh-action@v1
+          with:
+            host: ${{ secrets.SERVER_HOST }}
+            username: ${{ secrets.SERVER_USER }}
+            key: ${{ secrets.SSH_PRIVATE_KEY }}
+            script: |
+              cd /opt/bitacora
+              docker compose pull
+              docker compose up -d
