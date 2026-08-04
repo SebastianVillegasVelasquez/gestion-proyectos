@@ -16,10 +16,10 @@ from app.modules.areas.presentation.routes import router as areas_router
 from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )
-from app.modules.dashboard.presentation.routes import router as dashboard_router
 from app.modules.dashboard.presentation.public_routes import (
     router as public_router,
 )
+from app.modules.dashboard.presentation.routes import router as dashboard_router
 from app.modules.feedback.presentation.routes import router as feedback_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.notifications.presentation.routes import (
@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
 
     logger.info("Iniciando OBJ Digital PM", env=settings.APP_ENV, debug=settings.DEBUG)
+    logger.info(f"Connecting to REDIS: {settings.REDIS_URL}")
 
     if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
         logger.warning("SECRET_KEY débil o ausente en un entorno no-dev: ...")
