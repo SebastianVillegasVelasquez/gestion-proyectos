@@ -10,6 +10,7 @@ function member(
   role: ProjectRole = "integrante",
 ): ProjectMember {
   return {
+    id: `id-${name}-${email}`,
     user_id: `${name}-${email}`,
     name,
     last_name: last,

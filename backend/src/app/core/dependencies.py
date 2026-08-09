@@ -8,10 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_token
-from app.modules.areas.infrastructure.repository import (
-    AreaRepository,
-    SqlAlchemyAreaRepository,
-)
 from app.modules.collaborators.domain.repository import CollaboratorRepository
 from app.modules.collaborators.infrastructure.repository import (
     SqlAlchemyCollaboratorRepository,
@@ -123,10 +119,6 @@ def traceability_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> TraceabilityRepository:
     return SqlAlchemyTraceabilityRepository(db)
-
-
-def area_repo_dependency(db: AsyncSession = Depends(get_db)) -> AreaRepository:
-    return SqlAlchemyAreaRepository(db)
 
 
 def notification_repo_dependency(

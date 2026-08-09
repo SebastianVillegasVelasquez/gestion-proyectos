@@ -11,14 +11,19 @@ import type { Team } from "../../types/api.types";
 import { TeamFormModal } from "../teams/TeamFormModal";
 import { TeamMembersManager } from "../teams/TeamMembersManager";
 
-function TeamCard({ team, onOpen }: { team: Team; onOpen: () => void }) {
+// El avance de un equipo se calcula igual que el avance individual: tareas
+// completadas sobre asignadas de todos sus integrantes (las tareas son las
+// hojas del árbol de la estructura del proyecto, así que el avance por
+// equipo también refleja la completación de módulos/cursos asignados).
+function TeamRow({ team, onOpen }: { team: Team; onOpen: () => void }) {
+  const pct = Math.round(team.completion_pct);
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="group flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-brand-gold/40 hover:shadow-lg"
+      className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-brand-gold/40 hover:shadow-lg sm:flex-row sm:items-center sm:gap-5"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-xl",
@@ -34,17 +39,35 @@ function TeamCard({ team, onOpen }: { team: Team; onOpen: () => void }) {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 border-t border-accent/70 pt-3 text-xs font-semibold text-muted-foreground">
+
+      <div className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground sm:w-32">
         <Users className="size-3.5" />
         {team.member_count} {team.member_count === 1 ? "integrante" : "integrantes"}
       </div>
+
+      <div className="flex shrink-0 items-center gap-2.5 sm:w-56">
+        <div className="h-2 min-w-[100px] flex-1 overflow-hidden rounded-full bg-accent">
+          <div
+            className="h-full rounded-full bg-brand-blue transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="w-10 shrink-0 text-right text-xs font-bold tabular-nums text-brand-blue-dark dark:text-brand-blue">
+          {pct}%
+        </span>
+      </div>
+
+      <span className="shrink-0 text-[11px] font-semibold text-muted-foreground sm:w-24 sm:text-right">
+        {team.completed_tasks}/{team.assigned_tasks} tareas
+      </span>
     </button>
   );
 }
 
 // Equipos de trabajo del proyecto: se crean dentro de este proyecto y no existen
-// fuera de él. Vista en grid (cada equipo es una tarjeta); al abrir un equipo se
-// entra a su detalle (integrantes) con un botón para volver al grid.
+// fuera de él. Vista en lista, con el avance de cada equipo (misma fórmula que
+// el avance individual); al abrir un equipo se entra a su detalle (integrantes)
+// con un botón para volver a la lista.
 export function ProjectTeamsPage({ projectId }: { projectId: string }) {
   const teamsQuery = useTeams(projectId);
   const deleteTeam = useDeleteTeam(projectId);
@@ -72,7 +95,7 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
     });
   };
 
-  // Detalle de un equipo: reemplaza el grid, con retroceso a la lista.
+  // Detalle de un equipo: reemplaza la lista, con retroceso a ella.
   if (open) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
@@ -104,6 +127,20 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
               {open.description && (
                 <p className="mt-0.5 text-sm text-muted-foreground">{open.description}</p>
               )}
+              <div className="mt-2 flex items-center gap-2.5">
+                <div className="h-2 w-40 overflow-hidden rounded-full bg-accent">
+                  <div
+                    className="h-full rounded-full bg-brand-blue transition-all"
+                    style={{ width: `${Math.round(open.completion_pct)}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold tabular-nums text-brand-blue-dark dark:text-brand-blue">
+                  {Math.round(open.completion_pct)}%
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  ({open.completed_tasks}/{open.assigned_tasks} tareas)
+                </span>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -208,9 +245,9 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="flex flex-col gap-3">
             {filtered.map((team) => (
-              <TeamCard
+              <TeamRow
                 key={team.id}
                 team={team}
                 onOpen={() => {
@@ -223,7 +260,7 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
               onClick={() => {
                 setShowCreate(true);
               }}
-              className="flex min-h-[132px] flex-col items-center justify-center gap-2.5 rounded-2xl border-[1.5px] border-dashed border-border text-muted-foreground transition-colors hover:border-brand-gold/60 hover:text-foreground"
+              className="flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-border text-muted-foreground transition-colors hover:border-brand-gold/60 hover:text-foreground"
             >
               <Plus className="size-5" />
               <span className="text-sm font-bold">Crear equipo</span>

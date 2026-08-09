@@ -60,11 +60,16 @@ class ProjectMemberRequest(BaseModelConfig):
 
 
 class ProjectMemberResponse(BaseModelConfig):
+    id: UUID
     user_id: UUID
     name: str
     last_name: str
     email: str
     position: str
+    project_role: ProjectRole
+
+
+class UpdateProjectMemberRoleRequest(BaseModelConfig):
     project_role: ProjectRole
 
 

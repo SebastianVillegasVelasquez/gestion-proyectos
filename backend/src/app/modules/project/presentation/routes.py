@@ -25,6 +25,8 @@ from app.modules.project.application.use_cases import (
     GetProjectsUseCase,
     ListProjectNotesUseCase,
     RegenerateClientAccessUseCase,
+    RemoveProjectMemberUseCase,
+    UpdateProjectMemberRoleUseCase,
     UpdateProjectUseCase,
 )
 from app.modules.project.presentation.schemas import (
@@ -36,6 +38,7 @@ from app.modules.project.presentation.schemas import (
     ProjectMemberResponse,
     ProjectNoteResponse,
     ProjectResponse,
+    UpdateProjectMemberRoleRequest,
     UpdateProjectRequest,
 )
 
@@ -184,6 +187,27 @@ async def get_project_members(
         user_repo=user_repo,
         member_repo=project_member_repo,
     ).execute(project_id)
+
+
+@router.patch("/members/{member_id}", response_model=ProjectMemberResponse)
+async def update_project_member_role(
+    member_id: UUID,
+    payload: UpdateProjectMemberRoleRequest,
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    return await UpdateProjectMemberRoleUseCase(project_member_repo).execute(
+        member_id, payload.project_role
+    )
+
+
+@router.delete("/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_project_member(
+    member_id: UUID,
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    await RemoveProjectMemberUseCase(project_member_repo).execute(member_id)
 
 
 @router.post(
