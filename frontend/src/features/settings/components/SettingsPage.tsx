@@ -98,7 +98,6 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",
-  [Role.CLIENT]: "Cliente",
 };
 
 function SettingsCard({

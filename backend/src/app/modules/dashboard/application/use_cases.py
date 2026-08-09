@@ -255,6 +255,7 @@ class GetPublicProjectScheduleUseCase:
                     due_date=item.due_date,
                     status=item.status,
                     progress_pct=item.progress_pct,
+                    is_task=item.is_task,
                 )
                 for item in schedule.items
             ],

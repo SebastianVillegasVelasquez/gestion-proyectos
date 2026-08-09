@@ -37,7 +37,6 @@ const PAGE_SIZE = 20;
 const ASSIGNABLE_ROLES: { value: Role; label: string }[] = [
   { value: Role.USER, label: "Usuario" },
   { value: Role.ADMIN, label: "Administrador" },
-  { value: Role.CLIENT, label: "Cliente" },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -45,7 +44,6 @@ const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super admin",
   admin: "Administrador",
   user: "Usuario",
-  client: "Cliente",
 };
 
 const inputCls =

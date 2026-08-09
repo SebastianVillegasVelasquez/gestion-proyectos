@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Project } from "../types/api.types";
 import { useUpdateProject } from "../hooks/use-projects";
 import { ProjectActions } from "./detail/ProjectActions";
-import { ClientAccessCard } from "./detail/ClientAccessCard";
+import { ClientAccessButton } from "./detail/ClientAccessButton";
 import { ProjectNotesCard } from "./detail/ProjectNotesCard";
 
 // Cada sección es una vista/pantalla independiente (ruta propia), ya no una
@@ -194,75 +194,75 @@ export function ProjectDetailView({
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onToggleDark}
-          aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-        </button>
+        {/* Acciones del encabezado: compartir con el cliente (compacto) + tema. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <ClientAccessButton projectId={project.id} />
+          <button
+            type="button"
+            onClick={onToggleDark}
+            aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.7fr_1fr]">
-        {/* Columna izquierda: accesos rápidos y progreso general */}
-        <div className="flex flex-col gap-5">
-          {/* Accesos: Cronograma + Tareas */}
-          <ProjectActions projectId={project.id} />
+      {/* Accesos rápidos: Cronograma + Tareas (ancho completo) */}
+      <ProjectActions projectId={project.id} />
 
-          {/* Progreso */}
-          <Card className="shrink-0 rounded-2xl">
-            <CardContent className="flex flex-col gap-3 py-5">
-              <div className="flex items-center justify-between">
-                <span className="text-[15px] font-medium text-foreground">Progreso general</span>
-                <span className="text-xl font-semibold tabular-nums text-brand-blue-dark dark:text-brand-blue">
-                  {progress}%
-                </span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-accent">
+      {/* Progreso general y Secciones del proyecto, al mismo nivel. En pantallas
+          medianas/grandes van lado a lado; sus bordes se alinean con los accesos
+          de arriba y con las Notas de abajo (todos ocupan el mismo ancho). */}
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
+        {/* Progreso */}
+        <Card className="rounded-2xl">
+          <CardContent className="flex h-full flex-col justify-center gap-3 py-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] font-medium text-foreground">Progreso general</span>
+              <span className="text-2xl font-semibold tabular-nums text-brand-blue-dark dark:text-brand-blue">
+                {progress}%
+              </span>
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-accent">
+              <div
+                className="h-full rounded-full bg-brand-blue transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Calculado sobre las tareas completadas del proyecto.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Secciones del proyecto */}
+        <Card className="rounded-2xl">
+          <CardContent className="flex flex-col gap-1 py-4">
+            <p className="px-1 pb-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Secciones del proyecto
+            </p>
+            {SECTIONS.map(({ to, label, meta, icon: Icon, accent }) => (
+              <button
+                key={to}
+                type="button"
+                onClick={() => void navigate(`/projects/${project.id}/${to}`)}
+                className="group flex items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-accent"
+              >
                 <div
-                  className="h-full rounded-full bg-brand-blue transition-all"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Columna derecha: secciones del proyecto + compartir con el cliente.
-            Ambas viven en la misma columna para que quede a la altura de los
-            accesos, sin espacio muerto entre medias. */}
-        <aside className="flex flex-col gap-5 lg:sticky lg:top-1">
-          <Card className="rounded-2xl">
-            <CardContent className="flex flex-col gap-1 py-4">
-              <p className="px-1 pb-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Secciones del proyecto
-              </p>
-              {SECTIONS.map(({ to, label, meta, icon: Icon, accent }) => (
-                <button
-                  key={to}
-                  type="button"
-                  onClick={() => void navigate(`/projects/${project.id}/${to}`)}
-                  className="group flex items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-accent"
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${accent}`}
                 >
-                  <div
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${accent}`}
-                  >
-                    <Icon className="size-[18px]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{label}</p>
-                    <p className="truncate text-xs text-muted-foreground">{meta}</p>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
-          <ClientAccessCard projectId={project.id} />
-        </aside>
+                  <Icon className="size-[18px]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-foreground">{label}</p>
+                  <p className="truncate text-xs text-muted-foreground">{meta}</p>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Notas / recordatorios del proyecto: al final de la página */}

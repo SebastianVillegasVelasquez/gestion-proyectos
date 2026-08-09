@@ -15,8 +15,7 @@ import { WhatsNewModal } from "./WhatsNewModal";
 export function WhatsNewProvider({ children }: { children: ReactNode }) {
   const { user, hasRole } = useAuth();
   const isElevated = hasRole(["admin", "super_admin"]);
-  // El cliente no usa este shell; no consultamos novedades para su rol.
-  const enabled = Boolean(user) && user?.role !== "client";
+  const enabled = Boolean(user);
 
   const seenQuery = useSeenReleases(enabled);
   const markSeen = useMarkReleasesSeen();
