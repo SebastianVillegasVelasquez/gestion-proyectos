@@ -205,7 +205,7 @@ export function ProjectDetailView({
       </header>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.7fr_1fr]">
-        {/* Columna izquierda: accesos, progreso y compartir con el cliente */}
+        {/* Columna izquierda: accesos rápidos y progreso general */}
         <div className="flex flex-col gap-5">
           {/* Accesos: Cronograma + Tareas */}
           <ProjectActions projectId={project.id} />
@@ -227,13 +227,12 @@ export function ProjectDetailView({
               </div>
             </CardContent>
           </Card>
-
-          {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
-          <ClientAccessCard projectId={project.id} />
         </div>
 
-        {/* Columna derecha: secciones del proyecto, cada una en su propia vista */}
-        <aside className="lg:sticky lg:top-1">
+        {/* Columna derecha: secciones del proyecto + compartir con el cliente.
+            Ambas viven en la misma columna para que quede a la altura de los
+            accesos, sin espacio muerto entre medias. */}
+        <aside className="flex flex-col gap-5 lg:sticky lg:top-1">
           <Card className="rounded-2xl">
             <CardContent className="flex flex-col gap-1 py-4">
               <p className="px-1 pb-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -260,6 +259,9 @@ export function ProjectDetailView({
               ))}
             </CardContent>
           </Card>
+
+          {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
+          <ClientAccessCard projectId={project.id} />
         </aside>
       </div>
 

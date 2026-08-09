@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from app.modules.dashboard.infrastructure.repository import (
+    ActivityRow,
     DashboardPanels,
     DashboardRepository,
     DashboardSummary,
@@ -18,11 +19,13 @@ class FakeDashboardRepository(DashboardRepository):
         panels: DashboardPanels | None = None,
         project_progress: ProjectProgressDetail | None = None,
         project_schedule: ProjectSchedule | None = None,
+        activity: list[ActivityRow] | None = None,
     ) -> None:
         self._summary = summary
         self._panels = panels or DashboardPanels()
         self._project_progress = project_progress
         self._project_schedule = project_schedule
+        self._activity = activity or []
 
     async def get_summary(self) -> DashboardSummary:
         return self._summary
@@ -31,6 +34,9 @@ class FakeDashboardRepository(DashboardRepository):
         self, board_limit: int, projects_limit: int, deadlines_limit: int
     ) -> DashboardPanels:
         return self._panels
+
+    async def get_recent_activity(self, limit: int) -> list[ActivityRow]:
+        return self._activity[:limit]
 
     # Variantes por usuario: el fake ignora el user_id y devuelve lo configurado.
     async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary:

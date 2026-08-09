@@ -2,6 +2,7 @@ from uuid import UUID
 
 from app.modules.dashboard.infrastructure.repository import DashboardRepository
 from app.modules.dashboard.presentation.schemas import (
+    ActivityItemResponse,
     DashboardPanelsResponse,
     DashboardSummaryResponse,
     DeadlineItemResponse,
@@ -10,8 +11,10 @@ from app.modules.dashboard.presentation.schemas import (
     PublicProjectProgressResponse,
     PublicProjectScheduleResponse,
     PublicScheduleItemResponse,
+    RecentActivityResponse,
     TaskBoardItemResponse,
 )
+from app.modules.traceability.domain.events import classify_event
 from app.shared.exceptions import NotFoundError
 
 
@@ -90,6 +93,40 @@ class GetDashboardPanelsUseCase:
             deadlines_limit=deadlines_limit,
         )
         return _panels_to_response(panels)
+
+
+class GetRecentActivityUseCase:
+    """Actividad reciente del sistema para el dashboard admin.
+
+    Toma los últimos eventos del historial de tareas (todos los proyectos) y los
+    clasifica con la misma regla del dominio de trazabilidad, para que la UI
+    muestre "creó", "entregó", "aprobó", "devolvió"… en vez del cambio crudo.
+    """
+
+    def __init__(self, repo: DashboardRepository) -> None:
+        self._repo = repo
+
+    async def execute(self, limit: int = 10) -> RecentActivityResponse:
+        rows = await self._repo.get_recent_activity(limit)
+        return RecentActivityResponse(
+            items=[
+                ActivityItemResponse(
+                    id=row.id,
+                    task_id=row.task_id,
+                    task_title=row.task_title,
+                    project_name=row.project_name,
+                    actor_name=row.actor_name,
+                    kind=classify_event(
+                        action=row.action,
+                        new_status=row.new_status,
+                        due_date=row.due_date,
+                        occurred_on=row.created_at,
+                    ).kind,
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ]
+        )
 
 
 class GetMyDashboardSummaryUseCase:

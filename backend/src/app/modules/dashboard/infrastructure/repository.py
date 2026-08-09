@@ -10,8 +10,8 @@ from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import WorkItem
-from app.modules.tasks.infrastructure.enums import TaskStatus
-from app.modules.tasks.infrastructure.models import Task
+from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
+from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
 
 @dataclass
@@ -50,6 +50,27 @@ class DeadlineItem:
     title: str
     project_name: str | None
     due_date: datetime.date
+
+
+@dataclass
+class ActivityRow:
+    """Un evento del historial de tareas, transversal a todos los proyectos.
+
+    Fila cruda del read model de actividad reciente del dashboard admin: qué
+    pasó (action + new_status), sobre qué tarea/proyecto y quién lo hizo. La
+    clasificación semántica (creación, entrega, devolución…) la hace el caso de
+    uso reutilizando la regla del dominio de trazabilidad.
+    """
+
+    id: uuid.UUID
+    task_id: uuid.UUID
+    task_title: str
+    project_name: str | None
+    actor_name: str | None
+    action: HistoryAction
+    new_status: TaskStatus | None
+    due_date: datetime.date | None
+    created_at: datetime.datetime
 
 
 @dataclass
@@ -148,6 +169,9 @@ class DashboardRepository(ABC):
         self, board_limit: int, projects_limit: int, deadlines_limit: int
     ) -> DashboardPanels: ...
 
+    @abstractmethod
+    async def get_recent_activity(self, limit: int) -> list[ActivityRow]: ...
+
     # ── Variantes por usuario (dashboard del rol User) ──
     @abstractmethod
     async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary: ...
@@ -236,6 +260,52 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             projects=await self._get_projects_overview(projects_limit),
             upcoming_deadlines=await self._get_upcoming_deadlines(deadlines_limit),
         )
+
+    # ── Actividad reciente (transversal a todos los proyectos) ────────────────
+    async def get_recent_activity(self, limit: int) -> list[ActivityRow]:
+        """Últimos eventos del historial de tareas, de cualquier proyecto.
+
+        Se une por `Task.project_id` (siempre presente) y no por el WorkItem, para
+        no perder eventos de tareas aún sin ubicar en la estructura. Ordena por
+        fecha descendente y acota a `limit`: la BD hace el trabajo, el payload es
+        mínimo.
+        """
+        rows = (
+            await self._session.execute(
+                select(
+                    TaskHistory,
+                    Task.title,
+                    Task.due_date,
+                    Project.name,
+                    User.name,
+                    User.last_name,
+                )
+                .join(Task, TaskHistory.task_id == Task.id)
+                .join(Project, Task.project_id == Project.id)
+                .outerjoin(User, TaskHistory.changed_by_id == User.id)
+                .where(Task.deleted_at.is_(None), Project.deleted_at.is_(None))
+                .order_by(TaskHistory.created_at.desc())
+                .limit(limit)
+            )
+        ).all()
+
+        activity: list[ActivityRow] = []
+        for hist, title, due_date, project_name, name, last_name in rows:
+            actor_name = f"{name} {last_name}".strip() if name else None
+            activity.append(
+                ActivityRow(
+                    id=hist.id,
+                    task_id=hist.task_id,
+                    task_title=title,
+                    project_name=project_name,
+                    actor_name=actor_name,
+                    action=hist.action,
+                    new_status=hist.new_status,
+                    due_date=due_date,
+                    created_at=hist.created_at,
+                )
+            )
+        return activity
 
     def _task_with_project(self):
         """Cada tarea con el nombre de su proyecto, vía el WorkItem del que cuelga."""

@@ -44,6 +44,26 @@ class DashboardPanelsResponse(BaseModelConfig):
     upcoming_deadlines: list[DeadlineItemResponse]
 
 
+class ActivityItemResponse(BaseModelConfig):
+    """Un evento de actividad reciente ya clasificado para la UI.
+
+    `kind` es el tipo semántico del evento (creacion, entrega, aprobacion…); el
+    frontend decide su icono y color. `actor_name`/`project_name` pueden faltar.
+    """
+
+    id: UUID
+    task_id: UUID
+    task_title: str
+    project_name: str | None = None
+    actor_name: str | None = None
+    kind: str
+    created_at: datetime.datetime
+
+
+class RecentActivityResponse(BaseModelConfig):
+    items: list[ActivityItemResponse]
+
+
 class MyProjectProgressResponse(BaseModelConfig):
     """Progreso general de un proyecto (solo lectura) + tareas propias del usuario."""
 
