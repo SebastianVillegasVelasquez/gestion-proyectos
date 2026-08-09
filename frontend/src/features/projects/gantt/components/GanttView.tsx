@@ -15,11 +15,12 @@ import {
   ChevronsUpDown,
   Crosshair,
   FilterX,
+  Spline,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree } from "../../hooks/use-structure";
-import { useProjectTasks, useUpdateTask } from "../../hooks/use-tasks";
+import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import {
@@ -207,6 +208,8 @@ export function GanttView({
   const membersQuery = useProjectMembers(project.id);
   const teamsQuery = useTeams(project.id);
   const updateTask = useUpdateTask(project.id);
+  const dependenciesQuery = useProjectTaskDependencies(project.id);
+  const dependencies = useMemo(() => dependenciesQuery.data ?? [], [dependenciesQuery.data]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {
@@ -222,6 +225,8 @@ export function GanttView({
   const [teamId, setTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
+  // Mostrar/ocultar las flechas de dependencia (pueden saturar en proyectos densos).
+  const [showDeps, setShowDeps] = useState(true);
   // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
   // si dejas todo colapsado, así lo encuentras la próxima vez.
   const collapsedStorageKey = `gantt-collapsed:${project.id}`;
@@ -455,6 +460,60 @@ export function GanttView({
       }))
       .sort((a, b) => a.order - b.order);
   }, [tasks, itemMeta]);
+
+  // Geometría de cada fila de tarea visible (no colapsada), en el sistema de
+  // coordenadas del cuerpo (y=0 en la primera fila). Sirve para trazar las
+  // flechas de dependencia y espeja EXACTAMENTE el orden de render de grupos.
+  const layout = useMemo(() => {
+    const positions = new Map<string, { yTop: number; left: number; width: number }>();
+    if (!range) {
+      return { positions, height: 0 };
+    }
+    let y = 0;
+    for (const group of groups) {
+      y += ROW_H; // encabezado del grupo
+      if (collapsedGroups.has(group.id)) {
+        continue; // sus tareas no se renderizan → no ocupan alto
+      }
+      for (const task of group.tasks) {
+        const m = barMetrics(task, range);
+        positions.set(task.id, {
+          yTop: y,
+          left: (m.offsetPct / 100) * trackWidth,
+          width: Math.max(10, (m.widthPct / 100) * trackWidth),
+        });
+        y += ROW_H;
+      }
+    }
+    return { positions, height: y };
+  }, [groups, collapsedGroups, range, trackWidth]);
+
+  // Flechas finish-to-start: del extremo derecho de la predecesora al izquierdo
+  // de la sucesora. Solo entre tareas visibles (ambas con geometría conocida).
+  const arrows = useMemo(() => {
+    if (!showDeps) {
+      return [];
+    }
+    const out: { id: string; d: string }[] = [];
+    for (const dep of dependencies) {
+      const from = layout.positions.get(dep.depends_on_id);
+      const to = layout.positions.get(dep.task_id);
+      if (!from || !to) {
+        continue;
+      }
+      const x1 = from.left + from.width;
+      const y1 = from.yTop + ROW_H / 2;
+      const x2 = to.left;
+      const y2 = to.yTop + ROW_H / 2;
+      const stub = 10;
+      // Codo ortogonal: sale a la derecha, baja/sube y entra por la izquierda.
+      out.push({
+        id: dep.id,
+        d: `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${y2} L ${x2 - 2} ${y2}`,
+      });
+    }
+    return out;
+  }, [showDeps, dependencies, layout]);
 
   const toggleStatus = (s: TaskStatus) => {
     setStatuses((prev) => {
@@ -747,6 +806,26 @@ export function GanttView({
             {allCollapsed ? "Expandir" : "Colapsar"}
           </button>
 
+          {/* Mostrar/ocultar flechas de dependencia */}
+          {dependencies.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeps((v) => !v);
+              }}
+              aria-pressed={showDeps}
+              title="Mostrar u ocultar las flechas de dependencia"
+              className={cn(
+                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                showDeps
+                  ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Spline className="size-3.5" /> Dependencias
+            </button>
+          )}
+
           {/* Limpiar filtros: solo aparece si hay alguno activo */}
           {hasActiveFilters && (
             <button
@@ -879,6 +958,39 @@ export function GanttView({
                   className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
                   style={{ left: LABEL_W + pctToPx(todayPct) }}
                 />
+              )}
+
+              {/* Flechas de dependencia (finish-to-start) sobre las barras */}
+              {arrows.length > 0 && (
+                <svg
+                  className="pointer-events-none absolute z-10 text-brand-teal/70"
+                  style={{ left: LABEL_W, top: 0, width: trackWidth, height: layout.height }}
+                  aria-hidden
+                >
+                  <defs>
+                    <marker
+                      id={`gantt-arrow-${project.id}`}
+                      markerUnits="userSpaceOnUse"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" />
+                    </marker>
+                  </defs>
+                  {arrows.map((a) => (
+                    <path
+                      key={a.id}
+                      d={a.d}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      markerEnd={`url(#gantt-arrow-${project.id})`}
+                    />
+                  ))}
+                </svg>
               )}
 
               {groups.length === 0 ? (

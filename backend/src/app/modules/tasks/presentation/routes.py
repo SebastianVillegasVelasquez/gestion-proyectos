@@ -20,6 +20,7 @@ from app.modules.tasks.application.use_cases import (
     CreateTaskUseCase,
     DeleteTaskUseCase,
     DetachTaskUseCase,
+    GetProjectTaskDependenciesUseCase,
     GetTaskByIdUseCase,
     GetTaskDependenciesUseCase,
     GetTasksByProjectUseCase,
@@ -149,6 +150,22 @@ async def list_task_dependencies(
     task_repo=Depends(task_repo_dependency),
 ):
     return await GetTaskDependenciesUseCase(task_repo).execute(task_id)
+
+
+@router.get(
+    "/projects/{project_id}/task-dependencies",
+    response_model=list[TaskDependencyResponse],
+)
+async def list_project_task_dependencies(
+    project_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+):
+    """Todas las dependencias FtS del proyecto, para dibujarlas en el cronograma."""
+    return await GetProjectTaskDependenciesUseCase(task_repo, project_repo).execute(
+        project_id
+    )
 
 
 @router.patch("/tasks/{task_id}/status", response_model=TaskResponse)

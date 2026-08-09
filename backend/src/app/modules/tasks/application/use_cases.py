@@ -254,6 +254,20 @@ class GetTaskDependenciesUseCase:
         return await self.service.list_dependencies(task_id)
 
 
+class GetProjectTaskDependenciesUseCase:
+    """Todas las dependencias FtS del proyecto en una sola llamada (cronograma)."""
+
+    def __init__(self, task_repo: TaskRepository, project_repo: Repository):
+        self.project_repo = project_repo
+        self.service = TaskDependencyService(task_repo)
+
+    async def execute(self, project_id: UUID) -> list[TaskDependencyResponse]:
+        project = await self.project_repo.get_by_id(project_id)
+        if not project or project.is_deleted:
+            raise NotFoundError("El proyecto no existe")
+        return await self.service.list_dependencies_by_project(project_id)
+
+
 class ChangeTaskStatusUseCase:
     """Cambia el estado de una tarea con el flujo:
 

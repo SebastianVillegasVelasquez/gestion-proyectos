@@ -40,6 +40,10 @@ export const tasksApi = {
   listDependencies: (taskId: string) =>
     http.get<TaskDependency[]>(`/tasks/${taskId}/dependencies`).then((r) => r.data),
 
+  // Todas las dependencias FtS del proyecto (para el cronograma).
+  listProjectDependencies: (projectId: string) =>
+    http.get<TaskDependency[]>(`/projects/${projectId}/task-dependencies`).then((r) => r.data),
+
   addDependency: (taskId: string, dependsOnId: string) =>
     http
       .post<TaskDependency>(`/tasks/${taskId}/dependencies`, {
