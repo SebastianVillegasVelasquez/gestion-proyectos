@@ -58,6 +58,35 @@ export interface DashboardPanels {
   upcoming_deadlines: DashboardDeadlineItem[];
 }
 
+// ─── Actividad reciente (API contract) ────────────────────────────────────────
+// Eventos del historial de tareas (todos los proyectos), ya clasificados por el
+// backend. `kind` es el tipo semántico; el frontend le asigna icono/color/verbo.
+
+export type ActivityKind =
+  | "creacion"
+  | "asignacion"
+  | "inicio"
+  | "entrega"
+  | "aprobacion"
+  | "devolucion"
+  | "cancelacion"
+  | "comentario"
+  | "cambio_estado";
+
+export interface ActivityItem {
+  id: string;
+  task_id: string;
+  task_title: string;
+  project_name: string | null;
+  actor_name: string | null;
+  kind: ActivityKind;
+  created_at: string; // ISO datetime
+}
+
+export interface RecentActivity {
+  items: ActivityItem[];
+}
+
 // ─── Progreso de proyecto (solo lectura, rol User) ────────────────────────────
 
 export interface MyProjectProgress {

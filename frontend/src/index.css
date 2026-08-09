@@ -1,0 +1,10 @@
+/*
+ * Escala tipográfica base de la app.
+ *
+ * El navegador usa 16px por defecto; subirlo a 17px agranda ~1px toda la letra
+ * de una sola vez, porque las utilidades de Tailwind se miden en `rem`
+ * (relativas a la raíz). Un único punto de control para el tamaño global.
+ */
+html {
+  font-size: 17px;
+}

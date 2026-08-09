@@ -186,6 +186,41 @@
   --radius-sm: calc(var(--radius) - 4px);
 }
 
+/* ----------------------------------------------------------------------------
+   Barra de scroll moderna y suave, en toda la app.
+   - Delgada, con el pulgar redondeado y "flotante" (padding vía borde
+     transparente + background-clip), pista invisible.
+   - El color deriva de --muted-foreground, así se adapta solo a claro/oscuro.
+   - Va en @layer base (baja prioridad) para que la utilidad `scrollbar-none`,
+     que oculta la barra por completo (p. ej. el cronograma), siga ganando.
+   ---------------------------------------------------------------------------- */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--muted-foreground) 32%, transparent);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+  }
+  /* La esquina donde se cruzan scroll vertical y horizontal, sin fondo gris. */
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
 /* Timeline entrance animation used by AuditTimeline */
 @keyframes tl-enter {
   from {

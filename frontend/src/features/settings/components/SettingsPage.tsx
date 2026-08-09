@@ -195,14 +195,14 @@ export function SettingsPage() {
               aria-label="Alternar tema oscuro"
               onClick={toggleDark}
               className={cn(
-                "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors",
                 dark ? "bg-brand-gold" : "bg-muted-foreground/30",
               )}
             >
               <span
                 className={cn(
-                  "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                  dark ? "translate-x-[1.375rem]" : "translate-x-0.5",
+                  "inline-block size-5 rounded-full bg-white shadow transition-transform",
+                  dark ? "translate-x-5" : "translate-x-0",
                 )}
               />
             </button>
