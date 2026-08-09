@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List
 from uuid import UUID
 
@@ -6,21 +6,28 @@ from fastapi import HTTPException
 
 from app.modules.project.domain.services import ProjectMemberService, ProjectService
 from app.modules.project.infrastructure.enums import ProjectRole
-from app.modules.project.infrastructure.models import ProjectMember
-from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.modules.project.infrastructure.models import ProjectMember, ProjectNote
+from app.modules.project.infrastructure.repository import (
+    ProjectMemberRepository,
+    ProjectRepository,
+)
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
     ClientAccessResponse,
+    CreateProjectNoteRequest,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
+    ProjectNoteResponse,
     ProjectResponse,
     UpdateProjectRequest,
 )
 from app.modules.teams.domain.repository import TeamRepository
+from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import MemberAssigned
+from app.shared.exceptions import ForbiddenError, NotFoundError
 
 
 class CreateProjectUseCase:
@@ -65,6 +72,75 @@ class RegenerateClientAccessUseCase:
 
     async def execute(self, project_id: UUID) -> ClientAccessResponse:
         return await self.service.regenerate_client_access(project_id)
+
+
+# ── Notas del proyecto ────────────────────────────────────────────────────────
+def _note_to_response(
+    note: ProjectNote, author_name: str | None
+) -> ProjectNoteResponse:
+    return ProjectNoteResponse(
+        id=note.id,
+        project_id=note.project_id,
+        content=note.content,
+        note_date=note.note_date,
+        author_id=note.author_id,
+        author_name=author_name,
+        created_at=note.created_at,
+    )
+
+
+class ListProjectNotesUseCase:
+    def __init__(self, repo: ProjectRepository):
+        self.repo = repo
+
+    async def execute(self, project_id: UUID) -> List[ProjectNoteResponse]:
+        rows = await self.repo.get_notes_by_project(project_id)
+        return [_note_to_response(note, author_name) for note, author_name in rows]
+
+
+class CreateProjectNoteUseCase:
+    def __init__(self, repo: ProjectRepository):
+        self.repo = repo
+
+    async def execute(
+        self,
+        project_id: UUID,
+        data: CreateProjectNoteRequest,
+        author_id: UUID,
+        author_name: str | None = None,
+    ) -> ProjectNoteResponse:
+        project = await self.repo.get_by_id(project_id)
+        if not project or project.is_deleted:
+            raise NotFoundError("El proyecto no existe")
+        note = ProjectNote(
+            project_id=project_id,
+            author_id=author_id,
+            content=data.content.strip(),
+            note_date=data.note_date or date.today(),
+        )
+        saved = await self.repo.add_note(note)
+        return _note_to_response(saved, author_name)
+
+
+class DeleteProjectNoteUseCase:
+    """Borra (lógico) una nota. Solo su autor o un rol elevado pueden hacerlo."""
+
+    def __init__(self, repo: ProjectRepository):
+        self.repo = repo
+
+    async def execute(
+        self, note_id: UUID, current_user_id: UUID, current_user_role: str
+    ) -> None:
+        note = await self.repo.get_note_by_id(note_id)
+        if not note or note.is_deleted:
+            raise NotFoundError("La nota no existe")
+        elevated = role_satisfies(current_user_role, ["admin", "super_admin"])
+        if note.author_id != current_user_id and not elevated:
+            raise ForbiddenError(
+                "Solo el autor o un administrador puede borrar la nota"
+            )
+        note.soft_delete()
+        await self.repo.save_note(note)
 
 
 class UpdateProjectUseCase:

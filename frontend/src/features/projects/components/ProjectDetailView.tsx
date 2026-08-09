@@ -21,6 +21,7 @@ import type { Project } from "../types/api.types";
 import { useUpdateProject } from "../hooks/use-projects";
 import { ProjectActions } from "./detail/ProjectActions";
 import { ClientAccessCard } from "./detail/ClientAccessCard";
+import { ProjectNotesCard } from "./detail/ProjectNotesCard";
 
 // Cada sección es una vista/pantalla independiente (ruta propia), ya no una
 // pestaña embebida. Desde aquí se navega a ellas; cada una regresa al detalle.
@@ -234,6 +235,9 @@ export function ProjectDetailView({
               </div>
             </CardContent>
           </Card>
+
+          {/* Notas / recordatorios del proyecto */}
+          <ProjectNotesCard projectId={project.id} />
 
           {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
           <ClientAccessCard projectId={project.id} />

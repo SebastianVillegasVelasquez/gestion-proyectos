@@ -33,6 +33,22 @@ export interface CreateProjectPayload {
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 
+export interface ProjectNote {
+  id: string;
+  project_id: string;
+  content: string;
+  note_date: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface CreateProjectNotePayload {
+  content: string;
+  // Opcional: si se omite, el backend usa la fecha de hoy.
+  note_date?: string | null;
+}
+
 // ── Árbol de trabajo (estructura flexible) ───────────────────────────────────
 // La estructura de un proyecto es un árbol recursivo de WorkItems. Cada nivel
 // (programa/curso/módulo/fase, o componente/actividad…) es del mismo tipo; lo

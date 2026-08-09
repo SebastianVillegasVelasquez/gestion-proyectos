@@ -79,3 +79,32 @@ class ProjectMember(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Relacion
     user: Mapped[User] = relationship("User", back_populates="project_members")
     project: Mapped[Project] = relationship("Project", back_populates="members")
+
+
+class ProjectNote(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Nota/recordatorio sobre un proyecto: un problema, una anomalía o algo que
+    conviene dejar por escrito. Lleva su propia fecha (por defecto hoy, pero
+    editable) y su autor. Borrado lógico para poder quitarla sin perder historial.
+    """
+
+    __tablename__ = "project_notes"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Autor de la nota. ON DELETE SET NULL: si se borra el usuario, la nota
+    # permanece (solo queda sin autor).
+    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Fecha a la que refiere la nota (por defecto la de hoy en la app, editable).
+    note_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)

@@ -4,7 +4,11 @@ from uuid import UUID
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
 
-from app.modules.project.infrastructure.models import Project, ProjectMember
+from app.modules.project.infrastructure.models import (
+    Project,
+    ProjectMember,
+    ProjectNote,
+)
 from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
@@ -45,6 +49,43 @@ class ProjectRepository(BaseRepository[Project]):
             if total:
                 result[pid] = round(float(completed) / float(total) * 100, 1)
         return result
+
+    # ── Notas del proyecto ───────────────────────────────────────────────────
+    async def add_note(self, note: ProjectNote) -> ProjectNote:
+        self._session.add(note)
+        await self._session.flush()
+        await self._session.refresh(note)
+        return note
+
+    async def get_notes_by_project(self, project_id: UUID) -> list[tuple]:
+        """Notas vivas del proyecto con el nombre del autor ya resuelto.
+
+        LEFT JOIN al usuario porque el autor es opcional (pudo eliminarse). Se
+        ordenan de la más reciente a la más antigua por fecha de la nota.
+        """
+        from app.modules.identity.infrastructure.models import User
+
+        query = (
+            select(
+                ProjectNote,
+                func.concat(User.name, " ", User.last_name).label("author_name"),
+            )
+            .outerjoin(User, ProjectNote.author_id == User.id)
+            .where(
+                ProjectNote.project_id == project_id,
+                ProjectNote.deleted_at.is_(None),
+            )
+            .order_by(ProjectNote.note_date.desc(), ProjectNote.created_at.desc())
+        )
+        return [tuple(r) for r in (await self._session.execute(query)).all()]
+
+    async def get_note_by_id(self, note_id: UUID) -> Optional[ProjectNote]:
+        return await self._session.get(ProjectNote, note_id)
+
+    async def save_note(self, note: ProjectNote) -> ProjectNote:
+        self._session.add(note)
+        await self._session.flush()
+        return note
 
 
 class ProjectMemberRepository(BaseRepository[ProjectMember]):

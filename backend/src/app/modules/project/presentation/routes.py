@@ -15,21 +15,26 @@ from app.core.dependencies import (
 from app.modules.project.application.use_cases import (
     AddMemberToProjectUseCase,
     AssignTeamToProjectUseCase,
+    CreateProjectNoteUseCase,
     CreateProjectUseCase,
+    DeleteProjectNoteUseCase,
     DeleteProjectUseCase,
     GetClientAccessUseCase,
     GetProjectByIdUseCase,
     GetProjectMembersUseCase,
     GetProjectsUseCase,
+    ListProjectNotesUseCase,
     RegenerateClientAccessUseCase,
     UpdateProjectUseCase,
 )
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
     ClientAccessResponse,
+    CreateProjectNoteRequest,
     CreateProjectRequest,
     ProjectMemberRequest,
     ProjectMemberResponse,
+    ProjectNoteResponse,
     ProjectResponse,
     UpdateProjectRequest,
 )
@@ -103,6 +108,49 @@ async def regenerate_client_access(
 ):
     """Rota el token: invalida el enlace anterior (revocación)."""
     return await RegenerateClientAccessUseCase(repo).execute(project_id)
+
+
+# ── Notas del proyecto ───────────────────────────────────────────────────────
+@router.get("/{project_id}/notes", response_model=List[ProjectNoteResponse])
+async def list_project_notes(
+    project_id: UUID,
+    repo=Depends(project_repo_dependency),
+    _=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Notas/recordatorios del proyecto (más recientes primero)."""
+    return await ListProjectNotesUseCase(repo).execute(project_id)
+
+
+@router.post(
+    "/{project_id}/notes",
+    response_model=ProjectNoteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_project_note(
+    project_id: UUID,
+    data: CreateProjectNoteRequest,
+    repo=Depends(project_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
+):
+    return await CreateProjectNoteUseCase(repo).execute(
+        project_id,
+        data,
+        author_id=current_user.id,
+        author_name=f"{current_user.name} {current_user.last_name}",
+    )
+
+
+@router.delete("/{project_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project_note(
+    project_id: UUID,
+    note_id: UUID,
+    repo=Depends(project_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Borra una nota. Solo su autor o un administrador pueden hacerlo."""
+    await DeleteProjectNoteUseCase(repo).execute(
+        note_id, current_user.id, current_user.role
+    )
 
 
 # ── Miembros del proyecto ────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -83,3 +83,19 @@ class ClientAccessResponse(BaseModelConfig):
     """Token del portal del cliente. El frontend arma el enlace /portal/{token}."""
 
     token: str
+
+
+class CreateProjectNoteRequest(BaseModelConfig):
+    content: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    # Opcional: si no se envía, la nota toma la fecha de hoy.
+    note_date: Optional[date] = None
+
+
+class ProjectNoteResponse(BaseModelConfig):
+    id: UUID
+    project_id: UUID
+    content: str
+    note_date: date
+    author_id: Optional[UUID] = None
+    author_name: Optional[str] = None
+    created_at: datetime
