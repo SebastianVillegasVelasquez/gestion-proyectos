@@ -34,7 +34,13 @@ import {
   shortDate,
   type TickUnit,
 } from "../timeline";
-import { statusProgressPct, isOverdue, summarize, daysRemaining } from "../metrics";
+import {
+  statusProgressPct,
+  isOverdue,
+  summarize,
+  daysRemaining,
+  weightedProgressPct,
+} from "../metrics";
 import { filterGanttTasks, type GanttFilters } from "../filters";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
 import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
@@ -272,6 +278,8 @@ export function GanttView({
   // arrastrar el % de avance a 0. Siguen dibujándose en la línea de tiempo.
   const realVisibleTasks = useMemo(() => tasks.filter((t) => !t.id.startsWith("wi-")), [tasks]);
   const summary = useMemo(() => summarize(realVisibleTasks, TODAY), [realVisibleTasks]);
+  // Avance ponderado por duración (más realista que completadas/total).
+  const weightedProgress = useMemo(() => weightedProgressPct(realVisibleTasks), [realVisibleTasks]);
   const remaining = daysRemaining(project.end_date, TODAY);
 
   const trackWidth = range ? Math.max(MIN_TRACK, range.totalDays * ZOOM_CFG[zoom].px) : MIN_TRACK;
@@ -440,14 +448,14 @@ export function GanttView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           icon={TrendingUp}
-          label="Avance"
-          value={`${summary.progressPct}%`}
+          label="Avance ponderado"
+          value={`${weightedProgress}%`}
           tone="bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         >
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-brand-gold transition-all"
-              style={{ width: `${summary.progressPct}%` }}
+              style={{ width: `${weightedProgress}%` }}
             />
           </div>
         </KpiCard>
