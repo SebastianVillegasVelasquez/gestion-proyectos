@@ -197,3 +197,18 @@
     transform: translateX(0);
   }
 }
+
+/*
+ * Oculta la barra de scroll manteniendo el desplazamiento (rueda, trackpad,
+ * teclado y touch siguen funcionando en ambos ejes). Se usa en áreas con scroll
+ * X/Y donde la barra nativa ensucia el diseño, como el cronograma. Cross-browser:
+ * Firefox (scrollbar-width), navegadores WebKit/Blink (::-webkit-scrollbar) y
+ * el Edge/IE antiguos (-ms-overflow-style).
+ */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

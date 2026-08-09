@@ -74,6 +74,21 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_dependencies_by_project(
+        self, project_id: UUID
+    ) -> list[TaskDependency]:
+        """Todas las dependencias cuyas tareas dependientes son del proyecto.
+
+        Sirve al cronograma para dibujar las flechas FtS de todo el proyecto en
+        una sola llamada (en vez de una por tarea).
+        """
+        query = (
+            select(TaskDependency)
+            .join(Task, TaskDependency.task_id == Task.id)
+            .where(Task.project_id == project_id, Task.deleted_at.is_(None))
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
     async def add_dependency(self, dependency: TaskDependency) -> TaskDependency:
         self._session.add(dependency)
         await self._session.flush()

@@ -108,6 +108,15 @@ export function useTaskDependencies(taskId: string | undefined) {
   });
 }
 
+/** Todas las dependencias FtS del proyecto, para dibujar flechas en el Gantt. */
+export function useProjectTaskDependencies(projectId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.projectDependencies(projectId ?? ""),
+    queryFn: () => tasksApi.listProjectDependencies(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
 export function useAddTaskDependency() {
   const qc = useQueryClient();
   return useMutation({

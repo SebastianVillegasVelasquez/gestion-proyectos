@@ -11,12 +11,16 @@ import {
   AlertTriangle,
   CalendarClock,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Crosshair,
+  FilterX,
+  Spline,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree } from "../../hooks/use-structure";
-import { useProjectTasks } from "../../hooks/use-tasks";
+import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import {
@@ -29,9 +33,16 @@ import {
   weekendBands,
   toDayNumber,
   shortDate,
+  addDays,
   type TickUnit,
 } from "../timeline";
-import { statusProgressPct, isOverdue, summarize, daysRemaining } from "../metrics";
+import {
+  statusProgressPct,
+  isOverdue,
+  summarize,
+  daysRemaining,
+  weightedProgressPct,
+} from "../metrics";
 import { filterGanttTasks, type GanttFilters } from "../filters";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
 import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
@@ -61,6 +72,38 @@ const GROUP_TONES = [
   { accent: "border-l-amber-400", bar: "bg-amber-400/50 dark:bg-amber-400/40" },
   { accent: "border-l-rose-400", bar: "bg-rose-400/50 dark:bg-rose-400/40" },
 ];
+
+// Arrastre de barras: mover la tarea completa o estirar uno de sus extremos.
+type DragMode = "move" | "start" | "end";
+interface DragInfo {
+  taskId: string;
+  mode: DragMode;
+  startClientX: number;
+  origStart: string;
+  origDue: string;
+}
+
+/** Aplica un desfase en días a una tarea según el modo de arrastre (con guardas
+ * para que el inicio nunca supere al fin ni viceversa). Puro y testeable. */
+function previewDates(info: DragInfo, deltaDays: number): { start: string; due: string } {
+  let start = info.origStart;
+  let due = info.origDue;
+  if (info.mode === "move") {
+    start = addDays(start, deltaDays);
+    due = addDays(due, deltaDays);
+  } else if (info.mode === "start") {
+    start = addDays(start, deltaDays);
+    if (start > due) {
+      start = due;
+    }
+  } else {
+    due = addDays(due, deltaDays);
+    if (due < start) {
+      due = start;
+    }
+  }
+  return { start, due };
+}
 
 const LEGEND_STATUSES: TaskStatus[] = [
   "pendiente_por_iniciar",
@@ -141,11 +184,9 @@ function KpiCard({
           <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", tone)}>
             <Icon className="size-4" />
           </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">{label}</span>
+          <span className="text-[11px] text-muted-foreground">{label}</span>
         </div>
-        <span className="text-lg font-semibold leading-tight text-slate-900 dark:text-slate-50">
-          {value}
-        </span>
+        <span className="text-lg font-semibold leading-tight text-foreground">{value}</span>
         {children}
       </CardContent>
     </Card>
@@ -166,6 +207,9 @@ export function GanttView({
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
   const teamsQuery = useTeams(project.id);
+  const updateTask = useUpdateTask(project.id);
+  const dependenciesQuery = useProjectTaskDependencies(project.id);
+  const dependencies = useMemo(() => dependenciesQuery.data ?? [], [dependenciesQuery.data]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {
@@ -181,6 +225,8 @@ export function GanttView({
   const [teamId, setTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
+  // Mostrar/ocultar las flechas de dependencia (pueden saturar en proyectos densos).
+  const [showDeps, setShowDeps] = useState(true);
   // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
   // si dejas todo colapsado, así lo encuentras la próxima vez.
   const collapsedStorageKey = `gantt-collapsed:${project.id}`;
@@ -266,12 +312,86 @@ export function GanttView({
     () => (range && zoom === "dia" ? weekendBands(range) : []),
     [range, zoom],
   );
-  const summary = useMemo(() => summarize(tasks, TODAY), [tasks]);
+  // Los KPIs miden trabajo REAL: las tareas sintéticas (andamiaje `wi-` desde la
+  // estructura) no son tareas todavía, así que no deben inflar los conteos ni
+  // arrastrar el % de avance a 0. Siguen dibujándose en la línea de tiempo.
+  const realVisibleTasks = useMemo(() => tasks.filter((t) => !t.id.startsWith("wi-")), [tasks]);
+  const summary = useMemo(() => summarize(realVisibleTasks, TODAY), [realVisibleTasks]);
+  // Avance ponderado por duración (más realista que completadas/total).
+  const weightedProgress = useMemo(() => weightedProgressPct(realVisibleTasks), [realVisibleTasks]);
   const remaining = daysRemaining(project.end_date, TODAY);
 
   const trackWidth = range ? Math.max(MIN_TRACK, range.totalDays * ZOOM_CFG[zoom].px) : MIN_TRACK;
   const pxPerDay = range ? trackWidth / range.totalDays : 0;
   const pctToPx = (pct: number) => (pct / 100) * trackWidth;
+
+  // ── Arrastre de barras (reprogramar sin abrir el panel) ──
+  // `drag` guarda el estado inicial del arrastre; `dragDelta` el desfase vivo en
+  // días (para el preview). Un ref espeja el delta para leerlo en el `pointerup`
+  // sin recrear los listeners en cada movimiento.
+  const [drag, setDrag] = useState<DragInfo | null>(null);
+  const [dragDelta, setDragDelta] = useState(0);
+  const dragDeltaRef = useRef(0);
+  // Distingue un clic (abrir detalle) de un arrastre real (reprogramar).
+  const draggedRef = useRef(false);
+
+  const commitDrag = useCallback(
+    (info: DragInfo, deltaDays: number) => {
+      const { start, due } = previewDates(info, deltaDays);
+      if (start === info.origStart && due === info.origDue) {
+        return;
+      }
+      updateTask.mutate({ taskId: info.taskId, payload: { start_date: start, due_date: due } });
+    },
+    [updateTask],
+  );
+
+  const startDrag = (e: React.PointerEvent, task: DatedTask, mode: DragMode) => {
+    // Solo tareas reales y planificadas son arrastrables; el clic izquierdo manda.
+    if (task.id.startsWith("wi-") || e.button !== 0 || pxPerDay <= 0) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    draggedRef.current = false;
+    dragDeltaRef.current = 0;
+    setDragDelta(0);
+    setDrag({
+      taskId: task.id,
+      mode,
+      startClientX: e.clientX,
+      origStart: task.start_date,
+      origDue: task.due_date,
+    });
+  };
+
+  // Mientras hay arrastre, seguimos el puntero a nivel de ventana (aunque salga
+  // de la barra) y confirmamos en `pointerup`.
+  useEffect(() => {
+    if (!drag || pxPerDay <= 0) {
+      return;
+    }
+    const onMove = (e: PointerEvent) => {
+      const delta = Math.round((e.clientX - drag.startClientX) / pxPerDay);
+      if (delta !== 0) {
+        draggedRef.current = true;
+      }
+      dragDeltaRef.current = delta;
+      setDragDelta(delta);
+    };
+    const onUp = () => {
+      commitDrag(drag, dragDeltaRef.current);
+      setDrag(null);
+      setDragDelta(0);
+      dragDeltaRef.current = 0;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [drag, pxPerDay, commitDrag]);
 
   // Scroll horizontal: centrar la línea de "hoy" en el área visible.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -341,6 +461,60 @@ export function GanttView({
       .sort((a, b) => a.order - b.order);
   }, [tasks, itemMeta]);
 
+  // Geometría de cada fila de tarea visible (no colapsada), en el sistema de
+  // coordenadas del cuerpo (y=0 en la primera fila). Sirve para trazar las
+  // flechas de dependencia y espeja EXACTAMENTE el orden de render de grupos.
+  const layout = useMemo(() => {
+    const positions = new Map<string, { yTop: number; left: number; width: number }>();
+    if (!range) {
+      return { positions, height: 0 };
+    }
+    let y = 0;
+    for (const group of groups) {
+      y += ROW_H; // encabezado del grupo
+      if (collapsedGroups.has(group.id)) {
+        continue; // sus tareas no se renderizan → no ocupan alto
+      }
+      for (const task of group.tasks) {
+        const m = barMetrics(task, range);
+        positions.set(task.id, {
+          yTop: y,
+          left: (m.offsetPct / 100) * trackWidth,
+          width: Math.max(10, (m.widthPct / 100) * trackWidth),
+        });
+        y += ROW_H;
+      }
+    }
+    return { positions, height: y };
+  }, [groups, collapsedGroups, range, trackWidth]);
+
+  // Flechas finish-to-start: del extremo derecho de la predecesora al izquierdo
+  // de la sucesora. Solo entre tareas visibles (ambas con geometría conocida).
+  const arrows = useMemo(() => {
+    if (!showDeps) {
+      return [];
+    }
+    const out: { id: string; d: string }[] = [];
+    for (const dep of dependencies) {
+      const from = layout.positions.get(dep.depends_on_id);
+      const to = layout.positions.get(dep.task_id);
+      if (!from || !to) {
+        continue;
+      }
+      const x1 = from.left + from.width;
+      const y1 = from.yTop + ROW_H / 2;
+      const x2 = to.left;
+      const y2 = to.yTop + ROW_H / 2;
+      const stub = 10;
+      // Codo ortogonal: sale a la derecha, baja/sube y entra por la izquierda.
+      out.push({
+        id: dep.id,
+        d: `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${y2} L ${x2 - 2} ${y2}`,
+      });
+    }
+    return out;
+  }, [showDeps, dependencies, layout]);
+
   const toggleStatus = (s: TaskStatus) => {
     setStatuses((prev) => {
       const next = new Set(prev);
@@ -365,6 +539,28 @@ export function GanttView({
     });
   };
 
+  // ¿Hay algún filtro activo? (algún estado apagado o algún selector puesto).
+  const hasActiveFilters =
+    statuses.size !== LEGEND_STATUSES.length ||
+    assigneeId != null ||
+    teamId != null ||
+    position != null ||
+    onlyAtRisk;
+
+  const clearFilters = () => {
+    setStatuses(new Set(LEGEND_STATUSES));
+    setAssigneeId(null);
+    setTeamId(null);
+    setPosition(null);
+    setOnlyAtRisk(false);
+  };
+
+  // Colapsar/expandir todos los grupos visibles de una vez.
+  const allCollapsed = groups.length > 0 && groups.every((g) => collapsedGroups.has(g.id));
+  const toggleAllGroups = () => {
+    setCollapsedGroups(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)));
+  };
+
   const remainingText =
     remaining == null
       ? "—"
@@ -373,7 +569,7 @@ export function GanttView({
         : `${remaining} d`;
 
   const inputCls =
-    "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-brand-gold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+    "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
 
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
@@ -382,11 +578,11 @@ export function GanttView({
           <button
             type="button"
             onClick={() => void navigate(`/projects/${project.id}`)}
-            className="mb-1 text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+            className="mb-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             ← {project.name}
           </button>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
           </h1>
         </div>
@@ -402,7 +598,7 @@ export function GanttView({
             type="button"
             onClick={onToggleDark}
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
@@ -413,14 +609,14 @@ export function GanttView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           icon={TrendingUp}
-          label="Avance"
-          value={`${summary.progressPct}%`}
+          label="Avance ponderado"
+          value={`${weightedProgress}%`}
           tone="bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         >
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-brand-gold transition-all"
-              style={{ width: `${summary.progressPct}%` }}
+              style={{ width: `${weightedProgress}%` }}
             />
           </div>
         </KpiCard>
@@ -443,7 +639,7 @@ export function GanttView({
           tone={
             summary.overdue > 0
               ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300"
-              : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              : "bg-muted text-muted-foreground"
           }
         />
         <KpiCard
@@ -475,8 +671,8 @@ export function GanttView({
                 className={cn(
                   "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition",
                   active
-                    ? "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                    : "border-transparent text-slate-300 line-through dark:text-slate-600",
+                    ? "border-border text-foreground"
+                    : "border-transparent text-muted-foreground/50 line-through",
                 )}
               >
                 <span
@@ -553,7 +749,7 @@ export function GanttView({
               "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
               onlyAtRisk
                 ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-                : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400",
+                : "border-border text-muted-foreground hover:text-foreground",
             )}
           >
             <AlertTriangle className="size-3.5" /> Solo en riesgo
@@ -566,14 +762,14 @@ export function GanttView({
               scrollToToday();
             }}
             disabled={todayPct == null}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             title="Centrar el cronograma en la fecha actual"
           >
             <Crosshair className="size-3.5" /> Hoy
           </button>
 
           {/* Zoom */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
             {(Object.keys(ZOOM_CFG) as Zoom[]).map((z) => (
               <button
                 key={z}
@@ -586,22 +782,69 @@ export function GanttView({
                   "rounded-md px-2 py-1 text-xs font-medium transition",
                   zoom === z
                     ? "bg-primary text-primary-foreground"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {ZOOM_CFG[z].label}
               </button>
             ))}
           </div>
+
+          {/* Colapsar / expandir todos los grupos de una vez */}
+          <button
+            type="button"
+            onClick={toggleAllGroups}
+            disabled={groups.length === 0}
+            title={allCollapsed ? "Expandir todos los grupos" : "Colapsar todos los grupos"}
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {allCollapsed ? (
+              <ChevronsUpDown className="size-3.5" />
+            ) : (
+              <ChevronsDownUp className="size-3.5" />
+            )}
+            {allCollapsed ? "Expandir" : "Colapsar"}
+          </button>
+
+          {/* Mostrar/ocultar flechas de dependencia */}
+          {dependencies.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeps((v) => !v);
+              }}
+              aria-pressed={showDeps}
+              title="Mostrar u ocultar las flechas de dependencia"
+              className={cn(
+                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                showDeps
+                  ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Spline className="size-3.5" /> Dependencias
+            </button>
+          )}
+
+          {/* Limpiar filtros: solo aparece si hay alguno activo */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              <FilterX className="size-3.5" /> Limpiar filtros
+            </button>
+          )}
         </div>
       </div>
 
       {tasksQuery.isLoading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+        <div className="h-64 animate-pulse rounded-xl bg-muted" />
       ) : datedTasks.length === 0 || !range ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center dark:border-slate-700">
-          <GanttChartSquare className="size-8 text-slate-300 dark:text-slate-600" />
-          <p className="text-sm text-slate-400 dark:text-slate-500">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-center">
+          <GanttChartSquare className="size-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
             El cronograma se arma solo cuando los elementos de la estructura tienen fechas plan.
             <br />
             Añade fechas a los elementos o crea tareas para verlas aquí.
@@ -612,16 +855,19 @@ export function GanttView({
         // arriba y la columna de tareas fija a la izquierda.
         <div
           ref={scrollRef}
-          className="relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          className={cn(
+            "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm",
+            drag && "select-none",
+          )}
         >
           <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
-            <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="sticky top-0 z-30 flex border-b border-border bg-card">
               <div
                 style={{ width: LABEL_W }}
-                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-slate-200 bg-white px-3 pb-1.5 dark:border-slate-800 dark:bg-slate-950"
+                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
               >
-                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Tareas · {tasks.length}
                 </span>
               </div>
@@ -630,18 +876,18 @@ export function GanttView({
                   {months.map((b) => (
                     <div
                       key={b.key}
-                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-slate-200 pl-1.5 dark:border-slate-700"
+                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
                       style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                     >
                       {pctToPx(b.widthPct) >= 48 && (
-                        <span className="truncate text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className="truncate text-[10px] font-semibold text-muted-foreground">
                           {b.label}
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="relative h-5 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="relative h-5 border-t border-border/70">
                   {ticks.map((t) => {
                     if (t.offsetPct > 97) {
                       return null; // el rótulo no cabe: la línea de rejilla basta
@@ -653,7 +899,7 @@ export function GanttView({
                       <span
                         key={t.key}
                         className={cn(
-                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-slate-400 dark:text-slate-500",
+                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground",
                           centered && "-translate-x-1/2",
                         )}
                         style={{
@@ -686,21 +932,21 @@ export function GanttView({
                 {weekends.map((b) => (
                   <div
                     key={b.key}
-                    className="absolute inset-y-0 bg-slate-100/70 dark:bg-slate-900/60"
+                    className="absolute inset-y-0 bg-muted/60"
                     style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                   />
                 ))}
                 {ticks.map((t) => (
                   <div
                     key={`grid-${t.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-100 dark:bg-slate-800/60"
+                    className="absolute inset-y-0 w-px bg-border/50"
                     style={{ left: pctToPx(t.offsetPct) }}
                   />
                 ))}
                 {months.slice(1).map((b) => (
                   <div
                     key={`mline-${b.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-200 dark:bg-slate-700/70"
+                    className="absolute inset-y-0 w-px bg-border"
                     style={{ left: pctToPx(b.startPct) }}
                   />
                 ))}
@@ -714,9 +960,42 @@ export function GanttView({
                 />
               )}
 
+              {/* Flechas de dependencia (finish-to-start) sobre las barras */}
+              {arrows.length > 0 && (
+                <svg
+                  className="pointer-events-none absolute z-10 text-brand-teal/70"
+                  style={{ left: LABEL_W, top: 0, width: trackWidth, height: layout.height }}
+                  aria-hidden
+                >
+                  <defs>
+                    <marker
+                      id={`gantt-arrow-${project.id}`}
+                      markerUnits="userSpaceOnUse"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" />
+                    </marker>
+                  </defs>
+                  {arrows.map((a) => (
+                    <path
+                      key={a.id}
+                      d={a.d}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      markerEnd={`url(#gantt-arrow-${project.id})`}
+                    />
+                  ))}
+                </svg>
+              )}
+
               {groups.length === 0 ? (
                 <div className="flex h-32 items-center justify-center">
-                  <p className="sticky left-0 px-4 text-sm italic text-slate-400 dark:text-slate-500">
+                  <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
                     No hay tareas que coincidan con los filtros.
                   </p>
                 </div>
@@ -736,11 +1015,22 @@ export function GanttView({
                     group.tasks[0].due_date,
                   );
                   const gm = barMetrics({ start_date: gStart, due_date: gEnd }, range);
+                  // Alto exacto del grupo (encabezado + filas si está expandido).
+                  // Se lo damos al navegador como tamaño intrínseco para que, con
+                  // `content-visibility: auto`, omita el render de los grupos fuera
+                  // de pantalla (virtualización nativa) sin saltos de scroll.
+                  const sectionHeight = ROW_H * (isCollapsed ? 1 : 1 + group.tasks.length);
                   return (
-                    <section key={group.id}>
+                    <section
+                      key={group.id}
+                      style={{
+                        contentVisibility: "auto",
+                        containIntrinsicSize: `auto ${sectionHeight}px`,
+                      }}
+                    >
                       {/* Encabezado del grupo: clic = colapsar/expandir */}
                       <div
-                        className="flex items-stretch border-b border-slate-100 dark:border-slate-800/70"
+                        className="flex items-stretch border-b border-border/70"
                         style={{ height: ROW_H }}
                       >
                         <button
@@ -751,24 +1041,24 @@ export function GanttView({
                           aria-expanded={!isCollapsed}
                           style={{ width: LABEL_W }}
                           className={cn(
-                            "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-l-[3px] border-r border-r-slate-200 bg-slate-50 px-2 text-left transition-colors hover:bg-slate-100 dark:border-r-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+                            "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-l-[3px] border-r border-r-border bg-muted px-2 text-left transition-colors hover:bg-accent",
                             tone.accent,
                           )}
                         >
                           <ChevronDown
                             className={cn(
-                              "size-3.5 shrink-0 text-slate-400 transition-transform",
+                              "size-3.5 shrink-0 text-muted-foreground transition-transform",
                               isCollapsed && "-rotate-90",
                             )}
                           />
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
                             {group.name}
                           </span>
-                          <span className="shrink-0 rounded-full bg-white px-1.5 py-px text-[10px] font-medium tabular-nums text-slate-400 dark:bg-slate-800 dark:text-slate-400">
+                          <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
                             {done}/{group.tasks.length}
                           </span>
                         </button>
-                        <div className="relative flex-1 bg-slate-50/60 dark:bg-slate-900/40">
+                        <div className="relative flex-1 bg-muted/40">
                           {/* Barra agregada del nodo (resumen del grupo) */}
                           <div
                             className={cn(
@@ -787,7 +1077,17 @@ export function GanttView({
                       {/* Filas de tareas */}
                       {!isCollapsed &&
                         group.tasks.map((task) => {
-                          const metrics = barMetrics(task, range);
+                          const draggable = !task.id.startsWith("wi-");
+                          // Durante el arrastre, la barra sigue al puntero usando
+                          // las fechas de preview; al soltar se persiste.
+                          const isDragging = drag?.taskId === task.id;
+                          const view = isDragging
+                            ? previewDates(drag, dragDelta)
+                            : { start: task.start_date, due: task.due_date };
+                          const metrics = barMetrics(
+                            { start_date: view.start, due_date: view.due },
+                            range,
+                          );
                           const overdue = isOverdue(task, TODAY);
                           const progress = statusProgressPct(task.status);
                           const assignee = task.assignee_id
@@ -796,16 +1096,15 @@ export function GanttView({
                           const teamLabel = task.team_id ? teamNameById.get(task.team_id) : null;
                           const barLeft = pctToPx(metrics.offsetPct);
                           const barW = Math.max(10, pctToPx(metrics.widthPct));
-                          const days =
-                            toDayNumber(task.due_date) - toDayNumber(task.start_date) + 1;
-                          const dateLabel = `${shortDate(task.start_date)} – ${shortDate(task.due_date)} · ${days} d`;
+                          const days = toDayNumber(view.due) - toDayNumber(view.start) + 1;
+                          const dateLabel = `${shortDate(view.start)} – ${shortDate(view.due)} · ${days} d`;
                           // El rótulo va a la derecha de la barra; si no cabe,
                           // se ancla a su izquierda (nunca se corta).
                           const labelFitsRight = barLeft + barW + 140 <= trackWidth;
                           return (
                             <div
                               key={task.id}
-                              className="group/row flex items-stretch border-b border-slate-50 last:border-b-0 dark:border-slate-900"
+                              className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
                               style={{ height: ROW_H }}
                             >
                               <button
@@ -823,7 +1122,7 @@ export function GanttView({
                                   task.id.startsWith("wi-") ? undefined : "Ver y editar la tarea"
                                 }
                                 style={{ width: LABEL_W }}
-                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-slate-200 bg-white px-3 text-left transition-colors group-hover/row:bg-slate-50 enabled:cursor-pointer enabled:hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900 dark:enabled:hover:bg-slate-900"
+                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-border bg-card px-3 text-left transition-colors group-hover/row:bg-muted enabled:cursor-pointer enabled:hover:bg-muted"
                               >
                                 <span
                                   className={cn(
@@ -832,9 +1131,7 @@ export function GanttView({
                                   )}
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs text-slate-600 dark:text-slate-300">
-                                    {task.title}
-                                  </p>
+                                  <p className="truncate text-xs text-foreground">{task.title}</p>
                                   {teamLabel && (
                                     <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
                                       {teamLabel}
@@ -847,19 +1144,29 @@ export function GanttView({
                                     "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                                     assignee
                                       ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
-                                      : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
+                                      : "bg-muted text-muted-foreground",
                                   )}
                                 >
                                   {assignee?.initials ?? "—"}
                                 </span>
                               </button>
-                              <div className="relative flex-1 transition-colors group-hover/row:bg-slate-50/60 dark:group-hover/row:bg-slate-900/40">
+                              <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
                                 <button
                                   type="button"
+                                  onPointerDown={(e) => {
+                                    if (draggable) {
+                                      startDrag(e, task, "move");
+                                    }
+                                  }}
                                   onClick={() => {
-                                    // Las tareas sintéticas (id `wi-…`) vienen de la estructura,
-                                    // no del listado real, así que no abren el panel de detalle.
-                                    if (task.id.startsWith("wi-")) {
+                                    // Tras un arrastre real no abrimos el detalle
+                                    // (fue una reprogramación, no un clic).
+                                    if (draggedRef.current) {
+                                      draggedRef.current = false;
+                                      return;
+                                    }
+                                    // Las sintéticas (id `wi-…`) no abren detalle.
+                                    if (!draggable) {
                                       return;
                                     }
                                     setSelectedId(task.id);
@@ -868,8 +1175,9 @@ export function GanttView({
                                     task.title,
                                     teamLabel ? `Equipo: ${teamLabel}` : null,
                                     assignee?.name ?? "Sin responsable",
-                                    `${task.start_date} → ${task.due_date}`,
+                                    `${view.start} → ${view.due}`,
                                     `${TASK_STATUS_LABELS[task.status]} · ${progress}%`,
+                                    draggable ? "Arrastra para reprogramar" : null,
                                   ]
                                     .filter(Boolean)
                                     .join("\n")}
@@ -877,6 +1185,8 @@ export function GanttView({
                                     "absolute top-1/2 h-[18px] -translate-y-1/2 overflow-hidden rounded-[5px] text-left shadow-sm outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-brand-gold",
                                     STATUS_BAR_SOFT[task.status],
                                     overdue && "ring-1 ring-rose-500",
+                                    draggable && "cursor-grab touch-none",
+                                    isDragging && "z-30 cursor-grabbing ring-2 ring-brand-gold",
                                   )}
                                   style={{ left: barLeft, width: barW }}
                                 >
@@ -885,12 +1195,49 @@ export function GanttView({
                                     style={{ width: `${progress}%` }}
                                   />
                                 </button>
+
+                                {/* Manijas de redimensionado (estirar inicio/fin) */}
+                                {draggable && (
+                                  <>
+                                    <div
+                                      role="slider"
+                                      aria-label="Ajustar inicio"
+                                      aria-valuetext={view.start}
+                                      tabIndex={-1}
+                                      onPointerDown={(e) => {
+                                        startDrag(e, task, "start");
+                                      }}
+                                      className={cn(
+                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-l-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+                                        isDragging && "opacity-100",
+                                      )}
+                                      style={{ left: barLeft }}
+                                    />
+                                    <div
+                                      role="slider"
+                                      aria-label="Ajustar fin"
+                                      aria-valuetext={view.due}
+                                      tabIndex={-1}
+                                      onPointerDown={(e) => {
+                                        startDrag(e, task, "end");
+                                      }}
+                                      className={cn(
+                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-r-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+                                        isDragging && "opacity-100",
+                                      )}
+                                      style={{ left: barLeft + barW - 8 }}
+                                    />
+                                  </>
+                                )}
+
                                 <span
                                   className={cn(
                                     "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
-                                    overdue
-                                      ? "font-medium text-rose-500"
-                                      : "text-slate-400 dark:text-slate-500",
+                                    isDragging
+                                      ? "font-semibold text-brand-gold-dark dark:text-brand-gold"
+                                      : overdue
+                                        ? "font-medium text-rose-500"
+                                        : "text-muted-foreground",
                                   )}
                                   style={
                                     labelFitsRight
