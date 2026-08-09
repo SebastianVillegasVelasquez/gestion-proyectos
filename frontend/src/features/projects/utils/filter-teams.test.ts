@@ -11,6 +11,9 @@ const teams: Team[] = [
     name: "Equipo de Desarrollo",
     description: "Backend y frontend",
     member_count: 5,
+    assigned_tasks: 0,
+    completed_tasks: 0,
+    completion_pct: 0,
   },
   {
     id: "2",
@@ -18,8 +21,20 @@ const teams: Team[] = [
     name: "Diseño",
     description: "Identidad visual",
     member_count: 3,
+    assigned_tasks: 0,
+    completed_tasks: 0,
+    completion_pct: 0,
   },
-  { id: "3", project_id: PROJECT_ID, name: "Soporte", description: null, member_count: 0 },
+  {
+    id: "3",
+    project_id: PROJECT_ID,
+    name: "Soporte",
+    description: null,
+    member_count: 0,
+    assigned_tasks: 0,
+    completed_tasks: 0,
+    completion_pct: 0,
+  },
 ];
 
 describe("filterTeams", () => {

@@ -67,11 +67,6 @@ const ProjectEquiposPage = lazy(() =>
     default: m.ProjectEquiposPage,
   })),
 );
-const ProjectAreasPage = lazy(() =>
-  import("@/features/projects/components/detail/ProjectAreasPage.tsx").then((m) => ({
-    default: m.ProjectAreasPage,
-  })),
-);
 const ProjectTrazabilidadPage = lazy(() =>
   import("@/features/projects/components/detail/ProjectTrazabilidadPage.tsx").then((m) => ({
     default: m.ProjectTrazabilidadPage,
@@ -120,7 +115,6 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/estructura" element={<ProjectEstructuraPage />} />
           <Route path="/projects/:projectId/integrantes" element={<ProjectIntegrantesPage />} />
           <Route path="/projects/:projectId/equipos" element={<ProjectEquiposPage />} />
-          <Route path="/projects/:projectId/areas" element={<ProjectAreasPage />} />
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />

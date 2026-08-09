@@ -10,6 +10,7 @@ from app.modules.teams.presentation.schemas import (
     UpdateTeamRequest,
 )
 from app.shared.exceptions import ConflictError, NotFoundError
+from app.shared.progress import completion_percentage
 
 
 class TeamService:
@@ -43,7 +44,12 @@ class TeamService:
             setattr(team, field, value)
         saved = await self.repo.save_team(team)
         member_count = await self.repo.count_members(team_id)
-        return self._to_team_response(saved, member_count=member_count)
+        assigned, completed = (await self.repo.progress_counts([team_id])).get(
+            team_id, (0, 0)
+        )
+        return self._to_team_response(
+            saved, member_count=member_count, assigned=assigned, completed=completed
+        )
 
     async def delete_team(self, project_id: UUID, team_id: UUID) -> None:
         team = await self._get_active_team(project_id, team_id)
@@ -53,16 +59,28 @@ class TeamService:
     async def get_team(self, project_id: UUID, team_id: UUID) -> TeamResponse:
         team = await self._get_active_team(project_id, team_id)
         member_count = await self.repo.count_members(team_id)
-        return self._to_team_response(team, member_count=member_count)
+        assigned, completed = (await self.repo.progress_counts([team_id])).get(
+            team_id, (0, 0)
+        )
+        return self._to_team_response(
+            team, member_count=member_count, assigned=assigned, completed=completed
+        )
 
     async def search_teams(
         self, project_id: UUID, search: str | None, limit: int, offset: int
     ) -> tuple[list[TeamResponse], int]:
         teams, total = await self.repo.search_teams(project_id, search, limit, offset)
-        # Un único query agrupado para todos los conteos (en vez de 1 por equipo).
-        counts = await self.repo.member_counts([team.id for team in teams])
+        team_ids = [team.id for team in teams]
+        # Dos queries agrupadas para todo el listado (en vez de N por equipo).
+        counts = await self.repo.member_counts(team_ids)
+        progress = await self.repo.progress_counts(team_ids)
         responses = [
-            self._to_team_response(team, member_count=counts.get(team.id, 0))
+            self._to_team_response(
+                team,
+                member_count=counts.get(team.id, 0),
+                assigned=progress.get(team.id, (0, 0))[0],
+                completed=progress.get(team.id, (0, 0))[1],
+            )
             for team in teams
         ]
         return responses, total
@@ -120,13 +138,18 @@ class TeamService:
         return member
 
     @staticmethod
-    def _to_team_response(team: Team, member_count: int) -> TeamResponse:
+    def _to_team_response(
+        team: Team, member_count: int, assigned: int = 0, completed: int = 0
+    ) -> TeamResponse:
         return TeamResponse(
             id=team.id,
             project_id=team.project_id,
             name=team.name,
             description=team.description,
             member_count=member_count,
+            assigned_tasks=assigned,
+            completed_tasks=completed,
+            completion_pct=completion_percentage(completed, assigned),
         )
 
     @staticmethod

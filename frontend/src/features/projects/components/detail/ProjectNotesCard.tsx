@@ -37,6 +37,18 @@ function formatNoteDate(iso: string): string {
  * pero editable). Cualquier miembro puede añadir; borrar queda para el autor o
  * un administrador (la regla la aplica el backend; aquí solo ocultamos el botón).
  */
+const NOTE_ACCENTS = [
+  "border-l-brand-teal",
+  "border-l-brand-gold",
+  "border-l-brand-blue",
+  "border-l-emerald-500",
+] as const;
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p.charAt(0).toUpperCase()).join("") || "?";
+}
+
 export function ProjectNotesCard({ projectId }: { projectId: string }) {
   const { user, hasRole } = useAuth();
   const notesQuery = useProjectNotes(projectId);
@@ -140,46 +152,58 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
           </div>
         )}
 
-        {/* Lista de notas */}
+        {/* Lista de notas: tarjetas tipo "nota adhesiva", en cuadrícula */}
         {notesQuery.isLoading ? (
-          <div className="h-16 animate-pulse rounded-xl bg-muted" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
         ) : notes.length === 0 ? (
           !adding && (
-            <p className="py-2 text-center text-sm italic text-muted-foreground">
-              Aún no hay notas. Deja aquí un problema, una anomalía o algo que recordar.
-            </p>
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-8 text-center">
+              <NotebookPen className="size-6 text-muted-foreground/50" />
+              <p className="text-sm italic text-muted-foreground">
+                Aún no hay notas. Deja aquí un problema, una anomalía o algo que recordar.
+              </p>
+            </div>
           )
         ) : (
-          <ul className="flex flex-col gap-2">
-            {notes.map((note) => (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {notes.map((note, idx) => (
               <li
                 key={note.id}
-                className="group/note flex gap-3 rounded-xl border border-border bg-card px-3 py-2.5"
+                className={`group/note relative flex flex-col gap-2.5 rounded-xl border border-l-[3px] border-border bg-card px-3.5 py-3 shadow-sm transition-shadow hover:shadow-md ${NOTE_ACCENTS[idx % NOTE_ACCENTS.length]}`}
               >
-                <span className="mt-0.5 shrink-0 rounded-md bg-brand-teal-light px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
-                  {formatNoteDate(note.note_date)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-wrap break-words text-sm text-foreground">
-                    {note.content}
-                  </p>
-                  {note.author_name && (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">— {note.author_name}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="rounded-md bg-accent px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                    {formatNoteDate(note.note_date)}
+                  </span>
+                  {canDelete(note) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteNote.mutate(note.id);
+                      }}
+                      disabled={deleteNote.isPending}
+                      aria-label="Borrar nota"
+                      title="Borrar nota"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
                   )}
                 </div>
-                {canDelete(note) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      deleteNote.mutate(note.id);
-                    }}
-                    disabled={deleteNote.isPending}
-                    aria-label="Borrar nota"
-                    title="Borrar nota"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                <p className="line-clamp-6 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                  {note.content}
+                </p>
+                {note.author_name && (
+                  <div className="mt-auto flex items-center gap-1.5 pt-1">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-[9px] font-bold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
+                      {initials(note.author_name)}
+                    </span>
+                    <p className="truncate text-[11px] text-muted-foreground">{note.author_name}</p>
+                  </div>
                 )}
               </li>
             ))}

@@ -7,7 +7,6 @@ import {
   ChevronRight,
   FolderTree,
   History,
-  Layers,
   Moon,
   Pencil,
   Sun,
@@ -49,16 +48,9 @@ const SECTIONS: {
   {
     to: "equipos",
     label: "Equipos de trabajo",
-    meta: "Grupos de trabajo del proyecto",
+    meta: "Grupos de trabajo y su avance",
     icon: UsersRound,
     accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    to: "areas",
-    label: "Progreso por equipo",
-    meta: "Avance agrupado por cargo",
-    icon: Layers,
-    accent: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
   },
   {
     to: "trazabilidad",
@@ -236,9 +228,6 @@ export function ProjectDetailView({
             </CardContent>
           </Card>
 
-          {/* Notas / recordatorios del proyecto */}
-          <ProjectNotesCard projectId={project.id} />
-
           {/* Compartir el avance con el cliente (enlace público de solo lectura) */}
           <ClientAccessCard projectId={project.id} />
         </div>
@@ -273,6 +262,9 @@ export function ProjectDetailView({
           </Card>
         </aside>
       </div>
+
+      {/* Notas / recordatorios del proyecto: al final de la página */}
+      <ProjectNotesCard projectId={project.id} />
     </div>
   );
 }

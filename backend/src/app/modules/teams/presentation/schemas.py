@@ -23,6 +23,9 @@ class TeamResponse(BaseModelConfig):
     name: str
     description: Optional[str] = None
     member_count: int = 0
+    assigned_tasks: int = 0
+    completed_tasks: int = 0
+    completion_pct: int = 0
 
 
 class PaginatedTeamsResponse(BaseModelConfig):

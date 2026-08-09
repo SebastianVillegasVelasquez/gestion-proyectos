@@ -199,6 +199,7 @@ export interface TaskDependency {
 export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante" | "cliente";
 
 export interface ProjectMember {
+  id: string;
   user_id: string;
   name: string;
   last_name: string;
@@ -281,6 +282,9 @@ export interface Team {
   name: string;
   description: string | null;
   member_count: number;
+  assigned_tasks: number;
+  completed_tasks: number;
+  completion_pct: number;
 }
 
 export interface PaginatedTeams {
@@ -363,20 +367,4 @@ export interface ProjectTraceability {
   project_id: string;
   summary: TraceabilitySummary;
   events: TraceabilityEvent[];
-}
-
-// ── Progreso por área/equipo (agrupado por cargo) ────────────────────────────
-export interface AreaProgress {
-  position: UserPosition;
-  member_count: number;
-  assigned_tasks: number;
-  completed_tasks: number;
-  completion_pct: number;
-}
-
-export interface ProjectAreas {
-  project_id: string;
-  total_assigned: number;
-  total_completed: number;
-  areas: AreaProgress[];
 }

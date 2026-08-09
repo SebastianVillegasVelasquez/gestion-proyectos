@@ -12,7 +12,6 @@ from app.core.logger import get_logger
 # ── Import all models to register SQLAlchemy mappers ──────────────────────────
 # Important: Import before creating app to ensure all relationships are resolved
 from app.core.models_registry import *  # noqa: F401, F403
-from app.modules.areas.presentation.routes import router as areas_router
 from app.modules.collaborators.presentation.routes import (
     router as collaborators_router,
 )
@@ -177,7 +176,6 @@ app.include_router(workspace_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")
-app.include_router(areas_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")

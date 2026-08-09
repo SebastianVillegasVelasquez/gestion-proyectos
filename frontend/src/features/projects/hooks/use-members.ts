@@ -28,6 +28,23 @@ export function useAddMember(projectId: string) {
   });
 }
 
+export function useUpdateMemberRole(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { memberId: string; role: ProjectRole }) =>
+      membersApi.updateRole(input.memberId, input.role),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.members(projectId) }),
+  });
+}
+
+export function useRemoveMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => membersApi.remove(memberId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.members(projectId) }),
+  });
+}
+
 export function useUsers(enabled = true) {
   return useQuery({
     queryKey: userKeys.list(),

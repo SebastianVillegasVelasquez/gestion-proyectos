@@ -1,6 +1,5 @@
 from app.core.models_registry import *  # noqa: F401, F403
 from tests.fixtures.shared.fake_repositories import *  # noqa: F401, F403
-from tests.fixtures.unit.areas import *  # noqa: F401, F403
 from tests.fixtures.unit.collaborators import *  # noqa: F401, F403
 from tests.fixtures.unit.config import *  # noqa: F401, F403
 from tests.fixtures.unit.dashboard import *  # noqa: F401, F403

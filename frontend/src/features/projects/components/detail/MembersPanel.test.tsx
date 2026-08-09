@@ -9,9 +9,16 @@ import { membersApi } from "../../api/members.api";
 import type { ProjectMember } from "../../types/api.types";
 
 vi.mock("../../api/members.api", () => ({
-  membersApi: { list: vi.fn(), add: vi.fn() },
+  membersApi: { list: vi.fn(), add: vi.fn(), updateRole: vi.fn(), remove: vi.fn() },
   usersApi: { list: vi.fn() },
   directoryApi: { list: vi.fn(), search: vi.fn() },
+}));
+
+vi.mock("@/features/auth/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: { id: "u1", name: "Ana", email: "ana@obj.com", role: "user" },
+    hasRole: (roles: string[]) => roles.includes("user"),
+  }),
 }));
 
 function renderPanel() {
@@ -24,6 +31,7 @@ function renderPanel() {
 
 const members: ProjectMember[] = [
   {
+    id: "m1",
     user_id: "u1",
     name: "Ana",
     last_name: "García",
@@ -32,6 +40,7 @@ const members: ProjectMember[] = [
     project_role: "integrante",
   },
   {
+    id: "m2",
     user_id: "u2",
     name: "Beto",
     last_name: "López",

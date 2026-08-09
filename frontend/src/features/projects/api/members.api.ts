@@ -6,6 +6,7 @@ import type {
   IdentityUser,
   PaginatedDirectory,
   ProjectMember,
+  ProjectRole,
   UserPosition,
 } from "@/features/projects/types/api.types";
 
@@ -15,6 +16,13 @@ export const membersApi = {
 
   add: (payload: AddMemberPayload) =>
     http.post<ProjectMember>("/projects/members/", payload).then((r) => r.data),
+
+  updateRole: (memberId: string, projectRole: ProjectRole) =>
+    http
+      .patch<ProjectMember>(`/projects/members/${memberId}`, { project_role: projectRole })
+      .then((r) => r.data),
+
+  remove: (memberId: string) => http.delete(`/projects/members/${memberId}`),
 };
 
 export const usersApi = {

@@ -91,6 +91,11 @@ class FakeTeamRepository(TeamRepository):
                 counts[tid] = counts.get(tid, 0) + 1
         return counts
 
+    async def progress_counts(self, team_ids):
+        # Sin tareas en este fake: siempre 0/0 (las use cases de progreso se
+        # cubren con pruebas dedicadas a la agregación SQL).
+        return {tid: (0, 0) for tid in team_ids}
+
     async def add_member(self, member: TeamMember) -> TeamMember:
         if member.id is None:
             member.id = uuid.uuid4()

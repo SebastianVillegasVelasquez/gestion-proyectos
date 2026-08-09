@@ -169,9 +169,29 @@ class ProjectMemberService:
         )
         return [self._to_member_response(m) for m in members]
 
+    async def update_member_role(
+        self, member_id: UUID, project_role
+    ) -> ProjectMemberResponse:
+        member = await self.project_member_repo.get_member_by_id(member_id)
+        if not member or member.is_deleted:
+            raise HTTPException(status_code=404, detail="Integrante no encontrado")
+
+        member.project_role = project_role
+        persisted = await self.project_member_repo.save(member)
+        return self._to_member_response(persisted)
+
+    async def remove_member(self, member_id: UUID) -> None:
+        member = await self.project_member_repo.get_member_by_id(member_id)
+        if not member or member.is_deleted:
+            raise HTTPException(status_code=404, detail="Integrante no encontrado")
+
+        member.soft_delete()
+        await self.project_member_repo.save(member)
+
     @staticmethod
     def _to_member_response(member: ProjectMember) -> ProjectMemberResponse:
         return ProjectMemberResponse(
+            id=member.id,
             user_id=member.user_id,
             name=member.user.name,
             last_name=member.user.last_name,

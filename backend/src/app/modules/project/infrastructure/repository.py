@@ -97,7 +97,10 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
     ) -> list[ProjectMember]:
         query = (
             select(ProjectMember)
-            .where(ProjectMember.project_id == project_id)
+            .where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.deleted_at.is_(None),
+            )
             .options(selectinload(ProjectMember.user))
         )
         result = await self._session.execute(query)
@@ -108,6 +111,15 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
     ) -> Optional[ProjectMember]:
         query = select(ProjectMember).where(
             ProjectMember.project_id == project_id, ProjectMember.user_id == user_id
+        )
+        result = await self._session.execute(query)
+        return result.scalars().first()
+
+    async def get_member_by_id(self, member_id: UUID) -> Optional[ProjectMember]:
+        query = (
+            select(ProjectMember)
+            .where(ProjectMember.id == member_id)
+            .options(selectinload(ProjectMember.user))
         )
         result = await self._session.execute(query)
         return result.scalars().first()

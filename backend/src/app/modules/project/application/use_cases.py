@@ -214,6 +214,26 @@ class GetProjectMembersUseCase:
         return await self.service.get_project_members(project_id)
 
 
+class UpdateProjectMemberRoleUseCase:
+    def __init__(self, member_repo: ProjectMemberRepository):
+        self.service = ProjectMemberService(
+            project_repo=None, user_repo=None, project_member_repo=member_repo
+        )
+
+    async def execute(self, member_id: UUID, project_role) -> ProjectMemberResponse:
+        return await self.service.update_member_role(member_id, project_role)
+
+
+class RemoveProjectMemberUseCase:
+    def __init__(self, member_repo: ProjectMemberRepository):
+        self.service = ProjectMemberService(
+            project_repo=None, user_repo=None, project_member_repo=member_repo
+        )
+
+    async def execute(self, member_id: UUID) -> None:
+        await self.service.remove_member(member_id)
+
+
 class AssignTeamToProjectUseCase:
     """Opción A (snapshot): copia los integrantes de un equipo al proyecto.
 
