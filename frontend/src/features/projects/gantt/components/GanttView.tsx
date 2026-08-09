@@ -11,7 +11,10 @@ import {
   AlertTriangle,
   CalendarClock,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Crosshair,
+  FilterX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -141,11 +144,9 @@ function KpiCard({
           <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", tone)}>
             <Icon className="size-4" />
           </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">{label}</span>
+          <span className="text-[11px] text-muted-foreground">{label}</span>
         </div>
-        <span className="text-lg font-semibold leading-tight text-slate-900 dark:text-slate-50">
-          {value}
-        </span>
+        <span className="text-lg font-semibold leading-tight text-foreground">{value}</span>
         {children}
       </CardContent>
     </Card>
@@ -266,7 +267,11 @@ export function GanttView({
     () => (range && zoom === "dia" ? weekendBands(range) : []),
     [range, zoom],
   );
-  const summary = useMemo(() => summarize(tasks, TODAY), [tasks]);
+  // Los KPIs miden trabajo REAL: las tareas sintéticas (andamiaje `wi-` desde la
+  // estructura) no son tareas todavía, así que no deben inflar los conteos ni
+  // arrastrar el % de avance a 0. Siguen dibujándose en la línea de tiempo.
+  const realVisibleTasks = useMemo(() => tasks.filter((t) => !t.id.startsWith("wi-")), [tasks]);
+  const summary = useMemo(() => summarize(realVisibleTasks, TODAY), [realVisibleTasks]);
   const remaining = daysRemaining(project.end_date, TODAY);
 
   const trackWidth = range ? Math.max(MIN_TRACK, range.totalDays * ZOOM_CFG[zoom].px) : MIN_TRACK;
@@ -365,6 +370,28 @@ export function GanttView({
     });
   };
 
+  // ¿Hay algún filtro activo? (algún estado apagado o algún selector puesto).
+  const hasActiveFilters =
+    statuses.size !== LEGEND_STATUSES.length ||
+    assigneeId != null ||
+    teamId != null ||
+    position != null ||
+    onlyAtRisk;
+
+  const clearFilters = () => {
+    setStatuses(new Set(LEGEND_STATUSES));
+    setAssigneeId(null);
+    setTeamId(null);
+    setPosition(null);
+    setOnlyAtRisk(false);
+  };
+
+  // Colapsar/expandir todos los grupos visibles de una vez.
+  const allCollapsed = groups.length > 0 && groups.every((g) => collapsedGroups.has(g.id));
+  const toggleAllGroups = () => {
+    setCollapsedGroups(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)));
+  };
+
   const remainingText =
     remaining == null
       ? "—"
@@ -373,7 +400,7 @@ export function GanttView({
         : `${remaining} d`;
 
   const inputCls =
-    "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-brand-gold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+    "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
 
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
@@ -382,11 +409,11 @@ export function GanttView({
           <button
             type="button"
             onClick={() => void navigate(`/projects/${project.id}`)}
-            className="mb-1 text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+            className="mb-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             ← {project.name}
           </button>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
           </h1>
         </div>
@@ -402,7 +429,7 @@ export function GanttView({
             type="button"
             onClick={onToggleDark}
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
@@ -417,7 +444,7 @@ export function GanttView({
           value={`${summary.progressPct}%`}
           tone="bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
         >
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-brand-gold transition-all"
               style={{ width: `${summary.progressPct}%` }}
@@ -443,7 +470,7 @@ export function GanttView({
           tone={
             summary.overdue > 0
               ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300"
-              : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              : "bg-muted text-muted-foreground"
           }
         />
         <KpiCard
@@ -475,8 +502,8 @@ export function GanttView({
                 className={cn(
                   "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition",
                   active
-                    ? "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                    : "border-transparent text-slate-300 line-through dark:text-slate-600",
+                    ? "border-border text-foreground"
+                    : "border-transparent text-muted-foreground/50 line-through",
                 )}
               >
                 <span
@@ -553,7 +580,7 @@ export function GanttView({
               "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
               onlyAtRisk
                 ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-                : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400",
+                : "border-border text-muted-foreground hover:text-foreground",
             )}
           >
             <AlertTriangle className="size-3.5" /> Solo en riesgo
@@ -566,14 +593,14 @@ export function GanttView({
               scrollToToday();
             }}
             disabled={todayPct == null}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             title="Centrar el cronograma en la fecha actual"
           >
             <Crosshair className="size-3.5" /> Hoy
           </button>
 
           {/* Zoom */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
             {(Object.keys(ZOOM_CFG) as Zoom[]).map((z) => (
               <button
                 key={z}
@@ -586,22 +613,49 @@ export function GanttView({
                   "rounded-md px-2 py-1 text-xs font-medium transition",
                   zoom === z
                     ? "bg-primary text-primary-foreground"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {ZOOM_CFG[z].label}
               </button>
             ))}
           </div>
+
+          {/* Colapsar / expandir todos los grupos de una vez */}
+          <button
+            type="button"
+            onClick={toggleAllGroups}
+            disabled={groups.length === 0}
+            title={allCollapsed ? "Expandir todos los grupos" : "Colapsar todos los grupos"}
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {allCollapsed ? (
+              <ChevronsUpDown className="size-3.5" />
+            ) : (
+              <ChevronsDownUp className="size-3.5" />
+            )}
+            {allCollapsed ? "Expandir" : "Colapsar"}
+          </button>
+
+          {/* Limpiar filtros: solo aparece si hay alguno activo */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              <FilterX className="size-3.5" /> Limpiar filtros
+            </button>
+          )}
         </div>
       </div>
 
       {tasksQuery.isLoading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+        <div className="h-64 animate-pulse rounded-xl bg-muted" />
       ) : datedTasks.length === 0 || !range ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center dark:border-slate-700">
-          <GanttChartSquare className="size-8 text-slate-300 dark:text-slate-600" />
-          <p className="text-sm text-slate-400 dark:text-slate-500">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-center">
+          <GanttChartSquare className="size-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
             El cronograma se arma solo cuando los elementos de la estructura tienen fechas plan.
             <br />
             Añade fechas a los elementos o crea tareas para verlas aquí.
@@ -612,16 +666,16 @@ export function GanttView({
         // arriba y la columna de tareas fija a la izquierda.
         <div
           ref={scrollRef}
-          className="scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          className="scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm"
         >
           <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
-            <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="sticky top-0 z-30 flex border-b border-border bg-card">
               <div
                 style={{ width: LABEL_W }}
-                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-slate-200 bg-white px-3 pb-1.5 dark:border-slate-800 dark:bg-slate-950"
+                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
               >
-                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Tareas · {tasks.length}
                 </span>
               </div>
@@ -630,18 +684,18 @@ export function GanttView({
                   {months.map((b) => (
                     <div
                       key={b.key}
-                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-slate-200 pl-1.5 dark:border-slate-700"
+                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
                       style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                     >
                       {pctToPx(b.widthPct) >= 48 && (
-                        <span className="truncate text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className="truncate text-[10px] font-semibold text-muted-foreground">
                           {b.label}
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="relative h-5 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="relative h-5 border-t border-border/70">
                   {ticks.map((t) => {
                     if (t.offsetPct > 97) {
                       return null; // el rótulo no cabe: la línea de rejilla basta
@@ -653,7 +707,7 @@ export function GanttView({
                       <span
                         key={t.key}
                         className={cn(
-                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-slate-400 dark:text-slate-500",
+                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground",
                           centered && "-translate-x-1/2",
                         )}
                         style={{
@@ -686,21 +740,21 @@ export function GanttView({
                 {weekends.map((b) => (
                   <div
                     key={b.key}
-                    className="absolute inset-y-0 bg-slate-100/70 dark:bg-slate-900/60"
+                    className="absolute inset-y-0 bg-muted/60"
                     style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                   />
                 ))}
                 {ticks.map((t) => (
                   <div
                     key={`grid-${t.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-100 dark:bg-slate-800/60"
+                    className="absolute inset-y-0 w-px bg-border/50"
                     style={{ left: pctToPx(t.offsetPct) }}
                   />
                 ))}
                 {months.slice(1).map((b) => (
                   <div
                     key={`mline-${b.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-200 dark:bg-slate-700/70"
+                    className="absolute inset-y-0 w-px bg-border"
                     style={{ left: pctToPx(b.startPct) }}
                   />
                 ))}
@@ -716,7 +770,7 @@ export function GanttView({
 
               {groups.length === 0 ? (
                 <div className="flex h-32 items-center justify-center">
-                  <p className="sticky left-0 px-4 text-sm italic text-slate-400 dark:text-slate-500">
+                  <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
                     No hay tareas que coincidan con los filtros.
                   </p>
                 </div>
@@ -740,7 +794,7 @@ export function GanttView({
                     <section key={group.id}>
                       {/* Encabezado del grupo: clic = colapsar/expandir */}
                       <div
-                        className="flex items-stretch border-b border-slate-100 dark:border-slate-800/70"
+                        className="flex items-stretch border-b border-border/70"
                         style={{ height: ROW_H }}
                       >
                         <button
@@ -751,24 +805,24 @@ export function GanttView({
                           aria-expanded={!isCollapsed}
                           style={{ width: LABEL_W }}
                           className={cn(
-                            "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-l-[3px] border-r border-r-slate-200 bg-slate-50 px-2 text-left transition-colors hover:bg-slate-100 dark:border-r-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+                            "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-l-[3px] border-r border-r-border bg-muted px-2 text-left transition-colors hover:bg-accent",
                             tone.accent,
                           )}
                         >
                           <ChevronDown
                             className={cn(
-                              "size-3.5 shrink-0 text-slate-400 transition-transform",
+                              "size-3.5 shrink-0 text-muted-foreground transition-transform",
                               isCollapsed && "-rotate-90",
                             )}
                           />
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
                             {group.name}
                           </span>
-                          <span className="shrink-0 rounded-full bg-white px-1.5 py-px text-[10px] font-medium tabular-nums text-slate-400 dark:bg-slate-800 dark:text-slate-400">
+                          <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
                             {done}/{group.tasks.length}
                           </span>
                         </button>
-                        <div className="relative flex-1 bg-slate-50/60 dark:bg-slate-900/40">
+                        <div className="relative flex-1 bg-muted/40">
                           {/* Barra agregada del nodo (resumen del grupo) */}
                           <div
                             className={cn(
@@ -805,7 +859,7 @@ export function GanttView({
                           return (
                             <div
                               key={task.id}
-                              className="group/row flex items-stretch border-b border-slate-50 last:border-b-0 dark:border-slate-900"
+                              className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
                               style={{ height: ROW_H }}
                             >
                               <button
@@ -823,7 +877,7 @@ export function GanttView({
                                   task.id.startsWith("wi-") ? undefined : "Ver y editar la tarea"
                                 }
                                 style={{ width: LABEL_W }}
-                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-slate-200 bg-white px-3 text-left transition-colors group-hover/row:bg-slate-50 enabled:cursor-pointer enabled:hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900 dark:enabled:hover:bg-slate-900"
+                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-border bg-card px-3 text-left transition-colors group-hover/row:bg-muted enabled:cursor-pointer enabled:hover:bg-muted"
                               >
                                 <span
                                   className={cn(
@@ -832,9 +886,7 @@ export function GanttView({
                                   )}
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs text-slate-600 dark:text-slate-300">
-                                    {task.title}
-                                  </p>
+                                  <p className="truncate text-xs text-foreground">{task.title}</p>
                                   {teamLabel && (
                                     <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
                                       {teamLabel}
@@ -847,13 +899,13 @@ export function GanttView({
                                     "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                                     assignee
                                       ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
-                                      : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
+                                      : "bg-muted text-muted-foreground",
                                   )}
                                 >
                                   {assignee?.initials ?? "—"}
                                 </span>
                               </button>
-                              <div className="relative flex-1 transition-colors group-hover/row:bg-slate-50/60 dark:group-hover/row:bg-slate-900/40">
+                              <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -888,9 +940,7 @@ export function GanttView({
                                 <span
                                   className={cn(
                                     "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
-                                    overdue
-                                      ? "font-medium text-rose-500"
-                                      : "text-slate-400 dark:text-slate-500",
+                                    overdue ? "font-medium text-rose-500" : "text-muted-foreground",
                                   )}
                                   style={
                                     labelFitsRight
