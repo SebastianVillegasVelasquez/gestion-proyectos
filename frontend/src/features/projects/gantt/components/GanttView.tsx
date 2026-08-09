@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree } from "../../hooks/use-structure";
-import { useProjectTasks } from "../../hooks/use-tasks";
+import { useProjectTasks, useUpdateTask } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import {
@@ -32,6 +32,7 @@ import {
   weekendBands,
   toDayNumber,
   shortDate,
+  addDays,
   type TickUnit,
 } from "../timeline";
 import {
@@ -70,6 +71,38 @@ const GROUP_TONES = [
   { accent: "border-l-amber-400", bar: "bg-amber-400/50 dark:bg-amber-400/40" },
   { accent: "border-l-rose-400", bar: "bg-rose-400/50 dark:bg-rose-400/40" },
 ];
+
+// Arrastre de barras: mover la tarea completa o estirar uno de sus extremos.
+type DragMode = "move" | "start" | "end";
+interface DragInfo {
+  taskId: string;
+  mode: DragMode;
+  startClientX: number;
+  origStart: string;
+  origDue: string;
+}
+
+/** Aplica un desfase en días a una tarea según el modo de arrastre (con guardas
+ * para que el inicio nunca supere al fin ni viceversa). Puro y testeable. */
+function previewDates(info: DragInfo, deltaDays: number): { start: string; due: string } {
+  let start = info.origStart;
+  let due = info.origDue;
+  if (info.mode === "move") {
+    start = addDays(start, deltaDays);
+    due = addDays(due, deltaDays);
+  } else if (info.mode === "start") {
+    start = addDays(start, deltaDays);
+    if (start > due) {
+      start = due;
+    }
+  } else {
+    due = addDays(due, deltaDays);
+    if (due < start) {
+      due = start;
+    }
+  }
+  return { start, due };
+}
 
 const LEGEND_STATUSES: TaskStatus[] = [
   "pendiente_por_iniciar",
@@ -173,6 +206,7 @@ export function GanttView({
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
   const teamsQuery = useTeams(project.id);
+  const updateTask = useUpdateTask(project.id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teamNameById = useMemo(() => {
@@ -285,6 +319,74 @@ export function GanttView({
   const trackWidth = range ? Math.max(MIN_TRACK, range.totalDays * ZOOM_CFG[zoom].px) : MIN_TRACK;
   const pxPerDay = range ? trackWidth / range.totalDays : 0;
   const pctToPx = (pct: number) => (pct / 100) * trackWidth;
+
+  // ── Arrastre de barras (reprogramar sin abrir el panel) ──
+  // `drag` guarda el estado inicial del arrastre; `dragDelta` el desfase vivo en
+  // días (para el preview). Un ref espeja el delta para leerlo en el `pointerup`
+  // sin recrear los listeners en cada movimiento.
+  const [drag, setDrag] = useState<DragInfo | null>(null);
+  const [dragDelta, setDragDelta] = useState(0);
+  const dragDeltaRef = useRef(0);
+  // Distingue un clic (abrir detalle) de un arrastre real (reprogramar).
+  const draggedRef = useRef(false);
+
+  const commitDrag = useCallback(
+    (info: DragInfo, deltaDays: number) => {
+      const { start, due } = previewDates(info, deltaDays);
+      if (start === info.origStart && due === info.origDue) {
+        return;
+      }
+      updateTask.mutate({ taskId: info.taskId, payload: { start_date: start, due_date: due } });
+    },
+    [updateTask],
+  );
+
+  const startDrag = (e: React.PointerEvent, task: DatedTask, mode: DragMode) => {
+    // Solo tareas reales y planificadas son arrastrables; el clic izquierdo manda.
+    if (task.id.startsWith("wi-") || e.button !== 0 || pxPerDay <= 0) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    draggedRef.current = false;
+    dragDeltaRef.current = 0;
+    setDragDelta(0);
+    setDrag({
+      taskId: task.id,
+      mode,
+      startClientX: e.clientX,
+      origStart: task.start_date,
+      origDue: task.due_date,
+    });
+  };
+
+  // Mientras hay arrastre, seguimos el puntero a nivel de ventana (aunque salga
+  // de la barra) y confirmamos en `pointerup`.
+  useEffect(() => {
+    if (!drag || pxPerDay <= 0) {
+      return;
+    }
+    const onMove = (e: PointerEvent) => {
+      const delta = Math.round((e.clientX - drag.startClientX) / pxPerDay);
+      if (delta !== 0) {
+        draggedRef.current = true;
+      }
+      dragDeltaRef.current = delta;
+      setDragDelta(delta);
+    };
+    const onUp = () => {
+      commitDrag(drag, dragDeltaRef.current);
+      setDrag(null);
+      setDragDelta(0);
+      dragDeltaRef.current = 0;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [drag, pxPerDay, commitDrag]);
 
   // Scroll horizontal: centrar la línea de "hoy" en el área visible.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -674,7 +776,10 @@ export function GanttView({
         // arriba y la columna de tareas fija a la izquierda.
         <div
           ref={scrollRef}
-          className="scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm"
+          className={cn(
+            "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm",
+            drag && "select-none",
+          )}
         >
           <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
@@ -849,7 +954,17 @@ export function GanttView({
                       {/* Filas de tareas */}
                       {!isCollapsed &&
                         group.tasks.map((task) => {
-                          const metrics = barMetrics(task, range);
+                          const draggable = !task.id.startsWith("wi-");
+                          // Durante el arrastre, la barra sigue al puntero usando
+                          // las fechas de preview; al soltar se persiste.
+                          const isDragging = drag?.taskId === task.id;
+                          const view = isDragging
+                            ? previewDates(drag, dragDelta)
+                            : { start: task.start_date, due: task.due_date };
+                          const metrics = barMetrics(
+                            { start_date: view.start, due_date: view.due },
+                            range,
+                          );
                           const overdue = isOverdue(task, TODAY);
                           const progress = statusProgressPct(task.status);
                           const assignee = task.assignee_id
@@ -858,9 +973,8 @@ export function GanttView({
                           const teamLabel = task.team_id ? teamNameById.get(task.team_id) : null;
                           const barLeft = pctToPx(metrics.offsetPct);
                           const barW = Math.max(10, pctToPx(metrics.widthPct));
-                          const days =
-                            toDayNumber(task.due_date) - toDayNumber(task.start_date) + 1;
-                          const dateLabel = `${shortDate(task.start_date)} – ${shortDate(task.due_date)} · ${days} d`;
+                          const days = toDayNumber(view.due) - toDayNumber(view.start) + 1;
+                          const dateLabel = `${shortDate(view.start)} – ${shortDate(view.due)} · ${days} d`;
                           // El rótulo va a la derecha de la barra; si no cabe,
                           // se ancla a su izquierda (nunca se corta).
                           const labelFitsRight = barLeft + barW + 140 <= trackWidth;
@@ -916,10 +1030,20 @@ export function GanttView({
                               <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
                                 <button
                                   type="button"
+                                  onPointerDown={(e) => {
+                                    if (draggable) {
+                                      startDrag(e, task, "move");
+                                    }
+                                  }}
                                   onClick={() => {
-                                    // Las tareas sintéticas (id `wi-…`) vienen de la estructura,
-                                    // no del listado real, así que no abren el panel de detalle.
-                                    if (task.id.startsWith("wi-")) {
+                                    // Tras un arrastre real no abrimos el detalle
+                                    // (fue una reprogramación, no un clic).
+                                    if (draggedRef.current) {
+                                      draggedRef.current = false;
+                                      return;
+                                    }
+                                    // Las sintéticas (id `wi-…`) no abren detalle.
+                                    if (!draggable) {
                                       return;
                                     }
                                     setSelectedId(task.id);
@@ -928,8 +1052,9 @@ export function GanttView({
                                     task.title,
                                     teamLabel ? `Equipo: ${teamLabel}` : null,
                                     assignee?.name ?? "Sin responsable",
-                                    `${task.start_date} → ${task.due_date}`,
+                                    `${view.start} → ${view.due}`,
                                     `${TASK_STATUS_LABELS[task.status]} · ${progress}%`,
+                                    draggable ? "Arrastra para reprogramar" : null,
                                   ]
                                     .filter(Boolean)
                                     .join("\n")}
@@ -937,6 +1062,8 @@ export function GanttView({
                                     "absolute top-1/2 h-[18px] -translate-y-1/2 overflow-hidden rounded-[5px] text-left shadow-sm outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-brand-gold",
                                     STATUS_BAR_SOFT[task.status],
                                     overdue && "ring-1 ring-rose-500",
+                                    draggable && "cursor-grab touch-none",
+                                    isDragging && "z-30 cursor-grabbing ring-2 ring-brand-gold",
                                   )}
                                   style={{ left: barLeft, width: barW }}
                                 >
@@ -945,10 +1072,49 @@ export function GanttView({
                                     style={{ width: `${progress}%` }}
                                   />
                                 </button>
+
+                                {/* Manijas de redimensionado (estirar inicio/fin) */}
+                                {draggable && (
+                                  <>
+                                    <div
+                                      role="slider"
+                                      aria-label="Ajustar inicio"
+                                      aria-valuetext={view.start}
+                                      tabIndex={-1}
+                                      onPointerDown={(e) => {
+                                        startDrag(e, task, "start");
+                                      }}
+                                      className={cn(
+                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-l-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+                                        isDragging && "opacity-100",
+                                      )}
+                                      style={{ left: barLeft }}
+                                    />
+                                    <div
+                                      role="slider"
+                                      aria-label="Ajustar fin"
+                                      aria-valuetext={view.due}
+                                      tabIndex={-1}
+                                      onPointerDown={(e) => {
+                                        startDrag(e, task, "end");
+                                      }}
+                                      className={cn(
+                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-r-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+                                        isDragging && "opacity-100",
+                                      )}
+                                      style={{ left: barLeft + barW - 8 }}
+                                    />
+                                  </>
+                                )}
+
                                 <span
                                   className={cn(
                                     "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
-                                    overdue ? "font-medium text-rose-500" : "text-muted-foreground",
+                                    isDragging
+                                      ? "font-semibold text-brand-gold-dark dark:text-brand-gold"
+                                      : overdue
+                                        ? "font-medium text-rose-500"
+                                        : "text-muted-foreground",
                                   )}
                                   style={
                                     labelFitsRight

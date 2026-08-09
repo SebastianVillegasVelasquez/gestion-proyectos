@@ -17,6 +17,20 @@ export function toDayNumber(iso: string): number {
   return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
 }
 
+/** Inverso de `toDayNumber`: convierte un número de día a ISO YYYY-MM-DD (UTC). */
+export function isoFromDayNumber(day: number): string {
+  const date = new Date(day * 86_400_000);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Suma (o resta) `n` días a una fecha ISO, devolviendo otra fecha ISO. */
+export function addDays(iso: string, n: number): string {
+  return isoFromDayNumber(toDayNumber(iso) + n);
+}
+
 /** Rango total que abarca todas las tareas, o null si no hay fechas válidas. */
 export function computeRange(
   tasks: { start_date: string; due_date: string }[],

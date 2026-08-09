@@ -3,6 +3,8 @@ import {
   computeRange,
   barMetrics,
   toDayNumber,
+  isoFromDayNumber,
+  addDays,
   dayOffsetPct,
   axisTicks,
   padRange,
@@ -15,6 +17,17 @@ import {
 describe("toDayNumber", () => {
   it("produces consecutive integers for consecutive days", () => {
     expect(toDayNumber("2026-06-02") - toDayNumber("2026-06-01")).toBe(1);
+  });
+});
+
+describe("isoFromDayNumber / addDays", () => {
+  it("round-trips an ISO date through its day number", () => {
+    expect(isoFromDayNumber(toDayNumber("2026-06-15"))).toBe("2026-06-15");
+  });
+
+  it("adds and subtracts days across month boundaries", () => {
+    expect(addDays("2026-06-28", 5)).toBe("2026-07-03");
+    expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
   });
 });
 
