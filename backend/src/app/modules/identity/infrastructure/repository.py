@@ -3,7 +3,11 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.infrastructure.models import Position, User
+from app.modules.identity.infrastructure.models import (
+    Position,
+    User,
+    UserReleaseView,
+)
 from app.shared.base_repository import BaseRepository
 
 
@@ -130,6 +134,27 @@ class UserRepository(BaseRepository[User]):
         user.is_active = False
 
         return await self.save(user)
+
+    # ── Novedades vistas por el usuario (modal "what's new") ──────────────────
+    async def get_seen_release_ids(self, user_id: UUID) -> list[str]:
+        query = select(UserReleaseView.release_id).where(
+            UserReleaseView.user_id == user_id
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def add_seen_releases(
+        self, user_id: UUID, release_ids: list[str]
+    ) -> list[str]:
+        """Marca releases como vistos (idempotente) y devuelve el set actualizado."""
+        existing = set(await self.get_seen_release_ids(user_id))
+        for release_id in release_ids:
+            if release_id and release_id not in existing:
+                self._session.add(
+                    UserReleaseView(user_id=user_id, release_id=release_id)
+                )
+                existing.add(release_id)
+        await self._session.flush()
+        return list(existing)
 
 
 class PositionRepository(BaseRepository[Position]):

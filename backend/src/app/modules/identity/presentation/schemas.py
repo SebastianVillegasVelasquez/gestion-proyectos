@@ -239,3 +239,15 @@ class BulkCreateUsersResponse(BaseModelConfig):
     created: list[BulkCreatedUser]
     failed: list[BulkUserRowError]
     total_rows: int
+
+
+class SeenReleasesResponse(BaseModelConfig):
+    """Ids de novedades ("what's new") que el usuario ya vio."""
+
+    release_ids: list[str] = []
+
+
+class MarkReleasesSeenRequest(BaseModelConfig):
+    """Ids de novedades a marcar como vistas (idempotente)."""
+
+    release_ids: list[str] = []

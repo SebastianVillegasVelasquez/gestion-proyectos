@@ -4,7 +4,7 @@ import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
-import { WhatsNewModal } from "@/features/whats-new/WhatsNewModal";
+import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
 // Fallback mientras se descarga el chunk de la ruta (solo el área de contenido;
@@ -56,77 +56,78 @@ export const AppLayout = () => {
   const context: AppOutletContext = { dark, toggleDark };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
-          onClick={() => {
+    <WhatsNewProvider>
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => {
+              setSidebarOpen(false);
+            }}
+          />
+        )}
+
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => {
             setSidebarOpen(false);
           }}
+          collapsed={collapsed}
+          onToggleCollapsed={toggleCollapsed}
+          dark={dark}
+          onToggleDark={toggleDark}
         />
-      )}
 
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => {
-          setSidebarOpen(false);
-        }}
-        collapsed={collapsed}
-        onToggleCollapsed={toggleCollapsed}
-        dark={dark}
-        onToggleDark={toggleDark}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Mobile-only topbar */}
-        <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSidebarOpen(true);
-              }}
-              aria-label="Abrir menú de navegación"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
-            >
-              <Menu className="size-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <img
-                src="/logo.webp"
-                alt="Bitácora OBJ"
-                className="h-7 w-7 shrink-0 rounded-lg object-contain"
-              />
-              <span className="text-sm font-bold tracking-tight text-foreground">Bitácora OBJ</span>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Mobile-only topbar */}
+          <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(true);
+                }}
+                aria-label="Abrir menú de navegación"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+              >
+                <Menu className="size-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/logo.webp"
+                  alt="Bitácora OBJ"
+                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
+                />
+                <span className="text-sm font-bold tracking-tight text-foreground">
+                  Bitácora OBJ
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <NotificationBell placement="down" />
-            <button
-              type="button"
-              onClick={toggleDark}
-              aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
-            >
-              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
-          </div>
-        </header>
+            <div className="flex items-center gap-1">
+              <NotificationBell placement="down" />
+              <button
+                type="button"
+                onClick={toggleDark}
+                aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+              >
+                {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </button>
+            </div>
+          </header>
 
-        {/* Page content — scrollable on mobile, fixed on desktop. */}
-        <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
-          <Suspense fallback={<RouteFallback />}>
-            <Outlet context={context} />
-          </Suspense>
-        </main>
+          {/* Page content — scrollable on mobile, fixed on desktop. */}
+          <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet context={context} />
+            </Suspense>
+          </main>
+        </div>
+
+        {/* Botón de feedback siempre visible en la app autenticada. */}
+        <FeedbackWidget />
       </div>
-
-      {/* Botón de feedback siempre visible en la app autenticada. */}
-      <FeedbackWidget />
-
-      {/* Novedades: una sola vez por usuario, según su rol. */}
-      <WhatsNewModal />
-    </div>
+    </WhatsNewProvider>
   );
 };

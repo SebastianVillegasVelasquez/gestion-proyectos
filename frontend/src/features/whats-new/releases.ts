@@ -50,27 +50,6 @@ export const RELEASES: ReleaseNote[] = [
   },
 ];
 
-const storageKey = (userId: string) => `whatsnew-seen:${userId}`;
-
-export function readSeen(userId: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(storageKey(userId));
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-export function markSeen(userId: string, ids: string[]): void {
-  try {
-    const next = readSeen(userId);
-    ids.forEach((id) => next.add(id));
-    localStorage.setItem(storageKey(userId), JSON.stringify([...next]));
-  } catch {
-    // Sin persistencia si el almacenamiento no está disponible; no es crítico.
-  }
-}
-
 /** Predicado: ¿esta novedad le concierne a un usuario según si es de rol elevado? */
 export function isRelevant(release: ReleaseNote, isElevated: boolean): boolean {
   if (release.audience === "all") {
@@ -79,8 +58,13 @@ export function isRelevant(release: ReleaseNote, isElevated: boolean): boolean {
   return release.audience === "elevated" ? isElevated : !isElevated;
 }
 
-/** Novedades que el usuario aún no ha visto y que le conciernen por su rol. */
-export function unseenReleases(userId: string, isElevated: boolean): ReleaseNote[] {
-  const seen = readSeen(userId);
-  return RELEASES.filter((r) => isRelevant(r, isElevated) && !seen.has(r.id));
+/** Novedades que le conciernen a un usuario según su rol (todas, vistas o no). */
+export function relevantReleases(isElevated: boolean): ReleaseNote[] {
+  return RELEASES.filter((r) => isRelevant(r, isElevated));
+}
+
+/** De las relevantes, las que aún no están en el set de vistas (persistido). */
+export function unseenReleases(seenIds: string[], isElevated: boolean): ReleaseNote[] {
+  const seen = new Set(seenIds);
+  return relevantReleases(isElevated).filter((r) => !seen.has(r.id));
 }

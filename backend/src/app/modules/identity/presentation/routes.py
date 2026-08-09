@@ -41,11 +41,13 @@ from app.modules.identity.presentation.schemas import (
     CreateUserRequest,
     DirectoryUserResponse,
     LoginRequest,
+    MarkReleasesSeenRequest,
     PaginatedDirectoryResponse,
     PaginatedUsersResponse,
     PositionOption,
     RefreshRequest,
     ResetPasswordResponse,
+    SeenReleasesResponse,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
@@ -157,6 +159,28 @@ async def refresh(
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/me/seen-releases", response_model=SeenReleasesResponse)
+async def get_seen_releases(
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Ids de novedades que el usuario ya vio (persistido por persona)."""
+    return SeenReleasesResponse(
+        release_ids=await repo.get_seen_release_ids(current_user.id)
+    )
+
+
+@router.post("/me/seen-releases", response_model=SeenReleasesResponse)
+async def mark_seen_releases(
+    data: MarkReleasesSeenRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Marca novedades como vistas (idempotente) y devuelve el set actualizado."""
+    updated = await repo.add_seen_releases(current_user.id, data.release_ids)
+    return SeenReleasesResponse(release_ids=updated)
 
 
 @router.patch("/me/password", status_code=204)
