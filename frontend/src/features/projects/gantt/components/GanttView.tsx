@@ -1015,8 +1015,19 @@ export function GanttView({
                     group.tasks[0].due_date,
                   );
                   const gm = barMetrics({ start_date: gStart, due_date: gEnd }, range);
+                  // Alto exacto del grupo (encabezado + filas si está expandido).
+                  // Se lo damos al navegador como tamaño intrínseco para que, con
+                  // `content-visibility: auto`, omita el render de los grupos fuera
+                  // de pantalla (virtualización nativa) sin saltos de scroll.
+                  const sectionHeight = ROW_H * (isCollapsed ? 1 : 1 + group.tasks.length);
                   return (
-                    <section key={group.id}>
+                    <section
+                      key={group.id}
+                      style={{
+                        contentVisibility: "auto",
+                        containIntrinsicSize: `auto ${sectionHeight}px`,
+                      }}
+                    >
                       {/* Encabezado del grupo: clic = colapsar/expandir */}
                       <div
                         className="flex items-stretch border-b border-border/70"
