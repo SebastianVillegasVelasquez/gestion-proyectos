@@ -612,7 +612,7 @@ export function GanttView({
         // arriba y la columna de tareas fija a la izquierda.
         <div
           ref={scrollRef}
-          className="relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          className="scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
         >
           <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
