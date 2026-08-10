@@ -1,4 +1,4 @@
-"""E2E de autorización: jerarquía del rol DEVELOPER, restricciones del rol CLIENT
+"""E2E de autorización: jerarquía del rol DEVELOPER, restricciones del rol USER
 y límite de intentos en el login.
 """
 
@@ -15,13 +15,13 @@ class TestDeveloperHierarchy:
         assert resp.status_code == 200, resp.text
 
 
-class TestClientRestrictions:
-    async def test_client_blocked_from_admin_users(self, client, client_headers):
-        resp = await client.get("/api/v1/identity/users/manage", headers=client_headers)
+class TestUserRestrictions:
+    async def test_user_blocked_from_admin_users(self, client, member_headers):
+        resp = await client.get("/api/v1/identity/users/manage", headers=member_headers)
         assert resp.status_code == 403
 
-    async def test_client_blocked_from_projects(self, client, client_headers):
-        resp = await client.get("/api/v1/projects/", headers=client_headers)
+    async def test_user_blocked_from_projects(self, client, member_headers):
+        resp = await client.get("/api/v1/projects/", headers=member_headers)
         assert resp.status_code == 403
 
 

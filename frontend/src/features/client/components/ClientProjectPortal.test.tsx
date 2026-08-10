@@ -78,7 +78,7 @@ describe("ClientProjectPortal", () => {
     expect(await screen.findByText(/Token no válido o expirado/)).toBeInTheDocument();
   });
 
-  it("loads the structure schedule lazily only when the Cronograma tab is opened", async () => {
+  it("loads the schedule (components and tasks) lazily only when the Cronograma tab is opened", async () => {
     const schedule: PublicProjectSchedule = {
       project_name: "Diplomado en Analítica",
       items: [
@@ -92,6 +92,19 @@ describe("ClientProjectPortal", () => {
           due_date: "2026-07-20",
           status: "en_progreso",
           progress_pct: 45,
+          is_task: false,
+        },
+        {
+          key: "n1",
+          parent_key: "n0",
+          name: "Grabar lección 1",
+          depth: 1,
+          order: 1,
+          start_date: "2026-07-02",
+          due_date: "2026-07-05",
+          status: "completada",
+          progress_pct: 100,
+          is_task: true,
         },
       ],
     };
@@ -106,13 +119,14 @@ describe("ClientProjectPortal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /cronograma/i }));
 
-    // Muestra la estructura (componentes), no tareas ni responsables.
+    // Muestra componentes Y tareas, pero nunca responsables ni equipos.
     expect(await screen.findByText("Módulo 1")).toBeInTheDocument();
+    expect(screen.getByText("Grabar lección 1")).toBeInTheDocument();
     expect(portalApi.getSchedule).toHaveBeenCalledWith("tok-123");
     expect(screen.queryByLabelText(/responsable/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/equipo/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/responsabilidad/i)).not.toBeInTheDocument();
-    // Sí conserva la búsqueda por componente.
+    // Sí conserva la búsqueda por componente o tarea.
     expect(screen.getByLabelText(/buscar componente/i)).toBeInTheDocument();
   });
 });

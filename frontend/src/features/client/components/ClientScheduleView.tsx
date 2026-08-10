@@ -52,12 +52,12 @@ const STATUS_ORDER: TaskStatus[] = [
 const TODAY = new Date().toISOString().slice(0, 10);
 
 /**
- * Cronograma del proyecto para el portal público del cliente: la ESTRUCTURA con
- * su tiempo, no las tareas. Cada fila es un componente/entregable con su barra
- * (rango agregado) y su avance; la jerarquía se navega colapsando padres.
- * Reutiliza la matemática del cronograma interno (timeline/metrics) y omite todo
- * lo sensible: sin responsables, equipos, cargos ni tareas individuales. Filtros
- * permitidos: estado, "solo en riesgo", zoom y búsqueda.
+ * Cronograma del proyecto para el portal público del cliente: la misma
+ * información que el cronograma interno —componentes/entregables Y sus tareas—
+ * pero omitiendo todo lo sensible: sin responsables, equipos ni cargos. Cada
+ * fila lleva su barra (rango), estado y avance; los componentes se colapsan para
+ * mostrar/ocultar sus tareas. Reutiliza la matemática del cronograma interno
+ * (timeline/metrics). Filtros permitidos: estado, "solo en riesgo", zoom y búsqueda.
  */
 export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedule }) {
   const items: PublicScheduleItem[] = schedule.items;
@@ -241,8 +241,8 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               onChange={(e) => {
                 setSearch(e.target.value);
               }}
-              placeholder="Buscar componente"
-              aria-label="Buscar componente por nombre"
+              placeholder="Buscar componente o tarea"
+              aria-label="Buscar componente o tarea por nombre"
               className={cn(inputCls, "pl-7")}
             />
           </div>
@@ -313,7 +313,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
       ) : (
         <div
           ref={scrollRef}
-          className="relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          className="relative max-h-[80vh] min-h-[28rem] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
         >
           <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
@@ -323,7 +323,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                 className="sticky left-0 z-10 flex shrink-0 items-end border-r border-slate-200 bg-white px-3 pb-1.5 dark:border-slate-800 dark:bg-slate-950"
               >
                 <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Estructura · {rows.length}
+                  Cronograma · {rows.length}
                 </span>
               </div>
               <div className="relative shrink-0" style={{ width: trackWidth }}>
@@ -464,8 +464,13 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                           ) : (
                             <span className="w-3.5 shrink-0" aria-hidden />
                           )}
+                          {/* Marcador: círculo = componente, cuadrado = tarea. */}
                           <span
-                            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[item.status])}
+                            className={cn(
+                              "size-2 shrink-0",
+                              item.is_task ? "rounded-[2px]" : "rounded-full",
+                              STATUS_DOT[item.status],
+                            )}
                           />
                           <p
                             className={cn(
