@@ -4,6 +4,7 @@ import type { ProjectMember, ProjectRole } from "../types/api.types";
 
 function member(name: string, last: string, role: ProjectRole): ProjectMember {
   return {
+    id: `id-${name}-${role}`,
     user_id: `${name}-${role}`,
     name,
     last_name: last,

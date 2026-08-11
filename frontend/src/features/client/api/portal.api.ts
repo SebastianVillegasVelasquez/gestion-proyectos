@@ -33,6 +33,8 @@ export interface PublicScheduleItem {
   due_date: string;
   status: TaskStatus;
   progress_pct: number;
+  // True si la fila es una tarea (hoja) y no un componente de la estructura.
+  is_task: boolean;
 }
 
 export interface PublicProjectSchedule {

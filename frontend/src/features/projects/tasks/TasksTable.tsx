@@ -1,13 +1,60 @@
 import { useMemo, useState } from "react";
-import { Pencil, Replace, X } from "lucide-react";
+import { AlertCircle, ChevronDown, Pencil, Replace, UserPlus, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "../types/labels";
-import type { ProjectMember, Task, TaskPriority, TaskStatus, Team } from "../types/api.types";
+import { getErrorMessage } from "@/utils/get-error-message";
+import { useSortableData } from "@/hooks/use-sortable-data";
+import { SortableTh } from "@/components/ui/SortableTh";
+import { TASK_PRIORITY_LABELS, TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../types/labels";
+import type {
+  ProjectMember,
+  ProjectRole,
+  Task,
+  TaskPriority,
+  TaskStatus,
+  Team,
+} from "../types/api.types";
 import { useChangeTaskStatus, useUpdateTask } from "../hooks/use-tasks";
 import { commonPrefix, replaceInTitle } from "./bulk-title";
+import { AssignTaskModal } from "./AssignTaskModal";
 
 const STATUSES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
 const PRIORITIES = Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[];
+
+// Columnas ordenables de la tabla (las de datos derivados/complejos —
+// asignación, ubicación — quedan fuera).
+type SortKey = "title" | "status" | "priority" | "due_date";
+
+// Estados que solo puede fijar quien revisa (líder/supervisor del proyecto):
+// espejo de `_REVIEW_TARGET_STATUSES` en el backend (ChangeTaskStatusUseCase).
+const REVIEW_TARGET_STATUSES: TaskStatus[] = ["completada", "devuelta"];
+const REVIEW_ROLES: ProjectRole[] = ["coordinador", "supervisor"];
+
+/**
+ * Qué estados puede fijar el usuario actual en esta tarea, replicando en el
+ * frontend la misma regla de `ChangeTaskStatusUseCase._authorize` del backend:
+ * gestión (admin/super_admin/developer) fija cualquiera; el responsable puede
+ * todo menos aprobar/devolver (eso es del revisor); el líder/supervisor del
+ * proyecto puede cualquiera; cualquier otra persona no puede cambiar el estado.
+ * Sin esto, la tabla ofrecía transiciones que el backend rechazaba en silencio.
+ */
+function allowedStatuses(
+  task: Task,
+  currentUserId: string | undefined,
+  isElevated: boolean,
+  myProjectRole: ProjectRole | undefined,
+): TaskStatus[] {
+  if (isElevated) {
+    return STATUSES;
+  }
+  if (myProjectRole && REVIEW_ROLES.includes(myProjectRole)) {
+    return STATUSES;
+  }
+  const isAssignee = Boolean(currentUserId) && task.assignee_id === currentUserId;
+  if (isAssignee) {
+    return STATUSES.filter((s) => !REVIEW_TARGET_STATUSES.includes(s));
+  }
+  return [];
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -31,8 +78,40 @@ function formatDate(iso: string | null): string {
   return `${d} ${months[Number(m) - 1]}`;
 }
 
+// Los selects inline comparten el mismo tratamiento visual que los inputs de
+// texto (borde, fondo, foco dorado). `appearance-none` quita la flecha nativa
+// para dibujar una propia y que se vean idénticos en todos los navegadores.
 const cellSelect =
-  "w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-foreground outline-none transition hover:border-border focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+  "w-full appearance-none rounded-md border border-border bg-card px-2 py-1 pr-6 text-xs text-foreground outline-none transition hover:border-brand-gold/60 focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+
+/** Select inline con la flecha personalizada, para igualar el estilo de los inputs. */
+function CellSelect({
+  value,
+  onChange,
+  ariaLabel,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
+        aria-label={ariaLabel}
+        className={cellSelect}
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  );
+}
 
 /**
  * Vista de tareas como tabla editable: cada fila permite cambiar estado, prioridad
@@ -46,6 +125,8 @@ export function TasksTable({
   members,
   teams,
   locationById,
+  currentUserId,
+  isElevated,
   onOpenDetail,
 }: {
   projectId: string;
@@ -53,6 +134,9 @@ export function TasksTable({
   members: ProjectMember[];
   teams: Team[];
   locationById: Map<string, { name: string; tipoId: string }>;
+  // Quién mira la tabla: decide qué transiciones de estado puede fijar cada fila.
+  currentUserId: string | undefined;
+  isElevated: boolean;
   onOpenDetail: (taskId: string) => void;
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
@@ -62,6 +146,47 @@ export function TasksTable({
   const [find, setFind] = useState("");
   const [replace, setReplace] = useState("");
   const [dirtyFind, setDirtyFind] = useState(false);
+  // Tarea que se está asignando por primera vez desde la tabla (modal).
+  const [assigningTask, setAssigningTask] = useState<Task | null>(null);
+  // Último error al cambiar un estado (el backend rechaza transiciones fuera de
+  // flujo o con dependencias sin completar); antes fallaba en silencio.
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const myProjectRole = useMemo(
+    () => members.find((m) => m.user_id === currentUserId)?.project_role,
+    [members, currentUserId],
+  );
+
+  // Orden de la tabla al hacer clic en un header. La prioridad ordena por
+  // severidad (el orden de PRIORITIES ya va de menor a mayor), no alfabético.
+  const {
+    sorted: sortedTasks,
+    sort,
+    toggleSort,
+  } = useSortableData<Task, SortKey>(tasks, (task, key) => {
+    switch (key) {
+      case "title":
+        return task.title;
+      case "status":
+        return TASK_STATUS_LABELS[task.status];
+      case "priority":
+        return PRIORITIES.indexOf(task.priority);
+      case "due_date":
+        return task.due_date;
+    }
+  });
+
+  // Nombres para mostrar la asignación actual (solo lectura en la tabla).
+  const memberName = useMemo(() => {
+    const map = new Map<string, string>();
+    members.forEach((m) => map.set(m.user_id, `${m.name} ${m.last_name}`));
+    return map;
+  }, [members]);
+  const teamName = useMemo(() => {
+    const map = new Map<string, string>();
+    teams.forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teams]);
 
   const selectedTasks = useMemo(() => tasks.filter((t) => selected.has(t.id)), [tasks, selected]);
 
@@ -90,23 +215,17 @@ export function TasksTable({
     });
   };
 
-  const assignmentValue = (task: Task): string =>
-    task.assignee_id ? `u:${task.assignee_id}` : task.team_id ? `t:${task.team_id}` : "";
-
-  const reassign = (task: Task, value: string) => {
-    if (value.startsWith("u:")) {
-      updateTask.mutate({
-        taskId: task.id,
-        payload: { assignee_id: value.slice(2), team_id: null },
-      });
-    } else if (value.startsWith("t:")) {
-      updateTask.mutate({
-        taskId: task.id,
-        payload: { team_id: value.slice(2), assignee_id: null },
-      });
-    } else {
-      updateTask.mutate({ taskId: task.id, payload: { assignee_id: null, team_id: null } });
+  // La asignación es de solo lectura en la tabla: si ya tiene responsable, se
+  // muestra como etiqueta y se reasigna desde la edición de la tarea; si no,
+  // se ofrece asignar mediante el modal (mismo flujo que crear tarea).
+  const assignmentOf = (task: Task): { kind: "person" | "team"; label: string } | null => {
+    if (task.assignee_id) {
+      return { kind: "person", label: memberName.get(task.assignee_id) ?? "Responsable" };
     }
+    if (task.team_id) {
+      return { kind: "team", label: teamName.get(task.team_id) ?? "Equipo" };
+    }
+    return null;
   };
 
   const applyBulkRename = () => {
@@ -127,6 +246,25 @@ export function TasksTable({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Error al cambiar un estado: antes fallaba en silencio y el select
+          volvía a mostrar el valor anterior sin ninguna explicación. */}
+      {statusError && (
+        <div className="mb-2 flex shrink-0 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+          <AlertCircle className="size-4 shrink-0" />
+          <span className="flex-1">{statusError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setStatusError(null);
+            }}
+            aria-label="Cerrar aviso"
+            className="rounded-md p-0.5 transition hover:bg-rose-500/10"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Barra de edición masiva: aparece al seleccionar tareas. */}
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border border-b-0 border-border bg-accent/40 px-3 py-2 text-xs">
@@ -184,7 +322,19 @@ export function TasksTable({
           selected.size > 0 ? "rounded-b-2xl" : "rounded-2xl",
         )}
       >
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
+          {/* Layout fijo: los anchos por columna evitan que un título largo
+              empuje y aplaste al resto (estado, prioridad…). La columna "Tarea"
+              es la única flexible y absorbe el espacio sobrante. */}
+          <colgroup>
+            <col className="w-11" />
+            <col />
+            <col className="w-[7.5rem]" />
+            <col className="w-28" />
+            <col className="w-44" />
+            <col className="w-32" />
+            <col className="w-20" />
+          </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-3">
@@ -196,16 +346,44 @@ export function TasksTable({
                   className="size-4 accent-brand-gold"
                 />
               </th>
-              <th className="px-3 py-3">Tarea</th>
-              <th className="px-3 py-3">Estado</th>
-              <th className="px-3 py-3">Prioridad</th>
+              <SortableTh
+                label="Tarea"
+                columnKey="title"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
+              <SortableTh
+                label="Estado"
+                columnKey="status"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
+              <SortableTh
+                label="Prioridad"
+                columnKey="priority"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
               <th className="px-3 py-3">Asignación</th>
               <th className="px-3 py-3">Ubicación</th>
-              <th className="px-3 py-3">Vence</th>
+              <SortableTh
+                label="Vence"
+                columnKey="due_date"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
+            {sortedTasks.map((task) => {
               const location = task.work_item_id ? locationById.get(task.work_item_id) : undefined;
               const isSel = selected.has(task.id);
               return (
@@ -227,91 +405,139 @@ export function TasksTable({
                       className="size-4 accent-brand-gold"
                     />
                   </td>
-                  <td className="max-w-xs px-3 py-2">
+                  <td className="px-3 py-2">
                     <button
                       type="button"
                       onClick={() => {
                         onOpenDetail(task.id);
                       }}
-                      title="Abrir y editar la tarea"
-                      className="group flex items-center gap-1.5 text-left font-semibold text-foreground hover:text-brand-gold-dark dark:hover:text-brand-gold"
+                      title={task.title}
+                      className="group flex w-full min-w-0 items-center gap-1.5 text-left font-semibold text-foreground hover:text-brand-gold-dark dark:hover:text-brand-gold"
                     >
-                      <span className="truncate">{task.title}</span>
+                      <span className="min-w-0 flex-1 truncate">{task.title}</span>
                       <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
                   </td>
                   <td className="px-3 py-2">
-                    <select
-                      value={task.status}
-                      onChange={(e) => {
-                        changeStatus.mutate({
-                          taskId: task.id,
-                          status: e.target.value as TaskStatus,
-                        });
-                      }}
-                      aria-label="Estado"
-                      className={cellSelect}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {TASK_STATUS_LABELS[s]}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const options = allowedStatuses(
+                        task,
+                        currentUserId,
+                        isElevated,
+                        myProjectRole,
+                      );
+                      if (options.length === 0) {
+                        // Sin permiso para tocar esta tarea: badge de solo lectura en
+                        // vez de un select que el backend rechazaría igual.
+                        return (
+                          <span
+                            title="No tienes permiso para cambiar el estado de esta tarea"
+                            className={cn(
+                              "flex w-full items-center justify-center rounded-md px-2 py-1 text-xs font-medium",
+                              TASK_STATUS_COLORS[task.status],
+                            )}
+                          >
+                            {TASK_STATUS_LABELS[task.status]}
+                          </span>
+                        );
+                      }
+                      return (
+                        <CellSelect
+                          value={task.status}
+                          onChange={(value) => {
+                            changeStatus.mutate(
+                              { taskId: task.id, status: value as TaskStatus },
+                              {
+                                onSuccess: () => {
+                                  setStatusError(null);
+                                },
+                                onError: (error) => {
+                                  setStatusError(
+                                    getErrorMessage(error, "No se pudo cambiar el estado"),
+                                  );
+                                },
+                              },
+                            );
+                          }}
+                          ariaLabel="Estado"
+                        >
+                          {/* El estado actual siempre se ofrece aunque no esté entre las
+                              transiciones permitidas, para no ocultar dónde está la tarea. */}
+                          {(options.includes(task.status)
+                            ? options
+                            : [task.status, ...options]
+                          ).map((s) => (
+                            <option key={s} value={s}>
+                              {TASK_STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </CellSelect>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-2">
-                    <select
+                    <CellSelect
                       value={task.priority}
-                      onChange={(e) => {
+                      onChange={(value) => {
                         updateTask.mutate({
                           taskId: task.id,
-                          payload: { priority: e.target.value as TaskPriority },
+                          payload: { priority: value as TaskPriority },
                         });
                       }}
-                      aria-label="Prioridad"
-                      className={cellSelect}
+                      ariaLabel="Prioridad"
                     >
                       {PRIORITIES.map((p) => (
                         <option key={p} value={p}>
                           {TASK_PRIORITY_LABELS[p]}
                         </option>
                       ))}
-                    </select>
+                    </CellSelect>
                   </td>
                   <td className="px-3 py-2">
-                    <select
-                      value={assignmentValue(task)}
-                      onChange={(e) => {
-                        reassign(task, e.target.value);
-                      }}
-                      aria-label="Asignación"
-                      className={cellSelect}
-                    >
-                      <option value="">— Sin asignar —</option>
-                      {members.length > 0 && (
-                        <optgroup label="Personas">
-                          {members.map((m) => (
-                            <option key={m.user_id} value={`u:${m.user_id}`}>
-                              {m.name} {m.last_name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {teams.length > 0 && (
-                        <optgroup label="Equipos">
-                          {teams.map((t) => (
-                            <option key={t.id} value={`t:${t.id}`}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
+                    {(() => {
+                      const assignment = assignmentOf(task);
+                      if (!assignment) {
+                        // Sin responsable: asignar por primera vez con el modal.
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssigningTask(task);
+                            }}
+                            className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:border-brand-gold hover:text-brand-gold-dark dark:hover:text-brand-gold"
+                          >
+                            <UserPlus className="size-3.5 shrink-0" /> Asignar
+                          </button>
+                        );
+                      }
+                      // Ya asignada: solo lectura. Se reasigna desde la edición.
+                      const isTeam = assignment.kind === "team";
+                      return (
+                        <span
+                          title={`${assignment.label} · reasigna desde la edición de la tarea`}
+                          className={cn(
+                            "flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium",
+                            isTeam
+                              ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                              : "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
+                          )}
+                        >
+                          {isTeam ? (
+                            <Users className="size-3.5 shrink-0" />
+                          ) : (
+                            <UserPlus className="size-3.5 shrink-0" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate">{assignment.label}</span>
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {location?.name ?? "—"}
+                    <span className="block truncate" title={location?.name ?? undefined}>
+                      {location?.name ?? "—"}
+                    </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                     {formatDate(task.due_date)}
                   </td>
                 </tr>
@@ -325,6 +551,18 @@ export function TasksTable({
           </p>
         )}
       </div>
+
+      {assigningTask && (
+        <AssignTaskModal
+          projectId={projectId}
+          task={assigningTask}
+          members={members}
+          teams={teams}
+          onClose={() => {
+            setAssigningTask(null);
+          }}
+        />
+      )}
     </div>
   );
 }

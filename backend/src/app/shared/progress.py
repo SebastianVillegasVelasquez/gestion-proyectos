@@ -1,5 +1,5 @@
-"""Regla pura de avance por área (sin BD ni FastAPI), para testear sin base de
-datos y mantener una única fuente de verdad del cálculo."""
+"""Regla pura de avance por tareas (sin BD ni FastAPI), compartida por los
+distintos read models que agregan avance (colaborador, equipo)."""
 
 
 def completion_percentage(completed: int, assigned: int) -> int:

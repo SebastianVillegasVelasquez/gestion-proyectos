@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "@/features/projects/api/projects.api";
 import { projectKeys } from "./query-keys";
 import type {
+  CreateProjectNotePayload,
   CreateProjectPayload,
   UpdateProjectPayload,
 } from "@/features/projects/types/api.types";
@@ -67,5 +68,30 @@ export function useRegenerateClientAccess(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(projectKeys.clientAccess(id), data);
     },
+  });
+}
+
+/** Notas / recordatorios del proyecto (más recientes primero). */
+export function useProjectNotes(id: string) {
+  return useQuery({
+    queryKey: projectKeys.notes(id),
+    queryFn: () => projectsApi.listNotes(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCreateProjectNote(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateProjectNotePayload) => projectsApi.createNote(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.notes(id) }),
+  });
+}
+
+export function useDeleteProjectNote(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noteId: string) => projectsApi.deleteNote(id, noteId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.notes(id) }),
   });
 }

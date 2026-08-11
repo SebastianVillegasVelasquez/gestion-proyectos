@@ -3,9 +3,14 @@ import { useNavigate, useOutletContext } from "react-router";
 import { Plus, Moon, Sun, Trash2, Layers, Search, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { useSortableData } from "@/hooks/use-sortable-data";
+import { SortableTh } from "@/components/ui/SortableTh";
 import { useProjects, useDeleteProject } from "../hooks/use-projects";
 import { filterProjects, monogram, monogramTone, shortId } from "../utils/project-table";
 import type { Project } from "../types/api.types";
+
+// Columnas ordenables (el ID truncado y las acciones no tiene sentido ordenarlos).
+type SortKey = "name" | "start_date" | "progress_pct";
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -143,7 +148,21 @@ export function AllProjectsPage() {
   const deleteProject = useDeleteProject();
   const [search, setSearch] = useState("");
 
-  const visible = useMemo(() => filterProjects(projects ?? [], search), [projects, search]);
+  const filtered = useMemo(() => filterProjects(projects ?? [], search), [projects, search]);
+  const {
+    sorted: visible,
+    sort,
+    toggleSort,
+  } = useSortableData<Project, SortKey>(filtered, (project, key) => {
+    switch (key) {
+      case "name":
+        return project.name;
+      case "start_date":
+        return project.start_date;
+      case "progress_pct":
+        return project.progress_pct;
+    }
+  });
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) {
@@ -228,10 +247,31 @@ export function AllProjectsPage() {
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-slate-900/95">
                   <tr className="border-b border-slate-200 dark:border-slate-800">
-                    <th className={HEADER_CELL}>Proyecto</th>
+                    <SortableTh
+                      label="Proyecto"
+                      columnKey="name"
+                      activeKey={sort.key}
+                      direction={sort.direction}
+                      onSort={toggleSort}
+                      className={HEADER_CELL}
+                    />
                     <th className={cn(HEADER_CELL, "hidden md:table-cell")}>ID</th>
-                    <th className={cn(HEADER_CELL, "hidden lg:table-cell")}>Periodo</th>
-                    <th className={HEADER_CELL}>Progreso</th>
+                    <SortableTh
+                      label="Periodo"
+                      columnKey="start_date"
+                      activeKey={sort.key}
+                      direction={sort.direction}
+                      onSort={toggleSort}
+                      className={cn(HEADER_CELL, "hidden lg:table-cell")}
+                    />
+                    <SortableTh
+                      label="Progreso"
+                      columnKey="progress_pct"
+                      activeKey={sort.key}
+                      direction={sort.direction}
+                      onSort={toggleSort}
+                      className={HEADER_CELL}
+                    />
                     <th className={cn(HEADER_CELL, "w-12")}>
                       <span className="sr-only">Acciones</span>
                     </th>

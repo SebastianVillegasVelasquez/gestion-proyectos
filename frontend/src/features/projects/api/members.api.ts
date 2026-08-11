@@ -6,6 +6,8 @@ import type {
   IdentityUser,
   PaginatedDirectory,
   ProjectMember,
+  ProjectMemberProgress,
+  ProjectRole,
   UserPosition,
 } from "@/features/projects/types/api.types";
 
@@ -13,8 +15,21 @@ export const membersApi = {
   list: (projectId: string) =>
     http.get<ProjectMember[]>(`/projects/${projectId}/members`).then((r) => r.data),
 
+  // Integrantes + su avance ponderado en ESTE proyecto (para decidir el pago).
+  progress: (projectId: string) =>
+    http
+      .get<ProjectMemberProgress[]>(`/projects/${projectId}/members/progress`)
+      .then((r) => r.data),
+
   add: (payload: AddMemberPayload) =>
     http.post<ProjectMember>("/projects/members/", payload).then((r) => r.data),
+
+  updateRole: (memberId: string, projectRole: ProjectRole) =>
+    http
+      .patch<ProjectMember>(`/projects/members/${memberId}`, { project_role: projectRole })
+      .then((r) => r.data),
+
+  remove: (memberId: string) => http.delete(`/projects/members/${memberId}`),
 };
 
 export const usersApi = {

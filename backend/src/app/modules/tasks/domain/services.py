@@ -112,6 +112,16 @@ class TaskDependencyService:
             for d in await self.repo.get_dependencies(task_id)
         ]
 
+    async def list_dependencies_by_project(
+        self, project_id: UUID
+    ) -> list["TaskDependencyResponse"]:
+        return [
+            TaskDependencyResponse(
+                id=d.id, task_id=d.task_id, depends_on_id=d.depends_on_id
+            )
+            for d in await self.repo.get_dependencies_by_project(project_id)
+        ]
+
 
 class TaskStatusService:
     """Cambia el estado de una tarea aplicando la regla FtS.

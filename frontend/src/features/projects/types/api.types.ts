@@ -33,6 +33,22 @@ export interface CreateProjectPayload {
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 
+export interface ProjectNote {
+  id: string;
+  project_id: string;
+  content: string;
+  note_date: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface CreateProjectNotePayload {
+  content: string;
+  // Opcional: si se omite, el backend usa la fecha de hoy.
+  note_date?: string | null;
+}
+
 // ── Árbol de trabajo (estructura flexible) ───────────────────────────────────
 // La estructura de un proyecto es un árbol recursivo de WorkItems. Cada nivel
 // (programa/curso/módulo/fase, o componente/actividad…) es del mismo tipo; lo
@@ -183,12 +199,23 @@ export interface TaskDependency {
 export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante" | "cliente";
 
 export interface ProjectMember {
+  id: string;
   user_id: string;
   name: string;
   last_name: string;
   email: string;
   position: string;
   project_role: ProjectRole;
+}
+
+// Integrante + su avance ponderado en ESTE proyecto (nunca cruzado con otros
+// proyectos en los que también participe). `progress_pct` pesa cada tarea
+// según la profundidad de su nodo en la estructura, no es completadas/total
+// plano — es el número que determina cuándo corresponde pagarle su parte.
+export interface ProjectMemberProgress extends ProjectMember {
+  tasks_total: number;
+  tasks_completed: number;
+  progress_pct: number;
 }
 
 export interface AddMemberPayload {
@@ -265,6 +292,9 @@ export interface Team {
   name: string;
   description: string | null;
   member_count: number;
+  assigned_tasks: number;
+  completed_tasks: number;
+  completion_pct: number;
 }
 
 export interface PaginatedTeams {
@@ -347,20 +377,4 @@ export interface ProjectTraceability {
   project_id: string;
   summary: TraceabilitySummary;
   events: TraceabilityEvent[];
-}
-
-// ── Progreso por área/equipo (agrupado por cargo) ────────────────────────────
-export interface AreaProgress {
-  position: UserPosition;
-  member_count: number;
-  assigned_tasks: number;
-  completed_tasks: number;
-  completion_pct: number;
-}
-
-export interface ProjectAreas {
-  project_id: string;
-  total_assigned: number;
-  total_completed: number;
-  areas: AreaProgress[];
 }

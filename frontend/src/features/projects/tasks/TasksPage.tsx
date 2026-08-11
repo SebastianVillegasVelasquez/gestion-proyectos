@@ -1,97 +1,26 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router";
-import {
-  Plus,
-  Moon,
-  Sun,
-  ListChecks,
-  AlertTriangle,
-  CalendarClock,
-  Search,
-  LayoutGrid,
-  List,
-  ChevronLeft,
-  CheckCircle2,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, Moon, Sun, ListChecks, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { Role } from "@/features/auth/types";
 import { useProject } from "../hooks/use-projects";
-import { useProjectTasks, useChangeTaskStatus } from "../hooks/use-tasks";
-import { useDirectory, useProjectMembers } from "../hooks/use-members";
+import { useProjectTasks } from "../hooks/use-tasks";
+import { useProjectMembers } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { useWorkTree } from "../hooks/use-structure";
-import { tipoStyle } from "../utils/tipo-style";
-import { colorForName } from "../utils/entity-color";
-import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS } from "../types/labels";
-import type { Task, TaskStatus, WorkItemTree } from "../types/api.types";
+import type { WorkItemTree } from "../types/api.types";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { TasksTable } from "./TasksTable";
 import { TaskDetailPanel } from "../gantt/components/TaskDetailPanel";
 
-const COLUMNS: { id: TaskStatus; label: string; dot: string; badge: string }[] = [
-  {
-    id: "pendiente_por_iniciar",
-    label: "Pendiente",
-    dot: "bg-slate-400",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  },
-  {
-    id: "en_progreso",
-    label: "En progreso",
-    dot: "bg-brand-teal",
-    badge: "bg-brand-teal/15 text-brand-teal-dark dark:text-brand-teal",
-  },
-  {
-    id: "en_revision",
-    label: "En revisión",
-    dot: "bg-amber-400",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  },
-  {
-    id: "completada",
-    label: "Completada",
-    dot: "bg-emerald-500",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  },
-];
-
-// A qué columna cae cada estado.
-const STATUS_COLUMN: Record<TaskStatus, TaskStatus> = {
-  pendiente_por_iniciar: "pendiente_por_iniciar",
-  en_progreso: "en_progreso",
-  en_revision: "en_revision",
-  devuelta: "en_revision",
-  completada: "completada",
-  cancelada: "completada",
-};
-
-function isOverdue(task: Task): boolean {
-  return (
-    task.status !== "completada" &&
-    task.status !== "cancelada" &&
-    task.due_date != null &&
-    task.due_date < new Date().toISOString().slice(0, 10)
-  );
-}
-
-// Las tareas sin planificar no tienen fecha: mostramos un guion en su lugar.
-function formatDate(iso: string | null): string {
-  if (!iso) {
-    return "Sin fecha";
-  }
-  const [, m, d] = iso.split("-");
-  return `${d} ${["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][Number(m) - 1]}`;
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
-  return (first + last).toUpperCase();
-}
+// Tamaño de página de la tabla. La consulta sigue trayendo todas las tareas del
+// proyecto de una vez (las necesitan otras vistas del detalle para sus métricas),
+// pero la tabla ya no las renderiza todas juntas: pagina en cliente.
+const PAGE_SIZE = 25;
 
 /** Aplana el árbol de estructura a un mapa id → {nombre, tipoId}, para el tag
- * de ubicación de cada tarjeta de tarea. */
+ * de ubicación de cada tarea en la tabla. */
 function flattenLocations(nodes: WorkItemTree[]): Map<string, { name: string; tipoId: string }> {
   const map = new Map<string, { name: string; tipoId: string }>();
   const visit = (node: WorkItemTree) => {
@@ -102,156 +31,22 @@ function flattenLocations(nodes: WorkItemTree[]): Map<string, { name: string; ti
   return map;
 }
 
-function TaskCard({
-  task,
-  location,
-  teamName,
-  assignee,
-  subtasks,
-  draggable,
-  onDragStart,
-  onClick,
-}: {
-  task: Task;
-  location: { name: string; tipoId: string } | undefined;
-  teamName: string | undefined;
-  assignee: string | undefined;
-  subtasks: { done: number; total: number };
-  draggable: boolean;
-  onDragStart: (e: React.DragEvent) => void;
-  onClick: () => void;
-}) {
-  const overdue = isOverdue(task);
-  const completed = task.status === "completada";
-  const locationStyle = location ? tipoStyle(location.tipoId) : null;
-
-  return (
-    <button
-      type="button"
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onClick={onClick}
-      className={cn(
-        "flex w-full cursor-grab flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-brand-gold/40 hover:shadow-lg active:cursor-grabbing",
-        completed && "opacity-80 hover:opacity-100",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        {completed ? (
-          <span className="flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-            <CheckCircle2 className="size-3" /> Lista
-          </span>
-        ) : (
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide",
-              TASK_PRIORITY_COLORS[task.priority],
-            )}
-          >
-            {TASK_PRIORITY_LABELS[task.priority]}
-          </span>
-        )}
-      </div>
-
-      <p
-        className={cn(
-          "text-[14.5px] font-bold leading-snug text-foreground",
-          completed && "text-muted-foreground line-through decoration-muted-foreground/50",
-        )}
-      >
-        {task.title}
-      </p>
-
-      {task.description && (
-        <p className="line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
-      )}
-
-      {location && (
-        <span
-          className={cn(
-            "w-fit rounded-md px-2 py-0.5 text-[10.5px] font-bold",
-            locationStyle?.chip,
-          )}
-        >
-          {location.name}
-        </span>
-      )}
-
-      {task.status === "en_progreso" && subtasks.total > 0 && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-            <span>Progreso</span>
-            <span>{Math.round((subtasks.done / subtasks.total) * 100)}%</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent">
-            <div
-              className="h-full rounded-full bg-brand-blue"
-              style={{ width: `${(subtasks.done / subtasks.total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-2 border-t border-accent/70 pt-2.5">
-        <span
-          className={cn(
-            "flex items-center gap-1 text-xs font-semibold text-muted-foreground",
-            overdue && "font-bold text-rose-500",
-          )}
-        >
-          {overdue ? (
-            <AlertTriangle className="size-3.5" />
-          ) : (
-            <CalendarClock className="size-3.5" />
-          )}
-          {formatDate(task.due_date)}
-        </span>
-        <div className="flex items-center gap-2">
-          {subtasks.total > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-              <ListChecks className="size-3.5" />
-              {subtasks.done}/{subtasks.total}
-            </span>
-          )}
-          {teamName && (
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                colorForName(teamName),
-              )}
-            >
-              {teamName}
-            </span>
-          )}
-          {assignee && (
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-blue/15 text-[10px] font-extrabold text-brand-blue-dark dark:text-brand-blue">
-              {initials(assignee)}
-            </span>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-}
-
 export function TasksPage() {
   const { projectId = "" } = useParams<{ projectId: string }>();
   const { dark, toggleDark } = useOutletContext<AppOutletContext>();
   const navigate = useNavigate();
+  const { user, hasRole } = useAuth();
+  const isElevated = hasRole([Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER]);
   const projectQuery = useProject(projectId);
   const tasksQuery = useProjectTasks(projectId);
-  const directoryQuery = useDirectory();
   const membersQuery = useProjectMembers(projectId);
   const teamsQuery = useTeams(projectId);
   const treeQuery = useWorkTree(projectId);
-  const changeStatus = useChangeTaskStatus(projectId);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  // La tabla editable es la vista principal de tareas (más flexible que el kanban).
-  const [view, setView] = useState<"kanban" | "lista">("lista");
-  const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
+  const [page, setPage] = useState(1);
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
   // Deriva del listado en vivo (no una copia local) para que el panel refleje
@@ -271,55 +66,22 @@ export function TasksPage() {
     );
   }, [tasks, search]);
 
-  const assigneeName = useMemo(() => {
-    const map = new Map<string, string>();
-    (directoryQuery.data ?? []).forEach((u) => map.set(u.id, `${u.name} ${u.last_name}`));
-    return map;
-  }, [directoryQuery.data]);
+  // Al cambiar la búsqueda volvemos a la página 1. Se compara contra el valor
+  // anterior durante el render (en vez de un efecto) para no encadenar renders.
+  const [searchAtReset, setSearchAtReset] = useState(search);
+  if (search !== searchAtReset) {
+    setSearchAtReset(search);
+    setPage(1);
+  }
 
-  const teamName = useMemo(() => {
-    const map = new Map<string, string>();
-    (teamsQuery.data?.items ?? []).forEach((t) => map.set(t.id, t.name));
-    return map;
-  }, [teamsQuery.data]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   const locationById = useMemo(() => flattenLocations(treeQuery.data ?? []), [treeQuery.data]);
-
-  // Subtareas: tareas cuyo parent_task_id apunta a esta. done/total por padre.
-  const subtasksByParent = useMemo(() => {
-    const map = new Map<string, { done: number; total: number }>();
-    for (const task of tasks) {
-      if (!task.parent_task_id) {
-        continue;
-      }
-      const entry = map.get(task.parent_task_id) ?? { done: 0, total: 0 };
-      entry.total += 1;
-      if (task.status === "completada") {
-        entry.done += 1;
-      }
-      map.set(task.parent_task_id, entry);
-    }
-    return map;
-  }, [tasks]);
-
-  const byColumn = useMemo(() => {
-    const groups = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.id, []]));
-    for (const task of filtered) {
-      groups.get(STATUS_COLUMN[task.status])?.push(task);
-    }
-    return groups;
-  }, [filtered]);
-
-  const handleDrop = (column: TaskStatus, e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOverCol(null);
-    const taskId = e.dataTransfer.getData("text/plain");
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task || STATUS_COLUMN[task.status] === column) {
-      return;
-    }
-    changeStatus.mutate({ taskId, status: column });
-  };
 
   return (
     <div className="flex h-full flex-col gap-4 p-4 sm:p-5">
@@ -361,40 +123,6 @@ export function TasksPage() {
                 className="w-48 rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 sm:w-64"
               />
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setView("kanban");
-                }}
-                aria-pressed={view === "kanban"}
-                aria-label="Vista kanban"
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-lg transition-colors",
-                  view === "kanban"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <LayoutGrid className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setView("lista");
-                }}
-                aria-pressed={view === "lista"}
-                aria-label="Vista de lista"
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-lg transition-colors",
-                  view === "lista"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <List className="size-3.5" />
-              </button>
-            </div>
             <button
               type="button"
               onClick={() => {
@@ -409,82 +137,60 @@ export function TasksPage() {
       </header>
 
       {tasksQuery.isLoading ? (
-        <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-4">
-          {COLUMNS.map((c) => (
-            <div key={c.id} className="h-40 animate-pulse rounded-2xl bg-accent" />
-          ))}
-        </div>
-      ) : view === "lista" ? (
-        <TasksTable
-          projectId={projectId}
-          tasks={filtered}
-          members={membersQuery.data ?? []}
-          teams={teamsQuery.data?.items ?? []}
-          locationById={locationById}
-          onOpenDetail={(id) => {
-            setSelectedId(id);
-          }}
-        />
+        <div className="h-40 animate-pulse rounded-2xl bg-accent" />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-4">
-          {COLUMNS.map((col) => {
-            const items = byColumn.get(col.id) ?? [];
-            return (
-              <div
-                key={col.id}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOverCol(col.id);
-                }}
-                onDragLeave={() => {
-                  setDragOverCol((c) => (c === col.id ? null : c));
-                }}
-                onDrop={(e) => {
-                  handleDrop(col.id, e);
-                }}
-                className={cn(
-                  "flex min-h-0 flex-col gap-3 rounded-2xl transition-colors",
-                  dragOverCol === col.id && "bg-accent/50 ring-2 ring-brand-gold/40",
-                )}
-              >
-                <div className="flex shrink-0 items-center gap-2 px-1">
-                  <span className={cn("size-2 shrink-0 rounded-full", col.dot)} />
-                  <span className="text-[14.5px] font-bold text-foreground">{col.label}</span>
-                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", col.badge)}>
-                    {items.length}
-                  </span>
-                </div>
+        <>
+          <TasksTable
+            projectId={projectId}
+            tasks={paginated}
+            members={membersQuery.data ?? []}
+            teams={teamsQuery.data?.items ?? []}
+            locationById={locationById}
+            currentUserId={user?.id}
+            isElevated={isElevated}
+            onOpenDetail={(id) => {
+              setSelectedId(id);
+            }}
+          />
 
-                <div className="flex flex-col gap-2.5 overflow-y-auto px-0.5 pb-2">
-                  {items.length === 0 ? (
-                    <p className="px-1 py-2 text-xs italic text-muted-foreground">Sin tareas</p>
-                  ) : (
-                    items.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        location={
-                          task.work_item_id ? locationById.get(task.work_item_id) : undefined
-                        }
-                        assignee={task.assignee_id ? assigneeName.get(task.assignee_id) : undefined}
-                        teamName={task.team_id ? teamName.get(task.team_id) : undefined}
-                        subtasks={subtasksByParent.get(task.id) ?? { done: 0, total: 0 }}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", task.id);
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
-                        onClick={() => {
-                          setSelectedId(task.id);
-                        }}
-                      />
-                    ))
-                  )}
+          {/* Paginación: la tabla ya no renderiza todas las tareas de una vez. */}
+          {filtered.length > 0 && (
+            <div className="flex shrink-0 items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {filtered.length} tarea{filtered.length === 1 ? "" : "s"}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    aria-label="Página anterior"
+                    onClick={() => {
+                      setPage((p) => p - 1);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <span>
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    aria-label="Página siguiente"
+                    onClick={() => {
+                      setPage((p) => p + 1);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (

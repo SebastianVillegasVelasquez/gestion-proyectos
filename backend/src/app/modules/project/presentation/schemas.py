@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -60,12 +60,37 @@ class ProjectMemberRequest(BaseModelConfig):
 
 
 class ProjectMemberResponse(BaseModelConfig):
+    id: UUID
     user_id: UUID
     name: str
     last_name: str
     email: str
     position: str
     project_role: ProjectRole
+
+
+class UpdateProjectMemberRoleRequest(BaseModelConfig):
+    project_role: ProjectRole
+
+
+class ProjectMemberProgressResponse(BaseModelConfig):
+    """Integrante + su avance ponderado en ESTE proyecto (nunca cruzado con otros).
+
+    `progress_pct` no es completadas/totales plano: pesa cada tarea según la
+    profundidad de su nodo en la estructura (ver `member_progress` en domain).
+    Es el número que determina cuándo corresponde pagarle su parte.
+    """
+
+    id: UUID
+    user_id: UUID
+    name: str
+    last_name: str
+    email: str
+    position: str
+    project_role: ProjectRole
+    tasks_total: int
+    tasks_completed: int
+    progress_pct: int
 
 
 class ResponseProjectMember(BaseModelConfig):
@@ -83,3 +108,19 @@ class ClientAccessResponse(BaseModelConfig):
     """Token del portal del cliente. El frontend arma el enlace /portal/{token}."""
 
     token: str
+
+
+class CreateProjectNoteRequest(BaseModelConfig):
+    content: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    # Opcional: si no se envía, la nota toma la fecha de hoy.
+    note_date: Optional[date] = None
+
+
+class ProjectNoteResponse(BaseModelConfig):
+    id: UUID
+    project_id: UUID
+    content: str
+    note_date: date
+    author_id: Optional[UUID] = None
+    author_name: Optional[str] = None
+    created_at: datetime

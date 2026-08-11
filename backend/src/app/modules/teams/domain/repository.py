@@ -35,6 +35,11 @@ class TeamRepository(ABC):
     @abstractmethod
     async def member_counts(self, team_ids: list[UUID]) -> dict[UUID, int]: ...
 
+    @abstractmethod
+    async def progress_counts(
+        self, team_ids: list[UUID]
+    ) -> dict[UUID, tuple[int, int]]: ...
+
     # ── Integrantes ──────────────────────────────────────────────────────────
     @abstractmethod
     async def add_member(self, member: TeamMember) -> TeamMember: ...

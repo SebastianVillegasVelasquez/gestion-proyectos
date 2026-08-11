@@ -1,11 +1,17 @@
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, String, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.domain.repository import TeamRepository
 from app.modules.teams.infrastructure.models import Team, TeamMember
+
+_STATUS = cast(Task.status, String)
+_COMPLETED = TaskStatus.COMPLETADA.name
 
 
 class SqlAlchemyTeamRepository(TeamRepository):
@@ -88,6 +94,38 @@ class SqlAlchemyTeamRepository(TeamRepository):
             )
         ).all()
         return {team_id: int(count) for team_id, count in rows}
+
+    async def progress_counts(
+        self, team_ids: list[UUID]
+    ) -> dict[UUID, tuple[int, int]]:
+        """Tareas asignadas/completadas por equipo: cuenta las tareas de cada
+        integrante del equipo (el mismo criterio que el avance individual),
+        agregadas a nivel de equipo."""
+        if not team_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(
+                    TeamMember.team_id,
+                    func.count(Task.id).label("assigned"),
+                    func.coalesce(
+                        func.sum(case((_STATUS == _COMPLETED, 1), else_=0)), 0
+                    ).label("completed"),
+                )
+                .select_from(TeamMember)
+                .join(Task, Task.assignee_id == TeamMember.user_id)
+                .join(WorkItem, Task.work_item_id == WorkItem.id)
+                .where(
+                    TeamMember.team_id.in_(team_ids),
+                    Task.deleted_at.is_(None),
+                )
+                .group_by(TeamMember.team_id)
+            )
+        ).all()
+        return {
+            team_id: (int(assigned or 0), int(completed or 0))
+            for team_id, assigned, completed in rows
+        }
 
     # ── Integrantes ──────────────────────────────────────────────────────────
     async def add_member(self, member: TeamMember) -> TeamMember:

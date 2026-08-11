@@ -13,12 +13,14 @@ from app.modules.dashboard.application.use_cases import (
     GetMyDashboardPanelsUseCase,
     GetMyDashboardSummaryUseCase,
     GetMyProjectProgressUseCase,
+    GetRecentActivityUseCase,
 )
 from app.modules.dashboard.infrastructure.repository import DashboardRepository
 from app.modules.dashboard.presentation.schemas import (
     DashboardPanelsResponse,
     DashboardSummaryResponse,
     MyProjectProgressResponse,
+    RecentActivityResponse,
 )
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.presentation.schemas import UserResponse
@@ -26,6 +28,10 @@ from app.modules.identity.presentation.schemas import UserResponse
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 _any_role = require_role(SystemRole.ADMIN, SystemRole.SUPER_ADMIN, SystemRole.USER)
+# La actividad reciente es transversal a todos los proyectos: solo la ve la gestión.
+_admin_role = require_role(
+    SystemRole.DEVELOPER, SystemRole.SUPER_ADMIN, SystemRole.ADMIN
+)
 
 
 @router.get("/summary", response_model=DashboardSummaryResponse)
@@ -48,6 +54,25 @@ async def get_dashboard_panels(
         board_limit=board_limit,
         projects_limit=projects_limit,
         deadlines_limit=deadlines_limit,
+    )
+
+
+@router.get("/activity", response_model=RecentActivityResponse)
+async def get_recent_activity(
+    limit: int = Query(10, ge=1, le=30),
+    project_id: UUID | None = Query(
+        None, description="Acota la actividad a un solo proyecto (detalle de proyecto)."
+    ),
+    _=Depends(_admin_role),
+    repo: DashboardRepository = Depends(dashboard_repo_dependency),
+) -> RecentActivityResponse:
+    """Últimos eventos del sistema (creación, entrega, aprobación…).
+
+    Sin `project_id` es transversal a todos los proyectos (dashboard); con él se
+    restringe a un proyecto concreto para su pantalla de detalle.
+    """
+    return await GetRecentActivityUseCase(repo).execute(
+        limit=limit, project_id=project_id
     )
 
 

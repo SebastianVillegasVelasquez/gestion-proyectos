@@ -15,6 +15,15 @@ export function useProjectMembers(projectId: string | undefined) {
   });
 }
 
+/** Integrantes + su avance ponderado en este proyecto (vista de Integrantes). */
+export function useProjectMemberProgress(projectId: string | undefined) {
+  return useQuery({
+    queryKey: [...projectKeys.members(projectId ?? ""), "progress"],
+    queryFn: () => membersApi.progress(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
 export function useAddMember(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -24,6 +33,23 @@ export function useAddMember(projectId: string) {
         project_id: projectId,
         project_role: input.role,
       }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.members(projectId) }),
+  });
+}
+
+export function useUpdateMemberRole(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { memberId: string; role: ProjectRole }) =>
+      membersApi.updateRole(input.memberId, input.role),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.members(projectId) }),
+  });
+}
+
+export function useRemoveMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => membersApi.remove(memberId),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.members(projectId) }),
   });
 }

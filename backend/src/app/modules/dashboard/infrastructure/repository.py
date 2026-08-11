@@ -3,15 +3,15 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from sqlalchemy import String, and_, case, cast, func, select
+from sqlalchemy import ColumnElement, String, and_, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import WorkItem
-from app.modules.tasks.infrastructure.enums import TaskStatus
-from app.modules.tasks.infrastructure.models import Task
+from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
+from app.modules.tasks.infrastructure.models import Task, TaskHistory
 
 
 @dataclass
@@ -53,6 +53,27 @@ class DeadlineItem:
 
 
 @dataclass
+class ActivityRow:
+    """Un evento del historial de tareas, transversal a todos los proyectos.
+
+    Fila cruda del read model de actividad reciente del dashboard admin: qué
+    pasó (action + new_status), sobre qué tarea/proyecto y quién lo hizo. La
+    clasificación semántica (creación, entrega, devolución…) la hace el caso de
+    uso reutilizando la regla del dominio de trazabilidad.
+    """
+
+    id: uuid.UUID
+    task_id: uuid.UUID
+    task_title: str
+    project_name: str | None
+    actor_name: str | None
+    action: HistoryAction
+    new_status: TaskStatus | None
+    due_date: datetime.date | None
+    created_at: datetime.datetime
+
+
+@dataclass
 class DashboardPanels:
     task_board: list[TaskBoardItem] = field(default_factory=list)
     projects: list[ProjectOverviewItem] = field(default_factory=list)
@@ -79,6 +100,9 @@ class ScheduleItem:
     due_date: datetime.date
     status: str  # value del enum de tareas (para el color de la barra)
     progress_pct: int
+    # Distingue una fila de tarea (hoja) de un elemento de la estructura, para que
+    # la UI las muestre con matiz distinto. Nunca se expone responsable ni equipo.
+    is_task: bool = False
 
 
 @dataclass
@@ -124,6 +148,18 @@ _PENDING = [TaskStatus.PENDIENTE_POR_INICIAR, TaskStatus.DEVUELTA]
 _IN_PROGRESS = [TaskStatus.EN_PROGRESO, TaskStatus.EN_REVISION]
 _COMPLETED_BUCKET = [TaskStatus.COMPLETADA]
 
+# Avance derivado del estado de una tarea (no hay % por tarea en el modelo).
+# Espejo de STATUS_PROGRESS del cronograma del frontend, para que la barra de una
+# tarea en el portal del cliente comunique lo mismo que dentro del proyecto.
+_TASK_STATUS_PROGRESS = {
+    TaskStatus.PENDIENTE_POR_INICIAR: 0,
+    TaskStatus.EN_PROGRESO: 35,
+    TaskStatus.EN_REVISION: 70,
+    TaskStatus.DEVUELTA: 50,
+    TaskStatus.COMPLETADA: 100,
+    TaskStatus.CANCELADA: 0,
+}
+
 
 def _status_value(raw) -> str:
     """Devuelve el VALUE del enum (minúscula) a partir de lo que entregue la BD,
@@ -147,6 +183,11 @@ class DashboardRepository(ABC):
     async def get_panels(
         self, board_limit: int, projects_limit: int, deadlines_limit: int
     ) -> DashboardPanels: ...
+
+    @abstractmethod
+    async def get_recent_activity(
+        self, limit: int, project_id: uuid.UUID | None = None
+    ) -> list[ActivityRow]: ...
 
     # ── Variantes por usuario (dashboard del rol User) ──
     @abstractmethod
@@ -236,6 +277,61 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             projects=await self._get_projects_overview(projects_limit),
             upcoming_deadlines=await self._get_upcoming_deadlines(deadlines_limit),
         )
+
+    # ── Actividad reciente (transversal a todos los proyectos) ────────────────
+    async def get_recent_activity(
+        self, limit: int, project_id: uuid.UUID | None = None
+    ) -> list[ActivityRow]:
+        """Últimos eventos del historial de tareas, de cualquier proyecto.
+
+        Se une por `Task.project_id` (siempre presente) y no por el WorkItem, para
+        no perder eventos de tareas aún sin ubicar en la estructura. Ordena por
+        fecha descendente y acota a `limit`: la BD hace el trabajo, el payload es
+        mínimo. Con `project_id` la misma consulta se restringe a un solo proyecto
+        (para el detalle de proyecto), sin duplicar lógica.
+        """
+        conditions: list[ColumnElement[bool]] = [
+            Task.deleted_at.is_(None),
+            Project.deleted_at.is_(None),
+        ]
+        if project_id is not None:
+            conditions.append(Task.project_id == project_id)
+        rows = (
+            await self._session.execute(
+                select(
+                    TaskHistory,
+                    Task.title,
+                    Task.due_date,
+                    Project.name,
+                    User.name,
+                    User.last_name,
+                )
+                .join(Task, TaskHistory.task_id == Task.id)
+                .join(Project, Task.project_id == Project.id)
+                .outerjoin(User, TaskHistory.changed_by_id == User.id)
+                .where(*conditions)
+                .order_by(TaskHistory.created_at.desc())
+                .limit(limit)
+            )
+        ).all()
+
+        activity: list[ActivityRow] = []
+        for hist, title, due_date, project_name, name, last_name in rows:
+            actor_name = f"{name} {last_name}".strip() if name else None
+            activity.append(
+                ActivityRow(
+                    id=hist.id,
+                    task_id=hist.task_id,
+                    task_title=title,
+                    project_name=project_name,
+                    actor_name=actor_name,
+                    action=hist.action,
+                    new_status=hist.new_status,
+                    due_date=due_date,
+                    created_at=hist.created_at,
+                )
+            )
+        return activity
 
     def _task_with_project(self):
         """Cada tarea con el nombre de su proyecto, vía el WorkItem del que cuelga."""
@@ -797,6 +893,37 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 )
                 child_parent = key
                 child_depth = depth + 1
+
+                # Tareas fechadas del elemento como filas hijas (hojas). El cliente
+                # ve la tarea, su plazo y su estado, pero NUNCA el responsable ni el
+                # equipo. Las sin fechas no dibujan barra, así que se omiten.
+                dated_tasks: list[tuple[datetime.date, datetime.date, Task]] = [
+                    (t.start_date, t.due_date, t)
+                    for t in tasks_by_item.get(node.id, [])
+                    if t.start_date is not None and t.due_date is not None
+                ]
+                dated_tasks.sort(key=lambda row: (row[0], row[2].title))
+                for start_date, due_date, task in dated_tasks:
+                    task_status = (
+                        task.status
+                        if isinstance(task.status, TaskStatus)
+                        else TaskStatus(task.status)
+                    )
+                    items.append(
+                        ScheduleItem(
+                            key=f"n{counter}",
+                            parent_key=key,
+                            name=task.title,
+                            depth=child_depth,
+                            order=len(items),
+                            start_date=start_date,
+                            due_date=due_date,
+                            status=task_status.value,
+                            progress_pct=_TASK_STATUS_PROGRESS.get(task_status, 0),
+                            is_task=True,
+                        )
+                    )
+                    counter += 1
             for child in children.get(node.id, []):
                 walk(child, child_parent, child_depth)
 

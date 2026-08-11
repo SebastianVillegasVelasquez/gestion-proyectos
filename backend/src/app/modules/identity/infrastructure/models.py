@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import UUID, Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_database import Base
@@ -91,3 +92,27 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             f"name={self.name} last_name={self.last_name}"
             f"position={self.position}"
         )
+
+
+class UserReleaseView(Base, UUIDMixin, TimestampMixin):
+    """Registro de qué "novedad" (release) ya vio cada usuario.
+
+    Persiste el descarte del modal de novedades por PERSONA (no por dispositivo):
+    así, una vez visto, no vuelve a aparecer en ningún equipo. Un release nuevo
+    (id que el usuario no tiene aquí) vuelve a contar como pendiente.
+    """
+
+    __tablename__ = "user_release_views"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Id del release definido en el frontend (features/whats-new/releases.ts).
+    release_id: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "release_id", name="uq_user_release_view"),
+    )

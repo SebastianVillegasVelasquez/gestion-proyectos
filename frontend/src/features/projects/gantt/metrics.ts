@@ -70,3 +70,27 @@ export function daysRemaining(endDate: string | null, today: string): number | n
   }
   return toDayNumber(endDate) - toDayNumber(today);
 }
+
+/**
+ * Avance PONDERADO por duración: cada tarea aporta en proporción a sus días
+ * planificados (una tarea de 10 días pesa más que una de 1) usando el progreso
+ * por estado como proxy del avance individual. Es más realista que el conteo
+ * binario `completadas/total`, que trata igual a una tarea gigante y a una
+ * trivial. Las tareas sin fechas pesan 1 día (mínimo) para no desaparecer del
+ * cálculo. Devuelve 0-100 redondeado.
+ */
+export function weightedProgressPct(
+  tasks: Pick<Task, "status" | "start_date" | "due_date">[],
+): number {
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (const t of tasks) {
+    const days =
+      t.start_date && t.due_date
+        ? Math.max(1, toDayNumber(t.due_date) - toDayNumber(t.start_date) + 1)
+        : 1;
+    weightedSum += statusProgressPct(t.status) * days;
+    totalWeight += days;
+  }
+  return totalWeight === 0 ? 0 : Math.round(weightedSum / totalWeight);
+}

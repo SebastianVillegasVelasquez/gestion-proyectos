@@ -178,3 +178,128 @@ class TestRoutesProjectMember:
         assert "Carlos" in retrieved_names
         assert "integrante" in retrieved_roles
         assert "coordinador" in retrieved_roles
+
+    async def test_member_progress_is_weighted_by_structure_depth_and_scoped_per_project(
+        self,
+        client,
+        admin_headers,
+        valid_project_payload,
+    ):
+        """El % de avance de un integrante pesa cada tarea por su nodo en el
+        árbol de ESTE proyecto, y no se mezcla con lo que haga en otro proyecto.
+        """
+        project = (
+            await client.post(
+                "/api/v1/projects/", json=valid_project_payload, headers=admin_headers
+            )
+        ).json()
+        other_project = (
+            await client.post(
+                "/api/v1/projects/", json=valid_project_payload, headers=admin_headers
+            )
+        ).json()
+
+        user = (
+            await client.post(
+                "/api/v1/identity/users",
+                json={
+                    "email": "pago@example.com",
+                    "password": "password123",
+                    "name": "Pago",
+                    "last_name": "Test",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+                headers=admin_headers,
+            )
+        ).json()
+
+        for pid in (project["id"], other_project["id"]):
+            resp = await client.post(
+                "/api/v1/projects/members/",
+                json={
+                    "user_id": user["id"],
+                    "project_id": pid,
+                    "project_role": ProjectRole.INTEGRANTE.value,
+                },
+                headers=admin_headers,
+            )
+            assert resp.status_code == 201, resp.text
+
+        tipo = (
+            await client.post(
+                f"/api/v1/projects/{project['id']}/node-types",
+                json={"nombre": "Modulo"},
+                headers=admin_headers,
+            )
+        ).json()
+
+        # Dos módulos raíz (mismo nivel): cada uno pesa 0.5 del proyecto.
+        modulo_a = (
+            await client.post(
+                f"/api/v1/projects/{project['id']}/work-items",
+                json={"tipo_id": tipo["id"], "nombre": "Modulo A"},
+                headers=admin_headers,
+            )
+        ).json()
+        modulo_b = (
+            await client.post(
+                f"/api/v1/projects/{project['id']}/work-items",
+                json={"tipo_id": tipo["id"], "nombre": "Modulo B"},
+                headers=admin_headers,
+            )
+        ).json()
+
+        task_a = (
+            await client.post(
+                "/api/v1/tasks",
+                json={
+                    "title": "Tarea A",
+                    "work_item_id": modulo_a["id"],
+                    "assignee_id": user["id"],
+                },
+                headers=admin_headers,
+            )
+        ).json()
+        await client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Tarea B",
+                "work_item_id": modulo_b["id"],
+                "assignee_id": user["id"],
+            },
+            headers=admin_headers,
+        )
+
+        # Admin aprueba directo la Tarea A (0.5 del peso del proyecto).
+        change = await client.patch(
+            f"/api/v1/tasks/{task_a['id']}/status",
+            json={"status": "completada"},
+            headers=admin_headers,
+        )
+        assert change.status_code == 200, change.text
+
+        progress = await client.get(
+            f"/api/v1/projects/{project['id']}/members/progress",
+            headers=admin_headers,
+        )
+        assert progress.status_code == 200, progress.text
+        rows = progress.json()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["user_id"] == user["id"]
+        assert row["tasks_total"] == 2
+        assert row["tasks_completed"] == 1
+        assert row["progress_pct"] == 50
+
+        # En el otro proyecto (sin tareas para este usuario) el avance es 0,
+        # sin arrastrar nada de lo que hizo en el primero.
+        other_progress = await client.get(
+            f"/api/v1/projects/{other_project['id']}/members/progress",
+            headers=admin_headers,
+        )
+        assert other_progress.status_code == 200, other_progress.text
+        other_rows = other_progress.json()
+        assert len(other_rows) == 1
+        assert other_rows[0]["tasks_total"] == 0
+        assert other_rows[0]["progress_pct"] == 0

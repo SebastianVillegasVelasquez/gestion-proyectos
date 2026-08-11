@@ -52,22 +52,6 @@ async def developer_headers(developer_user):
 
 
 @pytest.fixture
-async def client_user(db_session):
-    return await _make_user(
-        db_session,
-        email="cliente@test.com",
-        password="Cliente123",
-        role=SystemRole.CLIENT,
-    )
-
-
-@pytest.fixture
-async def client_headers(client_user):
-    token = create_access_token(user_id=client_user.id, role=client_user.role.value)
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
 async def admin_user(db_session):
     user = User(
         email="admin@test.com",

@@ -8,6 +8,7 @@ import { useAuth, useChangePassword } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { positionLabel } from "@/features/projects/types/labels";
+import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
@@ -98,7 +99,6 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.SUPER_ADMIN]: "Super administrador",
   [Role.ADMIN]: "Administrador",
   [Role.USER]: "Usuario",
-  [Role.CLIENT]: "Cliente",
 };
 
 function SettingsCard({
@@ -195,14 +195,14 @@ export function SettingsPage() {
               aria-label="Alternar tema oscuro"
               onClick={toggleDark}
               className={cn(
-                "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors",
                 dark ? "bg-brand-gold" : "bg-muted-foreground/30",
               )}
             >
               <span
                 className={cn(
-                  "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                  dark ? "translate-x-[1.375rem]" : "translate-x-0.5",
+                  "inline-block size-5 rounded-full bg-white shadow transition-transform",
+                  dark ? "translate-x-5" : "translate-x-0",
                 )}
               />
             </button>
@@ -217,6 +217,13 @@ export function SettingsPage() {
             <KeyRound className="size-3.5 text-brand-teal" /> Contraseña
           </div>
           <ChangePasswordForm />
+        </SettingsCard>
+
+        <SettingsCard
+          title="Feedback"
+          description="Ayúdanos a mejorar la plataforma con tu opinión."
+        >
+          <FeedbackWidget />
         </SettingsCard>
       </div>
     </div>

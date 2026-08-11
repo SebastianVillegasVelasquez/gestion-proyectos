@@ -1,19 +1,15 @@
-import { Navigate } from "react-router";
 import { DashboardPage } from "@/features/dashboard/components/DashboardPage";
 import { UserDashboardPage } from "@/features/dashboard/components/UserDashboardPage";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 
 /**
- * Punto de entrada del dashboard. El cliente solo ve su portal; el rol User ve su
- * información; los roles administrativos ven el panorama global.
+ * Punto de entrada del dashboard. El rol User ve su información; los roles
+ * administrativos ven el panorama global.
  */
 export function Dashboard() {
   const { user } = useAuth();
 
-  if (user?.role === Role.CLIENT) {
-    return <Navigate to="/portal" replace />;
-  }
   if (user?.role === Role.USER) {
     return <UserDashboardPage />;
   }

@@ -15,22 +15,32 @@ from app.core.dependencies import (
 from app.modules.project.application.use_cases import (
     AddMemberToProjectUseCase,
     AssignTeamToProjectUseCase,
+    CreateProjectNoteUseCase,
     CreateProjectUseCase,
+    DeleteProjectNoteUseCase,
     DeleteProjectUseCase,
     GetClientAccessUseCase,
     GetProjectByIdUseCase,
+    GetProjectMemberProgressUseCase,
     GetProjectMembersUseCase,
     GetProjectsUseCase,
+    ListProjectNotesUseCase,
     RegenerateClientAccessUseCase,
+    RemoveProjectMemberUseCase,
+    UpdateProjectMemberRoleUseCase,
     UpdateProjectUseCase,
 )
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
     ClientAccessResponse,
+    CreateProjectNoteRequest,
     CreateProjectRequest,
+    ProjectMemberProgressResponse,
     ProjectMemberRequest,
     ProjectMemberResponse,
+    ProjectNoteResponse,
     ProjectResponse,
+    UpdateProjectMemberRoleRequest,
     UpdateProjectRequest,
 )
 
@@ -49,7 +59,11 @@ async def create_project(
 @router.get("/", response_model=List[ProjectResponse])
 async def get_all_projects(
     repo=Depends(project_repo_dependency),
-    _=Depends(require_role("admin", "super_admin", "user")),
+    # Listado completo (todos los proyectos, sin acotar por membresía): es
+    # vista de gestión. El rol user consulta sus proyectos vía /dashboard/me/*
+    # (ya acotado por membresía); si pudiera pegarle a este endpoint vería la
+    # lista completa de la organización sin filtro alguno.
+    _=Depends(require_role("admin", "super_admin")),
 ):
     return await GetProjectsUseCase(repo).execute()
 
@@ -105,6 +119,49 @@ async def regenerate_client_access(
     return await RegenerateClientAccessUseCase(repo).execute(project_id)
 
 
+# ── Notas del proyecto ───────────────────────────────────────────────────────
+@router.get("/{project_id}/notes", response_model=List[ProjectNoteResponse])
+async def list_project_notes(
+    project_id: UUID,
+    repo=Depends(project_repo_dependency),
+    _=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Notas/recordatorios del proyecto (más recientes primero)."""
+    return await ListProjectNotesUseCase(repo).execute(project_id)
+
+
+@router.post(
+    "/{project_id}/notes",
+    response_model=ProjectNoteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_project_note(
+    project_id: UUID,
+    data: CreateProjectNoteRequest,
+    repo=Depends(project_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
+):
+    return await CreateProjectNoteUseCase(repo).execute(
+        project_id,
+        data,
+        author_id=current_user.id,
+        author_name=f"{current_user.name} {current_user.last_name}",
+    )
+
+
+@router.delete("/{project_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project_note(
+    project_id: UUID,
+    note_id: UUID,
+    repo=Depends(project_repo_dependency),
+    current_user=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Borra una nota. Solo su autor o un administrador pueden hacerlo."""
+    await DeleteProjectNoteUseCase(repo).execute(
+        note_id, current_user.id, current_user.role
+    )
+
+
 # ── Miembros del proyecto ────────────────────────────────────────────────────
 @router.post("/members/", status_code=status.HTTP_201_CREATED)
 async def add_project_member(
@@ -136,6 +193,48 @@ async def get_project_members(
         user_repo=user_repo,
         member_repo=project_member_repo,
     ).execute(project_id)
+
+
+@router.get(
+    "/{project_id}/members/progress",
+    response_model=List[ProjectMemberProgressResponse],
+)
+async def get_project_member_progress(
+    project_id: UUID,
+    project_repo=Depends(project_repo_dependency),
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Integrantes de ESTE proyecto con su avance ponderado (para el pago).
+
+    No mezcla información de otros proyectos: un integrante puede estar en N
+    proyectos, pero el avance que se ve aquí es únicamente el de este.
+    """
+    return await GetProjectMemberProgressUseCase(
+        project_repo=project_repo,
+        member_repo=project_member_repo,
+    ).execute(project_id)
+
+
+@router.patch("/members/{member_id}", response_model=ProjectMemberResponse)
+async def update_project_member_role(
+    member_id: UUID,
+    payload: UpdateProjectMemberRoleRequest,
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    return await UpdateProjectMemberRoleUseCase(project_member_repo).execute(
+        member_id, payload.project_role
+    )
+
+
+@router.delete("/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_project_member(
+    member_id: UUID,
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    await RemoveProjectMemberUseCase(project_member_repo).execute(member_id)
 
 
 @router.post(

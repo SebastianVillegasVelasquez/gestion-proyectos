@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { statusProgressPct, isOverdue, summarize, daysRemaining } from "./metrics";
+import {
+  statusProgressPct,
+  isOverdue,
+  summarize,
+  daysRemaining,
+  weightedProgressPct,
+} from "./metrics";
 import type { Task, TaskStatus } from "../types/api.types";
 
 function task(status: TaskStatus, due_date: string): Pick<Task, "status" | "due_date"> {
@@ -54,6 +60,35 @@ describe("summarize", () => {
 
   it("returns zero progress for an empty list", () => {
     expect(summarize([], today).progressPct).toBe(0);
+  });
+});
+
+describe("weightedProgressPct", () => {
+  it("weights each task by its planned duration in days", () => {
+    // Tarea larga (10 días) completada vs. corta (1 día) sin iniciar:
+    // el conteo binario daría 50%, pero ponderado por días da ~91%.
+    const tasks = [
+      { status: "completada" as TaskStatus, start_date: "2026-06-01", due_date: "2026-06-10" },
+      {
+        status: "pendiente_por_iniciar" as TaskStatus,
+        start_date: "2026-06-11",
+        due_date: "2026-06-11",
+      },
+    ];
+    // (100*10 + 0*1) / 11 = 90.9 → 91
+    expect(weightedProgressPct(tasks)).toBe(91);
+  });
+
+  it("treats tasks without dates as one day of weight", () => {
+    const tasks = [
+      { status: "completada" as TaskStatus, start_date: null, due_date: null },
+      { status: "pendiente_por_iniciar" as TaskStatus, start_date: null, due_date: null },
+    ];
+    expect(weightedProgressPct(tasks)).toBe(50);
+  });
+
+  it("returns zero for an empty list", () => {
+    expect(weightedProgressPct([])).toBe(0);
   });
 });
 
