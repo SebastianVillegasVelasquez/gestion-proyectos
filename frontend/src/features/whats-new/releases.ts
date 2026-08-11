@@ -1,7 +1,7 @@
 // Novedades ("qué hay de nuevo") que se muestran UNA vez por usuario al iniciar
 // sesión. Cada release declara a qué audiencia le concierne (todos, roles
-// elevados o usuarios normales) y se recuerda como vista en localStorage por
-// usuario, para no volver a mostrarla.
+// elevados o usuarios normales) y se recuerda como vista en el backend (por
+// usuario), para no volver a mostrarla.
 
 export type ReleaseAudience = "all" | "elevated" | "normal";
 
@@ -15,6 +15,47 @@ export interface ReleaseNote {
 
 // De la más reciente a la más antigua.
 export const RELEASES: ReleaseNote[] = [
+  {
+    id: "2026-08-11-integrantes-pago-elevated",
+    date: "2026-08-11",
+    title: "Avance de pago por integrante",
+    audience: "elevated",
+    items: [
+      "La vista de Integrantes ahora es una tabla con nombre, correo, cargo y rol, con orden por columna y paginación para proyectos con muchas personas.",
+      "Cada integrante muestra su % de avance en ESE proyecto (nunca mezclado con otros proyectos donde también participe): pondera cada tarea según qué tan profundo está su nodo en la estructura, no solo cuántas tareas tiene completadas.",
+      "Al llegar al 100% se marca «Listo para pago».",
+    ],
+  },
+  {
+    id: "2026-08-11-tareas-flujo-elevated",
+    date: "2026-08-11",
+    title: "Se arregló aprobar tareas",
+    audience: "elevated",
+    items: [
+      "Aprobar una entrega (pasarla a completada) ya no fallaba en silencio — el bug de fondo era una notificación mal configurada, no un problema de permisos.",
+      "La tabla de tareas ahora solo ofrece los cambios de estado que en verdad puedes hacer según tu rol, con orden por columna y paginación.",
+    ],
+  },
+  {
+    id: "2026-08-11-detalle-proyecto-metricas-elevated",
+    date: "2026-08-11",
+    title: "Detalle de proyecto con métricas",
+    audience: "elevated",
+    items: [
+      "Nueva franja de estado con el progreso, tareas restantes/atrasadas y días para el cierre, de un vistazo.",
+      "Un solo panel de gráficos para alternar entre tareas por estado y desempeño de entregas en el tiempo.",
+      "Próximos vencimientos, actividad reciente y notas del proyecto, todo reorganizado en el mismo lugar.",
+    ],
+  },
+  {
+    id: "2026-08-11-feedback-configuracion-all",
+    date: "2026-08-11",
+    title: "El feedback se mudó",
+    audience: "all",
+    items: [
+      "El botón flotante de feedback ya no está sobre toda la app: ahora vive en Configuración, junto a tu perfil.",
+    ],
+  },
   {
     id: "2026-08-detalle-proyecto-elevated",
     date: "2026-08-09",
