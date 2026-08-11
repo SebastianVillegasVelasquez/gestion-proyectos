@@ -37,11 +37,14 @@ function formatNoteDate(iso: string): string {
  * pero editable). Cualquier miembro puede añadir; borrar queda para el autor o
  * un administrador (la regla la aplica el backend; aquí solo ocultamos el botón).
  */
+// Un acento de color por nota (rota entre los tonos de marca). Cada entrada
+// combina el color de la barra lateral y el de la pastilla de fecha para que la
+// tarjeta se sienta diseñada y no genérica.
 const NOTE_ACCENTS = [
-  "border-l-brand-teal",
-  "border-l-brand-gold",
-  "border-l-brand-blue",
-  "border-l-emerald-500",
+  { bar: "bg-brand-teal", chip: "bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal" },
+  { bar: "bg-brand-gold", chip: "bg-brand-gold/15 text-brand-gold-dark dark:text-brand-gold" },
+  { bar: "bg-brand-blue", chip: "bg-brand-blue/10 text-brand-blue" },
+  { bar: "bg-emerald-500", chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
 ] as const;
 
 function initials(name: string): string {
@@ -82,10 +85,18 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
 
   return (
     <Card className="shrink-0 rounded-2xl">
-      <CardContent className="flex flex-col gap-3 py-5">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 text-[15px] font-medium text-foreground">
-            <NotebookPen className="size-4 text-brand-teal" /> Notas del proyecto
+      <CardContent className="flex flex-col gap-4 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
+              <NotebookPen className="size-[18px]" />
+            </span>
+            Notas del proyecto
+            {notes.length > 0 && (
+              <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
+                {notes.length}
+              </span>
+            )}
           </span>
           {!adding && (
             <button
@@ -93,9 +104,9 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
               onClick={() => {
                 setAdding(true);
               }}
-              className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition hover:bg-brand-gold-dark"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark"
             >
-              <Plus className="size-3.5" /> Nota
+              <Plus className="size-3.5" /> Añadir nota
             </button>
           )}
         </div>
@@ -161,52 +172,61 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
           </div>
         ) : notes.length === 0 ? (
           !adding && (
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-8 text-center">
-              <NotebookPen className="size-6 text-muted-foreground/50" />
-              <p className="text-sm italic text-muted-foreground">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-accent/20 px-4 py-4 text-center sm:flex-row sm:text-left">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
+                <NotebookPen className="size-[18px]" />
+              </span>
+              <p className="flex-1 text-sm text-muted-foreground">
                 Aún no hay notas. Deja aquí un problema, una anomalía o algo que recordar.
               </p>
             </div>
           )
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {notes.map((note, idx) => (
-              <li
-                key={note.id}
-                className={`group/note relative flex flex-col gap-2.5 rounded-xl border border-l-[3px] border-border bg-card px-3.5 py-3 shadow-sm transition-shadow hover:shadow-md ${NOTE_ACCENTS[idx % NOTE_ACCENTS.length]}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="rounded-md bg-accent px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
-                    {formatNoteDate(note.note_date)}
-                  </span>
-                  {canDelete(note) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        deleteNote.mutate(note.id);
-                      }}
-                      disabled={deleteNote.isPending}
-                      aria-label="Borrar nota"
-                      title="Borrar nota"
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400"
+            {notes.map((note, idx) => {
+              const accent = NOTE_ACCENTS[idx % NOTE_ACCENTS.length];
+              return (
+                <li
+                  key={note.id}
+                  className="group/note relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {/* Barra de acento a la izquierda */}
+                  <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${accent.bar}`} />
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tabular-nums ${accent.chip}`}
                     >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-                <p className="line-clamp-6 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                  {note.content}
-                </p>
-                {note.author_name && (
-                  <div className="mt-auto flex items-center gap-1.5 pt-1">
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-[9px] font-bold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
-                      {initials(note.author_name)}
+                      {formatNoteDate(note.note_date)}
                     </span>
-                    <p className="truncate text-[11px] text-muted-foreground">{note.author_name}</p>
+                    {canDelete(note) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteNote.mutate(note.id);
+                        }}
+                        disabled={deleteNote.isPending}
+                        aria-label="Borrar nota"
+                        title="Borrar nota"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
                   </div>
-                )}
-              </li>
-            ))}
+                  <p className="line-clamp-6 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                    {note.content}
+                  </p>
+                  {note.author_name && (
+                    <div className="mt-auto flex items-center gap-2 border-t border-accent/60 pt-2.5">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-[10px] font-bold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
+                        {initials(note.author_name)}
+                      </span>
+                      <p className="truncate text-xs text-muted-foreground">{note.author_name}</p>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

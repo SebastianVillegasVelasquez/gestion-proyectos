@@ -10,7 +10,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Sparkles,
   Sun,
   UserCog,
   Users2,
@@ -21,7 +20,6 @@ import { useAuth, useLogout } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
-import { useWhatsNew } from "@/features/whats-new/whats-new-context";
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.DEVELOPER]: "Developer",
@@ -147,7 +145,6 @@ export function Sidebar({
   const location = useLocation();
   const { user } = useAuth();
   const logout = useLogout();
-  const whatsNew = useWhatsNew();
 
   // User: navegación reducida. Developer: completa + bandeja de feedback.
   // Resto (admin/super_admin): navegación completa.
@@ -317,32 +314,6 @@ export function Sidebar({
             </button>
           </div>
         </div>
-
-        {/* Novedades: reabre el modal de "qué hay de nuevo"; el badge muestra
-            cuántas actualizaciones (según el rol) aún no ha visto la persona. */}
-        {whatsNew.hasReleases && (
-          <button
-            type="button"
-            onClick={whatsNew.open}
-            title={collapsed ? "Novedades" : undefined}
-            className={cn(
-              "mt-3 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/70 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground",
-              collapsed ? "px-3 md:justify-center md:px-0" : "px-3",
-            )}
-          >
-            <span className="relative shrink-0">
-              <Sparkles className="size-4" />
-              {whatsNew.unseenCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-brand-gold px-1 text-[9px] font-bold text-brand-black">
-                  {whatsNew.unseenCount}
-                </span>
-              )}
-            </span>
-            <span className={cn("flex-1 truncate text-left", collapsed && "md:hidden")}>
-              Novedades
-            </span>
-          </button>
-        )}
 
         {/* Cerrar sesión: limpia los tokens y vuelve al login */}
         <button

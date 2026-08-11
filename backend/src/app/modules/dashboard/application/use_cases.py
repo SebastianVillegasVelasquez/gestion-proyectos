@@ -106,8 +106,10 @@ class GetRecentActivityUseCase:
     def __init__(self, repo: DashboardRepository) -> None:
         self._repo = repo
 
-    async def execute(self, limit: int = 10) -> RecentActivityResponse:
-        rows = await self._repo.get_recent_activity(limit)
+    async def execute(
+        self, limit: int = 10, project_id: UUID | None = None
+    ) -> RecentActivityResponse:
+        rows = await self._repo.get_recent_activity(limit, project_id)
         return RecentActivityResponse(
             items=[
                 ActivityItemResponse(

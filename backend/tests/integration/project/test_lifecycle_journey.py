@@ -129,3 +129,23 @@ class TestProjectLifecycleJourney:
         )
         assert revision.status_code == 200, revision.text
         assert revision.json()["status"] == "en_revision"
+
+        # 6. La gestión (admin) aprueba directamente: no necesita ser el líder del
+        #    proyecto para hacerlo — es el override administrativo.
+        aprobar = await client.patch(
+            f"/api/v1/tasks/{task1_id}/status",
+            json={"status": "completada"},
+            headers=admin_headers,
+        )
+        assert aprobar.status_code == 200, aprobar.text
+        assert aprobar.json()["status"] == "completada"
+
+        # 7. La gestión también puede saltar directamente de "por iniciar" a
+        #    "completada" sin pasar por revisión (task2, aún sin tocar).
+        salto = await client.patch(
+            f"/api/v1/tasks/{task2_id}/status",
+            json={"status": "completada"},
+            headers=admin_headers,
+        )
+        assert salto.status_code == 200, salto.text
+        assert salto.json()["status"] == "completada"

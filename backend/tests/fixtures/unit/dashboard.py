@@ -35,7 +35,9 @@ class FakeDashboardRepository(DashboardRepository):
     ) -> DashboardPanels:
         return self._panels
 
-    async def get_recent_activity(self, limit: int) -> list[ActivityRow]:
+    async def get_recent_activity(
+        self, limit: int, project_id: uuid.UUID | None = None
+    ) -> list[ActivityRow]:
         return self._activity[:limit]
 
     # Variantes por usuario: el fake ignora el user_id y devuelve lo configurado.

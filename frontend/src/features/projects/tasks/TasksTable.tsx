@@ -1,14 +1,60 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Pencil, Replace, UserPlus, Users, X } from "lucide-react";
+import { AlertCircle, ChevronDown, Pencil, Replace, UserPlus, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "../types/labels";
-import type { ProjectMember, Task, TaskPriority, TaskStatus, Team } from "../types/api.types";
+import { getErrorMessage } from "@/utils/get-error-message";
+import { useSortableData } from "@/hooks/use-sortable-data";
+import { SortableTh } from "@/components/ui/SortableTh";
+import { TASK_PRIORITY_LABELS, TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../types/labels";
+import type {
+  ProjectMember,
+  ProjectRole,
+  Task,
+  TaskPriority,
+  TaskStatus,
+  Team,
+} from "../types/api.types";
 import { useChangeTaskStatus, useUpdateTask } from "../hooks/use-tasks";
 import { commonPrefix, replaceInTitle } from "./bulk-title";
 import { AssignTaskModal } from "./AssignTaskModal";
 
 const STATUSES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
 const PRIORITIES = Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[];
+
+// Columnas ordenables de la tabla (las de datos derivados/complejos —
+// asignación, ubicación — quedan fuera).
+type SortKey = "title" | "status" | "priority" | "due_date";
+
+// Estados que solo puede fijar quien revisa (líder/supervisor del proyecto):
+// espejo de `_REVIEW_TARGET_STATUSES` en el backend (ChangeTaskStatusUseCase).
+const REVIEW_TARGET_STATUSES: TaskStatus[] = ["completada", "devuelta"];
+const REVIEW_ROLES: ProjectRole[] = ["coordinador", "supervisor"];
+
+/**
+ * Qué estados puede fijar el usuario actual en esta tarea, replicando en el
+ * frontend la misma regla de `ChangeTaskStatusUseCase._authorize` del backend:
+ * gestión (admin/super_admin/developer) fija cualquiera; el responsable puede
+ * todo menos aprobar/devolver (eso es del revisor); el líder/supervisor del
+ * proyecto puede cualquiera; cualquier otra persona no puede cambiar el estado.
+ * Sin esto, la tabla ofrecía transiciones que el backend rechazaba en silencio.
+ */
+function allowedStatuses(
+  task: Task,
+  currentUserId: string | undefined,
+  isElevated: boolean,
+  myProjectRole: ProjectRole | undefined,
+): TaskStatus[] {
+  if (isElevated) {
+    return STATUSES;
+  }
+  if (myProjectRole && REVIEW_ROLES.includes(myProjectRole)) {
+    return STATUSES;
+  }
+  const isAssignee = Boolean(currentUserId) && task.assignee_id === currentUserId;
+  if (isAssignee) {
+    return STATUSES.filter((s) => !REVIEW_TARGET_STATUSES.includes(s));
+  }
+  return [];
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -79,6 +125,8 @@ export function TasksTable({
   members,
   teams,
   locationById,
+  currentUserId,
+  isElevated,
   onOpenDetail,
 }: {
   projectId: string;
@@ -86,6 +134,9 @@ export function TasksTable({
   members: ProjectMember[];
   teams: Team[];
   locationById: Map<string, { name: string; tipoId: string }>;
+  // Quién mira la tabla: decide qué transiciones de estado puede fijar cada fila.
+  currentUserId: string | undefined;
+  isElevated: boolean;
   onOpenDetail: (taskId: string) => void;
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
@@ -97,6 +148,33 @@ export function TasksTable({
   const [dirtyFind, setDirtyFind] = useState(false);
   // Tarea que se está asignando por primera vez desde la tabla (modal).
   const [assigningTask, setAssigningTask] = useState<Task | null>(null);
+  // Último error al cambiar un estado (el backend rechaza transiciones fuera de
+  // flujo o con dependencias sin completar); antes fallaba en silencio.
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const myProjectRole = useMemo(
+    () => members.find((m) => m.user_id === currentUserId)?.project_role,
+    [members, currentUserId],
+  );
+
+  // Orden de la tabla al hacer clic en un header. La prioridad ordena por
+  // severidad (el orden de PRIORITIES ya va de menor a mayor), no alfabético.
+  const {
+    sorted: sortedTasks,
+    sort,
+    toggleSort,
+  } = useSortableData<Task, SortKey>(tasks, (task, key) => {
+    switch (key) {
+      case "title":
+        return task.title;
+      case "status":
+        return TASK_STATUS_LABELS[task.status];
+      case "priority":
+        return PRIORITIES.indexOf(task.priority);
+      case "due_date":
+        return task.due_date;
+    }
+  });
 
   // Nombres para mostrar la asignación actual (solo lectura en la tabla).
   const memberName = useMemo(() => {
@@ -168,6 +246,25 @@ export function TasksTable({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Error al cambiar un estado: antes fallaba en silencio y el select
+          volvía a mostrar el valor anterior sin ninguna explicación. */}
+      {statusError && (
+        <div className="mb-2 flex shrink-0 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+          <AlertCircle className="size-4 shrink-0" />
+          <span className="flex-1">{statusError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setStatusError(null);
+            }}
+            aria-label="Cerrar aviso"
+            className="rounded-md p-0.5 transition hover:bg-rose-500/10"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Barra de edición masiva: aparece al seleccionar tareas. */}
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border border-b-0 border-border bg-accent/40 px-3 py-2 text-xs">
@@ -249,16 +346,44 @@ export function TasksTable({
                   className="size-4 accent-brand-gold"
                 />
               </th>
-              <th className="px-3 py-3">Tarea</th>
-              <th className="px-3 py-3">Estado</th>
-              <th className="px-3 py-3">Prioridad</th>
+              <SortableTh
+                label="Tarea"
+                columnKey="title"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
+              <SortableTh
+                label="Estado"
+                columnKey="status"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
+              <SortableTh
+                label="Prioridad"
+                columnKey="priority"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
               <th className="px-3 py-3">Asignación</th>
               <th className="px-3 py-3">Ubicación</th>
-              <th className="px-3 py-3">Vence</th>
+              <SortableTh
+                label="Vence"
+                columnKey="due_date"
+                activeKey={sort.key}
+                direction={sort.direction}
+                onSort={toggleSort}
+                className="px-3 py-3"
+              />
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
+            {sortedTasks.map((task) => {
               const location = task.work_item_id ? locationById.get(task.work_item_id) : undefined;
               const isSel = selected.has(task.id);
               return (
@@ -294,19 +419,61 @@ export function TasksTable({
                     </button>
                   </td>
                   <td className="px-3 py-2">
-                    <CellSelect
-                      value={task.status}
-                      onChange={(value) => {
-                        changeStatus.mutate({ taskId: task.id, status: value as TaskStatus });
-                      }}
-                      ariaLabel="Estado"
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {TASK_STATUS_LABELS[s]}
-                        </option>
-                      ))}
-                    </CellSelect>
+                    {(() => {
+                      const options = allowedStatuses(
+                        task,
+                        currentUserId,
+                        isElevated,
+                        myProjectRole,
+                      );
+                      if (options.length === 0) {
+                        // Sin permiso para tocar esta tarea: badge de solo lectura en
+                        // vez de un select que el backend rechazaría igual.
+                        return (
+                          <span
+                            title="No tienes permiso para cambiar el estado de esta tarea"
+                            className={cn(
+                              "flex w-full items-center justify-center rounded-md px-2 py-1 text-xs font-medium",
+                              TASK_STATUS_COLORS[task.status],
+                            )}
+                          >
+                            {TASK_STATUS_LABELS[task.status]}
+                          </span>
+                        );
+                      }
+                      return (
+                        <CellSelect
+                          value={task.status}
+                          onChange={(value) => {
+                            changeStatus.mutate(
+                              { taskId: task.id, status: value as TaskStatus },
+                              {
+                                onSuccess: () => {
+                                  setStatusError(null);
+                                },
+                                onError: (error) => {
+                                  setStatusError(
+                                    getErrorMessage(error, "No se pudo cambiar el estado"),
+                                  );
+                                },
+                              },
+                            );
+                          }}
+                          ariaLabel="Estado"
+                        >
+                          {/* El estado actual siempre se ofrece aunque no esté entre las
+                              transiciones permitidas, para no ocultar dónde está la tarea. */}
+                          {(options.includes(task.status)
+                            ? options
+                            : [task.status, ...options]
+                          ).map((s) => (
+                            <option key={s} value={s}>
+                              {TASK_STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </CellSelect>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-2">
                     <CellSelect
