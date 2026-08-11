@@ -15,6 +15,15 @@ export function useProjectMembers(projectId: string | undefined) {
   });
 }
 
+/** Integrantes + su avance ponderado en este proyecto (vista de Integrantes). */
+export function useProjectMemberProgress(projectId: string | undefined) {
+  return useQuery({
+    queryKey: [...projectKeys.members(projectId ?? ""), "progress"],
+    queryFn: () => membersApi.progress(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
 export function useAddMember(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

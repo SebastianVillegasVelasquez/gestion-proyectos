@@ -73,6 +73,26 @@ class UpdateProjectMemberRoleRequest(BaseModelConfig):
     project_role: ProjectRole
 
 
+class ProjectMemberProgressResponse(BaseModelConfig):
+    """Integrante + su avance ponderado en ESTE proyecto (nunca cruzado con otros).
+
+    `progress_pct` no es completadas/totales plano: pesa cada tarea según la
+    profundidad de su nodo en la estructura (ver `member_progress` en domain).
+    Es el número que determina cuándo corresponde pagarle su parte.
+    """
+
+    id: UUID
+    user_id: UUID
+    name: str
+    last_name: str
+    email: str
+    position: str
+    project_role: ProjectRole
+    tasks_total: int
+    tasks_completed: int
+    progress_pct: int
+
+
 class ResponseProjectMember(BaseModelConfig):
     users: list[UserResponse] = []
 

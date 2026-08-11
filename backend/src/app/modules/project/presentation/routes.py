@@ -21,6 +21,7 @@ from app.modules.project.application.use_cases import (
     DeleteProjectUseCase,
     GetClientAccessUseCase,
     GetProjectByIdUseCase,
+    GetProjectMemberProgressUseCase,
     GetProjectMembersUseCase,
     GetProjectsUseCase,
     ListProjectNotesUseCase,
@@ -34,6 +35,7 @@ from app.modules.project.presentation.schemas import (
     ClientAccessResponse,
     CreateProjectNoteRequest,
     CreateProjectRequest,
+    ProjectMemberProgressResponse,
     ProjectMemberRequest,
     ProjectMemberResponse,
     ProjectNoteResponse,
@@ -189,6 +191,27 @@ async def get_project_members(
     return await GetProjectMembersUseCase(
         project_repo=project_repo,
         user_repo=user_repo,
+        member_repo=project_member_repo,
+    ).execute(project_id)
+
+
+@router.get(
+    "/{project_id}/members/progress",
+    response_model=List[ProjectMemberProgressResponse],
+)
+async def get_project_member_progress(
+    project_id: UUID,
+    project_repo=Depends(project_repo_dependency),
+    project_member_repo=Depends(project_members_repo_dependency),
+    _=Depends(require_role("admin", "super_admin", "user")),
+):
+    """Integrantes de ESTE proyecto con su avance ponderado (para el pago).
+
+    No mezcla información de otros proyectos: un integrante puede estar en N
+    proyectos, pero el avance que se ve aquí es únicamente el de este.
+    """
+    return await GetProjectMemberProgressUseCase(
+        project_repo=project_repo,
         member_repo=project_member_repo,
     ).execute(project_id)
 

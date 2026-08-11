@@ -4,6 +4,13 @@ from uuid import UUID
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
 
+from app.modules.project.domain.member_progress import (
+    MemberProgress,
+    WorkNode,
+    WorkTask,
+    aggregate_progress_by_user,
+    compute_task_weights,
+)
 from app.modules.project.infrastructure.models import (
     Project,
     ProjectMember,
@@ -12,6 +19,7 @@ from app.modules.project.infrastructure.models import (
 from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
+from app.modules.teams.infrastructure.models import TeamMember
 from app.shared.base_repository import BaseRepository
 
 
@@ -49,6 +57,62 @@ class ProjectRepository(BaseRepository[Project]):
             if total:
                 result[pid] = round(float(completed) / float(total) * 100, 1)
         return result
+
+    async def get_member_progress(self, project_id: UUID) -> dict[UUID, MemberProgress]:
+        """Avance ponderado por integrante (para decidir cuándo pagarle).
+
+        Ver `app.modules.project.domain.member_progress` para la regla de
+        reparto por profundidad del árbol. Tres queries (nodos, tareas,
+        integrantes de los equipos involucrados) y el resto es cómputo en
+        memoria: nada de esto escala mal a los tamaños de un proyecto real.
+        """
+        node_rows = (
+            await self._session.execute(
+                select(WorkItem.id, WorkItem.parent_id).where(
+                    WorkItem.proyecto_id == project_id,
+                    WorkItem.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        nodes = [WorkNode(id=r.id, parent_id=r.parent_id) for r in node_rows]
+
+        task_rows = (
+            await self._session.execute(
+                select(
+                    Task.id,
+                    Task.work_item_id,
+                    Task.assignee_id,
+                    Task.team_id,
+                    Task.status,
+                ).where(Task.project_id == project_id, Task.deleted_at.is_(None))
+            )
+        ).all()
+        tasks = [
+            WorkTask(
+                id=r.id,
+                work_item_id=r.work_item_id,
+                assignee_id=r.assignee_id,
+                team_id=r.team_id,
+                is_completed=r.status == TaskStatus.COMPLETADA,
+            )
+            for r in task_rows
+        ]
+
+        team_ids = {t.team_id for t in tasks if t.team_id is not None}
+        team_member_ids: dict[UUID, list[UUID]] = {}
+        if team_ids:
+            member_rows = (
+                await self._session.execute(
+                    select(TeamMember.team_id, TeamMember.user_id).where(
+                        TeamMember.team_id.in_(team_ids)
+                    )
+                )
+            ).all()
+            for r in member_rows:
+                team_member_ids.setdefault(r.team_id, []).append(r.user_id)
+
+        weights = compute_task_weights(nodes, tasks)
+        return aggregate_progress_by_user(tasks, weights, team_member_ids)
 
     # ── Notas del proyecto ───────────────────────────────────────────────────
     async def add_note(self, note: ProjectNote) -> ProjectNote:

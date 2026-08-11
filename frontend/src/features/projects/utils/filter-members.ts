@@ -6,7 +6,7 @@ import { positionLabel } from "@/features/projects/types/labels";
  * La búsqueda no distingue mayúsculas y compara también el cargo crudo
  * (ej. "experto_tematico") y su etiqueta legible (ej. "Experto temático").
  */
-export function filterMembers(members: ProjectMember[], query: string): ProjectMember[] {
+export function filterMembers<T extends ProjectMember>(members: T[], query: string): T[] {
   const q = query.trim().toLowerCase();
   if (!q) {
     return members;

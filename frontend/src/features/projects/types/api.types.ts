@@ -208,6 +208,16 @@ export interface ProjectMember {
   project_role: ProjectRole;
 }
 
+// Integrante + su avance ponderado en ESTE proyecto (nunca cruzado con otros
+// proyectos en los que también participe). `progress_pct` pesa cada tarea
+// según la profundidad de su nodo en la estructura, no es completadas/total
+// plano — es el número que determina cuándo corresponde pagarle su parte.
+export interface ProjectMemberProgress extends ProjectMember {
+  tasks_total: number;
+  tasks_completed: number;
+  progress_pct: number;
+}
+
 export interface AddMemberPayload {
   user_id: string;
   project_id: string;

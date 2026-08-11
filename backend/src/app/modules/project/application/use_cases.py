@@ -16,6 +16,7 @@ from app.modules.project.presentation.schemas import (
     ClientAccessResponse,
     CreateProjectNoteRequest,
     CreateProjectRequest,
+    ProjectMemberProgressResponse,
     ProjectMemberRequest,
     ProjectMemberResponse,
     ProjectNoteResponse,
@@ -212,6 +213,51 @@ class GetProjectMembersUseCase:
 
     async def execute(self, project_id: UUID) -> List[ProjectMemberResponse]:
         return await self.service.get_project_members(project_id)
+
+
+class GetProjectMemberProgressUseCase:
+    """Integrantes del proyecto + su avance ponderado (para decidir el pago).
+
+    Combina la lista de integrantes (nombre/correo/cargo/rol) con el avance
+    calculado por `ProjectRepository.get_member_progress`, acotado SIEMPRE a
+    este proyecto: un integrante puede estar en N proyectos, pero acá solo se
+    ve su avance en este. Quien no tiene tareas asignadas queda en 0%.
+    """
+
+    def __init__(
+        self,
+        project_repo: ProjectRepository,
+        member_repo: ProjectMemberRepository,
+    ):
+        self.project_repo = project_repo
+        self.member_repo = member_repo
+
+    async def execute(self, project_id: UUID) -> List[ProjectMemberProgressResponse]:
+        project = await self.project_repo.get_by_id(project_id)
+        if not project or project.is_deleted:
+            raise NotFoundError("Proyecto no encontrado")
+
+        members = await self.member_repo.get_all_members_by_project_id(project_id)
+        progress_by_user = await self.project_repo.get_member_progress(project_id)
+
+        result: List[ProjectMemberProgressResponse] = []
+        for member in members:
+            progress = progress_by_user.get(member.user_id)
+            result.append(
+                ProjectMemberProgressResponse(
+                    id=member.id,
+                    user_id=member.user_id,
+                    name=member.user.name,
+                    last_name=member.user.last_name,
+                    email=member.user.email,
+                    position=member.user.position,
+                    project_role=member.project_role,
+                    tasks_total=progress.tasks_total if progress else 0,
+                    tasks_completed=progress.tasks_completed if progress else 0,
+                    progress_pct=progress.progress_pct if progress else 0,
+                )
+            )
+        return result
 
 
 class UpdateProjectMemberRoleUseCase:

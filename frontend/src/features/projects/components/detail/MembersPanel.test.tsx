@@ -6,10 +6,16 @@ import type { ReactNode } from "react";
 
 import { MembersPanel } from "./MembersPanel";
 import { membersApi } from "../../api/members.api";
-import type { ProjectMember } from "../../types/api.types";
+import type { ProjectMemberProgress } from "../../types/api.types";
 
 vi.mock("../../api/members.api", () => ({
-  membersApi: { list: vi.fn(), add: vi.fn(), updateRole: vi.fn(), remove: vi.fn() },
+  membersApi: {
+    list: vi.fn(),
+    progress: vi.fn(),
+    add: vi.fn(),
+    updateRole: vi.fn(),
+    remove: vi.fn(),
+  },
   usersApi: { list: vi.fn() },
   directoryApi: { list: vi.fn(), search: vi.fn() },
 }));
@@ -29,7 +35,7 @@ function renderPanel() {
   return render(<MembersPanel projectId="p1" />, { wrapper: Wrapper });
 }
 
-const members: ProjectMember[] = [
+const members: ProjectMemberProgress[] = [
   {
     id: "m1",
     user_id: "u1",
@@ -38,6 +44,9 @@ const members: ProjectMember[] = [
     email: "ana@acme.com",
     position: "desarrollador",
     project_role: "integrante",
+    tasks_total: 4,
+    tasks_completed: 2,
+    progress_pct: 50,
   },
   {
     id: "m2",
@@ -47,6 +56,9 @@ const members: ProjectMember[] = [
     email: "beto@acme.com",
     position: "experto_tematico",
     project_role: "coordinador",
+    tasks_total: 3,
+    tasks_completed: 3,
+    progress_pct: 100,
   },
 ];
 
@@ -56,15 +68,25 @@ describe("MembersPanel", () => {
   });
 
   it("lists the project members once loaded", async () => {
-    vi.mocked(membersApi.list).mockResolvedValue(members);
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
     renderPanel();
 
     expect(await screen.findByText("Ana García")).toBeInTheDocument();
     expect(screen.getByText("Beto López")).toBeInTheDocument();
   });
 
+  it("shows each member's weighted progress", async () => {
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
+    renderPanel();
+
+    await screen.findByText("Ana García");
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText(/Listo para pago/)).toBeInTheDocument();
+  });
+
   it("filters by name as the user types", async () => {
-    vi.mocked(membersApi.list).mockResolvedValue(members);
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
     renderPanel();
     await screen.findByText("Ana García");
 
@@ -75,7 +97,7 @@ describe("MembersPanel", () => {
   });
 
   it("filters by cargo using its readable label", async () => {
-    vi.mocked(membersApi.list).mockResolvedValue(members);
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
     renderPanel();
     await screen.findByText("Ana García");
 
@@ -86,7 +108,7 @@ describe("MembersPanel", () => {
   });
 
   it("shows a no-results message when nothing matches", async () => {
-    vi.mocked(membersApi.list).mockResolvedValue(members);
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
     renderPanel();
     await screen.findByText("Ana García");
 
@@ -95,5 +117,17 @@ describe("MembersPanel", () => {
     await waitFor(() => {
       expect(screen.getByText(/Ningún integrante coincide/)).toBeInTheDocument();
     });
+  });
+
+  it("sorts by avance (progress) when the column header is clicked", async () => {
+    vi.mocked(membersApi.progress).mockResolvedValue(members);
+    renderPanel();
+    await screen.findByText("Ana García");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ordenar por Avance" }));
+
+    const rows = screen.getAllByRole("row").slice(1); // sin el header
+    expect(rows[0]).toHaveTextContent("Ana García");
+    expect(rows[1]).toHaveTextContent("Beto López");
   });
 });
