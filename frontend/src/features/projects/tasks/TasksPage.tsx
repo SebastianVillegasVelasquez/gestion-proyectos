@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router";
-import { Plus, Moon, Sun, ListChecks, Search, ChevronLeft } from "lucide-react";
+import { Plus, Moon, Sun, ListChecks, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { Role } from "@/features/auth/types";
 import { useProject } from "../hooks/use-projects";
 import { useProjectTasks } from "../hooks/use-tasks";
 import { useProjectMembers } from "../hooks/use-members";
@@ -11,6 +13,11 @@ import type { WorkItemTree } from "../types/api.types";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { TasksTable } from "./TasksTable";
 import { TaskDetailPanel } from "../gantt/components/TaskDetailPanel";
+
+// Tamaño de página de la tabla. La consulta sigue trayendo todas las tareas del
+// proyecto de una vez (las necesitan otras vistas del detalle para sus métricas),
+// pero la tabla ya no las renderiza todas juntas: pagina en cliente.
+const PAGE_SIZE = 25;
 
 /** Aplana el árbol de estructura a un mapa id → {nombre, tipoId}, para el tag
  * de ubicación de cada tarea en la tabla. */
@@ -28,6 +35,8 @@ export function TasksPage() {
   const { projectId = "" } = useParams<{ projectId: string }>();
   const { dark, toggleDark } = useOutletContext<AppOutletContext>();
   const navigate = useNavigate();
+  const { user, hasRole } = useAuth();
+  const isElevated = hasRole([Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER]);
   const projectQuery = useProject(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId);
@@ -37,6 +46,7 @@ export function TasksPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
   // Deriva del listado en vivo (no una copia local) para que el panel refleje
@@ -55,6 +65,21 @@ export function TasksPage() {
       (t) => t.title.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q),
     );
   }, [tasks, search]);
+
+  // Al cambiar la búsqueda volvemos a la página 1. Se compara contra el valor
+  // anterior durante el render (en vez de un efecto) para no encadenar renders.
+  const [searchAtReset, setSearchAtReset] = useState(search);
+  if (search !== searchAtReset) {
+    setSearchAtReset(search);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   const locationById = useMemo(() => flattenLocations(treeQuery.data ?? []), [treeQuery.data]);
 
@@ -114,16 +139,58 @@ export function TasksPage() {
       {tasksQuery.isLoading ? (
         <div className="h-40 animate-pulse rounded-2xl bg-accent" />
       ) : (
-        <TasksTable
-          projectId={projectId}
-          tasks={filtered}
-          members={membersQuery.data ?? []}
-          teams={teamsQuery.data?.items ?? []}
-          locationById={locationById}
-          onOpenDetail={(id) => {
-            setSelectedId(id);
-          }}
-        />
+        <>
+          <TasksTable
+            projectId={projectId}
+            tasks={paginated}
+            members={membersQuery.data ?? []}
+            teams={teamsQuery.data?.items ?? []}
+            locationById={locationById}
+            currentUserId={user?.id}
+            isElevated={isElevated}
+            onOpenDetail={(id) => {
+              setSelectedId(id);
+            }}
+          />
+
+          {/* Paginación: la tabla ya no renderiza todas las tareas de una vez. */}
+          {filtered.length > 0 && (
+            <div className="flex shrink-0 items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {filtered.length} tarea{filtered.length === 1 ? "" : "s"}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    aria-label="Página anterior"
+                    onClick={() => {
+                      setPage((p) => p - 1);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <span>
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    aria-label="Página siguiente"
+                    onClick={() => {
+                      setPage((p) => p + 1);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (

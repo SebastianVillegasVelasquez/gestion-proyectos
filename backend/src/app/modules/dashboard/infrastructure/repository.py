@@ -3,7 +3,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from sqlalchemy import String, and_, case, cast, func, select
+from sqlalchemy import ColumnElement, String, and_, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
@@ -185,7 +185,9 @@ class DashboardRepository(ABC):
     ) -> DashboardPanels: ...
 
     @abstractmethod
-    async def get_recent_activity(self, limit: int) -> list[ActivityRow]: ...
+    async def get_recent_activity(
+        self, limit: int, project_id: uuid.UUID | None = None
+    ) -> list[ActivityRow]: ...
 
     # ── Variantes por usuario (dashboard del rol User) ──
     @abstractmethod
@@ -277,14 +279,23 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         )
 
     # ── Actividad reciente (transversal a todos los proyectos) ────────────────
-    async def get_recent_activity(self, limit: int) -> list[ActivityRow]:
+    async def get_recent_activity(
+        self, limit: int, project_id: uuid.UUID | None = None
+    ) -> list[ActivityRow]:
         """Últimos eventos del historial de tareas, de cualquier proyecto.
 
         Se une por `Task.project_id` (siempre presente) y no por el WorkItem, para
         no perder eventos de tareas aún sin ubicar en la estructura. Ordena por
         fecha descendente y acota a `limit`: la BD hace el trabajo, el payload es
-        mínimo.
+        mínimo. Con `project_id` la misma consulta se restringe a un solo proyecto
+        (para el detalle de proyecto), sin duplicar lógica.
         """
+        conditions: list[ColumnElement[bool]] = [
+            Task.deleted_at.is_(None),
+            Project.deleted_at.is_(None),
+        ]
+        if project_id is not None:
+            conditions.append(Task.project_id == project_id)
         rows = (
             await self._session.execute(
                 select(
@@ -298,7 +309,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 .join(Task, TaskHistory.task_id == Task.id)
                 .join(Project, Task.project_id == Project.id)
                 .outerjoin(User, TaskHistory.changed_by_id == User.id)
-                .where(Task.deleted_at.is_(None), Project.deleted_at.is_(None))
+                .where(*conditions)
                 .order_by(TaskHistory.created_at.desc())
                 .limit(limit)
             )

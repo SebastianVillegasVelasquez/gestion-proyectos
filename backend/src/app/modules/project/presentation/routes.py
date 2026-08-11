@@ -57,7 +57,11 @@ async def create_project(
 @router.get("/", response_model=List[ProjectResponse])
 async def get_all_projects(
     repo=Depends(project_repo_dependency),
-    _=Depends(require_role("admin", "super_admin", "user")),
+    # Listado completo (todos los proyectos, sin acotar por membresía): es
+    # vista de gestión. El rol user consulta sus proyectos vía /dashboard/me/*
+    # (ya acotado por membresía); si pudiera pegarle a este endpoint vería la
+    # lista completa de la organización sin filtro alguno.
+    _=Depends(require_role("admin", "super_admin")),
 ):
     return await GetProjectsUseCase(repo).execute()
 

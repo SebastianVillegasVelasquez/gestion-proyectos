@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Check,
+  ChevronRight,
   Lightbulb,
   MessageCircle,
   MessageSquarePlus,
@@ -170,8 +171,8 @@ function FeedbackModal({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Widget de feedback siempre visible: un botón flotante (abajo a la derecha) que
- * abre el formulario. Se monta una vez en el layout autenticado.
+ * Entrada de feedback: un botón embebible (pensado para vivir dentro de
+ * Configuración, no flotando sobre toda la app) que abre el mismo formulario.
  */
 export function FeedbackWidget() {
   const [open, setOpen] = useState(false);
@@ -184,9 +185,18 @@ export function FeedbackWidget() {
           setOpen(true);
         }}
         aria-label="Abrir feedback"
-        className="fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full bg-brand-gold p-3 text-brand-black shadow-lg transition hover:bg-brand-gold-dark active:scale-95"
+        className="flex w-full items-center justify-between gap-4 rounded-lg border border-border bg-background px-4 py-3 text-left transition hover:bg-accent"
       >
-        <MessageSquarePlus className="size-5" />
+        <div className="flex items-center gap-3">
+          <MessageSquarePlus className="size-4 shrink-0 text-brand-gold" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Enviar feedback</p>
+            <p className="text-xs text-muted-foreground">
+              Cuéntanos qué funciona bien o qué podríamos mejorar.
+            </p>
+          </div>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (

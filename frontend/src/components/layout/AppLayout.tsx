@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
-import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
 import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
@@ -124,9 +123,6 @@ export const AppLayout = () => {
             </Suspense>
           </main>
         </div>
-
-        {/* Botón de feedback siempre visible en la app autenticada. */}
-        <FeedbackWidget />
       </div>
     </WhatsNewProvider>
   );

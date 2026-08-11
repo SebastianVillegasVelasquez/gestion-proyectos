@@ -8,6 +8,7 @@ import { useAuth, useChangePassword } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { positionLabel } from "@/features/projects/types/labels";
+import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
@@ -216,6 +217,13 @@ export function SettingsPage() {
             <KeyRound className="size-3.5 text-brand-teal" /> Contraseña
           </div>
           <ChangePasswordForm />
+        </SettingsCard>
+
+        <SettingsCard
+          title="Feedback"
+          description="Ayúdanos a mejorar la plataforma con tu opinión."
+        >
+          <FeedbackWidget />
         </SettingsCard>
       </div>
     </div>
