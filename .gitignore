@@ -62,7 +62,10 @@ postgres_data/
 /.todo/tasks.json
 
 # =========================
-# Carpeta local de notas/fixes (no versionar)
+# CLAUDE
 # =========================
 
-/fix/
+CLAUDE.md
+./CLAUDE.md
+
+#
