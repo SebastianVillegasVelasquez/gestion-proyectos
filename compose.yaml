@@ -1,0 +1,62 @@
+services:
+
+  frontend:
+    env_file: ./frontend/.env
+    build:
+      context: ./frontend
+      target: dev
+    container_name: frontend-bitacora
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - bitacora-network
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    container_name: backend-bitacora
+    env_file: ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    depends_on:
+      - db
+    networks:
+      - bitacora-network
+
+  db:
+    image: postgres:17-alpine
+    container_name: postgres-bitacora
+    environment:
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - bitacora-network
+
+  redis:
+    container_name: redis-bitacora
+    image: redis:7.2.6-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - bitacora-network
+
+volumes:
+  postgres-data:
+
+networks:
+  bitacora-network:
+    driver: bridge
