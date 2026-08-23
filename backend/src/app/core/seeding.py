@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.core.seed import ensure_developer, ensure_prod_users, ensure_super_admin
 from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
+from app.core.seed_project_structure import ensure_project_structure
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,7 @@ async def run_seed() -> None:
         # logger.info("Seed: entorno de desarrollo → datos de demostración")
         await ensure_demo_data()
         await ensure_demo_traceability()
+        await ensure_project_structure()
     else:
         # logger.info("Seed: entorno de producción → usuarios de OBJ Digital")
         await ensure_prod_users()
