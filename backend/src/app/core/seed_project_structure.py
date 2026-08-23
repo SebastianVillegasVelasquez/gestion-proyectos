@@ -1,16 +1,3 @@
-"""Siembra un proyecto con estructura académica de 4 niveles (idempotente).
-
-Facultad (raíz) -> Curso (x10) -> Módulo (x3 por curso) -> Unidad (x3 por
-módulo). Cada nivel es un `TipoNodo` propio del proyecto; el árbol se arma con
-`WorkItem.parent_id` (patrón Composite), igual que el resto de proyectos demo.
-
-Fechas: se calculan con el mismo motor de derivación (`date_engine`) que usa
-la app (duración + predecesor/padre -> inicio/fin). Los primeros
-`CURSOS_EN_CASCADA` cursos se entregan en cascada (cada uno depende del cierre
-del anterior, dependencia Finish-to-Start real vía `WorkItemDependency`); el
-resto arranca en paralelo desde el inicio de la facultad.
-"""
-
 import datetime
 import uuid
 
@@ -34,7 +21,7 @@ PROJECT_NAME = "Facultad de Educación Virtual (Seed)"
 N_CURSOS = 10
 N_MODULOS_POR_CURSO = 3
 N_UNIDADES_POR_MODULO = 3
-CURSOS_EN_CASCADA = 5  # los primeros N cursos se entregan uno tras otro
+CURSOS_EN_CASCADA = 5
 
 UNIDAD_SEMANAS = 1
 MODULO_SEMANAS = UNIDAD_SEMANAS * N_UNIDADES_POR_MODULO
