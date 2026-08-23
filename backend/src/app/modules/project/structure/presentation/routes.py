@@ -20,7 +20,9 @@ from app.modules.project.structure.application.use_cases import (
     GetWorkTreeUseCase,
     ListTiposNodoUseCase,
     ListWorkItemDependenciesUseCase,
+    MoveWorkItemUseCase,
     RemoveWorkItemDependencyUseCase,
+    ShiftWorkItemSubtreeUseCase,
     UpdateTipoNodoUseCase,
     UpdateWorkItemUseCase,
 )
@@ -28,6 +30,8 @@ from app.modules.project.structure.presentation.schemas import (
     CloneWorkItemRequest,
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
+    MoveWorkItemRequest,
+    ShiftWorkItemSubtreeRequest,
     TipoNodoResponse,
     UpdateTipoNodoRequest,
     UpdateWorkItemRequest,
@@ -145,6 +149,33 @@ async def delete_work_item(
     current_user=Depends(_admin),
 ):
     await DeleteWorkItemUseCase(repo).execute(item_id)
+
+
+@router.post("/work-items/{item_id}/move", response_model=WorkItemResponse)
+async def move_work_item(
+    item_id: UUID,
+    data: MoveWorkItemRequest,
+    repo=Depends(worktree_repo_dependency),
+    current_user=Depends(_admin),
+):
+    """Recoloca un nodo (drag & drop del árbol): nuevo padre y/o nuevo orden."""
+    return await MoveWorkItemUseCase(repo).execute(
+        item_id, data.new_parent_id, data.orden
+    )
+
+
+@router.post("/work-items/{item_id}/shift", response_model=WorkItemResponse)
+async def shift_work_item_subtree(
+    item_id: UUID,
+    data: ShiftWorkItemSubtreeRequest,
+    repo=Depends(worktree_repo_dependency),
+    task_repo=Depends(task_repo_dependency),
+    current_user=Depends(_admin),
+):
+    """Desplaza en el tiempo el subárbol completo (drag de la barra del nodo)."""
+    return await ShiftWorkItemSubtreeUseCase(repo, task_repo).execute(
+        item_id, data.offset_days, data.shift_tasks
+    )
 
 
 @router.post(

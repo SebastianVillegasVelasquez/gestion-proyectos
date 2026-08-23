@@ -97,6 +97,57 @@ class DeleteWorkItemUseCase:
         await self.service.delete_item(item_id)
 
 
+class MoveWorkItemUseCase:
+    def __init__(self, repo: WorkTreeRepository):
+        self.service = WorkTreeService(repo)
+
+    async def execute(
+        self, item_id: UUID, new_parent_id: UUID | None, orden: int | None
+    ) -> WorkItemResponse:
+        return await self.service.move_item(item_id, new_parent_id, orden)
+
+
+class ShiftWorkItemSubtreeUseCase:
+    """Desplaza en el tiempo un subárbol y, opcionalmente, sus tareas.
+
+    El dominio (`WorkTreeService`) mueve las fechas de la estructura; aquí se
+    orquesta además el desplazamiento de las tareas colgadas del subárbol, que
+    cruzan el límite del módulo de tareas.
+    """
+
+    def __init__(self, repo: WorkTreeRepository, task_repo: TaskRepository):
+        self.service = WorkTreeService(repo)
+        self.task_repo = task_repo
+
+    async def execute(
+        self, item_id: UUID, offset_days: int, shift_tasks: bool
+    ) -> WorkItemResponse:
+        response, descendant_ids = await self.service.shift_subtree(
+            item_id, offset_days
+        )
+        if shift_tasks and offset_days != 0:
+            await self._shift_tasks(
+                project_id=response.proyecto_id,
+                work_item_ids=set(descendant_ids),
+                offset_days=offset_days,
+            )
+        return response
+
+    async def _shift_tasks(
+        self, *, project_id: UUID, work_item_ids: set[UUID], offset_days: int
+    ) -> None:
+        offset = datetime.timedelta(days=offset_days)
+        tasks = await self.task_repo.get_all_by_project(project_id)
+        for task in tasks:
+            if task.work_item_id not in work_item_ids:
+                continue
+            if task.start_date is not None:
+                task.start_date = task.start_date + offset
+            if task.due_date is not None:
+                task.due_date = task.due_date + offset
+            await self.task_repo.save(task)
+
+
 class GetWorkItemUseCase:
     def __init__(self, repo: WorkTreeRepository):
         self.service = WorkTreeService(repo)

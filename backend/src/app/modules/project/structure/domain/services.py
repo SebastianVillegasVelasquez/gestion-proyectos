@@ -137,6 +137,99 @@ class WorkTreeService:
         ids = self._descendant_ids(item_id, all_items)
         await self.repo.soft_delete_many(ids)
 
+    async def move_item(
+        self, item_id: UUID, new_parent_id: UUID | None, orden: int | None
+    ) -> WorkItemResponse:
+        """Recoloca un nodo bajo otro padre (o a la raíz) e inserta en `orden`.
+
+        Impide ciclos (moverse dentro de sí mismo o de un descendiente) y respeta
+        las reglas de anidación del tipo de nodo. Re-secuencia a los hermanos del
+        destino (y del origen si cambió de padre) a 0..n-1 para que el orden
+        quede limpio y sin huecos ni empates. Las fechas efectivas se re-derivan
+        solas en lectura (el motor usa el inicio del nuevo padre).
+        """
+        item = await self._get_active_item(item_id)
+        all_items = await self.repo.list_items(item.proyecto_id)
+
+        if new_parent_id is not None:
+            if new_parent_id == item_id:
+                raise ValidationError("Un nodo no puede ser su propio padre")
+            parent = await self._get_active_item(new_parent_id)
+            if parent.proyecto_id != item.proyecto_id:
+                raise ValidationError("El nodo destino pertenece a otro proyecto")
+            if new_parent_id in set(self._descendant_ids(item_id, all_items)):
+                raise ValidationError(
+                    "No se puede mover un nodo dentro de sí mismo o de un descendiente"
+                )
+            child_tipo = await self._get_active_tipo(item.tipo_id)
+            self._validate_nesting(parent, child_tipo)
+
+        old_parent_id = item.parent_id
+        item.parent_id = new_parent_id
+
+        # Hermanos del destino, EXCLUYENDO el propio nodo, ya ordenados.
+        siblings = sorted(
+            (i for i in all_items if i.parent_id == new_parent_id and i.id != item_id),
+            key=lambda i: i.orden,
+        )
+        index = len(siblings) if orden is None else max(0, min(orden, len(siblings)))
+        ordered = siblings[:index] + [item] + siblings[index:]
+        await self._resequence(ordered)
+        # El nodo movido puede caer en un índice igual a su orden previo; su
+        # cambio de padre debe persistir igual, así que lo guardamos siempre.
+        item.orden = index
+        await self.repo.save_item(item)
+
+        # Si cambió de padre, compacta también el orden del padre anterior.
+        if old_parent_id != new_parent_id:
+            old_siblings = sorted(
+                (
+                    i
+                    for i in all_items
+                    if i.parent_id == old_parent_id and i.id != item_id
+                ),
+                key=lambda i: i.orden,
+            )
+            await self._resequence(old_siblings)
+
+        return await self._respond_item(item)
+
+    async def _resequence(self, ordered: list[WorkItem]) -> None:
+        """Asigna orden 0..n-1 a una lista ya ordenada, guardando solo los que
+        cambian (evita escrituras inútiles)."""
+        for index, node in enumerate(ordered):
+            if node.orden != index:
+                node.orden = index
+                await self.repo.save_item(node)
+
+    async def shift_subtree(
+        self, item_id: UUID, offset_days: int
+    ) -> tuple[WorkItemResponse, list[UUID]]:
+        """Desplaza las fechas plan de todo el subárbol `offset_days` días.
+
+        Opera sobre las fechas CRUDAS (no las derivadas) de cada nodo que las
+        tenga; las que se derivan (modo "solo duración") siguen el desplazamiento
+        de su padre al re-derivarse. Devuelve la respuesta del nodo raíz y los ids
+        del subárbol, para que la capa de aplicación desplace también las tareas.
+        """
+        item = await self._get_active_item(item_id)
+        all_items = await self.repo.list_items(item.proyecto_id)
+        descendant_ids = self._descendant_ids(item_id, all_items)
+
+        if offset_days != 0:
+            offset = datetime.timedelta(days=offset_days)
+            in_scope = set(descendant_ids)
+            for node in all_items:
+                if node.id not in in_scope:
+                    continue
+                if node.fecha_inicio_plan is not None:
+                    node.fecha_inicio_plan = node.fecha_inicio_plan + offset
+                if node.fecha_fin_plan is not None:
+                    node.fecha_fin_plan = node.fecha_fin_plan + offset
+                await self.repo.save_item(node)
+
+        return await self._respond_item(item), descendant_ids
+
     async def clone_subtree(
         self, source_id: UUID, data: CloneWorkItemRequest
     ) -> WorkItemResponse:
