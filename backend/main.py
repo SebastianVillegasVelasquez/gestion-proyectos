@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Iniciando OBJ Digital PM", env=settings.APP_ENV, debug=settings.DEBUG)
     logger.info(f"Connecting to REDIS: {settings.REDIS_URL}")
+    logger.info("Testing hot reload")
 
     if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
         logger.warning("SECRET_KEY débil o ausente en un entorno no-dev: ...")

@@ -62,10 +62,12 @@ postgres_data/
 /.todo/tasks.json
 
 # =========================
-# CLAUDE
+# Claude rules
 # =========================
-
 CLAUDE.md
-./CLAUDE.md
+*/CLAUDE.md
 
-#
+# =========================
+# Not real documentation
+# =========================
+docs/
