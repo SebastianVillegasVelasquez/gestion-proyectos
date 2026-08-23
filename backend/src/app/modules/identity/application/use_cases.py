@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from app.modules.identity.domain.services import UserService
 from app.modules.identity.infrastructure.enums import DocumentType, SystemRole
 from app.modules.identity.infrastructure.models import Position
+from app.shared.authz import can_assign_role
 from app.modules.identity.presentation.schemas import (
     BulkCreatedUser,
     BulkCreateUsersResponse,
@@ -231,8 +232,8 @@ class DeleteUserUseCase:
         self.user_repo = user_repo
         self.user_service = UserService(user_repo)
 
-    async def execute(self, user_id: UUID) -> None:
-        await self.user_service.delete(user_id=user_id)
+    async def execute(self, user_id: UUID, actor_role: str) -> None:
+        await self.user_service.delete(user_id=user_id, actor_role=actor_role)
 
 
 class ChangeMyPasswordUseCase:
@@ -317,7 +318,9 @@ class BulkCreateUsersUseCase:
         self.user_service = UserService(user_repo)
         self.event_bus = event_bus
 
-    async def execute(self, rows: list[dict[str, str]]) -> BulkCreateUsersResponse:
+    async def execute(
+        self, rows: list[dict[str, str]], actor_role: str
+    ) -> BulkCreateUsersResponse:
         created: list[BulkCreatedUser] = []
         failed: list[BulkUserRowError] = []
 
@@ -346,6 +349,11 @@ class BulkCreateUsersUseCase:
                     role = SystemRole(role_raw)
                 except ValueError:
                     raise ValueError(f"El rol '{role_raw}' no es válido")
+
+                if not can_assign_role(actor_role, role):
+                    raise ValueError(
+                        "Solo un super_admin puede asignar el rol super_admin"
+                    )
 
                 document_type_raw = (row.get("document_type") or "").strip()
                 try:

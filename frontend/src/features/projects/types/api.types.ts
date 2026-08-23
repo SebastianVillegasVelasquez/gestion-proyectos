@@ -72,6 +72,13 @@ export interface CreateTipoNodoPayload {
   reglas_anidacion?: Record<string, unknown> | null;
 }
 
+export interface UpdateTipoNodoPayload {
+  nombre?: string;
+  color?: string | null;
+  icono?: string | null;
+  reglas_anidacion?: Record<string, unknown> | null;
+}
+
 export interface WorkItem {
   id: string;
   proyecto_id: string;
