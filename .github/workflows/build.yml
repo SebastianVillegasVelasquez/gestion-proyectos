@@ -118,6 +118,7 @@
           uses: docker/build-push-action@v6
           with:
             context: ./backend
+            target: production
             # Publica solo en push a main; en PR construye para validar, sin publicar.
             push: ${{ github.event_name == 'push' }}
             tags: |
@@ -147,25 +148,26 @@
           uses: docker/build-push-action@v6
           with:
             context: ./frontend
+            target: production
             push: ${{ github.event_name == 'push' }}
             build-args: |
               VITE_API_URL=/api/v1
             tags: |
               ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:latest
               ghcr.io/sebastianvillegasvelasquez/bitacora-frontend:${{ github.sha }}
-    deploy:
-      name: deploy to production
-      needs: [ backend, frontend ]
-      runs-on: ubuntu-latest
-      if: github.event_name == 'push'
-      steps:
-        - name: Deploy via SSH
-          uses: appleboy/ssh-action@v1
-          with:
-            host: ${{ secrets.SERVER_HOST }}
-            username: ${{ secrets.SERVER_USER }}
-            key: ${{ secrets.SSH_PRIVATE_KEY }}
-            script: |
-              cd /opt/bitacora
-              docker compose pull
-              docker compose up -d
+#    deploy:
+#      name: deploy to production
+#      needs: [ backend, frontend ]
+#      runs-on: ubuntu-latest
+#      if: github.event_name == 'push'
+#      steps:
+#        - name: Deploy via SSH
+#          uses: appleboy/ssh-action@v1
+#          with:
+#            host: ${{ secrets.SERVER_HOST }}
+#            username: ${{ secrets.SERVER_USER }}
+#            key: ${{ secrets.SSH_PRIVATE_KEY }}
+#            script: |
+#              cd /opt/bitacora
+#              docker compose pull
+#              docker compose up -d
