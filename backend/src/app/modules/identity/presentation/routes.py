@@ -12,6 +12,8 @@ from app.core.dependencies import (
     user_repo_dependency,
     require_role,
 )
+from app.shared.authz import can_assign_role
+from app.shared.exceptions import ForbiddenError
 from app.modules.identity.application.use_cases import (
     BulkCreateUsersUseCase,
     ChangeMyPasswordUseCase,
@@ -62,6 +64,12 @@ MANAGEMENT_ROLES = ("admin", "super_admin", "developer")
 router = APIRouter(prefix="/identity", tags=["Identity"])
 
 
+def _assert_can_assign_role(actor_role: str, target_role) -> None:
+    """Bloquea que un admin asigne (o mantenga vía payload) el rol super_admin."""
+    if not can_assign_role(actor_role, target_role):
+        raise ForbiddenError("Solo un super_admin puede asignar el rol super_admin")
+
+
 @router.post("/users", response_model=UserResponse, status_code=201)
 async def create_user_admin(
     data: CreateUserRequest,
@@ -75,6 +83,7 @@ async def create_user_admin(
     Única vía para crear cuentas (la plataforma es privada, de uso interno;
     no hay registro público).
     """
+    _assert_can_assign_role(current_user.role, data.role)
     return await CreateUserUseCase(
         user_repo=repo, position_repo=position_repo, event_bus=event_bus
     ).execute(data)
@@ -108,7 +117,7 @@ async def create_users_bulk(
     rows = [row for row in reader]
     return await BulkCreateUsersUseCase(
         user_repo=repo, position_repo=position_repo, event_bus=event_bus
-    ).execute(rows)
+    ).execute(rows, actor_role=current_user.role)
 
 
 @router.get("/positions", response_model=list[PositionOption])
@@ -282,6 +291,7 @@ async def patch_user(
     repo: UserRepository = Depends(user_repo_dependency),
     current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
+    _assert_can_assign_role(current_user.role, data.role)
     return await UpdateUserUseCase(repo).execute(
         user_id=user_id,
         data=data,
@@ -298,6 +308,7 @@ async def update_user(
     repo: UserRepository = Depends(user_repo_dependency),
     current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
+    _assert_can_assign_role(current_user.role, data.role)
     return await UpdateUserUseCase(repo).execute(
         user_id=user_id,
         data=data,
@@ -315,4 +326,4 @@ async def delete_user(
         )
     ),
 ):
-    await DeleteUserUseCase(repo).execute(user_id)
+    await DeleteUserUseCase(repo).execute(user_id, actor_role=current_user.role)

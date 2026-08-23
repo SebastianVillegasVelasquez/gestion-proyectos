@@ -7,7 +7,8 @@ from app.modules.identity.presentation.schemas import (
     UserResponse,
 )
 from app.modules.identity.infrastructure.repository import UserRepository
-from app.shared.exceptions import NotFoundError, ConflictError
+from app.shared.authz import can_act_on_target
+from app.shared.exceptions import ForbiddenError, NotFoundError, ConflictError
 
 
 class UserService:
@@ -61,11 +62,16 @@ class UserService:
         updated_user = await self._repo.update(existing_user)
         return self._to_response(updated_user)
 
-    async def delete(self, user_id: UUID) -> None:
+    async def delete(self, user_id: UUID, actor_role: str) -> None:
         existing_user = await self._repo.get_by_id(user_id)
 
         if not existing_user:
             raise NotFoundError("Usuario no encontrado")
+
+        # Jerarquía: un admin no puede eliminar a un super_admin (o rango
+        # igual/superior); super_admin sí puede eliminar a un admin.
+        if not can_act_on_target(actor_role, existing_user.role):
+            raise ForbiddenError("No tienes permiso para eliminar a este usuario")
 
         await self._repo.soft_delete(existing_user)
 

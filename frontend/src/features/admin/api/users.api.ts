@@ -121,4 +121,6 @@ export const adminUsersApi = {
         temporary_password: string;
       }>(`/identity/users/${userId}/reset-password`)
       .then((r) => r.data),
+
+  delete: (userId: string) => http.delete(`/identity/users/${userId}`).then(() => undefined),
 };

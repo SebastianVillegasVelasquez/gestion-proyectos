@@ -27,6 +27,25 @@ export const Role = {
 
 export type Role = (typeof Role)[keyof typeof Role];
 
+// Jerarquía numérica de roles, espejo de app.shared.authz.ROLE_RANK en el
+// backend: se usa para decidir en la UI quién puede asignar/eliminar a quién,
+// aunque la validación real vive en la API.
+const ROLE_RANK: Record<Role, number> = {
+  [Role.USER]: 1,
+  [Role.ADMIN]: 2,
+  [Role.SUPER_ADMIN]: 3,
+  [Role.DEVELOPER]: 4,
+};
+
+export function roleRank(role: Role): number {
+  return ROLE_RANK[role] ?? 0;
+}
+
+/** ¿El actor tiene rango estrictamente mayor que el objetivo? (p. ej. para eliminar cuentas). */
+export function canActOnTarget(actorRole: Role, targetRole: Role): boolean {
+  return roleRank(actorRole) > roleRank(targetRole);
+}
+
 export interface JwtPayload {
   sub: string;
   role?: Role;
