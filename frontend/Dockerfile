@@ -23,7 +23,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm build
 
 # Production image
-FROM nginx:alpine
+FROM nginx:alpine AS prod
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

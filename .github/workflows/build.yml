@@ -118,7 +118,7 @@
           uses: docker/build-push-action@v6
           with:
             context: ./backend
-            target: production
+            target: prod
             # Publica solo en push a main; en PR construye para validar, sin publicar.
             push: ${{ github.event_name == 'push' }}
             tags: |
@@ -148,7 +148,7 @@
           uses: docker/build-push-action@v6
           with:
             context: ./frontend
-            target: production
+            target: prod
             push: ${{ github.event_name == 'push' }}
             build-args: |
               VITE_API_URL=/api/v1
