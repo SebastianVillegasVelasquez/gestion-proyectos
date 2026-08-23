@@ -7,6 +7,7 @@ import type {
   CreateWorkItemPayload,
   MoveWorkItemPayload,
   ShiftWorkItemSubtreePayload,
+  UpdateTipoNodoPayload,
   UpdateWorkItemPayload,
 } from "@/features/projects/types/api.types";
 
@@ -31,6 +32,26 @@ export function useCreateNodeType(projectId: string) {
   return useMutation({
     mutationFn: (payload: CreateTipoNodoPayload) => structureApi.createType(projectId, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.nodeTypes(projectId) }),
+  });
+}
+
+export function useUpdateNodeType(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ typeId, payload }: { typeId: string; payload: UpdateTipoNodoPayload }) =>
+      structureApi.updateType(typeId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.nodeTypes(projectId) }),
+  });
+}
+
+export function useDeleteNodeType(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (typeId: string) => structureApi.deleteType(typeId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: projectKeys.nodeTypes(projectId) });
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+    },
   });
 }
 

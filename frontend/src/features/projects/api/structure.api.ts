@@ -6,6 +6,7 @@ import type {
   MoveWorkItemPayload,
   ShiftWorkItemSubtreePayload,
   TipoNodo,
+  UpdateTipoNodoPayload,
   UpdateWorkItemPayload,
   WorkItem,
   WorkItemDependency,
@@ -19,6 +20,9 @@ export const structureApi = {
 
   createType: (projectId: string, payload: CreateTipoNodoPayload) =>
     http.post<TipoNodo>(`/projects/${projectId}/node-types`, payload).then((r) => r.data),
+
+  updateType: (typeId: string, payload: UpdateTipoNodoPayload) =>
+    http.patch<TipoNodo>(`/node-types/${typeId}`, payload).then((r) => r.data),
 
   deleteType: (typeId: string) => http.delete(`/node-types/${typeId}`).then(() => undefined),
 

@@ -92,6 +92,7 @@ class WorkTreeService:
             if parent.proyecto_id != proyecto_id:
                 raise ValidationError("El nodo padre pertenece a otro proyecto")
             self._validate_nesting(parent, tipo)
+            self._validate_end_date_within_parent(parent, data.fecha_fin_plan)
 
         orden = data.orden
         if orden is None:
@@ -127,6 +128,9 @@ class WorkTreeService:
             await self._get_valid_tipo_for_project(payload["tipo_id"], item.proyecto_id)
         for field, value in payload.items():
             setattr(item, field, value)
+        if item.parent_id is not None and "fecha_fin_plan" in payload:
+            parent = await self._get_active_item(item.parent_id)
+            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
         saved = await self.repo.save_item(item)
         return await self._respond_item(saved)
 
@@ -163,6 +167,7 @@ class WorkTreeService:
                 )
             child_tipo = await self._get_active_tipo(item.tipo_id)
             self._validate_nesting(parent, child_tipo)
+            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
 
         old_parent_id = item.parent_id
         item.parent_id = new_parent_id
@@ -563,6 +568,23 @@ class WorkTreeService:
         if tipo.proyecto_id is not None and tipo.proyecto_id != proyecto_id:
             raise ValidationError("El tipo de nodo pertenece a otro proyecto")
         return tipo
+
+    @staticmethod
+    def _validate_end_date_within_parent(
+        parent: WorkItem, fecha_fin_plan: datetime.date | None
+    ) -> None:
+        """Un hijo no puede terminar después que su padre.
+
+        Compara fechas plan crudas (las que captura el usuario), no las
+        derivadas: si el hijo no tiene fecha de fin explícita (modo "solo
+        duración"), no hay nada que validar aquí.
+        """
+        if fecha_fin_plan is None or parent.fecha_fin_plan is None:
+            return
+        if fecha_fin_plan > parent.fecha_fin_plan:
+            raise ValidationError(
+                "La fecha de fin no puede ser posterior a la de su elemento padre"
+            )
 
     @staticmethod
     def _validate_nesting(parent: WorkItem, child_tipo: TipoNodo) -> None:
