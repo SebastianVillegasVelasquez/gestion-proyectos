@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { structureApi } from "@/features/projects/api/structure.api";
-import { projectKeys, workItemKeys } from "./query-keys";
+import { projectKeys, taskKeys, workItemKeys } from "./query-keys";
 import type {
   CloneWorkItemPayload,
   CreateTipoNodoPayload,
   CreateWorkItemPayload,
+  MoveWorkItemPayload,
+  ShiftWorkItemSubtreePayload,
   UpdateWorkItemPayload,
 } from "@/features/projects/types/api.types";
 
@@ -46,6 +48,28 @@ export function useUpdateWorkItem(projectId: string) {
     mutationFn: ({ itemId, payload }: { itemId: string; payload: UpdateWorkItemPayload }) =>
       structureApi.update(itemId, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) }),
+  });
+}
+
+export function useMoveWorkItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, payload }: { itemId: string; payload: MoveWorkItemPayload }) =>
+      structureApi.move(itemId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) }),
+  });
+}
+
+export function useShiftWorkItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, payload }: { itemId: string; payload: ShiftWorkItemSubtreePayload }) =>
+      structureApi.shift(itemId, payload),
+    // Desplazar un subárbol mueve fechas de la estructura Y de sus tareas.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+    },
   });
 }
 

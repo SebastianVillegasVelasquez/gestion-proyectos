@@ -18,6 +18,8 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   MoreVertical,
+  GripVertical,
+  CornerLeftUp,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ import {
   useNodeTypes,
   useDeleteWorkItem,
   useCreateNodeType,
+  useMoveWorkItem,
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
 import { WorkItemModal } from "./WorkItemModal";
@@ -34,6 +37,24 @@ import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
 import { NodeTasksModal } from "./NodeTasksModal";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
+
+// Zona de suelta dentro de una fila: reordenar como hermano (antes/después) o
+// anidar dentro del nodo destino.
+type DropPos = "before" | "inside" | "after";
+
+/** Deriva la zona de suelta según dónde cae el puntero en la fila destino:
+ * tercio superior = antes, inferior = después, centro = dentro. */
+function dropPosFromEvent(e: { clientY: number; currentTarget: Element }): DropPos {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  if (y < rect.height * 0.3) {
+    return "before";
+  }
+  if (y > rect.height * 0.7) {
+    return "after";
+  }
+  return "inside";
+}
 
 function fmt(iso: string | null): string {
   if (!iso) {
@@ -94,6 +115,30 @@ function pruneForSearch(nodes: WorkItemTree[], query: string): WorkItemTree[] {
  * colapsados para saber cuánto contenido queda oculto en árboles grandes. */
 function descendantCount(node: WorkItemTree): number {
   return node.children.reduce((total, child) => total + 1 + descendantCount(child), 0);
+}
+
+/** Encuentra un nodo por id en el árbol (DFS). */
+function findNode(nodes: WorkItemTree[], id: string): WorkItemTree | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node;
+    }
+    const found = findNode(node.children, id);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+/** Ids del nodo y todos sus descendientes: destinos inválidos para soltarlo
+ * (no puede anidarse dentro de sí mismo ni de un descendiente → ciclo). */
+function subtreeIds(node: WorkItemTree, acc = new Set<string>()): Set<string> {
+  acc.add(node.id);
+  for (const child of node.children) {
+    subtreeIds(child, acc);
+  }
+  return acc;
 }
 
 /** Nº total de elementos en una lista de árboles (raíces + descendientes). */
@@ -227,6 +272,14 @@ interface TreeNodeProps {
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
   activeTypeIds: Set<string>;
+  // ── Drag & drop para recolocar nodos ──
+  draggingId: string | null;
+  dropTarget: { id: string; pos: DropPos } | null;
+  invalidDropIds: Set<string>;
+  onDragStartNode: (id: string) => void;
+  onDragEndNode: () => void;
+  onDragOverNode: (id: string, pos: DropPos) => void;
+  onDropNode: (id: string, pos: DropPos) => void;
 }
 
 function TreeNode({
@@ -242,6 +295,13 @@ function TreeNode({
   onDelete,
   onTasks,
   activeTypeIds,
+  draggingId,
+  dropTarget,
+  invalidDropIds,
+  onDragStartNode,
+  onDragEndNode,
+  onDragOverNode,
+  onDropNode,
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
   const style = tipoStyle(node.tipo_id);
@@ -249,6 +309,12 @@ function TreeNode({
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
   const nodeDimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
+  // ¿Este nodo es un destino de suelta válido, y en qué zona?
+  const isDragging = draggingId === node.id;
+  const dropPos =
+    dropTarget?.id === node.id && draggingId != null && !invalidDropIds.has(node.id)
+      ? dropTarget.pos
+      : null;
 
   const nameSize =
     depth === 0
@@ -266,11 +332,48 @@ function TreeNode({
       )}
     >
       <div
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = "move";
+          // Firefox exige datos en el dataTransfer para iniciar el arrastre.
+          e.dataTransfer.setData("text/plain", node.id);
+          onDragStartNode(node.id);
+        }}
+        onDragEnd={onDragEndNode}
+        onDragOver={(e) => {
+          // Solo permitimos soltar en destinos válidos (evita el cursor "no-drop"
+          // sobre uno mismo o un descendiente).
+          if (draggingId == null || invalidDropIds.has(node.id)) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          onDragOverNode(node.id, dropPosFromEvent(e));
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDropNode(node.id, dropPosFromEvent(e));
+        }}
         className={cn(
-          "group flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
+          "group relative flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
           nodeDimmed && "opacity-40",
+          isDragging && "opacity-40",
+          dropPos === "inside" && "rounded-lg ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
         )}
       >
+        {/* Indicadores de reordenamiento (soltar antes/después como hermano). */}
+        {dropPos === "before" && (
+          <div className="absolute inset-x-0 top-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+        )}
+        {dropPos === "after" && (
+          <div className="absolute inset-x-0 bottom-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+        )}
+        <GripVertical
+          className="size-4 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden
+        />
         <button
           onClick={() => {
             onToggle(node.id);
@@ -403,6 +506,13 @@ function TreeNode({
               onDelete={onDelete}
               onTasks={onTasks}
               activeTypeIds={activeTypeIds}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              invalidDropIds={invalidDropIds}
+              onDragStartNode={onDragStartNode}
+              onDragEndNode={onDragEndNode}
+              onDragOverNode={onDragOverNode}
+              onDropNode={onDropNode}
             />
           ))}
         </div>
@@ -564,6 +674,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const deleteItem = useDeleteWorkItem(projectId);
+  const moveItem = useMoveWorkItem(projectId);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
@@ -575,6 +686,10 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [view, setView] = useState<"arbol" | "lista">("arbol");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(new Set());
+  // Drag & drop para recolocar nodos: reordenar entre hermanos (before/after) o
+  // anidar dentro de otro (inside).
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
   const typeNameById = useMemo(() => {
@@ -636,6 +751,66 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   function handleDelete(node: WorkItemTree) {
     if (window.confirm(`¿Eliminar “${node.nombre}” y todo su contenido?`)) {
       deleteItem.mutate(node.id);
+    }
+  }
+
+  // Destinos inválidos mientras se arrastra: el propio nodo y sus descendientes
+  // (soltarlo ahí crearía un ciclo). Vacío cuando no se arrastra nada.
+  const invalidDropIds = useMemo(() => {
+    const empty = new Set<string>();
+    if (!draggingId) {
+      return empty;
+    }
+    const dragged = findNode(tree, draggingId);
+    return dragged ? subtreeIds(dragged) : empty;
+  }, [draggingId, tree]);
+
+  function resetDrag() {
+    setDraggingId(null);
+    setDropTarget(null);
+  }
+
+  /** Suelta el nodo arrastrado sobre `targetId`, reordenando (before/after entre
+   * hermanos) o anidando (inside). El índice se calcula EXCLUYENDO al movido,
+   * igual que el backend, para que la posición sea exacta. */
+  function handleDropOn(targetId: string, pos: DropPos) {
+    const itemId = draggingId;
+    resetDrag();
+    if (!itemId || invalidDropIds.has(targetId)) {
+      return;
+    }
+    const target = findNode(tree, targetId);
+    if (!target) {
+      return;
+    }
+    if (pos === "inside") {
+      moveItem.mutate({ itemId, payload: { new_parent_id: targetId } });
+      return;
+    }
+    const parentId = target.parent_id ?? null;
+    // No se puede colocar como hermano si el padre está dentro del subárbol movido.
+    if (parentId != null && invalidDropIds.has(parentId)) {
+      return;
+    }
+    const siblings = (parentId ? (findNode(tree, parentId)?.children ?? []) : tree).filter(
+      (s) => s.id !== itemId,
+    );
+    let index = siblings.findIndex((s) => s.id === targetId);
+    if (index < 0) {
+      index = siblings.length;
+    }
+    if (pos === "after") {
+      index += 1;
+    }
+    moveItem.mutate({ itemId, payload: { new_parent_id: parentId, orden: index } });
+  }
+
+  /** Suelta en la zona "nivel principal": mueve a la raíz al final. */
+  function handleDropRoot() {
+    const itemId = draggingId;
+    resetDrag();
+    if (itemId) {
+      moveItem.mutate({ itemId, payload: { new_parent_id: null } });
     }
   }
 
@@ -774,6 +949,28 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
+            {/* Zona para soltar un nodo en el nivel principal (des-anidar). Solo
+                aparece mientras se arrastra algo que aún no está en la raíz. */}
+            {draggingId != null && findNode(tree, draggingId)?.parent_id != null && (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropTarget({ id: "__root__", pos: "inside" });
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDropRoot();
+                }}
+                className={cn(
+                  "m-2 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-2 text-xs font-semibold transition-colors",
+                  dropTarget?.id === "__root__"
+                    ? "border-brand-teal bg-brand-teal/5 text-brand-teal-dark dark:text-brand-teal"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                <CornerLeftUp className="size-3.5" /> Soltar aquí para mover al nivel principal
+              </div>
+            )}
             {visibleTree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode
@@ -799,6 +996,15 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setTasksNode(n);
                   }}
                   activeTypeIds={activeTypeIds}
+                  draggingId={draggingId}
+                  dropTarget={dropTarget}
+                  invalidDropIds={invalidDropIds}
+                  onDragStartNode={setDraggingId}
+                  onDragEndNode={resetDrag}
+                  onDragOverNode={(id, pos) => {
+                    setDropTarget({ id, pos });
+                  }}
+                  onDropNode={handleDropOn}
                 />
               </div>
             ))}

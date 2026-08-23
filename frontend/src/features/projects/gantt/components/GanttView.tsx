@@ -16,13 +16,16 @@ import {
   Crosshair,
   FilterX,
   Spline,
+  Tag,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { useWorkTree } from "../../hooks/use-structure";
+import { useWorkTree, useNodeTypes } from "../../hooks/use-structure";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
+import { tipoStyle } from "../../utils/tipo-style";
 import {
   computeRange,
   padRange,
@@ -35,6 +38,7 @@ import {
   shortDate,
   addDays,
   type TickUnit,
+  type TimelineRange,
 } from "../timeline";
 import {
   statusProgressPct,
@@ -43,18 +47,25 @@ import {
   daysRemaining,
   weightedProgressPct,
 } from "../metrics";
+import { useShiftWorkItem } from "../../hooks/use-structure";
 import { filterGanttTasks, type GanttFilters } from "../filters";
+import { buildGanttRows, collectPlanSpans, type GanttNodeRow } from "../tree";
+import type { DatedTask } from "../task";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
 import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
-import type { Project, Task, TaskStatus, UserPosition, WorkItemTree } from "../../types/api.types";
+import type { Project, TaskStatus, UserPosition } from "../../types/api.types";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 
-// Ancho de la columna de etiquetas. Una sola fuente de verdad.
-const LABEL_W = 224;
+// Ancho por defecto de la columna de etiquetas (el usuario puede redimensionarla).
+const LABEL_W_DEFAULT = 240;
+const LABEL_W_MIN = 168;
+const LABEL_W_MAX = 560;
 // Ancho mínimo del área de tiempo, para que proyectos cortos no se aplasten.
 const MIN_TRACK = 480;
-// Alto de cada fila (tarea y encabezado de grupo).
+// Alto de cada fila (nodo o tarea).
 const ROW_H = 36;
+// Sangría por nivel de profundidad en la columna de etiquetas.
+const INDENT = 14;
 
 // Configuración por nivel de zoom: px por día y unidad natural de las marcas.
 const ZOOM_CFG: Record<"mes" | "semana" | "dia", { px: number; unit: TickUnit; label: string }> = {
@@ -64,23 +75,24 @@ const ZOOM_CFG: Record<"mes" | "semana" | "dia", { px: number; unit: TickUnit; l
 };
 type Zoom = keyof typeof ZOOM_CFG;
 
-// Acento visual por grupo (borde de la etiqueta + barra agregada del nodo).
-const GROUP_TONES = [
-  { accent: "border-l-blue-400", bar: "bg-blue-400/50 dark:bg-blue-400/40" },
-  { accent: "border-l-violet-400", bar: "bg-violet-400/50 dark:bg-violet-400/40" },
-  { accent: "border-l-emerald-400", bar: "bg-emerald-400/50 dark:bg-emerald-400/40" },
-  { accent: "border-l-amber-400", bar: "bg-amber-400/50 dark:bg-amber-400/40" },
-  { accent: "border-l-rose-400", bar: "bg-rose-400/50 dark:bg-rose-400/40" },
-];
-
-// Arrastre de barras: mover la tarea completa o estirar uno de sus extremos.
+// Arrastre de barras: mover la tarea/nodo completo o estirar un extremo (tareas).
 type DragMode = "move" | "start" | "end";
+type DragKind = "task" | "node";
 interface DragInfo {
-  taskId: string;
+  kind: DragKind;
+  id: string;
   mode: DragMode;
   startClientX: number;
   origStart: string;
   origDue: string;
+}
+/** Descriptor de lo que se arrastra: una tarea (reprograma) o un nodo (desplaza
+ * todo su subárbol). El tipo determina qué mutación se dispara al soltar. */
+interface DragTarget {
+  kind: DragKind;
+  id: string;
+  start: string;
+  due: string;
 }
 
 /** Aplica un desfase en días a una tarea según el modo de arrastre (con guardas
@@ -114,55 +126,7 @@ const LEGEND_STATUSES: TaskStatus[] = [
   "cancelada",
 ];
 
-// El cronograma solo ubica tareas con inicio y fin; las tareas sin planificar
-// (fechas en null) no tienen barra y se excluyen de la línea de tiempo.
-type DatedTask = Task & { start_date: string; due_date: string };
-
-interface NodeGroup {
-  id: string;
-  name: string;
-  order: number;
-  tasks: DatedTask[];
-}
-
 const TODAY = new Date().toISOString().slice(0, 10);
-
-/**
- * Sintetiza tareas placeholder desde work items con fechas plan, para que el
- * cronograma exista desde que se crea la estructura. Sólo se agregan cuando
- * el work item NO tiene tareas reales asociadas (evita duplicar filas).
- * Estas tareas llevan prefijo `wi-` en el id para distinguirlas y no aparecen
- * en el detalle porque nadie las abre (no llegan del listado real de tareas).
- */
-function synthesizeFromStructure(tree: WorkItemTree[], realTasks: Task[]): Task[] {
-  const workItemsWithTasks = new Set(realTasks.map((t) => t.work_item_id));
-  const acc: Task[] = [];
-  const now = new Date().toISOString();
-  const visit = (node: WorkItemTree) => {
-    if (node.fecha_inicio_plan && node.fecha_fin_plan && !workItemsWithTasks.has(node.id)) {
-      acc.push({
-        id: `wi-${node.id}`,
-        project_id: node.proyecto_id,
-        work_item_id: node.id,
-        parent_task_id: null,
-        title: node.nombre,
-        description: null,
-        priority: "no_definida",
-        assignee_id: null,
-        team_id: null,
-        start_date: node.fecha_inicio_plan,
-        due_date: node.fecha_fin_plan,
-        status: "pendiente_por_iniciar",
-        completed_at: null,
-        created_at: now,
-        updated_at: null,
-      });
-    }
-    node.children.forEach(visit);
-  };
-  tree.forEach(visit);
-  return acc;
-}
 
 function KpiCard({
   icon: Icon,
@@ -204,13 +168,23 @@ export function GanttView({
 }) {
   const navigate = useNavigate();
   const treeQuery = useWorkTree(project.id);
+  const typesQuery = useNodeTypes(project.id);
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useProjectMembers(project.id);
   const teamsQuery = useTeams(project.id);
   const updateTask = useUpdateTask(project.id);
+  const shiftWorkItem = useShiftWorkItem(project.id);
   const dependenciesQuery = useProjectTaskDependencies(project.id);
   const dependencies = useMemo(() => dependenciesQuery.data ?? [], [dependenciesQuery.data]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const tree = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
+  const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
+  const typeNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    types.forEach((t) => map.set(t.id, t.nombre));
+    return map;
+  }, [types]);
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -218,19 +192,24 @@ export function GanttView({
     return map;
   }, [teamsQuery.data]);
 
-  // Estado de filtros, zoom y grupos colapsados.
+  // Estado de filtros, zoom, tipos y nodos colapsados.
   const [zoom, setZoom] = useState<Zoom>("semana");
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(() => new Set(LEGEND_STATUSES));
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<UserPosition | null>(null);
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
+  // Filtro por tipo de elemento (Curso, Módulo…); vacío = todos.
+  const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(() => new Set());
+  // Mostrar/ocultar las tareas como filas hijas bajo cada elemento.
+  const [showTasks, setShowTasks] = useState(true);
   // Mostrar/ocultar las flechas de dependencia (pueden saturar en proyectos densos).
   const [showDeps, setShowDeps] = useState(true);
+
   // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
   // si dejas todo colapsado, así lo encuentras la próxima vez.
   const collapsedStorageKey = `gantt-collapsed:${project.id}`;
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(collapsedStorageKey);
       return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
@@ -238,38 +217,39 @@ export function GanttView({
       return new Set();
     }
   });
-
   useEffect(() => {
     try {
-      localStorage.setItem(collapsedStorageKey, JSON.stringify([...collapsedGroups]));
+      localStorage.setItem(collapsedStorageKey, JSON.stringify([...collapsedNodes]));
     } catch {
       // Sin persistencia si el almacenamiento no está disponible; no es crítico.
     }
-  }, [collapsedGroups, collapsedStorageKey]);
+  }, [collapsedNodes, collapsedStorageKey]);
+
+  // Ancho de la columna de etiquetas, redimensionable y persistido por proyecto.
+  const labelStorageKey = `gantt-labelw:${project.id}`;
+  const [labelW, setLabelW] = useState<number>(() => {
+    const raw = Number(localStorage.getItem(labelStorageKey));
+    return Number.isFinite(raw) && raw >= LABEL_W_MIN
+      ? Math.min(LABEL_W_MAX, raw)
+      : LABEL_W_DEFAULT;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(labelStorageKey, String(labelW));
+    } catch {
+      // no crítico
+    }
+  }, [labelW, labelStorageKey]);
 
   const realTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
-
-  // Cronograma "desde la estructura": si un work item tiene fechas plan y
-  // aún no tiene tareas reales, sintetizamos una tarea placeholder para que
-  // la línea de tiempo empiece a formarse desde que se crea la estructura.
-  // Las tareas reales dictan el tiempo cuando llegan; estas solo son andamiaje.
-  const syntheticTasks = useMemo<Task[]>(
-    () => synthesizeFromStructure(treeQuery.data ?? [], realTasks),
-    [treeQuery.data, realTasks],
-  );
-
-  const allTasks = useMemo(() => [...realTasks, ...syntheticTasks], [realTasks, syntheticTasks]);
-  // Solo las tareas con inicio y fin son ubicables en el cronograma; las que
-  // están sin planificar se dejan fuera de la escala y del agrupado.
+  // Solo las tareas con inicio y fin son ubicables en el cronograma.
   const datedTasks = useMemo(
-    () => allTasks.filter((t): t is DatedTask => t.start_date != null && t.due_date != null),
-    [allTasks],
+    () => realTasks.filter((t): t is DatedTask => t.start_date != null && t.due_date != null),
+    [realTasks],
   );
-  // Deriva del listado en vivo para que el panel refleje adjuntar/quitar de
-  // la estructura sin cerrarse y reabrirse.
   const selected = useMemo(
-    () => allTasks.find((t) => t.id === selectedId) ?? null,
-    [allTasks, selectedId],
+    () => realTasks.find((t) => t.id === selectedId) ?? null,
+    [realTasks, selectedId],
   );
 
   // Mapa user_id → cargo, para poder filtrar por responsabilidad.
@@ -290,17 +270,49 @@ export function GanttView({
     [datedTasks, filters, positionByUser],
   );
 
-  // El rango se calcula sobre TODAS las tareas (no las filtradas): así el eje
-  // de tiempo es estable y filtrar no "salta" la escala. Se le agrega aire en
-  // ambos extremos para que ninguna barra toque el borde del área.
+  // Tareas filtradas agrupadas por elemento, para colgarlas del árbol.
+  const tasksByItem = useMemo(() => {
+    const map = new Map<string, DatedTask[]>();
+    for (const task of tasks) {
+      if (!task.work_item_id) {
+        continue;
+      }
+      const arr = map.get(task.work_item_id) ?? [];
+      arr.push(task);
+      map.set(task.work_item_id, arr);
+    }
+    return map;
+  }, [tasks]);
+
+  // Filas del cronograma: la estructura del proyecto aplanada en orden DFS, con
+  // las tareas colgando de su elemento. Una sola fuente de verdad para render,
+  // geometría de barras y flechas de dependencia.
+  const rows = useMemo(
+    () =>
+      buildGanttRows({
+        tree,
+        tasksByItem,
+        isCollapsed: (id) => collapsedNodes.has(id),
+        showTasks,
+        activeTypeIds,
+      }),
+    [tree, tasksByItem, collapsedNodes, showTasks, activeTypeIds],
+  );
+
+  const nodeCount = useMemo(() => rows.filter((r) => r.kind === "node").length, [rows]);
+  const taskRowCount = rows.length - nodeCount;
+
+  // El rango cubre tareas + fechas plan de la estructura, para que el eje exista
+  // desde que hay estructura (aunque aún no haya tareas). Se calcula sobre TODO
+  // (no lo filtrado) para que el eje sea estable y filtrar no "salte" la escala.
   const range = useMemo(() => {
-    const raw = computeRange(datedTasks);
+    const raw = computeRange([...datedTasks, ...collectPlanSpans(tree)]);
     if (!raw) {
       return null;
     }
     const pad = Math.min(14, Math.max(2, Math.ceil(raw.totalDays * 0.04)));
     return padRange(raw, pad, pad + 1);
-  }, [datedTasks]);
+  }, [datedTasks, tree]);
 
   const todayPct = range ? dayOffsetPct(TODAY, range) : null;
   const ticks = useMemo(
@@ -312,13 +324,9 @@ export function GanttView({
     () => (range && zoom === "dia" ? weekendBands(range) : []),
     [range, zoom],
   );
-  // Los KPIs miden trabajo REAL: las tareas sintéticas (andamiaje `wi-` desde la
-  // estructura) no son tareas todavía, así que no deben inflar los conteos ni
-  // arrastrar el % de avance a 0. Siguen dibujándose en la línea de tiempo.
-  const realVisibleTasks = useMemo(() => tasks.filter((t) => !t.id.startsWith("wi-")), [tasks]);
-  const summary = useMemo(() => summarize(realVisibleTasks, TODAY), [realVisibleTasks]);
-  // Avance ponderado por duración (más realista que completadas/total).
-  const weightedProgress = useMemo(() => weightedProgressPct(realVisibleTasks), [realVisibleTasks]);
+
+  const summary = useMemo(() => summarize(tasks, TODAY), [tasks]);
+  const weightedProgress = useMemo(() => weightedProgressPct(tasks), [tasks]);
   const remaining = daysRemaining(project.end_date, TODAY);
 
   const trackWidth = range ? Math.max(MIN_TRACK, range.totalDays * ZOOM_CFG[zoom].px) : MIN_TRACK;
@@ -326,9 +334,6 @@ export function GanttView({
   const pctToPx = (pct: number) => (pct / 100) * trackWidth;
 
   // ── Arrastre de barras (reprogramar sin abrir el panel) ──
-  // `drag` guarda el estado inicial del arrastre; `dragDelta` el desfase vivo en
-  // días (para el preview). Un ref espeja el delta para leerlo en el `pointerup`
-  // sin recrear los listeners en cada movimiento.
   const [drag, setDrag] = useState<DragInfo | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
   const dragDeltaRef = useRef(0);
@@ -341,14 +346,18 @@ export function GanttView({
       if (start === info.origStart && due === info.origDue) {
         return;
       }
-      updateTask.mutate({ taskId: info.taskId, payload: { start_date: start, due_date: due } });
+      if (info.kind === "node") {
+        // Arrastrar un nodo desplaza TODO su subárbol (estructura + tareas).
+        shiftWorkItem.mutate({ itemId: info.id, payload: { offset_days: deltaDays } });
+      } else {
+        updateTask.mutate({ taskId: info.id, payload: { start_date: start, due_date: due } });
+      }
     },
-    [updateTask],
+    [updateTask, shiftWorkItem],
   );
 
-  const startDrag = (e: React.PointerEvent, task: DatedTask, mode: DragMode) => {
-    // Solo tareas reales y planificadas son arrastrables; el clic izquierdo manda.
-    if (task.id.startsWith("wi-") || e.button !== 0 || pxPerDay <= 0) {
+  const startDrag = (e: React.PointerEvent, target: DragTarget, mode: DragMode) => {
+    if (e.button !== 0 || pxPerDay <= 0) {
       return;
     }
     e.preventDefault();
@@ -357,16 +366,15 @@ export function GanttView({
     dragDeltaRef.current = 0;
     setDragDelta(0);
     setDrag({
-      taskId: task.id,
+      kind: target.kind,
+      id: target.id,
       mode,
       startClientX: e.clientX,
-      origStart: task.start_date,
-      origDue: task.due_date,
+      origStart: target.start,
+      origDue: target.due,
     });
   };
 
-  // Mientras hay arrastre, seguimos el puntero a nivel de ventana (aunque salga
-  // de la barra) y confirmamos en `pointerup`.
   useEffect(() => {
     if (!drag || pxPerDay <= 0) {
       return;
@@ -393,6 +401,38 @@ export function GanttView({
     };
   }, [drag, pxPerDay, commitDrag]);
 
+  // ── Redimensionado de la columna de etiquetas ──
+  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const [resizing, setResizing] = useState(false);
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeRef.current = { startX: e.clientX, startW: labelW };
+    setResizing(true);
+  };
+  useEffect(() => {
+    if (!resizing) {
+      return;
+    }
+    const onMove = (e: PointerEvent) => {
+      const r = resizeRef.current;
+      if (!r) {
+        return;
+      }
+      const next = r.startW + (e.clientX - r.startX);
+      setLabelW(Math.min(LABEL_W_MAX, Math.max(LABEL_W_MIN, next)));
+    };
+    const onUp = () => {
+      setResizing(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [resizing]);
+
   // Scroll horizontal: centrar la línea de "hoy" en el área visible.
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrolledRef = useRef(false);
@@ -403,9 +443,9 @@ export function GanttView({
         return;
       }
       const contentX = (todayPct / 100) * trackWidth;
-      el.scrollTo({ left: contentX - (el.clientWidth - LABEL_W) / 2, behavior });
+      el.scrollTo({ left: contentX - (el.clientWidth - labelW) / 2, behavior });
     },
-    [todayPct, trackWidth],
+    [todayPct, trackWidth, labelW],
   );
   useEffect(() => {
     if (!autoScrolledRef.current && todayPct != null && scrollRef.current) {
@@ -424,72 +464,30 @@ export function GanttView({
     return map;
   }, [membersQuery.data]);
 
-  // Mapa work_item_id → nombre, y su orden de aparición en el árbol (DFS), para
-  // agrupar las filas del Gantt por el nodo del que cuelga cada tarea.
-  const itemMeta = useMemo(() => {
-    const map = new Map<string, { name: string; order: number }>();
-    let order = 0;
-    const walk = (nodes: typeof treeQuery.data) => {
-      (nodes ?? []).forEach((n) => {
-        map.set(n.id, { name: n.nombre, order: order++ });
-        walk(n.children);
-      });
-    };
-    walk(treeQuery.data);
-    return map;
-  }, [treeQuery.data]);
-
-  const groups = useMemo<NodeGroup[]>(() => {
-    const byItem = new Map<string, DatedTask[]>();
-    // El cronograma agrupa por elemento de la estructura; las tareas sueltas
-    // (sin work_item_id todavía) no tienen fila aquí.
-    for (const task of tasks) {
-      if (!task.work_item_id) {
-        continue;
-      }
-      const arr = byItem.get(task.work_item_id) ?? [];
-      arr.push(task);
-      byItem.set(task.work_item_id, arr);
-    }
-    return Array.from(byItem.entries())
-      .map(([id, items]) => ({
-        id,
-        name: itemMeta.get(id)?.name ?? "Sin ubicación",
-        order: itemMeta.get(id)?.order ?? 999,
-        tasks: items,
-      }))
-      .sort((a, b) => a.order - b.order);
-  }, [tasks, itemMeta]);
-
-  // Geometría de cada fila de tarea visible (no colapsada), en el sistema de
-  // coordenadas del cuerpo (y=0 en la primera fila). Sirve para trazar las
-  // flechas de dependencia y espeja EXACTAMENTE el orden de render de grupos.
+  // Geometría de cada fila de tarea visible, en el sistema de coordenadas del
+  // cuerpo (y=0 en la primera fila). Espeja EXACTAMENTE el orden de `rows` y
+  // sirve para trazar las flechas de dependencia.
   const layout = useMemo(() => {
     const positions = new Map<string, { yTop: number; left: number; width: number }>();
     if (!range) {
       return { positions, height: 0 };
     }
     let y = 0;
-    for (const group of groups) {
-      y += ROW_H; // encabezado del grupo
-      if (collapsedGroups.has(group.id)) {
-        continue; // sus tareas no se renderizan → no ocupan alto
-      }
-      for (const task of group.tasks) {
-        const m = barMetrics(task, range);
-        positions.set(task.id, {
+    for (const row of rows) {
+      if (row.kind === "task") {
+        const m = barMetrics(row.task, range);
+        positions.set(row.task.id, {
           yTop: y,
           left: (m.offsetPct / 100) * trackWidth,
           width: Math.max(10, (m.widthPct / 100) * trackWidth),
         });
-        y += ROW_H;
       }
+      y += ROW_H;
     }
     return { positions, height: y };
-  }, [groups, collapsedGroups, range, trackWidth]);
+  }, [rows, range, trackWidth]);
 
-  // Flechas finish-to-start: del extremo derecho de la predecesora al izquierdo
-  // de la sucesora. Solo entre tareas visibles (ambas con geometría conocida).
+  // Flechas finish-to-start entre tareas visibles (ambas con geometría conocida).
   const arrows = useMemo(() => {
     if (!showDeps) {
       return [];
@@ -506,7 +504,6 @@ export function GanttView({
       const x2 = to.left;
       const y2 = to.yTop + ROW_H / 2;
       const stub = 10;
-      // Codo ortogonal: sale a la derecha, baja/sube y entra por la izquierda.
       out.push({
         id: dep.id,
         d: `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${y2} L ${x2 - 2} ${y2}`,
@@ -527,8 +524,8 @@ export function GanttView({
     });
   };
 
-  const toggleGroup = (id: string) => {
-    setCollapsedGroups((prev) => {
+  const toggleNode = (id: string) => {
+    setCollapsedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -539,13 +536,46 @@ export function GanttView({
     });
   };
 
-  // ¿Hay algún filtro activo? (algún estado apagado o algún selector puesto).
+  const toggleType = (id: string) => {
+    setActiveTypeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Todos los ids de nodo con hijos (para "colapsar / expandir todo"), tomados
+  // del árbol completo (no solo lo visible) para poder re-expandir desde cero.
+  const collapsibleIds = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: typeof tree) => {
+      for (const n of nodes) {
+        if (n.children.length > 0) {
+          ids.push(n.id);
+          walk(n.children);
+        }
+      }
+    };
+    walk(tree);
+    return ids;
+  }, [tree]);
+  const allCollapsed =
+    collapsibleIds.length > 0 && collapsibleIds.every((id) => collapsedNodes.has(id));
+  const toggleAllNodes = () => {
+    setCollapsedNodes(allCollapsed ? new Set() : new Set(collapsibleIds));
+  };
+
   const hasActiveFilters =
     statuses.size !== LEGEND_STATUSES.length ||
     assigneeId != null ||
     teamId != null ||
     position != null ||
-    onlyAtRisk;
+    onlyAtRisk ||
+    activeTypeIds.size > 0;
 
   const clearFilters = () => {
     setStatuses(new Set(LEGEND_STATUSES));
@@ -553,12 +583,7 @@ export function GanttView({
     setTeamId(null);
     setPosition(null);
     setOnlyAtRisk(false);
-  };
-
-  // Colapsar/expandir todos los grupos visibles de una vez.
-  const allCollapsed = groups.length > 0 && groups.every((g) => collapsedGroups.has(g.id));
-  const toggleAllGroups = () => {
-    setCollapsedGroups(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)));
+    setActiveTypeIds(new Set());
   };
 
   const remainingText =
@@ -653,6 +678,39 @@ export function GanttView({
           }
         />
       </div>
+
+      {/* Filtro por tipo de elemento (Curso, Módulo…), espejo de la estructura */}
+      {types.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Tag className="size-3" /> Tipos
+          </span>
+          {types.map((t) => {
+            const style = tipoStyle(t.id);
+            const active = activeTypeIds.has(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  toggleType(t.id);
+                }}
+                aria-pressed={active}
+                title="Filtrar por este tipo de elemento"
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition",
+                  style.chip,
+                  active ? "border-current" : "border-transparent",
+                  activeTypeIds.size > 0 && !active && "opacity-40",
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", style.dot)} />
+                {t.nombre}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Barra de filtros y zoom */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -755,6 +813,24 @@ export function GanttView({
             <AlertTriangle className="size-3.5" /> Solo en riesgo
           </button>
 
+          {/* Mostrar / ocultar tareas bajo cada elemento */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowTasks((v) => !v);
+            }}
+            aria-pressed={showTasks}
+            title="Mostrar u ocultar las tareas bajo cada elemento"
+            className={cn(
+              "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+              showTasks
+                ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ListChecks className="size-3.5" /> Tareas
+          </button>
+
           {/* Ir a hoy */}
           <button
             type="button"
@@ -790,12 +866,12 @@ export function GanttView({
             ))}
           </div>
 
-          {/* Colapsar / expandir todos los grupos de una vez */}
+          {/* Colapsar / expandir toda la estructura de una vez */}
           <button
             type="button"
-            onClick={toggleAllGroups}
-            disabled={groups.length === 0}
-            title={allCollapsed ? "Expandir todos los grupos" : "Colapsar todos los grupos"}
+            onClick={toggleAllNodes}
+            disabled={collapsibleIds.length === 0}
+            title={allCollapsed ? "Expandir toda la estructura" : "Colapsar toda la estructura"}
             className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             {allCollapsed ? (
@@ -839,9 +915,9 @@ export function GanttView({
         </div>
       </div>
 
-      {tasksQuery.isLoading ? (
+      {tasksQuery.isLoading || treeQuery.isLoading ? (
         <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      ) : datedTasks.length === 0 || !range ? (
+      ) : !range ? (
         <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-center">
           <GanttChartSquare className="size-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">
@@ -852,24 +928,36 @@ export function GanttView({
         </div>
       ) : (
         // Contenedor con scroll en ambos ejes: el eje de tiempo queda fijo
-        // arriba y la columna de tareas fija a la izquierda.
+        // arriba y la columna de etiquetas fija a la izquierda.
         <div
           ref={scrollRef}
           className={cn(
             "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm",
-            drag && "select-none",
+            (drag != null || resizing) && "select-none",
           )}
         >
-          <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
+          <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
             <div className="sticky top-0 z-30 flex border-b border-border bg-card">
               <div
-                style={{ width: LABEL_W }}
+                style={{ width: labelW }}
                 className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
               >
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Tareas · {tasks.length}
+                  Estructura · {nodeCount} · {taskRowCount} tareas
                 </span>
+                {/* Manija para redimensionar la columna de etiquetas */}
+                <div
+                  onPointerDown={startResize}
+                  role="separator"
+                  aria-label="Redimensionar la columna de nombres"
+                  aria-orientation="vertical"
+                  title="Arrastra para ampliar la columna de nombres"
+                  className={cn(
+                    "absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize touch-none transition-colors hover:bg-brand-gold/50",
+                    resizing && "bg-brand-gold/60",
+                  )}
+                />
               </div>
               <div className="relative shrink-0" style={{ width: trackWidth }}>
                 <div className="relative h-6">
@@ -890,10 +978,8 @@ export function GanttView({
                 <div className="relative h-5 border-t border-border/70">
                   {ticks.map((t) => {
                     if (t.offsetPct > 97) {
-                      return null; // el rótulo no cabe: la línea de rejilla basta
+                      return null;
                     }
-                    // En zoom de día el rótulo se centra dentro de su celda;
-                    // en semana/mes se ancla justo después de la marca.
                     const centered = zoom === "dia";
                     return (
                       <span
@@ -927,7 +1013,7 @@ export function GanttView({
               {/* Capa de fondo: fines de semana y rejilla, alineadas al eje */}
               <div
                 className="pointer-events-none absolute inset-y-0 z-0"
-                style={{ left: LABEL_W, width: trackWidth }}
+                style={{ left: labelW, width: trackWidth }}
               >
                 {weekends.map((b) => (
                   <div
@@ -956,7 +1042,7 @@ export function GanttView({
               {todayPct != null && (
                 <div
                   className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
-                  style={{ left: LABEL_W + pctToPx(todayPct) }}
+                  style={{ left: labelW + pctToPx(todayPct) }}
                 />
               )}
 
@@ -964,7 +1050,7 @@ export function GanttView({
               {arrows.length > 0 && (
                 <svg
                   className="pointer-events-none absolute z-10 text-brand-teal/70"
-                  style={{ left: LABEL_W, top: 0, width: trackWidth, height: layout.height }}
+                  style={{ left: labelW, top: 0, width: trackWidth, height: layout.height }}
                   aria-hidden
                 >
                   <defs>
@@ -993,267 +1079,54 @@ export function GanttView({
                 </svg>
               )}
 
-              {groups.length === 0 ? (
+              {rows.length === 0 ? (
                 <div className="flex h-32 items-center justify-center">
                   <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
-                    No hay tareas que coincidan con los filtros.
+                    No hay elementos que coincidan con los filtros.
                   </p>
                 </div>
               ) : (
-                groups.map((group, gi) => {
-                  const tone = GROUP_TONES[gi % GROUP_TONES.length];
-                  const isCollapsed = collapsedGroups.has(group.id);
-                  const done = group.tasks.filter((t) => t.status === "completada").length;
-                  // Rango agregado del grupo: de la primera fecha de inicio a
-                  // la última entrega (las ISO se comparan como strings).
-                  const gStart = group.tasks.reduce(
-                    (acc, t) => (t.start_date < acc ? t.start_date : acc),
-                    group.tasks[0].start_date,
-                  );
-                  const gEnd = group.tasks.reduce(
-                    (acc, t) => (t.due_date > acc ? t.due_date : acc),
-                    group.tasks[0].due_date,
-                  );
-                  const gm = barMetrics({ start_date: gStart, due_date: gEnd }, range);
-                  // Alto exacto del grupo (encabezado + filas si está expandido).
-                  // Se lo damos al navegador como tamaño intrínseco para que, con
-                  // `content-visibility: auto`, omita el render de los grupos fuera
-                  // de pantalla (virtualización nativa) sin saltos de scroll.
-                  const sectionHeight = ROW_H * (isCollapsed ? 1 : 1 + group.tasks.length);
-                  return (
-                    <section
-                      key={group.id}
-                      style={{
-                        contentVisibility: "auto",
-                        containIntrinsicSize: `auto ${sectionHeight}px`,
+                rows.map((row) =>
+                  row.kind === "node" ? (
+                    <NodeRow
+                      key={row.id}
+                      row={row}
+                      range={range}
+                      labelW={labelW}
+                      pctToPx={pctToPx}
+                      typeName={typeNameById.get(row.tipoId) ?? "elemento"}
+                      collapsed={collapsedNodes.has(row.id)}
+                      drag={drag}
+                      dragDelta={dragDelta}
+                      startDrag={startDrag}
+                      draggedRef={draggedRef}
+                      onToggle={() => {
+                        if (row.hasChildren) {
+                          toggleNode(row.id);
+                        }
                       }}
-                    >
-                      {/* Encabezado del grupo: clic = colapsar/expandir */}
-                      <div
-                        className="flex items-stretch border-b border-border/70"
-                        style={{ height: ROW_H }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            toggleGroup(group.id);
-                          }}
-                          aria-expanded={!isCollapsed}
-                          style={{ width: LABEL_W }}
-                          className={cn(
-                            "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-l-[3px] border-r border-r-border bg-muted px-2 text-left transition-colors hover:bg-accent",
-                            tone.accent,
-                          )}
-                        >
-                          <ChevronDown
-                            className={cn(
-                              "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                              isCollapsed && "-rotate-90",
-                            )}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
-                            {group.name}
-                          </span>
-                          <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
-                            {done}/{group.tasks.length}
-                          </span>
-                        </button>
-                        <div className="relative flex-1 bg-muted/40">
-                          {/* Barra agregada del nodo (resumen del grupo) */}
-                          <div
-                            className={cn(
-                              "absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full",
-                              tone.bar,
-                            )}
-                            style={{
-                              left: pctToPx(gm.offsetPct),
-                              width: Math.max(8, pctToPx(gm.widthPct)),
-                            }}
-                            title={`${group.name}\n${shortDate(gStart)} – ${shortDate(gEnd)} · ${group.tasks.length} tarea${group.tasks.length !== 1 ? "s" : ""}`}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Filas de tareas */}
-                      {!isCollapsed &&
-                        group.tasks.map((task) => {
-                          const draggable = !task.id.startsWith("wi-");
-                          // Durante el arrastre, la barra sigue al puntero usando
-                          // las fechas de preview; al soltar se persiste.
-                          const isDragging = drag?.taskId === task.id;
-                          const view = isDragging
-                            ? previewDates(drag, dragDelta)
-                            : { start: task.start_date, due: task.due_date };
-                          const metrics = barMetrics(
-                            { start_date: view.start, due_date: view.due },
-                            range,
-                          );
-                          const overdue = isOverdue(task, TODAY);
-                          const progress = statusProgressPct(task.status);
-                          const assignee = task.assignee_id
-                            ? assignees.get(task.assignee_id)
-                            : null;
-                          const teamLabel = task.team_id ? teamNameById.get(task.team_id) : null;
-                          const barLeft = pctToPx(metrics.offsetPct);
-                          const barW = Math.max(10, pctToPx(metrics.widthPct));
-                          const days = toDayNumber(view.due) - toDayNumber(view.start) + 1;
-                          const dateLabel = `${shortDate(view.start)} – ${shortDate(view.due)} · ${days} d`;
-                          // El rótulo va a la derecha de la barra; si no cabe,
-                          // se ancla a su izquierda (nunca se corta).
-                          const labelFitsRight = barLeft + barW + 140 <= trackWidth;
-                          return (
-                            <div
-                              key={task.id}
-                              className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
-                              style={{ height: ROW_H }}
-                            >
-                              <button
-                                type="button"
-                                disabled={task.id.startsWith("wi-")}
-                                onClick={() => {
-                                  // Las sintéticas (id `wi-…`) vienen de la estructura,
-                                  // no del listado real: no abren el panel de detalle.
-                                  if (task.id.startsWith("wi-")) {
-                                    return;
-                                  }
-                                  setSelectedId(task.id);
-                                }}
-                                title={
-                                  task.id.startsWith("wi-") ? undefined : "Ver y editar la tarea"
-                                }
-                                style={{ width: LABEL_W }}
-                                className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-border bg-card px-3 text-left transition-colors group-hover/row:bg-muted enabled:cursor-pointer enabled:hover:bg-muted"
-                              >
-                                <span
-                                  className={cn(
-                                    "size-2 shrink-0 rounded-full",
-                                    STATUS_DOT[task.status],
-                                  )}
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs text-foreground">{task.title}</p>
-                                  {teamLabel && (
-                                    <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
-                                      {teamLabel}
-                                    </p>
-                                  )}
-                                </div>
-                                <span
-                                  title={assignee?.name ?? "Sin responsable"}
-                                  className={cn(
-                                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
-                                    assignee
-                                      ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
-                                      : "bg-muted text-muted-foreground",
-                                  )}
-                                >
-                                  {assignee?.initials ?? "—"}
-                                </span>
-                              </button>
-                              <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
-                                <button
-                                  type="button"
-                                  onPointerDown={(e) => {
-                                    if (draggable) {
-                                      startDrag(e, task, "move");
-                                    }
-                                  }}
-                                  onClick={() => {
-                                    // Tras un arrastre real no abrimos el detalle
-                                    // (fue una reprogramación, no un clic).
-                                    if (draggedRef.current) {
-                                      draggedRef.current = false;
-                                      return;
-                                    }
-                                    // Las sintéticas (id `wi-…`) no abren detalle.
-                                    if (!draggable) {
-                                      return;
-                                    }
-                                    setSelectedId(task.id);
-                                  }}
-                                  title={[
-                                    task.title,
-                                    teamLabel ? `Equipo: ${teamLabel}` : null,
-                                    assignee?.name ?? "Sin responsable",
-                                    `${view.start} → ${view.due}`,
-                                    `${TASK_STATUS_LABELS[task.status]} · ${progress}%`,
-                                    draggable ? "Arrastra para reprogramar" : null,
-                                  ]
-                                    .filter(Boolean)
-                                    .join("\n")}
-                                  className={cn(
-                                    "absolute top-1/2 h-[18px] -translate-y-1/2 overflow-hidden rounded-[5px] text-left shadow-sm outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-brand-gold",
-                                    STATUS_BAR_SOFT[task.status],
-                                    overdue && "ring-1 ring-rose-500",
-                                    draggable && "cursor-grab touch-none",
-                                    isDragging && "z-30 cursor-grabbing ring-2 ring-brand-gold",
-                                  )}
-                                  style={{ left: barLeft, width: barW }}
-                                >
-                                  <span
-                                    className={cn("block h-full", STATUS_BAR_COLOR[task.status])}
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </button>
-
-                                {/* Manijas de redimensionado (estirar inicio/fin) */}
-                                {draggable && (
-                                  <>
-                                    <div
-                                      role="slider"
-                                      aria-label="Ajustar inicio"
-                                      aria-valuetext={view.start}
-                                      tabIndex={-1}
-                                      onPointerDown={(e) => {
-                                        startDrag(e, task, "start");
-                                      }}
-                                      className={cn(
-                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-l-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
-                                        isDragging && "opacity-100",
-                                      )}
-                                      style={{ left: barLeft }}
-                                    />
-                                    <div
-                                      role="slider"
-                                      aria-label="Ajustar fin"
-                                      aria-valuetext={view.due}
-                                      tabIndex={-1}
-                                      onPointerDown={(e) => {
-                                        startDrag(e, task, "end");
-                                      }}
-                                      className={cn(
-                                        "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-r-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
-                                        isDragging && "opacity-100",
-                                      )}
-                                      style={{ left: barLeft + barW - 8 }}
-                                    />
-                                  </>
-                                )}
-
-                                <span
-                                  className={cn(
-                                    "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
-                                    isDragging
-                                      ? "font-semibold text-brand-gold-dark dark:text-brand-gold"
-                                      : overdue
-                                        ? "font-medium text-rose-500"
-                                        : "text-muted-foreground",
-                                  )}
-                                  style={
-                                    labelFitsRight
-                                      ? { left: barLeft + barW + 8 }
-                                      : { right: trackWidth - barLeft + 8 }
-                                  }
-                                >
-                                  {dateLabel}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </section>
-                  );
-                })
+                    />
+                  ) : (
+                    <TaskRow
+                      key={row.id}
+                      task={row.task}
+                      depth={row.depth}
+                      range={range}
+                      labelW={labelW}
+                      trackWidth={trackWidth}
+                      pctToPx={pctToPx}
+                      assignee={row.task.assignee_id ? assignees.get(row.task.assignee_id) : null}
+                      teamLabel={row.task.team_id ? teamNameById.get(row.task.team_id) : null}
+                      drag={drag}
+                      dragDelta={dragDelta}
+                      startDrag={startDrag}
+                      draggedRef={draggedRef}
+                      onOpen={() => {
+                        setSelectedId(row.task.id);
+                      }}
+                    />
+                  ),
+                )
               )}
             </div>
           </div>
@@ -1269,6 +1142,280 @@ export function GanttView({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Fila de nodo (elemento de la estructura) ─────────────────────────────────
+
+function NodeRow({
+  row,
+  range,
+  labelW,
+  pctToPx,
+  typeName,
+  collapsed,
+  drag,
+  dragDelta,
+  startDrag,
+  draggedRef,
+  onToggle,
+}: {
+  row: GanttNodeRow;
+  range: TimelineRange;
+  labelW: number;
+  pctToPx: (pct: number) => number;
+  typeName: string;
+  collapsed: boolean;
+  drag: DragInfo | null;
+  dragDelta: number;
+  startDrag: (e: React.PointerEvent, target: DragTarget, mode: DragMode) => void;
+  draggedRef: React.RefObject<boolean>;
+  onToggle: () => void;
+}) {
+  const style = tipoStyle(row.tipoId);
+  const isDragging = drag?.id === row.id;
+  // Al arrastrar, la barra resumen sigue al puntero con las fechas de preview.
+  const view = isDragging ? previewDates(drag, dragDelta) : { start: row.start, due: row.due };
+  const gm = barMetrics({ start_date: view.start, due_date: view.due }, range);
+  const pct = row.taskCount > 0 ? Math.round((row.doneCount / row.taskCount) * 100) : 0;
+  const target: DragTarget = { kind: "node", id: row.id, start: row.start, due: row.due };
+  return (
+    <div className="flex items-stretch border-b border-border/70" style={{ height: ROW_H }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        style={{ width: labelW, paddingLeft: 8 + row.depth * INDENT }}
+        className={cn(
+          "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-r-border bg-muted pr-2 text-left transition-colors",
+          row.hasChildren ? "hover:bg-accent" : "cursor-default",
+        )}
+      >
+        <ChevronDown
+          className={cn(
+            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+            collapsed && "-rotate-90",
+            !row.hasChildren && "invisible",
+          )}
+        />
+        <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
+            style.chip,
+          )}
+        >
+          {typeName}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+          {row.name}
+        </span>
+        {row.taskCount > 0 && (
+          <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
+            {row.doneCount}/{row.taskCount}
+          </span>
+        )}
+      </button>
+      <div className="relative flex-1 bg-muted/40">
+        {/* Barra resumen del nodo: arrastrar desplaza TODO el subárbol. */}
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            startDrag(e, target, "move");
+          }}
+          onClick={(e) => {
+            // Tras un arrastre real, no dispares el toggle (fue reprogramación).
+            if (draggedRef.current) {
+              draggedRef.current = false;
+              e.stopPropagation();
+            }
+          }}
+          title={`${row.name}\n${shortDate(view.start)} – ${shortDate(view.due)} · ${row.taskCount} tarea${row.taskCount !== 1 ? "s" : ""}\nArrastra para reprogramar el bloque`}
+          className={cn(
+            "absolute top-1/2 h-2.5 -translate-y-1/2 cursor-grab touch-none overflow-hidden rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-brand-gold",
+            isDragging && "z-30 cursor-grabbing h-3 ring-2 ring-brand-gold",
+          )}
+          style={{ left: pctToPx(gm.offsetPct), width: Math.max(8, pctToPx(gm.widthPct)) }}
+        >
+          <div className={cn("h-full opacity-30", style.bar)} />
+          <div
+            className={cn("absolute inset-y-0 left-0 rounded-full", style.bar)}
+            style={{ width: `${pct}%` }}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Fila de tarea ────────────────────────────────────────────────────────────
+
+function TaskRow({
+  task,
+  depth,
+  range,
+  labelW,
+  trackWidth,
+  pctToPx,
+  assignee,
+  teamLabel,
+  drag,
+  dragDelta,
+  startDrag,
+  draggedRef,
+  onOpen,
+}: {
+  task: DatedTask;
+  depth: number;
+  range: TimelineRange;
+  labelW: number;
+  trackWidth: number;
+  pctToPx: (pct: number) => number;
+  assignee: { initials: string; name: string } | null | undefined;
+  teamLabel: string | null | undefined;
+  drag: DragInfo | null;
+  dragDelta: number;
+  startDrag: (e: React.PointerEvent, target: DragTarget, mode: DragMode) => void;
+  draggedRef: React.RefObject<boolean>;
+  onOpen: () => void;
+}) {
+  const target: DragTarget = {
+    kind: "task",
+    id: task.id,
+    start: task.start_date,
+    due: task.due_date,
+  };
+  const isDragging = drag?.id === task.id;
+  const view = isDragging
+    ? previewDates(drag, dragDelta)
+    : { start: task.start_date, due: task.due_date };
+  const metrics = barMetrics({ start_date: view.start, due_date: view.due }, range);
+  const overdue = isOverdue(task, TODAY);
+  const progress = statusProgressPct(task.status);
+  const barLeft = pctToPx(metrics.offsetPct);
+  const barW = Math.max(10, pctToPx(metrics.widthPct));
+  const days = toDayNumber(view.due) - toDayNumber(view.start) + 1;
+  const dateLabel = `${shortDate(view.start)} – ${shortDate(view.due)} · ${days} d`;
+  const labelFitsRight = barLeft + barW + 140 <= trackWidth;
+
+  return (
+    <div
+      className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
+      style={{ height: ROW_H, contentVisibility: "auto", containIntrinsicSize: `auto ${ROW_H}px` }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        title="Ver y editar la tarea"
+        style={{ width: labelW, paddingLeft: 8 + depth * INDENT }}
+        className="sticky left-0 z-20 flex shrink-0 cursor-pointer items-center gap-2 border-r border-border bg-card pr-3 text-left transition-colors group-hover/row:bg-muted hover:bg-muted"
+      >
+        <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[task.status])} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs text-foreground">{task.title}</p>
+          {teamLabel && (
+            <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
+              {teamLabel}
+            </p>
+          )}
+        </div>
+        <span
+          title={assignee?.name ?? "Sin responsable"}
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
+            assignee
+              ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {assignee?.initials ?? "—"}
+        </span>
+      </button>
+      <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            startDrag(e, target, "move");
+          }}
+          onClick={() => {
+            // Tras un arrastre real no abrimos el detalle (fue reprogramación).
+            if (draggedRef.current) {
+              draggedRef.current = false;
+              return;
+            }
+            onOpen();
+          }}
+          title={[
+            task.title,
+            teamLabel ? `Equipo: ${teamLabel}` : null,
+            assignee?.name ?? "Sin responsable",
+            `${view.start} → ${view.due}`,
+            `${TASK_STATUS_LABELS[task.status]} · ${progress}%`,
+            "Arrastra para reprogramar",
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          className={cn(
+            "absolute top-1/2 h-[18px] -translate-y-1/2 cursor-grab touch-none overflow-hidden rounded-[5px] text-left shadow-sm outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-brand-gold",
+            STATUS_BAR_SOFT[task.status],
+            overdue && "ring-1 ring-rose-500",
+            isDragging && "z-30 cursor-grabbing ring-2 ring-brand-gold",
+          )}
+          style={{ left: barLeft, width: barW }}
+        >
+          <span
+            className={cn("block h-full", STATUS_BAR_COLOR[task.status])}
+            style={{ width: `${progress}%` }}
+          />
+        </button>
+
+        {/* Manijas de redimensionado (estirar inicio/fin) */}
+        <div
+          role="slider"
+          aria-label="Ajustar inicio"
+          aria-valuetext={view.start}
+          tabIndex={-1}
+          onPointerDown={(e) => {
+            startDrag(e, target, "start");
+          }}
+          className={cn(
+            "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-l-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+            isDragging && "opacity-100",
+          )}
+          style={{ left: barLeft }}
+        />
+        <div
+          role="slider"
+          aria-label="Ajustar fin"
+          aria-valuetext={view.due}
+          tabIndex={-1}
+          onPointerDown={(e) => {
+            startDrag(e, target, "end");
+          }}
+          className={cn(
+            "absolute top-1/2 z-30 h-[18px] w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-r-[5px] bg-brand-gold/70 opacity-0 transition-opacity group-hover/row:opacity-100",
+            isDragging && "opacity-100",
+          )}
+          style={{ left: barLeft + barW - 8 }}
+        />
+
+        <span
+          className={cn(
+            "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
+            isDragging
+              ? "font-semibold text-brand-gold-dark dark:text-brand-gold"
+              : overdue
+                ? "font-medium text-rose-500"
+                : "text-muted-foreground",
+          )}
+          style={
+            labelFitsRight ? { left: barLeft + barW + 8 } : { right: trackWidth - barLeft + 8 }
+          }
+        >
+          {dateLabel}
+        </span>
+      </div>
     </div>
   );
 }
