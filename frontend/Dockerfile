@@ -25,9 +25,15 @@ RUN pnpm build
 # Production image
 FROM nginx:alpine AS prod
 
+
+# Sets the working directory for the production image to the Nginx configuration directory
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Copies the built application files from the builder image to the Nginx HTML directory in the production image
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Installs the shadow package in the production image to manage user accounts and permissions
+RUN apk add --no-cache shadow
 
 RUN useradd --no-create-home --shell /bin/false --uid 1001 appuser
 RUN chown -R appuser:appuser /usr/share/nginx/html
