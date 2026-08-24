@@ -27,6 +27,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/.venv
+      - ./backend/entrypoint.sh:/app/entrypoint.sh
     depends_on:
       - db
     networks:

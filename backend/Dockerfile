@@ -48,7 +48,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Copies the source code from the host to the working directory in the production image
 COPY src/ ./src/
 COPY main.py ./
-COPY ./alembic ./
+COPY ./alembic ./alembic/
 COPY ./alembic.ini ./
 COPY ./entrypoint.sh ./
 

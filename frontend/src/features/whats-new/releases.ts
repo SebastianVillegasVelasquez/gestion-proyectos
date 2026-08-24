@@ -16,6 +16,18 @@ export interface ReleaseNote {
 // De la más reciente a la más antigua.
 export const RELEASES: ReleaseNote[] = [
   {
+    id: "2026-08-24-estructura-tipos-elevated",
+    date: "2026-08-24",
+    title: "Estructura y tipos más claros",
+    audience: "elevated",
+    items: [
+      "Desde la Estructura ya puedes saltar al Cronograma con un botón, junto a «Añadir elemento».",
+      "Se quitó la vista de lista de la Estructura para dejar solo el árbol.",
+      "Los chips de tipo se comportan mejor: un click muestra editar/eliminar y otro los oculta, sin dejar la página atenuada.",
+      "Al eliminar un tipo, sus elementos ya no quedan sueltos: pasan a un tipo «Elemento» real que puedes editar y filtrar (también en el Cronograma).",
+    ],
+  },
+  {
     id: "2026-08-11-integrantes-pago-elevated",
     date: "2026-08-11",
     title: "Avance de pago por integrante",

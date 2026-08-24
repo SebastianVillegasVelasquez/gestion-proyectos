@@ -25,6 +25,10 @@ from app.modules.project.structure.presentation.schemas import (
 )
 from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
 
+# Nombre del tipo por defecto al que se reasignan los elementos cuyo tipo se
+# elimina. Sigue siendo un tipo real (editable/filtrable), no un hueco.
+DEFAULT_TIPO_NOMBRE = "Elemento"
+
 
 class WorkTreeService:
     """Reglas del árbol de trabajo recursivo. Depende de la abstracción del repo.
@@ -76,6 +80,31 @@ class WorkTreeService:
         tipo = await self._get_active_tipo(tipo_id)
         tipo.soft_delete()
         await self.repo.save_tipo(tipo)
+        # Los elementos que usaban este tipo se reasignan a un tipo por defecto
+        # "Elemento" (creado si hace falta): así siguen en el catálogo, editables
+        # y filtrables, en vez de quedar huérfanos apuntando a un tipo borrado.
+        if tipo.proyecto_id is not None:
+            await self._reassign_to_default_tipo(tipo.proyecto_id, tipo_id)
+
+    async def _reassign_to_default_tipo(
+        self, proyecto_id: UUID, from_tipo_id: UUID
+    ) -> None:
+        items = await self.repo.list_items(proyecto_id)
+        orphans = [item for item in items if item.tipo_id == from_tipo_id]
+        if not orphans:
+            return
+        default = await self._get_or_create_default_tipo(proyecto_id)
+        for item in orphans:
+            item.tipo_id = default.id
+            await self.repo.save_item(item)
+
+    async def _get_or_create_default_tipo(self, proyecto_id: UUID) -> TipoNodo:
+        existing = await self.repo.get_tipo_by_nombre(proyecto_id, DEFAULT_TIPO_NOMBRE)
+        if existing is not None:
+            return existing
+        return await self.repo.add_tipo(
+            TipoNodo(proyecto_id=proyecto_id, nombre=DEFAULT_TIPO_NOMBRE)
+        )
 
     async def list_tipos(self, proyecto_id: UUID) -> list[TipoNodoResponse]:
         tipos = await self.repo.list_tipos(proyecto_id)

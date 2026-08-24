@@ -180,6 +180,24 @@ class TestTipoNodo:
         with pytest.raises(ConflictError):
             await _tipo(service, "Fase")
 
+    async def test_delete_tipo_reassigns_items_to_editable_default(self, service):
+        # Al borrar un tipo, sus elementos no quedan huérfanos: pasan a un tipo
+        # real "Elemento" (que aparece en el catálogo y se puede editar/filtrar).
+        tipo = await _tipo(service, "Módulo")
+        item = await _item(service, tipo.id, "Módulo 1")
+
+        await service.delete_tipo(tipo.id)
+
+        tipos = await service.list_tipos(PROYECTO)
+        nombres = {t.nombre for t in tipos}
+        assert "Módulo" not in nombres
+        assert "Elemento" in nombres
+
+        default = next(t for t in tipos if t.nombre == "Elemento")
+        tree = await service.get_tree(PROYECTO)
+        assert tree[0].id == item.id
+        assert tree[0].tipo_id == default.id
+
 
 class TestWorkItemTree:
     async def test_builds_arbitrary_hierarchy(self, service):
