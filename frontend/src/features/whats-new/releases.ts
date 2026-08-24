@@ -16,6 +16,18 @@ export interface ReleaseNote {
 // De la más reciente a la más antigua.
 export const RELEASES: ReleaseNote[] = [
   {
+    id: "2026-08-24-carga-masiva-y-dnd-elevated",
+    date: "2026-08-24",
+    title: "Carga masiva de usuarios y drag & drop más flexible",
+    audience: "elevated",
+    items: [
+      "La carga masiva de usuarios (CSV) ahora usa columnas en español: email, nombre, apellido, cedula y cargo. La cédula es opcional y, si el cargo no existe, se crea solo. Todos quedan con el rol estándar.",
+      "Antes de cargar el archivo se ve una previsualización con los usuarios detectados, y un botón aparte para confirmar la carga.",
+      "En Estructura, «Cronograma» y «Añadir elemento» cambiaron de orden en la barra de acciones.",
+      "El drag & drop del árbol es más flexible: cualquier elemento puede moverse bajo cualquier otro (solo se bloquean los ciclos), tanto en Estructura como en el panel izquierdo del Cronograma, y quedan sincronizados entre sí.",
+    ],
+  },
+  {
     id: "2026-08-24-estructura-tipos-elevated",
     date: "2026-08-24",
     title: "Estructura y tipos más claros",
