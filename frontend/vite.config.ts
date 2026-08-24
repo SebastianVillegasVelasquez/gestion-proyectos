@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import {defineConfig} from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import * as path from "node:path";
@@ -21,9 +21,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Separa las librerías del código propio: el chunk "vendor" solo cambia
-        // al actualizar dependencias, así el navegador lo conserva cacheado
-        // entre deploys (los assets llevan hash + Cache-Control immutable).
         manualChunks(id: string) {
           if (!id.includes("node_modules")) {
             return undefined;

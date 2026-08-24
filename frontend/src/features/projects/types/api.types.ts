@@ -72,6 +72,13 @@ export interface CreateTipoNodoPayload {
   reglas_anidacion?: Record<string, unknown> | null;
 }
 
+export interface UpdateTipoNodoPayload {
+  nombre?: string;
+  color?: string | null;
+  icono?: string | null;
+  reglas_anidacion?: Record<string, unknown> | null;
+}
+
 export interface WorkItem {
   id: string;
   proyecto_id: string;
@@ -111,6 +118,20 @@ export interface CreateWorkItemPayload {
 }
 
 export type UpdateWorkItemPayload = Partial<Omit<CreateWorkItemPayload, "parent_id">>;
+
+export interface MoveWorkItemPayload {
+  /** Nuevo padre; null = mover al nivel raíz del proyecto. */
+  new_parent_id?: string | null;
+  /** Posición entre hermanos; si se omite, va al final. */
+  orden?: number | null;
+}
+
+export interface ShiftWorkItemSubtreePayload {
+  /** Días a sumar a las fechas plan del subárbol (negativo = mover atrás). */
+  offset_days: number;
+  /** Desplazar también las fechas de las tareas del subárbol (por defecto sí). */
+  shift_tasks?: boolean;
+}
 
 export interface CloneWorkItemPayload {
   /** Donde pegar el elemento y su contenido; null = nivel principal del proyecto. */

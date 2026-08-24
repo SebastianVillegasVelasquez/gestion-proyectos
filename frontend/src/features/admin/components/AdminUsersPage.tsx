@@ -7,6 +7,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Upload,
   UserPlus,
   Users,
@@ -17,13 +18,15 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { Role } from "@/features/auth/types";
+import { Role, canActOnTarget } from "@/features/auth/types";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useDebouncedValue } from "@/features/projects/utils/use-debounced-value";
 import { usePositions, useCreatePosition } from "../hooks/use-positions";
 import {
   useAdminUsers,
   useBulkCreateUsers,
   useCreateUser,
+  useDeleteUser,
   useResetPassword,
   useUpdateUser,
 } from "../hooks/use-admin-users";
@@ -33,11 +36,18 @@ import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/projects/types/
 
 const PAGE_SIZE = 20;
 
-// Roles que un admin puede asignar desde la UI (developer/super_admin se omiten).
-const ASSIGNABLE_ROLES: { value: Role; label: string }[] = [
-  { value: Role.USER, label: "Usuario" },
-  { value: Role.ADMIN, label: "Administrador" },
-];
+// Roles que un admin puede asignar desde la UI. Un super_admin (o developer)
+// puede además ascender a alguien a super_admin; un admin normal no.
+function getAssignableRoles(actorRole: Role): { value: Role; label: string }[] {
+  const base: { value: Role; label: string }[] = [
+    { value: Role.USER, label: "Usuario" },
+    { value: Role.ADMIN, label: "Administrador" },
+  ];
+  if (actorRole === Role.SUPER_ADMIN || actorRole === Role.DEVELOPER) {
+    base.push({ value: Role.SUPER_ADMIN, label: "Super admin" });
+  }
+  return base;
+}
 
 const ROLE_LABEL: Record<string, string> = {
   developer: "Developer",
@@ -184,9 +194,11 @@ function NewPositionInlineForm({
 function CreateUserModal({
   onClose,
   onCreated,
+  assignableRoles,
 }: {
   onClose: () => void;
   onCreated: (email: string, password: string) => void;
+  assignableRoles: { value: Role; label: string }[];
 }) {
   const [form, setForm] = useState({
     name: "",
@@ -333,7 +345,7 @@ function CreateUserModal({
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Rol</span>
             <select className={inputCls} value={form.role} onChange={set("role")} aria-label="Rol">
-              {ASSIGNABLE_ROLES.map((r) => (
+              {assignableRoles.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -583,18 +595,26 @@ function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () => void
 // ── Fila de la tabla ──────────────────────────────────────────────────────────
 function UserRow({
   user,
+  actorRole,
   onCredentials,
 }: {
   user: AdminUser;
+  actorRole: Role;
   onCredentials: (email: string, pwd: string) => void;
 }) {
   const updateUser = useUpdateUser();
   const resetPassword = useResetPassword();
+  const deleteUser = useDeleteUser();
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   // El developer/super_admin no se editan desde esta UI (evita pisar privilegios).
   const locked = user.role === "developer" || user.role === "super_admin";
+  const assignableRoles = useMemo(() => getAssignableRoles(actorRole), [actorRole]);
+  // Solo se puede eliminar a alguien de rango estrictamente menor (un admin no
+  // puede eliminar a un super_admin, pero un super_admin sí a un admin).
+  const canDelete = canActOnTarget(actorRole, user.role);
 
   return (
     <>
@@ -620,7 +640,7 @@ function UserRow({
               }}
               className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold disabled:opacity-50"
             >
-              {ASSIGNABLE_ROLES.map((r) => (
+              {assignableRoles.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -669,6 +689,19 @@ function UserRow({
             >
               <KeyRound className="size-3" /> Contraseña
             </button>
+            {canDelete && (
+              <button
+                type="button"
+                disabled={deleteUser.isPending}
+                onClick={() => {
+                  setConfirmDelete(true);
+                }}
+                aria-label={`Eliminar a ${user.name} ${user.last_name}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="size-3" /> Eliminar
+              </button>
+            )}
           </div>
         </td>
       </tr>
@@ -725,6 +758,31 @@ function UserRow({
           }}
           onCancel={() => {
             setConfirmReset(false);
+          }}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Eliminar usuario"
+          message={`Se eliminará la cuenta de ${user.name} ${user.last_name} (${user.email}). Esta acción no se puede deshacer desde aquí. ¿Continuar?`}
+          confirmLabel="Eliminar"
+          destructive
+          loading={deleteUser.isPending}
+          errorMessage={
+            deleteUser.isError
+              ? getErrorMessage(deleteUser.error, "No se pudo eliminar el usuario")
+              : null
+          }
+          onConfirm={() => {
+            deleteUser.mutate(user.id, {
+              onSuccess: () => {
+                setConfirmDelete(false);
+              },
+            });
+          }}
+          onCancel={() => {
+            setConfirmDelete(false);
           }}
         />
       )}
@@ -857,6 +915,9 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
 
 // ── Página ────────────────────────────────────────────────────────────────────
 export function AdminUsersPage() {
+  const { user: authUser } = useAuth();
+  const actorRole = authUser?.role ?? Role.USER;
+  const assignableRoles = useMemo(() => getAssignableRoles(actorRole), [actorRole]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search);
@@ -950,6 +1011,7 @@ export function AdminUsersPage() {
                 <UserRow
                   key={u.id}
                   user={u}
+                  actorRole={actorRole}
                   onCredentials={(email, password) => {
                     setCreds({ title: "Contraseña restablecida", email, password });
                   }}
@@ -998,6 +1060,7 @@ export function AdminUsersPage() {
 
       {showCreate && (
         <CreateUserModal
+          assignableRoles={assignableRoles}
           onClose={() => {
             setShowCreate(false);
           }}

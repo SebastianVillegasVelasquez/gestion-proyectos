@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, CalendarRange, Clock, Hourglass, CornerDownRight, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/utils/get-error-message";
 import { useCreateWorkItem, useUpdateWorkItem } from "../../hooks/use-structure";
 import type { DuracionUnidad, TipoNodo, WorkItemTree } from "../../types/api.types";
 
@@ -47,7 +48,8 @@ interface Props {
   projectId: string;
   /** Si se pasa, el modal entra en modo edición de ese nodo. */
   editItem?: WorkItemTree | null;
-  /** Padre al crear (ignorado en edición). */
+  /** Padre del elemento (al crear, dónde se anida; al editar, su padre actual).
+   * Se usa para validar que el fin no supere el de su padre antes de guardar. */
   parent: WorkItemTree | null;
   nodeTypes: TipoNodo[];
   onClose: () => void;
@@ -130,6 +132,18 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
     if (!dates) {
       return;
     }
+    // Regla: un elemento no puede terminar después que su elemento padre
+    // (alerta inmediata, sin esperar el viaje al backend).
+    if (
+      parent?.fecha_fin_plan &&
+      dates.fecha_fin_plan &&
+      dates.fecha_fin_plan > parent.fecha_fin_plan
+    ) {
+      setError(
+        `La fecha de fin no puede ser posterior a la de “${parent.nombre}” (${parent.fecha_fin_plan}).`,
+      );
+      return;
+    }
     const base = {
       nombre: nombre.trim(),
       tipo_id: tipoId,
@@ -143,8 +157,13 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         await createItem.mutateAsync({ ...base, parent_id: parent?.id ?? null });
       }
       onClose();
-    } catch {
-      setError("No se pudo guardar el elemento. Revisa los datos e inténtalo de nuevo.");
+    } catch (err) {
+      setError(
+        getErrorMessage(
+          err,
+          "No se pudo guardar el elemento. Revisa los datos e inténtalo de nuevo.",
+        ),
+      );
     }
   }
 

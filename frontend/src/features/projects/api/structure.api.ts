@@ -3,7 +3,10 @@ import type {
   CloneWorkItemPayload,
   CreateTipoNodoPayload,
   CreateWorkItemPayload,
+  MoveWorkItemPayload,
+  ShiftWorkItemSubtreePayload,
   TipoNodo,
+  UpdateTipoNodoPayload,
   UpdateWorkItemPayload,
   WorkItem,
   WorkItemDependency,
@@ -18,6 +21,9 @@ export const structureApi = {
   createType: (projectId: string, payload: CreateTipoNodoPayload) =>
     http.post<TipoNodo>(`/projects/${projectId}/node-types`, payload).then((r) => r.data),
 
+  updateType: (typeId: string, payload: UpdateTipoNodoPayload) =>
+    http.patch<TipoNodo>(`/node-types/${typeId}`, payload).then((r) => r.data),
+
   deleteType: (typeId: string) => http.delete(`/node-types/${typeId}`).then(() => undefined),
 
   // ── Nodos del árbol de trabajo ──────────────────────────────────────────────
@@ -31,6 +37,14 @@ export const structureApi = {
     http.patch<WorkItem>(`/work-items/${itemId}`, payload).then((r) => r.data),
 
   remove: (itemId: string) => http.delete(`/work-items/${itemId}`).then(() => undefined),
+
+  /** Recoloca un elemento (drag & drop del árbol): nuevo padre y/o orden. */
+  move: (itemId: string, payload: MoveWorkItemPayload) =>
+    http.post<WorkItem>(`/work-items/${itemId}/move`, payload).then((r) => r.data),
+
+  /** Desplaza en el tiempo el subárbol completo (drag de la barra del nodo). */
+  shift: (itemId: string, payload: ShiftWorkItemSubtreePayload) =>
+    http.post<WorkItem>(`/work-items/${itemId}/shift`, payload).then((r) => r.data),
 
   /** Duplica un elemento con todo su contenido bajo el destino (spec §9). */
   clone: (itemId: string, payload: CloneWorkItemPayload) =>

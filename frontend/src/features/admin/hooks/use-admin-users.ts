@@ -55,3 +55,11 @@ export function useResetPassword() {
     mutationFn: (userId: string) => adminUsersApi.resetPassword(userId),
   });
 }
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => adminUsersApi.delete(userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminUserKeys.all }),
+  });
+}

@@ -120,6 +120,34 @@ class CloneWorkItemRequest(BaseModelConfig):
     include_tasks: bool = True
 
 
+# ── Mover / reordenar un nodo (drag & drop del árbol) ─────────────────────────
+class MoveWorkItemRequest(BaseModelConfig):
+    """Recoloca un nodo bajo otro padre (o a la raíz) y/o cambia su orden.
+
+    - `new_parent_id`: nuevo padre; `null` = mover al nivel raíz del proyecto.
+    - `orden`: posición entre hermanos; si se omite, va al final.
+
+    No puede moverse dentro de sí mismo ni de un descendiente (crearía un ciclo),
+    ni a otro proyecto. Las fechas se re-derivan solas en lectura.
+    """
+
+    new_parent_id: Optional[UUID] = None
+    orden: Optional[int] = Field(default=None, ge=0)
+
+
+# ── Desplazar un subárbol en el tiempo (drag de la barra en el cronograma) ─────
+class ShiftWorkItemSubtreeRequest(BaseModelConfig):
+    """Suma `offset_days` (puede ser negativo) a las fechas plan de TODO el
+    subárbol y, si `shift_tasks`, a las fechas de sus tareas. Cero = sin cambios.
+
+    Reprograma el bloque completo conservando su forma interna (útil cuando un
+    evento se corre en el calendario). Las fechas reales y el avance no se tocan.
+    """
+
+    offset_days: int
+    shift_tasks: bool = True
+
+
 # ── Dependencias Finish-to-Start ──────────────────────────────────────────────
 class WorkItemDependencyRequest(BaseModelConfig):
     depends_on_id: UUID

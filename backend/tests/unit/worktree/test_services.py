@@ -591,3 +591,147 @@ class TestCloneSubtree:
             await service.clone_subtree(
                 mod_a.id, CloneWorkItemRequest(target_parent_id=f1.id)
             )
+
+
+def _find_in_tree(nodes, item_id):
+    for node in nodes:
+        if node.id == item_id:
+            return node
+        found = _find_in_tree(node.children, item_id)
+        if found is not None:
+            return found
+    return None
+
+
+class TestMoveWorkItem:
+    async def _ordered_children(self, service, parent_id):
+        """Nombres de los hijos de `parent_id` (o de la raíz) por su `orden`."""
+        tree = await service.get_tree(PROYECTO)
+        nodes = tree if parent_id is None else _find_in_tree(tree, parent_id).children
+        return [n.nombre for n in sorted(nodes, key=lambda n: n.orden)]
+
+    async def test_reparents_and_appends_at_end(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")
+        b = await _item(service, t.id, "B")
+        await _item(service, t.id, "B-hijo", parent_id=b.id)  # ya ocupa orden 0
+        child = await _item(service, t.id, "Hijo", parent_id=a.id)
+
+        moved = await service.move_item(child.id, b.id, None)
+
+        assert moved.parent_id == b.id
+        assert moved.orden == 1  # tras el hijo existente de B
+
+    async def test_moves_to_root(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")
+        child = await _item(service, t.id, "Hijo", parent_id=a.id)
+
+        moved = await service.move_item(child.id, None, None)
+
+        assert moved.parent_id is None
+
+    async def test_reorders_siblings_within_same_parent(self, service):
+        t = await _tipo(service, "Nodo")
+        await _item(service, t.id, "A")
+        await _item(service, t.id, "B")
+        c = await _item(service, t.id, "C")
+        assert await self._ordered_children(service, None) == ["A", "B", "C"]
+
+        # Mover C al frente (índice 0) → se re-secuencia a C, A, B.
+        moved = await service.move_item(c.id, None, 0)
+        assert moved.orden == 0
+        assert await self._ordered_children(service, None) == ["C", "A", "B"]
+
+    async def test_inserts_between_siblings(self, service):
+        t = await _tipo(service, "Nodo")
+        await _item(service, t.id, "A")
+        await _item(service, t.id, "B")
+        c = await _item(service, t.id, "C")
+        # Insertar C en el índice 1 (entre A y B); el índice excluye al movido.
+        await service.move_item(c.id, None, 1)
+        assert await self._ordered_children(service, None) == ["A", "C", "B"]
+
+    async def test_compacts_old_parent_after_reparent(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")
+        x = await _item(service, t.id, "X", parent_id=a.id)
+        await _item(service, t.id, "Y", parent_id=a.id)
+        await _item(service, t.id, "Z", parent_id=a.id)
+        # A tiene X(0) Y(1) Z(2); sacar X a la raíz compacta a Y(0) Z(1).
+        await service.move_item(x.id, None, None)
+        assert await self._ordered_children(service, a.id) == ["Y", "Z"]
+
+    async def test_rejects_self_parent(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")
+        with pytest.raises(ValidationError):
+            await service.move_item(a.id, a.id, None)
+
+    async def test_rejects_move_into_own_descendant(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")
+        child = await _item(service, t.id, "Hijo", parent_id=a.id)
+        with pytest.raises(ValidationError):
+            await service.move_item(a.id, child.id, None)
+
+    async def test_respects_nesting_rules(self, service):
+        t_allowed = await _tipo(service, "Permitido")
+        t_forbidden = await _tipo(service, "Prohibido")
+        t_parent = await _tipo(
+            service, "Padre", reglas={"tipos_hijos_permitidos": [str(t_allowed.id)]}
+        )
+        parent = await _item(service, t_parent.id, "Padre 1")
+        orphan = await _item(service, t_forbidden.id, "Huérfano")
+        with pytest.raises(ValidationError):
+            await service.move_item(orphan.id, parent.id, None)
+
+
+class TestShiftSubtree:
+    async def _dated(self, service, tipo_id, nombre, inicio, fin, parent_id=None):
+        return await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=tipo_id,
+                nombre=nombre,
+                parent_id=parent_id,
+                fecha_inicio_plan=inicio,
+                fecha_fin_plan=fin,
+            ),
+        )
+
+    async def test_shifts_whole_subtree_forward(self, service):
+        t = await _tipo(service, "Nodo")
+        root = await self._dated(service, t.id, "R", D(2026, 1, 1), D(2026, 1, 10))
+        child = await self._dated(
+            service, t.id, "C", D(2026, 1, 3), D(2026, 1, 8), parent_id=root.id
+        )
+
+        resp, ids = await service.shift_subtree(root.id, 5)
+
+        assert set(ids) == {root.id, child.id}
+        assert resp.fecha_inicio_plan == D(2026, 1, 6)
+        assert resp.fecha_fin_plan == D(2026, 1, 15)
+        moved_child = await service.get_item(child.id)
+        assert moved_child.fecha_inicio_plan == D(2026, 1, 8)
+        assert moved_child.fecha_fin_plan == D(2026, 1, 13)
+
+    async def test_negative_offset_moves_back(self, service):
+        t = await _tipo(service, "Nodo")
+        root = await self._dated(service, t.id, "R", D(2026, 3, 10), D(2026, 3, 20))
+        resp, _ = await service.shift_subtree(root.id, -4)
+        assert resp.fecha_inicio_plan == D(2026, 3, 6)
+
+    async def test_zero_offset_is_noop(self, service):
+        t = await _tipo(service, "Nodo")
+        root = await self._dated(service, t.id, "R", D(2026, 1, 1), D(2026, 1, 10))
+        resp, _ = await service.shift_subtree(root.id, 0)
+        assert resp.fecha_inicio_plan == D(2026, 1, 1)
+
+    async def test_leaves_siblings_outside_subtree_untouched(self, service):
+        t = await _tipo(service, "Nodo")
+        root = await self._dated(service, t.id, "R", D(2026, 1, 1), D(2026, 1, 10))
+        sibling = await self._dated(service, t.id, "S", D(2026, 1, 1), D(2026, 1, 10))
+        await service.shift_subtree(root.id, 7)
+        unchanged = await service.get_item(sibling.id)
+        assert unchanged.fecha_inicio_plan == D(2026, 1, 1)

@@ -18,15 +18,23 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   MoreVertical,
+  GripVertical,
+  CornerLeftUp,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { getErrorMessage } from "@/utils/get-error-message";
 import {
   useWorkTree,
   useNodeTypes,
   useDeleteWorkItem,
   useCreateNodeType,
+  useUpdateNodeType,
+  useDeleteNodeType,
+  useMoveWorkItem,
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
 import { WorkItemModal } from "./WorkItemModal";
@@ -34,6 +42,24 @@ import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
 import { NodeTasksModal } from "./NodeTasksModal";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
+
+// Zona de suelta dentro de una fila: reordenar como hermano (antes/después) o
+// anidar dentro del nodo destino.
+type DropPos = "before" | "inside" | "after";
+
+/** Deriva la zona de suelta según dónde cae el puntero en la fila destino:
+ * tercio superior = antes, inferior = después, centro = dentro. */
+function dropPosFromEvent(e: { clientY: number; currentTarget: Element }): DropPos {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  if (y < rect.height * 0.3) {
+    return "before";
+  }
+  if (y > rect.height * 0.7) {
+    return "after";
+  }
+  return "inside";
+}
 
 function fmt(iso: string | null): string {
   if (!iso) {
@@ -96,6 +122,30 @@ function descendantCount(node: WorkItemTree): number {
   return node.children.reduce((total, child) => total + 1 + descendantCount(child), 0);
 }
 
+/** Encuentra un nodo por id en el árbol (DFS). */
+function findNode(nodes: WorkItemTree[], id: string): WorkItemTree | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node;
+    }
+    const found = findNode(node.children, id);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+/** Ids del nodo y todos sus descendientes: destinos inválidos para soltarlo
+ * (no puede anidarse dentro de sí mismo ni de un descendiente → ciclo). */
+function subtreeIds(node: WorkItemTree, acc = new Set<string>()): Set<string> {
+  acc.add(node.id);
+  for (const child of node.children) {
+    subtreeIds(child, acc);
+  }
+  return acc;
+}
+
 /** Nº total de elementos en una lista de árboles (raíces + descendientes). */
 function totalNodes(nodes: WorkItemTree[]): number {
   return nodes.reduce((total, node) => total + 1 + descendantCount(node), 0);
@@ -114,7 +164,7 @@ interface NodeAction {
  * con `fixed` anclado al botón, así no lo recorta el scroll del contenedor. */
 function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
   function toggle() {
@@ -124,7 +174,18 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
     }
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect) {
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      // Altura aproximada del menú (ítems + padding). Si no cabe debajo del
+      // botón (fila cerca del borde inferior de la ventana, ej. al hacer
+      // scroll hasta el final de la lista), lo abrimos hacia arriba en vez de
+      // dejarlo renderizar fuera del viewport (donde queda inalcanzable).
+      const estimatedHeight = actions.length * 34 + 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUpward = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+      setPos({
+        top: openUpward ? undefined : rect.bottom + 4,
+        bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+        right: window.innerWidth - rect.right,
+      });
     }
     setOpen(true);
   }
@@ -158,8 +219,8 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
           />
           <div
             role="menu"
-            style={{ position: "fixed", top: pos.top, right: pos.right }}
-            className="z-50 flex w-48 flex-col rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100 dark:border-slate-700 dark:bg-slate-900"
+            style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right }}
+            className="z-50 flex max-h-[70vh] w-48 flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100 dark:border-slate-700 dark:bg-slate-900"
           >
             {actions.map(({ label, icon: Icon, onClick, danger }) => (
               <button
@@ -227,6 +288,14 @@ interface TreeNodeProps {
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
   activeTypeIds: Set<string>;
+  // ── Drag & drop para recolocar nodos ──
+  draggingId: string | null;
+  dropTarget: { id: string; pos: DropPos } | null;
+  invalidDropIds: Set<string>;
+  onDragStartNode: (id: string) => void;
+  onDragEndNode: () => void;
+  onDragOverNode: (id: string, pos: DropPos) => void;
+  onDropNode: (id: string, pos: DropPos) => void;
 }
 
 function TreeNode({
@@ -242,6 +311,13 @@ function TreeNode({
   onDelete,
   onTasks,
   activeTypeIds,
+  draggingId,
+  dropTarget,
+  invalidDropIds,
+  onDragStartNode,
+  onDragEndNode,
+  onDragOverNode,
+  onDropNode,
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
   const style = tipoStyle(node.tipo_id);
@@ -249,6 +325,12 @@ function TreeNode({
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
   const nodeDimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
+  // ¿Este nodo es un destino de suelta válido, y en qué zona?
+  const isDragging = draggingId === node.id;
+  const dropPos =
+    dropTarget?.id === node.id && draggingId != null && !invalidDropIds.has(node.id)
+      ? dropTarget.pos
+      : null;
 
   const nameSize =
     depth === 0
@@ -266,11 +348,48 @@ function TreeNode({
       )}
     >
       <div
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = "move";
+          // Firefox exige datos en el dataTransfer para iniciar el arrastre.
+          e.dataTransfer.setData("text/plain", node.id);
+          onDragStartNode(node.id);
+        }}
+        onDragEnd={onDragEndNode}
+        onDragOver={(e) => {
+          // Solo permitimos soltar en destinos válidos (evita el cursor "no-drop"
+          // sobre uno mismo o un descendiente).
+          if (draggingId == null || invalidDropIds.has(node.id)) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          onDragOverNode(node.id, dropPosFromEvent(e));
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDropNode(node.id, dropPosFromEvent(e));
+        }}
         className={cn(
-          "group flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
+          "group relative flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
           nodeDimmed && "opacity-40",
+          isDragging && "opacity-40",
+          dropPos === "inside" && "rounded-lg ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
         )}
       >
+        {/* Indicadores de reordenamiento (soltar antes/después como hermano). */}
+        {dropPos === "before" && (
+          <div className="absolute inset-x-0 top-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+        )}
+        {dropPos === "after" && (
+          <div className="absolute inset-x-0 bottom-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+        )}
+        <GripVertical
+          className="size-4 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden
+        />
         <button
           onClick={() => {
             onToggle(node.id);
@@ -325,6 +444,28 @@ function TreeNode({
             </div>
           )}
           <DateBadge node={node} />
+          {/* Acciones rápidas (editar/eliminar) visibles al hover, además del
+              menú kebab con el resto de opciones. */}
+          <button
+            onClick={() => {
+              onEdit(node);
+            }}
+            title="Editar tipo y datos del elemento"
+            aria-label={`Editar ${node.nombre}`}
+            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              onDelete(node);
+            }}
+            title="Eliminar elemento"
+            aria-label={`Eliminar ${node.nombre}`}
+            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
           {/* Acción rápida (añadir dentro) visible al hover + resto en el menú.
               Un solo botón por fila mantiene limpia la vista con muchos nodos. */}
           <button
@@ -346,13 +487,6 @@ function TreeNode({
                 },
               },
               {
-                label: "Editar",
-                icon: Pencil,
-                onClick: () => {
-                  onEdit(node);
-                },
-              },
-              {
                 label: "Ordenar (dependencias)",
                 icon: Link2,
                 onClick: () => {
@@ -371,14 +505,6 @@ function TreeNode({
                 icon: Copy,
                 onClick: () => {
                   onClone(node);
-                },
-              },
-              {
-                label: "Eliminar",
-                icon: Trash2,
-                danger: true,
-                onClick: () => {
-                  onDelete(node);
                 },
               },
             ]}
@@ -403,11 +529,162 @@ function TreeNode({
               onDelete={onDelete}
               onTasks={onTasks}
               activeTypeIds={activeTypeIds}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              invalidDropIds={invalidDropIds}
+              onDragStartNode={onDragStartNode}
+              onDragEndNode={onDragEndNode}
+              onDragOverNode={onDragOverNode}
+              onDropNode={onDropNode}
             />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** Chip de un tipo de nodo: filtra al hacer click; al pasar el mouse muestra
+ * lápiz/basura para editar el nombre o eliminarlo (con confirmación). */
+function TypeChip({
+  tipo,
+  active,
+  dimmed,
+  onToggle,
+  onRename,
+  onRequestDelete,
+}: {
+  tipo: TipoNodo;
+  active: boolean;
+  dimmed: boolean;
+  onToggle: () => void;
+  onRename: (nombre: string) => Promise<void>;
+  onRequestDelete: () => void;
+}) {
+  const style = tipoStyle(tipo.id);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(tipo.nombre);
+  const [saving, setSaving] = useState(false);
+  // Editar/eliminar solo aparecen al hacer click en el chip (no al pasar el
+  // mouse); un click fuera los oculta de nuevo.
+  const [showActions, setShowActions] = useState(false);
+
+  async function save() {
+    const trimmed = name.trim();
+    if (trimmed.length < 1 || trimmed === tipo.nombre) {
+      setEditing(false);
+      setName(tipo.nombre);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRename(trimmed);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="flex items-center gap-1">
+        <input
+          autoFocus
+          value={name}
+          disabled={saving}
+          onChange={(e) => {
+            setName(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              void save();
+            }
+            if (e.key === "Escape") {
+              setEditing(false);
+              setName(tipo.nombre);
+            }
+          }}
+          className="w-28 rounded-full border border-border bg-background px-3 py-1 text-[12.5px] outline-none focus:border-brand-blue"
+        />
+        <button
+          onClick={() => void save()}
+          disabled={saving}
+          className="text-[12.5px] font-bold text-brand-teal hover:text-brand-teal-dark hover:underline disabled:opacity-50"
+        >
+          ok
+        </button>
+        <button
+          onClick={() => {
+            setEditing(false);
+            setName(tipo.nombre);
+          }}
+          className="text-[12.5px] text-muted-foreground hover:underline"
+        >
+          cancelar
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "relative flex items-center gap-1 rounded-full border-[1.5px] pl-3 pr-1 py-1 text-[12.5px] font-bold transition-opacity",
+        style.chip,
+        active ? "border-current" : "border-transparent",
+        dimmed && "opacity-40",
+      )}
+    >
+      {showActions && (
+        <button
+          type="button"
+          aria-label="Cerrar acciones del tipo"
+          className="fixed inset-0 z-40 cursor-default"
+          onClick={() => {
+            setShowActions(false);
+          }}
+        />
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          onToggle();
+          setShowActions((prev) => !prev);
+        }}
+        title="Filtrar por este tipo / mostrar acciones"
+        className="relative z-50"
+      >
+        {tipo.nombre}
+      </button>
+      {showActions && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setShowActions(false);
+              setEditing(true);
+            }}
+            title={`Editar «${tipo.nombre}»`}
+            aria-label={`Editar tipo ${tipo.nombre}`}
+            className="relative z-50 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+          >
+            <Pencil className="size-2.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowActions(false);
+              onRequestDelete();
+            }}
+            title={`Eliminar «${tipo.nombre}»`}
+            aria-label={`Eliminar tipo ${tipo.nombre}`}
+            className="relative z-50 rounded-full p-0.5 hover:bg-rose-500/20 hover:text-rose-600"
+          >
+            <Trash2 className="size-2.5" />
+          </button>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -423,8 +700,11 @@ function NodeTypesBar({
   onToggleType: (id: string) => void;
 }) {
   const createType = useCreateNodeType(projectId);
+  const updateType = useUpdateNodeType(projectId);
+  const deleteType = useDeleteNodeType(projectId);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<TipoNodo | null>(null);
 
   async function add() {
     if (name.trim().length < 1) {
@@ -440,29 +720,47 @@ function NodeTypesBar({
       <span className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground">
         <Tag className="size-3" /> Tipos
       </span>
-      {types.map((t) => {
-        const style = tipoStyle(t.id);
-        const active = activeTypeIds.has(t.id);
-        return (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              onToggleType(t.id);
-            }}
-            aria-pressed={active}
-            title="Filtrar / atenuar por este tipo"
-            className={cn(
-              "rounded-full border-[1.5px] px-3 py-1 text-[12.5px] font-bold transition-opacity",
-              style.chip,
-              active ? "border-current" : "border-transparent",
-              activeTypeIds.size > 0 && !active && "opacity-40",
-            )}
-          >
-            {t.nombre}
-          </button>
-        );
-      })}
+      {types.map((t) => (
+        <TypeChip
+          key={t.id}
+          tipo={t}
+          active={activeTypeIds.has(t.id)}
+          dimmed={activeTypeIds.size > 0 && !activeTypeIds.has(t.id)}
+          onToggle={() => {
+            onToggleType(t.id);
+          }}
+          onRename={async (nombre) => {
+            await updateType.mutateAsync({ typeId: t.id, payload: { nombre } });
+          }}
+          onRequestDelete={() => {
+            setDeleteTarget(t);
+          }}
+        />
+      ))}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar tipo"
+          message={`Se eliminará el tipo «${deleteTarget.nombre}». Los elementos que ya lo usan lo perderán (se mostrarán como "elemento" genérico). ¿Continuar?`}
+          confirmLabel="Eliminar"
+          destructive
+          loading={deleteType.isPending}
+          errorMessage={
+            deleteType.isError
+              ? getErrorMessage(deleteType.error, "No se pudo eliminar el tipo")
+              : null
+          }
+          onConfirm={() => {
+            deleteType.mutate(deleteTarget.id, {
+              onSuccess: () => {
+                setDeleteTarget(null);
+              },
+            });
+          }}
+          onCancel={() => {
+            setDeleteTarget(null);
+          }}
+        />
+      )}
       {adding ? (
         <span className="flex items-center gap-1">
           <input
@@ -564,17 +862,24 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const deleteItem = useDeleteWorkItem(projectId);
+  const moveItem = useMoveWorkItem(projectId);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
   const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
   const [tasksNode, setTasksNode] = useState<WorkItemTree | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkItemTree | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"arbol" | "lista">("arbol");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(new Set());
+  // Drag & drop para recolocar nodos: reordenar entre hermanos (before/after) o
+  // anidar dentro de otro (inside).
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
   const typeNameById = useMemo(() => {
@@ -634,8 +939,92 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   }
 
   function handleDelete(node: WorkItemTree) {
-    if (window.confirm(`¿Eliminar “${node.nombre}” y todo su contenido?`)) {
-      deleteItem.mutate(node.id);
+    setDeleteTarget(node);
+  }
+
+  // Destinos inválidos mientras se arrastra: el propio nodo y sus descendientes
+  // (soltarlo ahí crearía un ciclo). Vacío cuando no se arrastra nada.
+  const invalidDropIds = useMemo(() => {
+    const empty = new Set<string>();
+    if (!draggingId) {
+      return empty;
+    }
+    const dragged = findNode(tree, draggingId);
+    return dragged ? subtreeIds(dragged) : empty;
+  }, [draggingId, tree]);
+
+  function resetDrag() {
+    setDraggingId(null);
+    setDropTarget(null);
+  }
+
+  /** Suelta el nodo arrastrado sobre `targetId`, reordenando (before/after entre
+   * hermanos) o anidando (inside). El índice se calcula EXCLUYENDO al movido,
+   * igual que el backend, para que la posición sea exacta. */
+  function handleDropOn(targetId: string, pos: DropPos) {
+    const itemId = draggingId;
+    resetDrag();
+    if (!itemId) {
+      return;
+    }
+    if (invalidDropIds.has(targetId)) {
+      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+      return;
+    }
+    const target = findNode(tree, targetId);
+    if (!target) {
+      return;
+    }
+    if (pos === "inside") {
+      moveItem.mutate(
+        { itemId, payload: { new_parent_id: targetId } },
+        {
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
+          },
+        },
+      );
+      return;
+    }
+    const parentId = target.parent_id ?? null;
+    // No se puede colocar como hermano si el padre está dentro del subárbol movido.
+    if (parentId != null && invalidDropIds.has(parentId)) {
+      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+      return;
+    }
+    const siblings = (parentId ? (findNode(tree, parentId)?.children ?? []) : tree).filter(
+      (s) => s.id !== itemId,
+    );
+    let index = siblings.findIndex((s) => s.id === targetId);
+    if (index < 0) {
+      index = siblings.length;
+    }
+    if (pos === "after") {
+      index += 1;
+    }
+    moveItem.mutate(
+      { itemId, payload: { new_parent_id: parentId, orden: index } },
+      {
+        onError: (err) => {
+          setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
+        },
+      },
+    );
+  }
+
+  /** Suelta en la zona "nivel principal": mueve a la raíz al final. */
+  function handleDropRoot() {
+    const itemId = draggingId;
+    resetDrag();
+    if (itemId) {
+      moveItem.mutate(
+        { itemId, payload: { new_parent_id: null } },
+        {
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
+          },
+        },
+      );
     }
   }
 
@@ -742,6 +1131,26 @@ export function StructurePanel({ projectId }: { projectId: string }) {
         onToggleType={toggleType}
       />
 
+      {moveError && (
+        <div
+          role="alert"
+          className="flex shrink-0 items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <p className="flex-1">{moveError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setMoveError(null);
+            }}
+            aria-label="Cerrar aviso"
+            className="rounded-md p-0.5 text-rose-500 transition-colors hover:bg-rose-100 dark:hover:bg-rose-900/40"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {treeQuery.isLoading ? (
         <div className="min-h-[400px] flex-1 animate-pulse rounded-2xl bg-accent" />
       ) : tree.length === 0 ? (
@@ -774,6 +1183,28 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
+            {/* Zona para soltar un nodo en el nivel principal (des-anidar). Solo
+                aparece mientras se arrastra algo que aún no está en la raíz. */}
+            {draggingId != null && findNode(tree, draggingId)?.parent_id != null && (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropTarget({ id: "__root__", pos: "inside" });
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDropRoot();
+                }}
+                className={cn(
+                  "m-2 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-2 text-xs font-semibold transition-colors",
+                  dropTarget?.id === "__root__"
+                    ? "border-brand-teal bg-brand-teal/5 text-brand-teal-dark dark:text-brand-teal"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                <CornerLeftUp className="size-3.5" /> Soltar aquí para mover al nivel principal
+              </div>
+            )}
             {visibleTree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode
@@ -799,6 +1230,15 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setTasksNode(n);
                   }}
                   activeTypeIds={activeTypeIds}
+                  draggingId={draggingId}
+                  dropTarget={dropTarget}
+                  invalidDropIds={invalidDropIds}
+                  onDragStartNode={setDraggingId}
+                  onDragEndNode={resetDrag}
+                  onDragOverNode={(id, pos) => {
+                    setDropTarget({ id, pos });
+                  }}
+                  onDropNode={handleDropOn}
                 />
               </div>
             ))}
@@ -821,7 +1261,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
         <WorkItemModal
           projectId={projectId}
           editItem={editItem}
-          parent={null}
+          parent={editItem.parent_id ? findNode(tree, editItem.parent_id) : null}
           nodeTypes={types}
           onClose={() => {
             setEditItem(null);
@@ -857,6 +1297,31 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           node={tasksNode}
           onClose={() => {
             setTasksNode(null);
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar elemento"
+          message={`Se eliminará “${deleteTarget.nombre}” y todo su contenido (elementos y tareas dentro de él). Esta acción no se puede deshacer. ¿Continuar?`}
+          confirmLabel="Eliminar"
+          destructive
+          loading={deleteItem.isPending}
+          errorMessage={
+            deleteItem.isError
+              ? getErrorMessage(deleteItem.error, "No se pudo eliminar el elemento")
+              : null
+          }
+          onConfirm={() => {
+            deleteItem.mutate(deleteTarget.id, {
+              onSuccess: () => {
+                setDeleteTarget(null);
+              },
+            });
+          }}
+          onCancel={() => {
+            setDeleteTarget(null);
           }}
         />
       )}
