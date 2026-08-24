@@ -16,6 +16,7 @@ class FakeUser:
     last_name: str
     role: SystemRole
     is_active: bool
+    position: str = "sin_cargo"
     document_type: str | None = None
     document_number: str | None = None
 
@@ -45,6 +46,7 @@ class FakeIdentityRepository:
             last_name=user.last_name,
             role=user.role,
             is_active=True,
+            position=user.position,
             document_type=(user.document_type.value if user.document_type else None),
             document_number=user.document_number,
         )
@@ -63,9 +65,15 @@ class FakePositionRepository:
 
     def __init__(self, existing_keys: list[str] | None = None):
         self.existing_keys = set(existing_keys or ["sin_cargo", "desarrollador"])
+        self.added_keys: list[str] = []
 
     async def key_exists(self, key: str) -> bool:
         return key in self.existing_keys
+
+    async def add(self, position):
+        self.existing_keys.add(position.key)
+        self.added_keys.append(position.key)
+        return position
 
 
 @pytest.fixture
