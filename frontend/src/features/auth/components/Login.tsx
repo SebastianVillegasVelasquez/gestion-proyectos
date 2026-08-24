@@ -1,10 +1,10 @@
-import {type FormEvent, useEffect, useRef, useState} from "react";
-import {useLocation} from "react-router-dom";
-import type {LoginRequest} from "@/features/auth/types";
-import {type FieldName, validateField} from "@/features/auth/utils/security.utils.ts";
-import {useLogin} from "@/features/auth/hooks/use-auth";
-import {getErrorMessage} from "@/utils/get-error-message";
-import {AuthPanel} from "./AuthPanel";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import type { LoginRequest } from "@/features/auth/types";
+import { type FieldName, validateField } from "@/features/auth/utils/security.utils.ts";
+import { useLogin } from "@/features/auth/hooks/use-auth";
+import { getErrorMessage } from "@/utils/get-error-message";
+import { AuthPanel } from "./AuthPanel";
 
 type Errors = Partial<Record<FieldName, string>>;
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
     : null;
 
   useEffect((): void => {
-    console.error("Probando hot reload!!")
+    console.error("Probando hot reload!!");
     localStorage.setItem("obj-theme", dark ? "dark" : "light");
   }, [dark]);
 
