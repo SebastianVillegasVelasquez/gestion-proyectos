@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import {
   FolderTree,
   Plus,
@@ -13,8 +14,7 @@ import {
   Link2,
   ListChecks,
   Search,
-  ListTree,
-  List,
+  GanttChartSquare,
   ChevronsDownUp,
   ChevronsUpDown,
   MoreVertical,
@@ -67,24 +67,6 @@ function fmt(iso: string | null): string {
   }
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y.slice(2)}`;
-}
-
-/** Duración legible de un elemento. Usa la duración capturada si existe; si el
- * elemento se definió con fechas exactas (sin duración), la calcula a partir del
- * rango inicio→fin (en días, inclusivo) para que la lista nunca la deje vacía. */
-function durationLabel(node: WorkItemTree): string {
-  if (node.duracion_valor != null) {
-    return `${node.duracion_valor} ${node.duracion_unidad === "semanas" ? "sem" : "d"}`;
-  }
-  if (node.fecha_inicio_plan && node.fecha_fin_plan) {
-    const start = Date.parse(node.fecha_inicio_plan);
-    const end = Date.parse(node.fecha_fin_plan);
-    if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
-      const days = Math.round((end - start) / 86400000) + 1;
-      return `${days} d`;
-    }
-  }
-  return "—";
 }
 
 function nodeMatches(node: WorkItemTree, query: string): boolean {
@@ -287,7 +269,6 @@ interface TreeNodeProps {
   onClone: (node: WorkItemTree) => void;
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
-  activeTypeIds: Set<string>;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   dropTarget: { id: string; pos: DropPos } | null;
@@ -310,7 +291,6 @@ function TreeNode({
   onClone,
   onDelete,
   onTasks,
-  activeTypeIds,
   draggingId,
   dropTarget,
   invalidDropIds,
@@ -324,7 +304,6 @@ function TreeNode({
   const hasChildren = node.children.length > 0;
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
-  const nodeDimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
   // ¿Este nodo es un destino de suelta válido, y en qué zona?
   const isDragging = draggingId === node.id;
   const dropPos =
@@ -373,8 +352,7 @@ function TreeNode({
           onDropNode(node.id, dropPosFromEvent(e));
         }}
         className={cn(
-          "group relative flex items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
-          nodeDimmed && "opacity-40",
+          "group relative flex select-none items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
           isDragging && "opacity-40",
           dropPos === "inside" && "rounded-lg ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
         )}
@@ -528,7 +506,6 @@ function TreeNode({
               onClone={onClone}
               onDelete={onDelete}
               onTasks={onTasks}
-              activeTypeIds={activeTypeIds}
               draggingId={draggingId}
               dropTarget={dropTarget}
               invalidDropIds={invalidDropIds}
@@ -544,20 +521,15 @@ function TreeNode({
   );
 }
 
-/** Chip de un tipo de nodo: filtra al hacer click; al pasar el mouse muestra
- * lápiz/basura para editar el nombre o eliminarlo (con confirmación). */
+/** Chip de un tipo de nodo. Al hacer click revela lápiz/basura para renombrar o
+ * eliminarlo; un segundo click (o un click fuera) los oculta. No filtra el
+ * árbol: es solo gestión del catálogo (el filtro por tipo vive en el Cronograma). */
 function TypeChip({
   tipo,
-  active,
-  dimmed,
-  onToggle,
   onRename,
   onRequestDelete,
 }: {
   tipo: TipoNodo;
-  active: boolean;
-  dimmed: boolean;
-  onToggle: () => void;
   onRename: (nombre: string) => Promise<void>;
   onRequestDelete: () => void;
 }) {
@@ -565,8 +537,8 @@ function TypeChip({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(tipo.nombre);
   const [saving, setSaving] = useState(false);
-  // Editar/eliminar solo aparecen al hacer click en el chip (no al pasar el
-  // mouse); un click fuera los oculta de nuevo.
+  // Editar/eliminar solo aparecen al hacer click en el chip; un segundo click o
+  // un click fuera los oculta de nuevo.
   const [showActions, setShowActions] = useState(false);
 
   async function save() {
@@ -629,10 +601,9 @@ function TypeChip({
   return (
     <span
       className={cn(
-        "relative flex items-center gap-1 rounded-full border-[1.5px] pl-3 pr-1 py-1 text-[12.5px] font-bold transition-opacity",
+        "relative flex items-center gap-1 rounded-full border-[1.5px] pl-3 pr-1 py-1 text-[12.5px] font-bold",
         style.chip,
-        active ? "border-current" : "border-transparent",
-        dimmed && "opacity-40",
+        showActions ? "border-current" : "border-transparent",
       )}
     >
       {showActions && (
@@ -648,10 +619,9 @@ function TypeChip({
       <button
         type="button"
         onClick={() => {
-          onToggle();
           setShowActions((prev) => !prev);
         }}
-        title="Filtrar por este tipo / mostrar acciones"
+        title="Editar o eliminar este tipo"
         className="relative z-50"
       >
         {tipo.nombre}
@@ -688,17 +658,7 @@ function TypeChip({
   );
 }
 
-function NodeTypesBar({
-  projectId,
-  types,
-  activeTypeIds,
-  onToggleType,
-}: {
-  projectId: string;
-  types: TipoNodo[];
-  activeTypeIds: Set<string>;
-  onToggleType: (id: string) => void;
-}) {
+function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo[] }) {
   const createType = useCreateNodeType(projectId);
   const updateType = useUpdateNodeType(projectId);
   const deleteType = useDeleteNodeType(projectId);
@@ -724,11 +684,6 @@ function NodeTypesBar({
         <TypeChip
           key={t.id}
           tipo={t}
-          active={activeTypeIds.has(t.id)}
-          dimmed={activeTypeIds.size > 0 && !activeTypeIds.has(t.id)}
-          onToggle={() => {
-            onToggleType(t.id);
-          }}
           onRename={async (nombre) => {
             await updateType.mutateAsync({ typeId: t.id, payload: { nombre } });
           }}
@@ -794,71 +749,8 @@ function NodeTypesBar({
   );
 }
 
-/** Vista de lista: tabla plana (sin jerarquía visual) de todos los nodos, para
- * cuando el volumen de elementos hace incómodo navegar el árbol. */
-function ListRows({
-  nodes,
-  typeNameById,
-  activeTypeIds,
-}: {
-  nodes: WorkItemTree[];
-  typeNameById: Map<string, string>;
-  activeTypeIds: Set<string>;
-}) {
-  const rows: WorkItemTree[] = [];
-  const collect = (list: WorkItemTree[]) => {
-    for (const n of list) {
-      rows.push(n);
-      collect(n.children);
-    }
-  };
-  collect(nodes);
-
-  return (
-    <table className="w-full text-left text-sm">
-      <thead className="sticky top-0 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
-        <tr>
-          <th className="px-4 py-3">Nombre</th>
-          <th className="px-4 py-3">Tipo</th>
-          <th className="px-4 py-3">Fechas</th>
-          <th className="px-4 py-3">Duración</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((node) => {
-          const style = tipoStyle(node.tipo_id);
-          const dimmed = activeTypeIds.size > 0 && !activeTypeIds.has(node.tipo_id);
-          return (
-            <tr
-              key={node.id}
-              className={cn("border-b border-accent/60 last:border-0", dimmed && "opacity-40")}
-            >
-              <td className="px-4 py-2.5 font-semibold text-foreground">{node.nombre}</td>
-              <td className="px-4 py-2.5">
-                <span
-                  className={cn(
-                    "rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider",
-                    style.chip,
-                  )}
-                >
-                  {typeNameById.get(node.tipo_id) ?? "elemento"}
-                </span>
-              </td>
-              <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                {node.fecha_inicio_plan || node.fecha_fin_plan
-                  ? `${fmt(node.fecha_inicio_plan)} → ${fmt(node.fecha_fin_plan)}`
-                  : "—"}
-              </td>
-              <td className="px-4 py-2.5 text-xs text-muted-foreground">{durationLabel(node)}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
 export function StructurePanel({ projectId }: { projectId: string }) {
+  const navigate = useNavigate();
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const deleteItem = useDeleteWorkItem(projectId);
@@ -873,9 +765,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [moveError, setMoveError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"arbol" | "lista">("arbol");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(new Set());
   // Drag & drop para recolocar nodos: reordenar entre hermanos (before/after) o
   // anidar dentro de otro (inside).
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -911,18 +801,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       return;
     }
     setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const toggleType = (id: string) => {
-    setActiveTypeIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -1030,7 +908,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Toolbar: buscador, vista árbol/lista, colapsar-expandir todo, + añadir */}
+      {/* Toolbar: buscador, colapsar-expandir todo, + añadir, ir al cronograma */}
       <div className="flex shrink-0 flex-wrap items-center gap-2.5">
         <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1046,62 +924,25 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           />
         </div>
 
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setView("arbol");
-            }}
-            aria-pressed={view === "arbol"}
-            aria-label="Vista de árbol"
-            className={cn(
-              "flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-colors",
-              view === "arbol"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ListTree className="size-3.5" /> Árbol
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setView("lista");
-            }}
-            aria-pressed={view === "lista"}
-            aria-label="Vista de lista"
-            className={cn(
-              "flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-colors",
-              view === "lista"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <List className="size-3.5" /> Lista
-          </button>
-        </div>
-
-        {view === "arbol" && (
-          <button
-            type="button"
-            onClick={() => {
-              setCollapsedIds((prev) =>
-                prev.size > 0 ? new Set() : collectParentIds(tree, new Set()),
-              );
-            }}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            {collapsedIds.size > 0 ? (
-              <>
-                <ChevronsUpDown className="size-3.5" /> Expandir todo
-              </>
-            ) : (
-              <>
-                <ChevronsDownUp className="size-3.5" /> Colapsar todo
-              </>
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setCollapsedIds((prev) =>
+              prev.size > 0 ? new Set() : collectParentIds(tree, new Set()),
+            );
+          }}
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          {collapsedIds.size > 0 ? (
+            <>
+              <ChevronsUpDown className="size-3.5" /> Expandir todo
+            </>
+          ) : (
+            <>
+              <ChevronsDownUp className="size-3.5" /> Colapsar todo
+            </>
+          )}
+        </button>
 
         {totalCount > 0 && (
           <span className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-muted-foreground">
@@ -1121,15 +962,19 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           >
             <Plus className="size-4" /> Añadir elemento
           </button>
+          {/* Acceso directo al cronograma (misma navegación que la card de
+              secciones del proyecto). */}
+          <button
+            type="button"
+            onClick={() => void navigate(`/projects/${projectId}/gantt`)}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+          >
+            <GanttChartSquare className="size-4 text-brand-teal" /> Cronograma
+          </button>
         </div>
       </div>
 
-      <NodeTypesBar
-        projectId={projectId}
-        types={types}
-        activeTypeIds={activeTypeIds}
-        onToggleType={toggleType}
-      />
+      <NodeTypesBar projectId={projectId} types={types} />
 
       {moveError && (
         <div
@@ -1170,16 +1015,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           <Search className="size-6 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Ningún elemento coincide con «{search}».</p>
         </div>
-      ) : view === "lista" ? (
-        <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
-          <CardContent className="flex-1 overflow-auto p-0">
-            <ListRows
-              nodes={visibleTree}
-              typeNameById={typeNameById}
-              activeTypeIds={activeTypeIds}
-            />
-          </CardContent>
-        </Card>
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
@@ -1229,7 +1064,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onTasks={(n) => {
                     setTasksNode(n);
                   }}
-                  activeTypeIds={activeTypeIds}
                   draggingId={draggingId}
                   dropTarget={dropTarget}
                   invalidDropIds={invalidDropIds}
