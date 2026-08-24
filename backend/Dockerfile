@@ -71,7 +71,7 @@ CMD ["./entrypoint.sh"]
 # Development image for the backend
 FROM base AS dev
 
-# Sets a ENV variable to indicate the entropint is starting to --reload
+# Enables Uvicorn auto-reload for development
 ENV UVICORN_RELOAD=true
 
 USER appuser
