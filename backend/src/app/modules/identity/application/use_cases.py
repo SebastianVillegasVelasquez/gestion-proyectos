@@ -3,6 +3,7 @@ from uuid import UUID
 
 from jose import JWTError
 
+import re
 import secrets
 import string
 
@@ -18,7 +19,6 @@ from pydantic import ValidationError
 from app.modules.identity.domain.services import UserService
 from app.modules.identity.infrastructure.enums import DocumentType, SystemRole
 from app.modules.identity.infrastructure.models import Position
-from app.shared.authz import can_assign_role
 from app.modules.identity.presentation.schemas import (
     BulkCreatedUser,
     BulkCreateUsersResponse,
@@ -51,6 +51,16 @@ def _generate_temp_password(length: int = 12) -> str:
         pwd = "".join(secrets.choice(alphabet) for _ in range(length))
         if any(c.isdigit() for c in pwd) and any(c.isalpha() for c in pwd):
             return pwd
+
+
+def _slugify_position_key(label: str) -> str:
+    """Deriva una clave estable (minúsculas, snake_case) a partir del cargo
+    tal cual viene escrito en el CSV, para que filas con el mismo cargo
+    (aunque varíe en mayúsculas/espacios) apunten a un único registro."""
+    normalized = re.sub(r"\s+", "_", label.strip().lower())
+    normalized = re.sub(r"[^a-záéíóúñ0-9_]", "", normalized)
+    normalized = normalized.strip("_") or "sin_cargo"
+    return normalized[:64]
 
 
 def _token_response(user) -> TokenResponse:
@@ -300,12 +310,17 @@ class BulkCreateUsersUseCase:
     """Alta masiva desde un CSV: el primer uso de la plataforma puede traer
     decenas de personas de una vez.
 
+    Todo usuario cargado por este canal nace con rol `user` (el CSV no trae
+    columna de rol: los roles de administración se asignan a mano después).
+    Si el cargo de una fila no existe todavía en el catálogo, se crea sobre
+    la marcha en vez de rechazar la fila.
+
     Procesamos cada fila de forma independiente (best effort): una fila mala
-    (correo repetido, cargo inexistente, rol inválido) queda reportada en
-    `failed` con el motivo, pero no bloquea la creación del resto del archivo.
+    (correo repetido, documento repetido) queda reportada en `failed` con el
+    motivo, pero no bloquea la creación del resto del archivo.
     """
 
-    REQUIRED_COLUMNS = ("email", "name", "last_name")
+    REQUIRED_COLUMNS = ("email", "nombre", "apellido")
 
     def __init__(
         self,
@@ -317,6 +332,14 @@ class BulkCreateUsersUseCase:
         self.position_repo = position_repo
         self.user_service = UserService(user_repo)
         self.event_bus = event_bus
+
+    async def _resolve_position_key(self, cargo_raw: str) -> str:
+        """Devuelve la clave de un cargo existente, creándolo si hace falta."""
+        cargo_label = cargo_raw.strip() or "Sin cargo"
+        key = _slugify_position_key(cargo_label)
+        if not await self.position_repo.key_exists(key):
+            await self.position_repo.add(Position(key=key, label=cargo_label))
+        return key
 
     async def execute(
         self, rows: list[dict[str, str]], actor_role: str
@@ -334,36 +357,14 @@ class BulkCreateUsersUseCase:
                 if not await self.user_repo.is_email_available(email):
                     raise ValueError("El correo ya se encuentra registrado")
 
-                document_number = (row.get("document_number") or "").strip() or None
-                if document_number and not await self.user_repo.is_document_available(
-                    document_number
-                ):
+                cedula = (row.get("cedula") or "").strip() or None
+                if cedula and not await self.user_repo.is_document_available(cedula):
                     raise ValueError("El documento ya está registrado")
+                document_type = DocumentType.CEDULA_CIUDADANIA if cedula else None
 
-                position_key = (row.get("position") or "sin_cargo").strip()
-                if not await self.position_repo.key_exists(position_key):
-                    raise ValueError(f"El cargo '{position_key}' no existe")
-
-                role_raw = (row.get("role") or "user").strip()
-                try:
-                    role = SystemRole(role_raw)
-                except ValueError:
-                    raise ValueError(f"El rol '{role_raw}' no es válido")
-
-                if not can_assign_role(actor_role, role):
-                    raise ValueError(
-                        "Solo un super_admin puede asignar el rol super_admin"
-                    )
-
-                document_type_raw = (row.get("document_type") or "").strip()
-                try:
-                    document_type = (
-                        DocumentType(document_type_raw) if document_type_raw else None
-                    )
-                except ValueError:
-                    raise ValueError(
-                        f"El tipo de documento '{document_type_raw}' no es válido"
-                    )
+                position_key = await self._resolve_position_key(
+                    row.get("cargo") or "sin_cargo"
+                )
 
                 raw_password = (row.get("password") or "").strip()
                 generated_password = not raw_password
@@ -372,12 +373,12 @@ class BulkCreateUsersUseCase:
                 data = CreateUserRequest(
                     email=email,
                     password=password,
-                    name=row["name"].strip(),
-                    last_name=row["last_name"].strip(),
-                    role=role,
+                    name=row["nombre"].strip(),
+                    last_name=row["apellido"].strip(),
+                    role=SystemRole.USER,
                     position=position_key,
                     document_type=document_type,
-                    document_number=document_number,
+                    document_number=cedula,
                 )
                 user = await self.user_service.create_user(data)
 

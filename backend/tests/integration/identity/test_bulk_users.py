@@ -8,9 +8,9 @@ def _csv_file(content: str, filename: str = "users.csv"):
 class TestBulkCreateUsers:
     async def test_creates_every_valid_row(self, client, admin_headers):
         csv_content = (
-            "email,name,last_name,role,position\n"
-            "ana@example.com,Ana,Garcia,user,desarrollador\n"
-            "carlos@example.com,Carlos,Lopez,admin,sin_cargo\n"
+            "email,nombre,apellido,cargo\n"
+            "ana@example.com,Ana,Garcia,desarrollador\n"
+            "carlos@example.com,Carlos,Lopez,sin_cargo\n"
         )
 
         response = await client.post(
@@ -43,15 +43,10 @@ class TestBulkCreateUsers:
         )
         assert login.status_code == 200
 
-    async def test_partial_failure_does_not_block_valid_rows(
-        self, client, admin_headers, member_user
-    ):
+    async def test_unknown_cargo_is_created_on_the_fly(self, client, admin_headers):
         csv_content = (
-            "email,name,last_name,role,position\n"
-            "valido@example.com,Valid,Row,user,desarrollador\n"
-            f"{member_user.email},Repetido,Correo,user,desarrollador\n"
-            "sinCargo@example.com,Sin,Cargo,user,cargo_no_existe\n"
-            "rolinvalido@example.com,Rol,Invalido,superusuario,desarrollador\n"
+            "email,nombre,apellido,cargo\n"
+            "nuevo.cargo@example.com,Nueva,Persona,Cargo Nunca Visto\n"
         )
 
         response = await client.post(
@@ -62,21 +57,58 @@ class TestBulkCreateUsers:
 
         assert response.status_code == 201, response.text
         body = response.json()
-        assert body["total_rows"] == 4
+        assert body["failed"] == []
         assert len(body["created"]) == 1
-        assert body["created"][0]["email"] == "valido@example.com"
-        assert len(body["failed"]) == 3
-        failed_emails = {f["email"] for f in body["failed"]}
-        assert failed_emails == {
-            member_user.email,
-            "sinCargo@example.com",
-            "rolinvalido@example.com",
-        }
+
+        positions = await client.get(
+            "/api/v1/identity/positions", headers=admin_headers
+        )
+        keys = {p["value"] for p in positions.json()}
+        assert "cargo_nunca_visto" in keys
+
+    async def test_cedula_is_optional(self, client, admin_headers):
+        csv_content = "email,nombre,apellido\nsincedula@example.com,Sin,Cedula\n"
+
+        response = await client.post(
+            "/api/v1/identity/users/bulk",
+            files=_csv_file(csv_content),
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["failed"] == []
+        assert len(body["created"]) == 1
+
+    async def test_partial_failure_does_not_block_valid_rows(
+        self, client, admin_headers, member_user
+    ):
+        csv_content = (
+            "email,nombre,apellido,cedula\n"
+            "valido@example.com,Valid,Row,\n"
+            f"{member_user.email},Repetido,Correo,\n"
+            "cedularepetida@example.com,Cedula,Repetida,111222333\n"
+        )
+
+        response = await client.post(
+            "/api/v1/identity/users/bulk",
+            files=_csv_file(csv_content),
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["total_rows"] == 3
+        assert len(body["created"]) == 2
+        created_emails = {u["email"] for u in body["created"]}
+        assert created_emails == {"valido@example.com", "cedularepetida@example.com"}
+        assert len(body["failed"]) == 1
+        assert body["failed"][0]["email"] == member_user.email
 
     async def test_uses_password_from_csv_when_present(self, client, admin_headers):
         csv_content = (
-            "email,name,last_name,role,position,password\n"
-            "conpassword@example.com,Con,Password,user,desarrollador,Passw0rd1\n"
+            "email,nombre,apellido,cargo,password\n"
+            "conpassword@example.com,Con,Password,desarrollador,Passw0rd1\n"
         )
 
         response = await client.post(
@@ -95,16 +127,38 @@ class TestBulkCreateUsers:
         )
         assert login.status_code == 200
 
+    async def test_bulk_created_user_always_has_user_role(self, client, admin_headers):
+        csv_content = "email,nombre,apellido\nsiemprerol@example.com,Siempre,Rol\n"
+
+        response = await client.post(
+            "/api/v1/identity/users/bulk",
+            files=_csv_file(csv_content),
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201, response.text
+        users = await client.get(
+            "/api/v1/identity/users/manage",
+            params={"search": "siemprerol@example.com"},
+            headers=admin_headers,
+        )
+        matches = [
+            u for u in users.json()["items"] if u["email"] == "siemprerol@example.com"
+        ]
+        assert matches and matches[0]["role"] == "user"
+
     async def test_regular_user_cannot_bulk_create(self, client, member_headers):
         response = await client.post(
             "/api/v1/identity/users/bulk",
-            files=_csv_file("email,name,last_name\nx@example.com,X,Y\n"),
+            files=_csv_file("email,nombre,apellido\nx@example.com,X,Y\n"),
             headers=member_headers,
         )
         assert response.status_code == 403
 
     async def test_developer_can_bulk_create(self, client, developer_headers):
-        csv_content = "email,name,last_name,role,position\ndev.bulk@example.com,Dev,Bulk,user,desarrollador\n"
+        csv_content = (
+            "email,nombre,apellido,cargo\ndev.bulk@example.com,Dev,Bulk,desarrollador\n"
+        )
 
         response = await client.post(
             "/api/v1/identity/users/bulk",

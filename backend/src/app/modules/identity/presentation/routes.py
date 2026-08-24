@@ -97,9 +97,11 @@ async def create_users_bulk(
     event_bus: EventBus = Depends(event_bus_dependency),
     current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
-    """Carga masiva de usuarios desde un CSV (columnas: email, name, last_name,
-    role, position, password). `role`/`position`/`password` son opcionales:
-    por defecto `user`, `sin_cargo` y una contraseña temporal generada.
+    """Carga masiva de usuarios desde un CSV (columnas: email, nombre, apellido,
+    cedula, cargo, password). `cedula`/`cargo`/`password` son opcionales: por
+    defecto sin documento, `sin_cargo` y una contraseña temporal generada. Si
+    `cargo` no existe todavía, se crea. Todos los usuarios se crean con rol
+    `user` (los roles de administración se asignan después, a mano).
 
     Procesa cada fila de forma independiente: una fila inválida no bloquea
     al resto del archivo (ver BulkCreateUsersUseCase).

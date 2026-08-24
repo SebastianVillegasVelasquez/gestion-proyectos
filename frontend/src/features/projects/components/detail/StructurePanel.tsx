@@ -37,29 +37,18 @@ import {
   useMoveWorkItem,
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
+import {
+  dropPosFromEvent,
+  findNode,
+  subtreeIds,
+  computeMovePayload,
+  type DropPos,
+} from "../../utils/work-tree-dnd";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
 import { NodeTasksModal } from "./NodeTasksModal";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
-
-// Zona de suelta dentro de una fila: reordenar como hermano (antes/después) o
-// anidar dentro del nodo destino.
-type DropPos = "before" | "inside" | "after";
-
-/** Deriva la zona de suelta según dónde cae el puntero en la fila destino:
- * tercio superior = antes, inferior = después, centro = dentro. */
-function dropPosFromEvent(e: { clientY: number; currentTarget: Element }): DropPos {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  if (y < rect.height * 0.3) {
-    return "before";
-  }
-  if (y > rect.height * 0.7) {
-    return "after";
-  }
-  return "inside";
-}
 
 function fmt(iso: string | null): string {
   if (!iso) {
@@ -102,30 +91,6 @@ function pruneForSearch(nodes: WorkItemTree[], query: string): WorkItemTree[] {
  * colapsados para saber cuánto contenido queda oculto en árboles grandes. */
 function descendantCount(node: WorkItemTree): number {
   return node.children.reduce((total, child) => total + 1 + descendantCount(child), 0);
-}
-
-/** Encuentra un nodo por id en el árbol (DFS). */
-function findNode(nodes: WorkItemTree[], id: string): WorkItemTree | null {
-  for (const node of nodes) {
-    if (node.id === id) {
-      return node;
-    }
-    const found = findNode(node.children, id);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
-}
-
-/** Ids del nodo y todos sus descendientes: destinos inválidos para soltarlo
- * (no puede anidarse dentro de sí mismo ni de un descendiente → ciclo). */
-function subtreeIds(node: WorkItemTree, acc = new Set<string>()): Set<string> {
-  acc.add(node.id);
-  for (const child of node.children) {
-    subtreeIds(child, acc);
-  }
-  return acc;
 }
 
 /** Nº total de elementos en una lista de árboles (raíces + descendientes). */
@@ -853,35 +818,18 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     if (!target) {
       return;
     }
-    if (pos === "inside") {
-      moveItem.mutate(
-        { itemId, payload: { new_parent_id: targetId } },
-        {
-          onError: (err) => {
-            setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
-          },
-        },
-      );
-      return;
-    }
-    const parentId = target.parent_id ?? null;
     // No se puede colocar como hermano si el padre está dentro del subárbol movido.
-    if (parentId != null && invalidDropIds.has(parentId)) {
+    const parentId = target.parent_id ?? null;
+    if (pos !== "inside" && parentId != null && invalidDropIds.has(parentId)) {
       setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
       return;
     }
-    const siblings = (parentId ? (findNode(tree, parentId)?.children ?? []) : tree).filter(
-      (s) => s.id !== itemId,
-    );
-    let index = siblings.findIndex((s) => s.id === targetId);
-    if (index < 0) {
-      index = siblings.length;
-    }
-    if (pos === "after") {
-      index += 1;
+    const payload = computeMovePayload(tree, itemId, targetId, pos);
+    if (!payload) {
+      return;
     }
     moveItem.mutate(
-      { itemId, payload: { new_parent_id: parentId, orden: index } },
+      { itemId, payload },
       {
         onError: (err) => {
           setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
@@ -953,15 +901,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => {
-              openAdd(null);
-            }}
-            disabled={types.length === 0}
-            className="flex items-center gap-1.5 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="size-4" /> Añadir elemento
-          </button>
           {/* Acceso directo al cronograma (misma navegación que la card de
               secciones del proyecto). */}
           <button
@@ -970,6 +909,15 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
           >
             <GanttChartSquare className="size-4 text-brand-teal" /> Cronograma
+          </button>
+          <button
+            onClick={() => {
+              openAdd(null);
+            }}
+            disabled={types.length === 0}
+            className="flex items-center gap-1.5 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="size-4" /> Añadir elemento
           </button>
         </div>
       </div>

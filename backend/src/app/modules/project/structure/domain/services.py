@@ -194,8 +194,10 @@ class WorkTreeService:
                 raise ValidationError(
                     "No se puede mover un nodo dentro de sí mismo o de un descendiente"
                 )
-            child_tipo = await self._get_active_tipo(item.tipo_id)
-            self._validate_nesting(parent, child_tipo)
+            # El drag & drop del árbol es deliberadamente más permisivo que la
+            # creación guiada: solo bloqueamos ciclos, no las reglas de
+            # anidación por tipo (`tipos_hijos_permitidos`), para que
+            # cualquier nodo pueda reordenarse bajo cualquier otro.
             self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
 
         old_parent_id = item.parent_id
