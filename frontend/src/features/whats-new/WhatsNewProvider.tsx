@@ -14,7 +14,7 @@ import { WhatsNewModal } from "./WhatsNewModal";
  */
 export function WhatsNewProvider({ children }: { children: ReactNode }) {
   const { user, hasRole } = useAuth();
-  const isElevated = hasRole(["admin", "super_admin"]);
+  const isElevated = hasRole(["admin", "super_admin", "developer"]);
   const enabled = Boolean(user);
 
   const seenQuery = useSeenReleases(enabled);

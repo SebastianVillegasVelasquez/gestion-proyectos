@@ -693,7 +693,10 @@ class TestMoveWorkItem:
         with pytest.raises(ValidationError):
             await service.move_item(a.id, child.id, None)
 
-    async def test_respects_nesting_rules(self, service):
+    async def test_ignores_nesting_rules_for_drag_and_drop(self, service):
+        """Las reglas de anidación por tipo solo aplican a la creación guiada
+        (`create_item`); el drag & drop del árbol es más flexible: cualquier
+        nodo puede recolocarse bajo cualquier otro, sin importar su tipo."""
         t_allowed = await _tipo(service, "Permitido")
         t_forbidden = await _tipo(service, "Prohibido")
         t_parent = await _tipo(
@@ -701,8 +704,8 @@ class TestMoveWorkItem:
         )
         parent = await _item(service, t_parent.id, "Padre 1")
         orphan = await _item(service, t_forbidden.id, "Huérfano")
-        with pytest.raises(ValidationError):
-            await service.move_item(orphan.id, parent.id, None)
+        moved = await service.move_item(orphan.id, parent.id, None)
+        assert moved.parent_id == parent.id
 
 
 class TestShiftSubtree:

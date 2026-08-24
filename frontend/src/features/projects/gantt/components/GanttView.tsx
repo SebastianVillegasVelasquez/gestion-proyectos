@@ -21,7 +21,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { useWorkTree, useNodeTypes } from "../../hooks/use-structure";
+import { useWorkTree, useNodeTypes, useMoveWorkItem } from "../../hooks/use-structure";
+import { getErrorMessage } from "@/utils/get-error-message";
+import {
+  dropPosFromEvent,
+  findNode,
+  subtreeIds,
+  computeMovePayload,
+  type DropPos,
+} from "../../utils/work-tree-dnd";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
@@ -536,6 +544,56 @@ export function GanttView({
     });
   };
 
+  // ── Drag & drop del panel izquierdo: recoloca nodos igual que el árbol de
+  // Estructura (misma lógica, mismo query key → ambos paneles quedan en sync). ──
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [nodeDropTarget, setNodeDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const moveWorkItem = useMoveWorkItem(project.id);
+
+  const invalidNodeDropIds = useMemo(() => {
+    if (!draggingNodeId) {
+      return new Set<string>();
+    }
+    const dragged = findNode(tree, draggingNodeId);
+    return dragged ? subtreeIds(dragged) : new Set<string>();
+  }, [draggingNodeId, tree]);
+
+  function resetNodeDrag() {
+    setDraggingNodeId(null);
+    setNodeDropTarget(null);
+  }
+
+  function handleNodeDropOn(targetId: string, pos: DropPos) {
+    const itemId = draggingNodeId;
+    resetNodeDrag();
+    if (!itemId || itemId === targetId) {
+      return;
+    }
+    if (invalidNodeDropIds.has(targetId)) {
+      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+      return;
+    }
+    const target = findNode(tree, targetId);
+    const parentId = target?.parent_id ?? null;
+    if (pos !== "inside" && parentId != null && invalidNodeDropIds.has(parentId)) {
+      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+      return;
+    }
+    const payload = computeMovePayload(tree, itemId, targetId, pos);
+    if (!payload) {
+      return;
+    }
+    moveWorkItem.mutate(
+      { itemId, payload },
+      {
+        onError: (err) => {
+          setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
+        },
+      },
+    );
+  }
+
   const toggleType = (id: string) => {
     setActiveTypeIds((prev) => {
       const next = new Set(prev);
@@ -629,6 +687,21 @@ export function GanttView({
           </button>
         </div>
       </header>
+
+      {moveError && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+          <span>{moveError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setMoveError(null);
+            }}
+            className="shrink-0 font-semibold underline underline-offset-2"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Franja de KPIs (se ajusta a los filtros activos) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -1105,6 +1178,27 @@ export function GanttView({
                           toggleNode(row.id);
                         }
                       }}
+                      isDraggingNode={draggingNodeId === row.id}
+                      nodeDropPos={
+                        nodeDropTarget?.id === row.id &&
+                        draggingNodeId != null &&
+                        !invalidNodeDropIds.has(row.id)
+                          ? nodeDropTarget.pos
+                          : null
+                      }
+                      onDragStartNode={() => {
+                        setDraggingNodeId(row.id);
+                      }}
+                      onDragEndNode={resetNodeDrag}
+                      onDragOverNode={(pos) => {
+                        if (draggingNodeId == null || invalidNodeDropIds.has(row.id)) {
+                          return;
+                        }
+                        setNodeDropTarget({ id: row.id, pos });
+                      }}
+                      onDropNode={(pos) => {
+                        handleNodeDropOn(row.id, pos);
+                      }}
                     />
                   ) : (
                     <TaskRow
@@ -1160,6 +1254,12 @@ function NodeRow({
   startDrag,
   draggedRef,
   onToggle,
+  isDraggingNode,
+  nodeDropPos,
+  onDragStartNode,
+  onDragEndNode,
+  onDragOverNode,
+  onDropNode,
 }: {
   row: GanttNodeRow;
   range: TimelineRange;
@@ -1172,6 +1272,13 @@ function NodeRow({
   startDrag: (e: React.PointerEvent, target: DragTarget, mode: DragMode) => void;
   draggedRef: React.RefObject<boolean>;
   onToggle: () => void;
+  // ── Drag & drop de reordenamiento del árbol (distinto del drag de la barra) ──
+  isDraggingNode: boolean;
+  nodeDropPos: DropPos | null;
+  onDragStartNode: () => void;
+  onDragEndNode: () => void;
+  onDragOverNode: (pos: DropPos) => void;
+  onDropNode: (pos: DropPos) => void;
 }) {
   const style = tipoStyle(row.tipoId);
   const isDragging = drag?.id === row.id;
@@ -1182,41 +1289,69 @@ function NodeRow({
   const target: DragTarget = { kind: "node", id: row.id, start: row.start, due: row.due };
   return (
     <div className="flex items-stretch border-b border-border/70" style={{ height: ROW_H }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={!collapsed}
-        style={{ width: labelW, paddingLeft: 8 + row.depth * INDENT }}
-        className={cn(
-          "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-r-border bg-muted pr-2 text-left transition-colors",
-          row.hasChildren ? "hover:bg-accent" : "cursor-default",
-        )}
-      >
-        <ChevronDown
+      <div className="sticky left-0 z-20 shrink-0" style={{ width: labelW }}>
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", row.id);
+            onDragStartNode();
+          }}
+          onDragEnd={onDragEndNode}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragOverNode(dropPosFromEvent(e));
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDropNode(dropPosFromEvent(e));
+          }}
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{ width: labelW, paddingLeft: 8 + row.depth * INDENT, height: ROW_H }}
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
-            collapsed && "-rotate-90",
-            !row.hasChildren && "invisible",
-          )}
-        />
-        <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
-        <span
-          className={cn(
-            "shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
-            style.chip,
+            "relative flex shrink-0 items-center gap-1.5 border-r border-r-border bg-muted pr-2 text-left transition-colors",
+            row.hasChildren ? "hover:bg-accent" : "cursor-default",
+            isDraggingNode && "opacity-40",
+            nodeDropPos === "inside" && "ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
           )}
         >
-          {typeName}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
-          {row.name}
-        </span>
-        {row.taskCount > 0 && (
-          <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
-            {row.doneCount}/{row.taskCount}
+          {nodeDropPos === "before" && (
+            <div className="absolute inset-x-0 top-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+          )}
+          {nodeDropPos === "after" && (
+            <div className="absolute inset-x-0 bottom-0 z-10 h-0.5 bg-brand-teal" aria-hidden />
+          )}
+          <ChevronDown
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground transition-transform",
+              collapsed && "-rotate-90",
+              !row.hasChildren && "invisible",
+            )}
+          />
+          <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
+          <span
+            className={cn(
+              "shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
+              style.chip,
+            )}
+          >
+            {typeName}
           </span>
-        )}
-      </button>
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+            {row.name}
+          </span>
+          {row.taskCount > 0 && (
+            <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
+              {row.doneCount}/{row.taskCount}
+            </span>
+          )}
+        </button>
+      </div>
       <div className="relative flex-1 bg-muted/40">
         {/* Barra resumen del nodo: arrastrar desplaza TODO el subárbol. */}
         <button

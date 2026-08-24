@@ -33,6 +33,7 @@ import {
 import type { AdminUser, BulkCreateUsersResult } from "../api/users.api";
 import type { DocumentType } from "@/features/projects/types/api.types";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/projects/types/labels";
+import { parseUsersCsv, type ParsedUsersCsv } from "../utils/parse-users-csv";
 
 const PAGE_SIZE = 20;
 
@@ -799,20 +800,57 @@ function UserRow({
   );
 }
 
+// Columnas que mostramos en la previsualización, en el orden esperado del CSV.
+const CSV_PREVIEW_COLUMNS: { key: string; label: string }[] = [
+  { key: "email", label: "Email" },
+  { key: "nombre", label: "Nombre" },
+  { key: "apellido", label: "Apellido" },
+  { key: "cedula", label: "Cédula" },
+  { key: "cargo", label: "Cargo" },
+];
+
 // ── Modal: carga masiva desde CSV ───────────────────────────────────────────
 function BulkUploadModal({ onClose }: { onClose: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<ParsedUsersCsv | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const bulkCreate = useBulkCreateUsers();
   const [result, setResult] = useState<BulkCreateUsersResult | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const selected = e.target.files?.[0];
+    if (!selected) {
+      return;
+    }
+    setResult(null);
+    setParseError(null);
+    setFileName(selected.name);
+    setFile(selected);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const parsed = parseUsersCsv(text);
+      if (parsed.rows.length === 0) {
+        setPreview(null);
+        setParseError("El archivo no tiene filas para previsualizar.");
+        return;
+      }
+      setPreview(parsed);
+    };
+    reader.onerror = () => {
+      setPreview(null);
+      setParseError("No se pudo leer el archivo.");
+    };
+    reader.readAsText(selected);
+  };
+
+  const handleUpload = () => {
     if (!file) {
       return;
     }
-    setFileName(file.name);
-    setResult(null);
     bulkCreate.mutate(file, { onSuccess: setResult });
   };
 
@@ -829,7 +867,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-xl">
+      <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Upload className="size-4 text-brand-gold" /> Cargar usuarios desde CSV
@@ -843,11 +881,13 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             <X className="size-4" />
           </button>
         </div>
-        <div className="flex flex-col gap-3 px-5 py-4">
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
           <p className="text-xs text-muted-foreground">
-            Columnas: <code>email, name, last_name</code> (obligatorias) y{" "}
-            <code>role, position, password</code> (opcionales). Sin contraseña, se genera una
-            temporal por fila. Las filas inválidas se reportan sin bloquear al resto.
+            Columnas: <code>email, nombre, apellido</code> (obligatorias) y{" "}
+            <code>cedula, cargo, password</code> (opcionales). Sin contraseña, se genera una
+            temporal por fila. Si el cargo no existe, se crea automáticamente. Todos los usuarios
+            cargados aquí quedan con el rol estándar. Las filas inválidas se reportan sin bloquear
+            al resto.
           </p>
           <input
             ref={fileInputRef}
@@ -857,8 +897,56 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             onChange={handleFileChange}
             className="text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-brand-gold-dark"
           />
-          {fileName && bulkCreate.isPending && (
-            <p className="text-xs text-muted-foreground">Procesando {fileName}…</p>
+          {parseError && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {parseError}
+            </p>
+          )}
+          {preview && !result && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                {fileName}: {preview.rows.length} usuario
+                {preview.rows.length !== 1 ? "s" : ""} para cargar.
+              </p>
+              <div className="max-h-56 overflow-auto rounded-lg border border-border">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-accent text-muted-foreground">
+                    <tr>
+                      {CSV_PREVIEW_COLUMNS.filter((c) => preview.headers.includes(c.key)).map(
+                        (c) => (
+                          <th key={c.key} className="px-3 py-2 font-medium">
+                            {c.label}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.rows.map((row, index) => (
+                      <tr key={index} className="border-t border-border">
+                        {CSV_PREVIEW_COLUMNS.filter((c) => preview.headers.includes(c.key)).map(
+                          (c) => (
+                            <td key={c.key} className="px-3 py-1.5 text-foreground">
+                              {row[c.key] || "—"}
+                            </td>
+                          ),
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                type="button"
+                onClick={handleUpload}
+                disabled={bulkCreate.isPending}
+                className="self-start rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-60"
+              >
+                {bulkCreate.isPending
+                  ? "Cargando…"
+                  : `Cargar ${preview.rows.length} usuario${preview.rows.length !== 1 ? "s" : ""}`}
+              </button>
+            </div>
           )}
           {bulkCreate.isError && (
             <p role="alert" className="text-xs text-red-600 dark:text-red-400">
