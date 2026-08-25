@@ -18,8 +18,8 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: db_test
     tmpfs:
       - /var/lib/postgresql/data

@@ -66,6 +66,16 @@ class BaseRepository(Repository[T], Generic[T]):
     async def add(self, entity: T) -> T:
         return await self.save(entity)
 
+    async def rollback(self) -> None:
+        """Descarta la transacción actual tras un fallo inesperado en `save`.
+
+        Necesario para callers que siguen usando la misma sesión después de un
+        error (p. ej. procesamiento fila a fila de un CSV): sin rollback, la
+        sesión queda en estado "aborted" y toda operación posterior también
+        fallaría, aunque sea sobre datos válidos.
+        """
+        await self._session.rollback()
+
     async def update(self, entity: T) -> T:
         return await self.save(entity)
 

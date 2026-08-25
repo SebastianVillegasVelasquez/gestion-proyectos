@@ -62,7 +62,39 @@ class TestBulkCreateUsersUseCase:
 
         assert result.failed == []
         assert len(result.created) == 1
-        assert "diseñador_gráfico" in position_repo.existing_keys
+        assert "diseñador_grafico" in position_repo.existing_keys
+
+    async def test_cargo_with_and_without_accent_resolves_to_the_same_position(
+        self, build_identity_repository, build_position_repository
+    ):
+        position_repo = build_position_repository()
+        use_case = BulkCreateUsersUseCase(
+            build_identity_repository(users=[]), position_repo
+        )
+
+        result = await use_case.execute(
+            [
+                {
+                    "email": "primera@test.com",
+                    "nombre": "Primera",
+                    "apellido": "Persona",
+                    "cargo": "Ingeniería",
+                },
+                {
+                    "email": "segunda@test.com",
+                    "nombre": "Segunda",
+                    "apellido": "Persona",
+                    "cargo": "ingenieria",
+                },
+            ],
+            actor_role="admin",
+        )
+
+        assert result.failed == []
+        assert len(result.created) == 2
+        # Una sola clave "ingenieria" para ambas filas: no se duplicó el cargo
+        # por la diferencia de tilde/mayúsculas.
+        assert position_repo.added_keys == ["ingenieria"]
 
     async def test_cedula_is_optional(
         self, build_identity_repository, build_position_repository
@@ -119,10 +151,22 @@ class TestSlugifyPositionKey:
         "raw, expected",
         [
             ("Desarrollador", "desarrollador"),
-            ("Diseñador Gráfico", "diseñador_gráfico"),
+            # Las tildes se quitan de la clave (para comparar), pero la ñ se
+            # conserva: es una letra distinta, no una "n" acentuada.
+            ("Diseñador Gráfico", "diseñador_grafico"),
             ("  Project Manager  ", "project_manager"),
             ("", "sin_cargo"),
+            ("Ingeniería", "ingenieria"),
+            ("Compañía", "compañia"),
         ],
     )
     def test_slugify(self, raw, expected):
         assert _slugify_position_key(raw) == expected
+
+    def test_same_role_with_and_without_accents_yields_the_same_key(self):
+        assert _slugify_position_key("Ingeniería") == _slugify_position_key(
+            "ingenieria"
+        )
+        assert _slugify_position_key("INGENIERÍA") == _slugify_position_key(
+            "  ingenieria  "
+        )
