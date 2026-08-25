@@ -41,9 +41,10 @@ import {
   dropPosFromEvent,
   findNode,
   subtreeIds,
-  computeMovePayload,
+  resolveDrop,
   type DropPos,
 } from "../../utils/work-tree-dnd";
+import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
@@ -271,6 +272,7 @@ function TreeNode({
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
   // ¿Este nodo es un destino de suelta válido, y en qué zona?
   const isDragging = draggingId === node.id;
+  const isInvalidTarget = draggingId != null && !isDragging && invalidDropIds.has(node.id);
   const dropPos =
     dropTarget?.id === node.id && draggingId != null && !invalidDropIds.has(node.id)
       ? dropTarget.pos
@@ -319,6 +321,9 @@ function TreeNode({
         className={cn(
           "group relative flex select-none items-center gap-2.5 py-2.5 pr-4 pl-2 transition-colors hover:bg-accent/40",
           isDragging && "opacity-40",
+          // Mientras se arrastra, el propio subárbol se atenúa: se ve de
+          // inmediato qué filas no admiten la suelta, sin tener que intentarlo.
+          isInvalidTarget && "opacity-50",
           dropPos === "inside" && "rounded-lg ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
         )}
       >
@@ -796,40 +801,69 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     return dragged ? subtreeIds(dragged) : empty;
   }, [draggingId, tree]);
 
+  // Contenedor scrollable del árbol: se auto-desplaza al arrastrar cerca de sus
+  // bordes, para poder alcanzar un destino que quedó fuera de la vista.
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  useDragAutoScroll(treeScrollRef, draggingId != null);
+
+  // Apertura automática al posarse sobre un elemento plegado ("spring-loaded"):
+  // sin esto, para soltar algo dentro de una rama cerrada habría que abrirla
+  // antes, soltando el arrastre a mitad de camino.
+  const springRef = useRef<{ id: string; timer: number } | null>(null);
+
+  function cancelSpringOpen() {
+    if (springRef.current) {
+      clearTimeout(springRef.current.timer);
+      springRef.current = null;
+    }
+  }
+
+  function scheduleSpringOpen(id: string, pos: DropPos) {
+    if (springRef.current?.id === id) {
+      return;
+    }
+    cancelSpringOpen();
+    const node = findNode(tree, id);
+    if (pos !== "inside" || !node || node.children.length === 0 || isExpanded(id)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCollapsedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      springRef.current = null;
+    }, 600);
+    springRef.current = { id, timer };
+  }
+
   function resetDrag() {
+    cancelSpringOpen();
     setDraggingId(null);
     setDropTarget(null);
   }
 
   /** Suelta el nodo arrastrado sobre `targetId`, reordenando (before/after entre
-   * hermanos) o anidando (inside). El índice se calcula EXCLUYENDO al movido,
-   * igual que el backend, para que la posición sea exacta. */
+   * hermanos) o anidando (inside). Las reglas (qué destino es válido y en qué
+   * índice cae) viven en `resolveDrop`, compartidas con el Gantt. */
   function handleDropOn(targetId: string, pos: DropPos) {
     const itemId = draggingId;
     resetDrag();
     if (!itemId) {
       return;
     }
-    if (invalidDropIds.has(targetId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+    const decision = resolveDrop(tree, itemId, targetId, pos);
+    if (!decision) {
       return;
     }
-    const target = findNode(tree, targetId);
-    if (!target) {
+    if (!decision.ok) {
+      setMoveError(decision.reason);
       return;
     }
-    // No se puede colocar como hermano si el padre está dentro del subárbol movido.
-    const parentId = target.parent_id ?? null;
-    if (pos !== "inside" && parentId != null && invalidDropIds.has(parentId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
-      return;
-    }
-    const payload = computeMovePayload(tree, itemId, targetId, pos);
-    if (!payload) {
-      return;
-    }
+    setMoveError(null);
     moveItem.mutate(
-      { itemId, payload },
+      { itemId, payload: decision.payload },
       {
         onError: (err) => {
           setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
@@ -965,7 +999,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
-          <CardContent className="flex flex-1 flex-col overflow-y-auto p-0">
+          <CardContent ref={treeScrollRef} className="flex flex-1 flex-col overflow-y-auto p-0">
             {/* Zona para soltar un nodo en el nivel principal (des-anidar). Solo
                 aparece mientras se arrastra algo que aún no está en la raíz. */}
             {draggingId != null && findNode(tree, draggingId)?.parent_id != null && (
@@ -1019,6 +1053,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onDragEndNode={resetDrag}
                   onDragOverNode={(id, pos) => {
                     setDropTarget({ id, pos });
+                    scheduleSpringOpen(id, pos);
                   }}
                   onDropNode={handleDropOn}
                 />

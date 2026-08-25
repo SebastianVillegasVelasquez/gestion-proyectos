@@ -27,9 +27,10 @@ import {
   dropPosFromEvent,
   findNode,
   subtreeIds,
-  computeMovePayload,
+  resolveDrop,
   type DropPos,
 } from "../../utils/work-tree-dnd";
+import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
@@ -559,7 +560,42 @@ export function GanttView({
     return dragged ? subtreeIds(dragged) : new Set<string>();
   }, [draggingNodeId, tree]);
 
+  // El cronograma también se auto-desplaza al arrastrar cerca de sus bordes: sin
+  // esto no se puede alcanzar una fila que quedó fuera de la parte visible.
+  useDragAutoScroll(scrollRef, draggingNodeId != null);
+
+  // Apertura automática de una rama plegada al posarse sobre ella (igual que en
+  // el panel de Estructura), para poder soltar dentro sin abrirla antes.
+  const nodeSpringRef = useRef<{ id: string; timer: number } | null>(null);
+
+  function cancelNodeSpringOpen() {
+    if (nodeSpringRef.current) {
+      clearTimeout(nodeSpringRef.current.timer);
+      nodeSpringRef.current = null;
+    }
+  }
+
+  function scheduleNodeSpringOpen(id: string, pos: DropPos) {
+    if (nodeSpringRef.current?.id === id) {
+      return;
+    }
+    cancelNodeSpringOpen();
+    if (pos !== "inside" || !collapsedNodes.has(id)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCollapsedNodes((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      nodeSpringRef.current = null;
+    }, 600);
+    nodeSpringRef.current = { id, timer };
+  }
+
   function resetNodeDrag() {
+    cancelNodeSpringOpen();
     setDraggingNodeId(null);
     setNodeDropTarget(null);
   }
@@ -567,25 +603,22 @@ export function GanttView({
   function handleNodeDropOn(targetId: string, pos: DropPos) {
     const itemId = draggingNodeId;
     resetNodeDrag();
-    if (!itemId || itemId === targetId) {
+    if (!itemId) {
       return;
     }
-    if (invalidNodeDropIds.has(targetId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+    // Las reglas viven en `resolveDrop`, compartidas con el panel de Estructura:
+    // ambas vistas muestran el mismo árbol y deben aceptar lo mismo.
+    const decision = resolveDrop(tree, itemId, targetId, pos);
+    if (!decision) {
       return;
     }
-    const target = findNode(tree, targetId);
-    const parentId = target?.parent_id ?? null;
-    if (pos !== "inside" && parentId != null && invalidNodeDropIds.has(parentId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+    if (!decision.ok) {
+      setMoveError(decision.reason);
       return;
     }
-    const payload = computeMovePayload(tree, itemId, targetId, pos);
-    if (!payload) {
-      return;
-    }
+    setMoveError(null);
     moveWorkItem.mutate(
-      { itemId, payload },
+      { itemId, payload: decision.payload },
       {
         onError: (err) => {
           setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
@@ -1190,11 +1223,13 @@ export function GanttView({
                         setDraggingNodeId(row.id);
                       }}
                       onDragEndNode={resetNodeDrag}
+                      isInvalidNodeDrop={draggingNodeId != null && invalidNodeDropIds.has(row.id)}
                       onDragOverNode={(pos) => {
                         if (draggingNodeId == null || invalidNodeDropIds.has(row.id)) {
                           return;
                         }
                         setNodeDropTarget({ id: row.id, pos });
+                        scheduleNodeSpringOpen(row.id, pos);
                       }}
                       onDropNode={(pos) => {
                         handleNodeDropOn(row.id, pos);
@@ -1256,6 +1291,7 @@ function NodeRow({
   onToggle,
   isDraggingNode,
   nodeDropPos,
+  isInvalidNodeDrop,
   onDragStartNode,
   onDragEndNode,
   onDragOverNode,
@@ -1275,6 +1311,7 @@ function NodeRow({
   // ── Drag & drop de reordenamiento del árbol (distinto del drag de la barra) ──
   isDraggingNode: boolean;
   nodeDropPos: DropPos | null;
+  isInvalidNodeDrop: boolean;
   onDragStartNode: () => void;
   onDragEndNode: () => void;
   onDragOverNode: (pos: DropPos) => void;
@@ -1301,6 +1338,12 @@ function NodeRow({
           }}
           onDragEnd={onDragEndNode}
           onDragOver={(e) => {
+            // Sin preventDefault el navegador marca la fila como destino no
+            // válido: así el cursor "no-drop" aparece justo sobre el propio
+            // subárbol, en vez de aceptar la suelta y rechazarla después.
+            if (isInvalidNodeDrop) {
+              return;
+            }
             e.preventDefault();
             e.stopPropagation();
             onDragOverNode(dropPosFromEvent(e));
@@ -1317,6 +1360,7 @@ function NodeRow({
             "relative flex shrink-0 items-center gap-1.5 border-r border-r-border bg-muted pr-2 text-left transition-colors",
             row.hasChildren ? "hover:bg-accent" : "cursor-default",
             isDraggingNode && "opacity-40",
+            isInvalidNodeDrop && !isDraggingNode && "opacity-50",
             nodeDropPos === "inside" && "ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
           )}
         >

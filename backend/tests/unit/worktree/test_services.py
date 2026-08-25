@@ -707,6 +707,61 @@ class TestMoveWorkItem:
         moved = await service.move_item(orphan.id, parent.id, None)
         assert moved.parent_id == parent.id
 
+    async def test_moves_a_grandchild_under_another_branch(self, service):
+        """Cualquier nodo, a cualquier profundidad, puede recolocarse bajo otro:
+        el drag & drop no está limitado a las ramas de primer nivel."""
+        t = await _tipo(service, "Nodo")
+        padre1 = await _item(service, t.id, "Padre 1")
+        hijo1 = await _item(service, t.id, "Hijo 1", parent_id=padre1.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=hijo1.id)
+        padre2 = await _item(service, t.id, "Padre 2")
+
+        moved = await service.move_item(nieto.id, padre2.id, None)
+
+        assert moved.parent_id == padre2.id
+        assert await self._ordered_children(service, hijo1.id) == []
+        assert await self._ordered_children(service, padre2.id) == ["Nieto"]
+
+    async def test_rejects_move_into_a_deep_descendant(self, service):
+        """El ciclo se bloquea a cualquier profundidad, no solo con el hijo
+        directo: meter el abuelo bajo su nieto desconectaría la rama."""
+        t = await _tipo(service, "Nodo")
+        abuelo = await _item(service, t.id, "Abuelo")
+        padre = await _item(service, t.id, "Padre", parent_id=abuelo.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=padre.id)
+
+        with pytest.raises(ValidationError):
+            await service.move_item(abuelo.id, nieto.id, None)
+
+    async def test_rejects_move_when_child_would_outlast_new_parent(self, service):
+        """Un hijo no puede terminar después que su padre: la regla se aplica
+        también al recolocar (igual que al crear y al editar), así que este
+        movimiento se rechaza hasta que se ajusten las fechas."""
+        t = await _tipo(service, "Nodo")
+        origen = await _item(service, t.id, "Origen")
+        largo = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id,
+                nombre="Tarea larga",
+                parent_id=origen.id,
+                fecha_inicio_plan=D(2026, 1, 1),
+                fecha_fin_plan=D(2026, 3, 31),
+            ),
+        )
+        corto = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id,
+                nombre="Fase corta",
+                fecha_inicio_plan=D(2026, 1, 1),
+                fecha_fin_plan=D(2026, 1, 31),
+            ),
+        )
+
+        with pytest.raises(ValidationError):
+            await service.move_item(largo.id, corto.id, None)
+
 
 class TestShiftSubtree:
     async def _dated(self, service, tipo_id, nombre, inicio, fin, parent_id=None):
