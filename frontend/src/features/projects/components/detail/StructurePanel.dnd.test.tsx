@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -232,12 +232,14 @@ describe("StructurePanel · conflicto de fechas", () => {
     vi.mocked(structureApi.update).mockResolvedValue({} as never);
   });
 
-  it("ofrece recortar el hijo hasta el fin de su padre", async () => {
+  it("ofrece recortar el elemento hasta el fin del que lo contiene", async () => {
     const user = userEvent.setup();
     renderPanel();
 
     await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
-    await user.click(await screen.findByRole("button", { name: /Recortar Hijo2/i }));
+    await user.click(
+      await screen.findByRole("button", { name: /Que Hijo2 termine el 31\/01\/2026/i }),
+    );
 
     await waitFor(() => {
       expect(structureApi.update).toHaveBeenCalledWith("Hijo2", {
@@ -246,18 +248,75 @@ describe("StructurePanel · conflicto de fechas", () => {
     });
   });
 
-  it("ofrece extender el padre hasta el fin del hijo", async () => {
+  it("ofrece extender el que lo contiene hasta el fin del elemento", async () => {
     const user = userEvent.setup();
     renderPanel();
 
     await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
-    await user.click(await screen.findByRole("button", { name: /Extender Padre2/i }));
+    await user.click(
+      await screen.findByRole("button", { name: /Que Padre2 termine el 20\/02\/2026/i }),
+    );
 
     await waitFor(() => {
       expect(structureApi.update).toHaveBeenCalledWith("Padre2", {
         fecha_fin_plan: "2026-02-20",
       });
     });
+  });
+
+  it("deja poner una fecha a mano en un calendario", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    await user.click(await screen.findByRole("button", { name: /Elegir otra fecha/i }));
+
+    // El calendario arranca con la fecha actual del elemento, no con la del
+    // que lo contiene: se ajusta lo que está mal, no lo que ya estaba bien.
+    const input = screen.getByLabelText(/Fecha de fin de Hijo2/i);
+    expect((input as HTMLInputElement).value).toBe("2026-02-20");
+
+    fireEvent.change(input, { target: { value: "2026-01-20" } });
+    await user.click(screen.getByRole("button", { name: /Guardar fecha/i }));
+
+    await waitFor(() => {
+      expect(structureApi.update).toHaveBeenCalledWith("Hijo2", {
+        fecha_fin_plan: "2026-01-20",
+      });
+    });
+  });
+
+  it("avisa si la fecha elegida a mano sigue quedando fuera, sin impedirla", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    await user.click(await screen.findByRole("button", { name: /Elegir otra fecha/i }));
+    fireEvent.change(screen.getByLabelText(/Fecha de fin de Hijo2/i), {
+      target: { value: "2026-03-15" },
+    });
+
+    expect(await screen.findByText(/el aviso se mantendrá/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Guardar fecha/i }));
+
+    await waitFor(() => {
+      expect(structureApi.update).toHaveBeenCalledWith("Hijo2", {
+        fecha_fin_plan: "2026-03-15",
+      });
+    });
+  });
+
+  it("no menciona la palabra «padre» en el modal", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    const modal = await screen.findByRole("dialog");
+
+    // «Padre2» es el NOMBRE de un elemento y sí debe salir; lo que no debe
+    // aparecer es la palabra suelta, hablándole a quien planifica de "padres".
+    expect(modal.textContent).not.toMatch(/\bpadre\b/i);
+    expect(modal.textContent).toContain("Padre2");
   });
 
   it("permite dejar el conflicto sin resolver", async () => {
@@ -278,5 +337,65 @@ describe("StructurePanel · conflicto de fechas", () => {
 
     await screen.findByText("Hijo2");
     expect(screen.queryByLabelText(/Resolver conflicto de fechas/i)).toBeNull();
+  });
+});
+
+describe("StructurePanel · sacar un elemento un nivel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(structureApi.tree).mockResolvedValue(buildTree());
+    vi.mocked(structureApi.listTypes).mockResolvedValue(tipos);
+    vi.mocked(structureApi.move).mockResolvedValue({} as never);
+  });
+
+  /** Abre el menú de opciones de la fila que contiene `name`. */
+  async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
+    const row = rowFor(name);
+    const menuButton = within(row).getByLabelText("Opciones del elemento");
+    await user.click(menuButton);
+  }
+
+  it("saca un nieto para dejarlo junto a lo que lo contenía", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Nieto1");
+
+    await openRowMenu(user, "Nieto1");
+    await user.click(await screen.findByRole("menuitem", { name: /Sacar un nivel/i }));
+
+    // Nieto1 estaba en Hijo1 (dentro de Padre1): sale a Padre1, detrás de Hijo1.
+    await waitFor(() => {
+      expect(structureApi.move).toHaveBeenCalledWith("Nieto1", {
+        new_parent_id: "Padre1",
+        orden: 1,
+      });
+    });
+  });
+
+  it("saca un hijo hasta el nivel principal", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Hijo1");
+
+    await openRowMenu(user, "Hijo1");
+    await user.click(await screen.findByRole("menuitem", { name: /Sacar un nivel/i }));
+
+    await waitFor(() => {
+      expect(structureApi.move).toHaveBeenCalledWith("Hijo1", {
+        new_parent_id: null,
+        orden: 1,
+      });
+    });
+  });
+
+  it("no ofrece la opción en el nivel principal", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await openRowMenu(user, "Padre1");
+
+    expect(await screen.findByRole("menu")).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: /Sacar un nivel/i })).toBeNull();
   });
 });

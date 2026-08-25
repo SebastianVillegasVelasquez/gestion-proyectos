@@ -63,6 +63,7 @@ import type { DatedTask } from "../task";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
 import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
 import type { Project, TaskStatus, UserPosition } from "../../types/api.types";
+import { DateConflictModal } from "../../components/detail/DateConflictModal";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 
 // Ancho por defecto de la columna de etiquetas (el usuario puede redimensionarla).
@@ -548,8 +549,15 @@ export function GanttView({
   // ── Drag & drop del panel izquierdo: recoloca nodos igual que el árbol de
   // Estructura (misma lógica, mismo query key → ambos paneles quedan en sync). ──
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  // Escrito de forma síncrona al empezar el arrastre: el estado de React puede
+  // llegar tarde al primer `dragover` y, sin `preventDefault()`, el navegador
+  // marca esa fila como destino inválido (ver StructurePanel).
+  const draggingNodeIdRef = useRef<string | null>(null);
   const [nodeDropTarget, setNodeDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Elemento cuyo desajuste de fechas se está resolviendo. Guardamos el id (no
+  // el nodo) para que el modal lea siempre el árbol recién cargado.
+  const [conflictItemId, setConflictItemId] = useState<string | null>(null);
   const moveWorkItem = useMoveWorkItem(project.id);
 
   const invalidNodeDropIds = useMemo(() => {
@@ -594,8 +602,14 @@ export function GanttView({
     nodeSpringRef.current = { id, timer };
   }
 
+  function startNodeDrag(id: string) {
+    draggingNodeIdRef.current = id;
+    setDraggingNodeId(id);
+  }
+
   function resetNodeDrag() {
     cancelNodeSpringOpen();
+    draggingNodeIdRef.current = null;
     setDraggingNodeId(null);
     setNodeDropTarget(null);
   }
@@ -1220,12 +1234,12 @@ export function GanttView({
                           : null
                       }
                       onDragStartNode={() => {
-                        setDraggingNodeId(row.id);
+                        startNodeDrag(row.id);
                       }}
                       onDragEndNode={resetNodeDrag}
                       isInvalidNodeDrop={draggingNodeId != null && invalidNodeDropIds.has(row.id)}
                       onDragOverNode={(pos) => {
-                        if (draggingNodeId == null || invalidNodeDropIds.has(row.id)) {
+                        if (draggingNodeIdRef.current == null || invalidNodeDropIds.has(row.id)) {
                           return;
                         }
                         setNodeDropTarget({ id: row.id, pos });
@@ -1233,6 +1247,9 @@ export function GanttView({
                       }}
                       onDropNode={(pos) => {
                         handleNodeDropOn(row.id, pos);
+                      }}
+                      onResolveConflict={() => {
+                        setConflictItemId(row.id);
                       }}
                     />
                   ) : (
@@ -1261,6 +1278,26 @@ export function GanttView({
           </div>
         </div>
       )}
+
+      {/* Ajuste de fechas: el mismo modal que en la Estructura, para que el
+          aviso haga lo mismo se mire desde donde se mire. */}
+      {(() => {
+        const item = conflictItemId ? findNode(tree, conflictItemId) : null;
+        const container = item?.parent_id ? findNode(tree, item.parent_id) : null;
+        if (!item || !container) {
+          return null;
+        }
+        return (
+          <DateConflictModal
+            projectId={project.id}
+            item={item}
+            container={container}
+            onClose={() => {
+              setConflictItemId(null);
+            }}
+          />
+        );
+      })()}
 
       {selected && (
         <TaskDetailPanel
@@ -1296,6 +1333,7 @@ function NodeRow({
   onDragEndNode,
   onDragOverNode,
   onDropNode,
+  onResolveConflict,
 }: {
   row: GanttNodeRow;
   range: TimelineRange;
@@ -1316,6 +1354,7 @@ function NodeRow({
   onDragEndNode: () => void;
   onDragOverNode: (pos: DropPos) => void;
   onDropNode: (pos: DropPos) => void;
+  onResolveConflict: () => void;
 }) {
   const style = tipoStyle(row.tipoId);
   const isDragging = drag?.id === row.id;
@@ -1326,7 +1365,7 @@ function NodeRow({
   const target: DragTarget = { kind: "node", id: row.id, start: row.start, due: row.due };
   return (
     <div className="flex items-stretch border-b border-border/70" style={{ height: ROW_H }}>
-      <div className="sticky left-0 z-20 shrink-0" style={{ width: labelW }}>
+      <div className="sticky left-0 z-20 shrink-0 relative" style={{ width: labelW }}>
         <button
           type="button"
           draggable
@@ -1389,21 +1428,29 @@ function NodeRow({
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
             {row.name}
           </span>
-          {/* Mismo aviso que en la Estructura: este elemento se sale del rango
-              de su padre. Aquí solo informa (las fechas se cuadran desde la
-              Estructura, que es donde se editan). */}
-          {row.conflictoFechas && (
-            <CalendarClock
-              className="size-3 shrink-0 text-rose-500"
-              aria-label={`${row.name} termina después que su elemento padre`}
-            />
-          )}
+          {/* Hueco para el aviso de fechas, que va fuera de este botón (no se
+              pueden anidar botones): así el texto no queda debajo del icono. */}
+          {row.conflictoFechas && <span className="w-5 shrink-0" aria-hidden />}
           {row.taskCount > 0 && (
             <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
               {row.doneCount}/{row.taskCount}
             </span>
           )}
         </button>
+        {/* Mismo aviso que en la Estructura y con el mismo comportamiento: abre
+            el ajuste de fechas. Va como hermano del botón de la fila —y no
+            dentro— porque un botón no puede contener otro botón. */}
+        {row.conflictoFechas && (
+          <button
+            type="button"
+            onClick={onResolveConflict}
+            title={`${row.name} termina más tarde que lo que lo contiene. Click para ajustar las fechas.`}
+            aria-label={`Ajustar fechas de ${row.name}`}
+            className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+          >
+            <CalendarClock className="size-3.5" />
+          </button>
+        )}
       </div>
       <div className="relative flex-1 bg-muted/40">
         {/* Barra resumen del nodo: arrastrar desplaza TODO el subárbol. */}

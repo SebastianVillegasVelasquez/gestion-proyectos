@@ -39,6 +39,7 @@ import {
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
 import {
+  computeOutdentPayload,
   dropPosFromEvent,
   findNode,
   subtreeIds,
@@ -201,9 +202,12 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
 
 function DateBadge({
   node,
+  containerName,
   onResolveConflict,
 }: {
   node: WorkItemTree;
+  /** Nombre del elemento que lo contiene, para el aviso (no decimos "padre"). */
+  containerName: string | null;
   onResolveConflict: () => void;
 }) {
   const hasRange = node.fecha_inicio_plan ?? node.fecha_fin_plan;
@@ -233,7 +237,11 @@ function DateBadge({
         <button
           type="button"
           onClick={onResolveConflict}
-          title={`«${node.nombre}» termina después que su elemento padre. Click para cuadrar las fechas.`}
+          title={
+            containerName
+              ? `«${node.nombre}» termina después que «${containerName}». Click para ajustar las fechas.`
+              : `«${node.nombre}» termina más tarde de lo que lo contiene. Click para ajustar las fechas.`
+          }
           aria-label={`Resolver conflicto de fechas de ${node.nombre}`}
           className="flex shrink-0 items-center rounded-md p-0.5 text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
         >
@@ -255,6 +263,8 @@ function DateBadge({
 interface TreeNodeProps {
   node: WorkItemTree;
   depth: number;
+  /** Nombre del elemento que contiene a este (null en el nivel principal). */
+  containerName: string | null;
   typeNameById: Map<string, string>;
   isExpanded: (id: string) => boolean;
   onToggle: (id: string) => void;
@@ -265,8 +275,12 @@ interface TreeNodeProps {
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
   onResolveConflict: (node: WorkItemTree) => void;
+  onOutdent: (node: WorkItemTree) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
+  /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
+   * arrastrar: el estado de React puede llegar tarde al primer `dragover`. */
+  draggingIdRef: React.RefObject<string | null>;
   dropTarget: { id: string; pos: DropPos } | null;
   invalidDropIds: Set<string>;
   onDragStartNode: (id: string) => void;
@@ -278,6 +292,7 @@ interface TreeNodeProps {
 function TreeNode({
   node,
   depth,
+  containerName,
   typeNameById,
   isExpanded,
   onToggle,
@@ -288,7 +303,9 @@ function TreeNode({
   onDelete,
   onTasks,
   onResolveConflict,
+  onOutdent,
   draggingId,
+  draggingIdRef,
   dropTarget,
   invalidDropIds,
   onDragStartNode,
@@ -337,7 +354,13 @@ function TreeNode({
         onDragOver={(e) => {
           // Solo permitimos soltar en destinos válidos (evita el cursor "no-drop"
           // sobre uno mismo o un descendiente).
-          if (draggingId == null || invalidDropIds.has(node.id)) {
+          //
+          // El "¿hay algo arrastrándose?" se consulta al REF, no al estado:
+          // React puede no haber re-renderizado todavía cuando llega el primer
+          // dragover, y sin `preventDefault()` el navegador marca la fila como
+          // destino inválido. Eso rompía justo las filas más cercanas al punto
+          // donde empieza el arrastre (las primeras del árbol, típicamente).
+          if (draggingIdRef.current == null || invalidDropIds.has(node.id)) {
             return;
           }
           e.preventDefault();
@@ -424,6 +447,7 @@ function TreeNode({
           )}
           <DateBadge
             node={node}
+            containerName={containerName}
             onResolveConflict={() => {
               onResolveConflict(node);
             }}
@@ -470,6 +494,19 @@ function TreeNode({
                   onAddChild(node);
                 },
               },
+              // Solo tiene sentido si está dentro de algo: en el nivel
+              // principal no hay nivel del que salir.
+              ...(node.parent_id != null
+                ? [
+                    {
+                      label: "Sacar un nivel",
+                      icon: CornerLeftUp,
+                      onClick: () => {
+                        onOutdent(node);
+                      },
+                    },
+                  ]
+                : []),
               {
                 label: "Ordenar (dependencias)",
                 icon: Link2,
@@ -503,6 +540,7 @@ function TreeNode({
               key={child.id}
               node={child}
               depth={depth + 1}
+              containerName={node.nombre}
               typeNameById={typeNameById}
               isExpanded={isExpanded}
               onToggle={onToggle}
@@ -513,7 +551,9 @@ function TreeNode({
               onDelete={onDelete}
               onTasks={onTasks}
               onResolveConflict={onResolveConflict}
+              onOutdent={onOutdent}
               draggingId={draggingId}
+              draggingIdRef={draggingIdRef}
               dropTarget={dropTarget}
               invalidDropIds={invalidDropIds}
               onDragStartNode={onDragStartNode}
@@ -779,6 +819,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // Drag & drop para recolocar nodos: reordenar entre hermanos (before/after) o
   // anidar dentro de otro (inside).
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
@@ -878,8 +919,14 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     springRef.current = { id, timer };
   }
 
+  function startDrag(id: string) {
+    draggingIdRef.current = id;
+    setDraggingId(id);
+  }
+
   function resetDrag() {
     cancelSpringOpen();
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDropTarget(null);
   }
@@ -904,6 +951,25 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     setMoveError(null);
     moveItem.mutate(
       { itemId, payload: decision.payload },
+      {
+        onError: (err) => {
+          setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
+        },
+      },
+    );
+  }
+
+  /** Saca un elemento de donde está y lo deja junto a su antiguo contenedor.
+   * Misma operación que arrastrarlo fuera, pero sin arrastrar: con estructuras
+   * grandes es la forma cómoda de deshacer un anidado equivocado. */
+  function handleOutdent(node: WorkItemTree) {
+    const payload = computeOutdentPayload(tree, node.id);
+    if (!payload) {
+      return;
+    }
+    setMoveError(null);
+    moveItem.mutate(
+      { itemId: node.id, payload },
       {
         onError: (err) => {
           setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
@@ -1040,33 +1106,46 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent ref={treeScrollRef} className="flex flex-1 flex-col overflow-y-auto p-0">
-            {/* Zona para soltar un nodo en el nivel principal (des-anidar). Solo
-                aparece mientras se arrastra algo que aún no está en la raíz. */}
-            {draggingId != null && findNode(tree, draggingId)?.parent_id != null && (
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDropTarget({ id: "__root__", pos: "inside" });
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleDropRoot();
-                }}
-                className={cn(
-                  "m-2 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-2 text-xs font-semibold transition-colors",
-                  dropTarget?.id === "__root__"
-                    ? "border-brand-teal bg-brand-teal/5 text-brand-teal-dark dark:text-brand-teal"
-                    : "border-border text-muted-foreground",
-                )}
-              >
-                <CornerLeftUp className="size-3.5" /> Soltar aquí para mover al nivel principal
-              </div>
-            )}
+            {/* Zona para soltar en el nivel principal (des-anidar).
+                Se renderiza SIEMPRE, aunque no se esté arrastrando: cuando solo
+                aparecía al empezar el arrastre, insertarla empujaba hacia abajo
+                todas las filas justo en ese momento, y lo que quedaba bajo el
+                puntero dejaba de ser la fila que se había apuntado (el fallo se
+                notaba sobre todo en los primeros elementos, los que más cerca
+                están de la zona). Ocupando su sitio desde el principio, nada se
+                mueve al empezar a arrastrar. */}
+            <div
+              onDragOver={(e) => {
+                if (draggingIdRef.current == null) {
+                  return;
+                }
+                e.preventDefault();
+                setDropTarget({ id: "__root__", pos: "inside" });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDropRoot();
+              }}
+              className={cn(
+                "m-2 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-2 text-xs font-semibold transition-colors",
+                dropTarget?.id === "__root__"
+                  ? "border-brand-teal bg-brand-teal/5 text-brand-teal-dark dark:text-brand-teal"
+                  : draggingId != null
+                    ? "border-border text-muted-foreground"
+                    : "border-border/50 text-muted-foreground/50",
+              )}
+            >
+              <CornerLeftUp className="size-3.5" />
+              {draggingId != null
+                ? "Soltar aquí para mover al nivel principal"
+                : "Arrastra aquí para mover al nivel principal"}
+            </div>
             {visibleTree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode
                   node={node}
                   depth={0}
+                  containerName={null}
                   typeNameById={typeNameById}
                   isExpanded={isExpanded}
                   onToggle={toggleNode}
@@ -1089,10 +1168,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onResolveConflict={(n) => {
                     setConflictItem(n);
                   }}
+                  onOutdent={handleOutdent}
                   draggingId={draggingId}
+                  draggingIdRef={draggingIdRef}
                   dropTarget={dropTarget}
                   invalidDropIds={invalidDropIds}
-                  onDragStartNode={setDraggingId}
+                  onDragStartNode={startDrag}
                   onDragEndNode={resetDrag}
                   onDragOverNode={(id, pos) => {
                     setDropTarget({ id, pos });
@@ -1118,7 +1199,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             <DateConflictModal
               projectId={projectId}
               item={conflictItem}
-              parent={parent}
+              container={parent}
               onClose={() => {
                 setConflictItem(null);
               }}

@@ -88,6 +88,34 @@ export function computeMovePayload(
   return { new_parent_id: parentId, orden: index };
 }
 
+/** Movimiento para sacar un elemento un nivel hacia afuera: pasa a ser hermano
+ * de quien lo contenía, colocado justo detrás de él.
+ *
+ * Es la salida rápida cuando algo acaba dentro de la rama equivocada: sin esto
+ * habría que arrastrarlo hasta un destino concreto, que es incómodo justo
+ * cuando la estructura es grande (que es cuando pasa). Devuelve null si ya está
+ * en el nivel principal: ahí no hay nivel del que salir.
+ */
+export function computeOutdentPayload(tree: WorkItemTree[], itemId: string): MovePayload | null {
+  const item = findNode(tree, itemId);
+  if (item?.parent_id == null) {
+    return null;
+  }
+  const parent = findNode(tree, item.parent_id);
+  if (!parent) {
+    return null;
+  }
+  const grandParentId = parent.parent_id ?? null;
+  const siblings = (grandParentId ? (findNode(tree, grandParentId)?.children ?? []) : tree).filter(
+    (s) => s.id !== itemId,
+  );
+  const parentIndex = siblings.findIndex((s) => s.id === parent.id);
+  // Justo DETRÁS de su antiguo contenedor: es donde se espera encontrarlo tras
+  // sacarlo, en vez de al final de una lista larga.
+  const index = parentIndex < 0 ? siblings.length : parentIndex + 1;
+  return { new_parent_id: grandParentId, orden: index };
+}
+
 /** Resultado de intentar soltar: o hay un movimiento que pedirle al backend, o
  * hay un motivo que explicarle a quien arrastró. */
 export type DropDecision =

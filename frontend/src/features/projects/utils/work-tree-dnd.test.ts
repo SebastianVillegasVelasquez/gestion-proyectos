@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { findNode, subtreeIds, computeMovePayload, resolveDrop } from "./work-tree-dnd";
+import {
+  findNode,
+  subtreeIds,
+  computeMovePayload,
+  computeOutdentPayload,
+  resolveDrop,
+} from "./work-tree-dnd";
 import type { WorkItemTree } from "../types/api.types";
 
 function node(
@@ -159,5 +165,42 @@ describe("resolveDrop", () => {
 
   it("devuelve null si el destino ya no existe", () => {
     expect(resolveDrop(deepTree(), "B", "missing", "inside")).toBeNull();
+  });
+});
+
+describe("computeOutdentPayload", () => {
+  // A ─ B ─ B1
+  // D
+  function deepTree(): WorkItemTree[] {
+    const b1 = node("B1", [], "B");
+    const b = node("B", [b1], "A");
+    const a = node("A", [b], null);
+    const d = node("D", [], null);
+    return [a, d];
+  }
+
+  it("saca un nieto para dejarlo junto a quien lo contenía", () => {
+    // B1 sale de B y pasa a ser hijo de A, justo detrás de B.
+    expect(computeOutdentPayload(deepTree(), "B1")).toEqual({
+      new_parent_id: "A",
+      orden: 1,
+    });
+  });
+
+  it("saca un hijo de primer nivel al nivel principal, tras su contenedor", () => {
+    // B sale de A: nivel principal, detrás de A (que ocupa el índice 0).
+    expect(computeOutdentPayload(deepTree(), "B")).toEqual({
+      new_parent_id: null,
+      orden: 1,
+    });
+  });
+
+  it("no hace nada con un elemento que ya está en el nivel principal", () => {
+    expect(computeOutdentPayload(deepTree(), "A")).toBeNull();
+    expect(computeOutdentPayload(deepTree(), "D")).toBeNull();
+  });
+
+  it("devuelve null si el elemento no existe", () => {
+    expect(computeOutdentPayload(deepTree(), "missing")).toBeNull();
   });
 });
