@@ -3,6 +3,7 @@ from uuid import UUID
 
 from jose import JWTError
 
+import logging
 import re
 import secrets
 import string
@@ -44,6 +45,9 @@ from app.shared.exceptions import ConflictError, NotFoundError, UnauthorizedErro
 from app.shared.pagination import Pagination
 
 
+logger = logging.getLogger(__name__)
+
+
 def _generate_temp_password(length: int = 12) -> str:
     """Contraseña temporal legible con al menos una letra y un dígito."""
     alphabet = string.ascii_letters + string.digits
@@ -53,12 +57,21 @@ def _generate_temp_password(length: int = 12) -> str:
             return pwd
 
 
+# Solo mapeamos vocales con tilde/diéresis: la ñ NO se toca porque en español
+# es una letra distinta de la "n" (año/ano), no una "n" acentuada.
+_ACCENTED_VOWELS = str.maketrans("áéíóúÁÉÍÓÚüÜ", "aeiouAEIOUuU")
+
+
 def _slugify_position_key(label: str) -> str:
-    """Deriva una clave estable (minúsculas, snake_case) a partir del cargo
-    tal cual viene escrito en el CSV, para que filas con el mismo cargo
-    (aunque varíe en mayúsculas/espacios) apunten a un único registro."""
-    normalized = re.sub(r"\s+", "_", label.strip().lower())
-    normalized = re.sub(r"[^a-záéíóúñ0-9_]", "", normalized)
+    """Deriva una clave estable (minúsculas, snake_case, sin tildes) a partir
+    del cargo tal cual viene escrito en el CSV, para que filas con el mismo
+    cargo -aunque varíen en mayúsculas, espacios o tildes ("Ingeniería" vs.
+    "ingenieria")- apunten a un único registro. El *label* que se muestra en
+    la UI no pasa por esta función: se guarda tal cual lo escribió quien
+    cargó el cargo por primera vez, tildes incluidas."""
+    normalized = label.strip().lower().translate(_ACCENTED_VOWELS)
+    normalized = re.sub(r"\s+", "_", normalized)
+    normalized = re.sub(r"[^a-zñ0-9_]", "", normalized)
     normalized = normalized.strip("_") or "sin_cargo"
     return normalized[:64]
 
@@ -297,12 +310,14 @@ class CreatePositionUseCase:
         self.position_repo = position_repo
 
     async def execute(self, data: CreatePositionRequest) -> PositionOption:
-        if await self.position_repo.key_exists(data.key):
-            raise ConflictError(f"Ya existe un cargo con la clave '{data.key}'")
+        # Normalizamos igual que la carga masiva: la clave que se compara y
+        # persiste nunca lleva tildes, aunque la app hoy no deje escribirlas
+        # desde el formulario (defensa ante llamadas directas a la API).
+        key = _slugify_position_key(data.key)
+        if await self.position_repo.key_exists(key):
+            raise ConflictError(f"Ya existe un cargo con la clave '{key}'")
 
-        position = await self.position_repo.add(
-            Position(key=data.key, label=data.label)
-        )
+        position = await self.position_repo.add(Position(key=key, label=data.label))
         return PositionOption(value=position.key, label=position.label)
 
 
@@ -348,7 +363,10 @@ class BulkCreateUsersUseCase:
         failed: list[BulkUserRowError] = []
 
         for index, row in enumerate(rows, start=1):
-            email = (row.get("email") or "").strip()
+            # Normalizamos igual que CreateUserRequest: el correo identifica a la
+            # persona, así que dos filas que difieran solo en mayúsculas o
+            # espacios deben chocar como el mismo usuario.
+            email = (row.get("email") or "").strip().lower()
             try:
                 for column in self.REQUIRED_COLUMNS:
                     if not (row.get(column) or "").strip():
@@ -412,6 +430,24 @@ class BulkCreateUsersUseCase:
             except ValueError as exc:
                 failed.append(
                     BulkUserRowError(row=index, email=email or None, error=str(exc))
+                )
+            except Exception:
+                # Red de seguridad: una fila con un fallo inesperado (p. ej. un
+                # problema puntual de infraestructura al guardar) no debe tumbar
+                # el resto del archivo. Queda registrada para diagnóstico.
+                # El rollback es imprescindible: tras un flush fallido, la sesión
+                # queda "aborted" y bloquearía también a las filas siguientes.
+                await self.user_repo.rollback()
+                logger.exception(
+                    "Fila %s de carga masiva de usuarios falló de forma inesperada",
+                    index,
+                )
+                failed.append(
+                    BulkUserRowError(
+                        row=index,
+                        email=email or None,
+                        error="No se pudo procesar esta fila por un error inesperado",
+                    )
                 )
 
         return BulkCreateUsersResponse(

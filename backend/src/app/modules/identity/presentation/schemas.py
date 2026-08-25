@@ -51,6 +51,13 @@ class CreateUserRequest(BaseModelConfig):
     document_type: Optional[DocumentType] = None
     document_number: Optional[DocumentNumber] = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: object) -> str:
+        # El correo es el identificador único de la persona: sin normalizar,
+        # "Test@x.com" y "test@x.com" pasarían como dos usuarios distintos.
+        return str(v).strip().lower()
+
     @field_validator("document_number", mode="before")
     @classmethod
     def normalize_document(cls, v: object) -> Optional[str]:
@@ -89,6 +96,11 @@ class UpdateUserRequest(BaseModelConfig):
     )
     document_type: Optional[DocumentType] = None
     document_number: Optional[DocumentNumber] = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: object) -> str:
+        return str(v).strip().lower()
 
     @field_validator("document_number", mode="before")
     @classmethod

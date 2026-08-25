@@ -68,6 +68,56 @@ class TestCreateUserAdminRoute:
 
         assert response.status_code == 422
 
+    async def test_email_is_normalized_to_lowercase_on_create(
+        self, client, admin_headers
+    ):
+        response = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": " Mixed.Case@Example.COM ",
+                "password": "password123",
+                "name": "John",
+                "last_name": "Doe",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["email"] == "mixed.case@example.com"
+
+    async def test_duplicate_email_case_insensitive_returns_409(
+        self, client, admin_headers
+    ):
+        first = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "duplicado@example.com",
+                "password": "password123",
+                "name": "John",
+                "last_name": "Doe",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+        assert first.status_code == 201, first.text
+
+        second = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "DUPLICADO@Example.com",
+                "password": "password123",
+                "name": "Jane",
+                "last_name": "Roe",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+        assert second.status_code == 409
+
     async def test_should_return_422_when_password_is_missing(
         self, client, admin_headers
     ):
