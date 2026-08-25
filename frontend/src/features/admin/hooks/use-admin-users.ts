@@ -9,8 +9,18 @@ import {
 
 const adminUserKeys = {
   all: ["admin", "users"] as const,
+  // Todo lo que cambia la respuesta del servidor (búsqueda, página, orden,
+  // filtro de inactivos) entra en la clave: si no, react-query serviría de
+  // caché una lista ordenada de otra forma.
   list: (params: AdminUsersParams) =>
-    [...adminUserKeys.all, params.search ?? "", params.page ?? 1] as const,
+    [
+      ...adminUserKeys.all,
+      params.search ?? "",
+      params.page ?? 1,
+      params.includeInactive ?? true,
+      params.sortBy ?? "name",
+      params.sortDir ?? "asc",
+    ] as const,
 };
 
 /** Lista paginada y buscable de usuarios (servidor). */
@@ -53,13 +63,5 @@ export function useUpdateUser() {
 export function useResetPassword() {
   return useMutation({
     mutationFn: (userId: string) => adminUsersApi.resetPassword(userId),
-  });
-}
-
-export function useDeleteUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (userId: string) => adminUsersApi.delete(userId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminUserKeys.all }),
   });
 }

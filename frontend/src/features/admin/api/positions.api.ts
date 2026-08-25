@@ -6,8 +6,12 @@ export interface PositionOption {
   label: string;
 }
 
+/**
+ * Alta de un cargo: quien lo crea solo escribe el nombre tal cual se lee
+ * ("Diseñador Gráfico"). La clave estable (`value`) la deriva el backend, así
+ * que la UI no le pide al administrador un dato técnico que no le aporta nada.
+ */
 export interface CreatePositionPayload {
-  key: string;
   label: string;
 }
 

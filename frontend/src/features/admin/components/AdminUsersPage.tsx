@@ -3,16 +3,20 @@ import {
   AlertCircle,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsUpDown,
+  ChevronUp,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   KeyRound,
   Pencil,
   Plus,
   Search,
   Sparkles,
-  Trash2,
   Upload,
   UserPlus,
   Users,
@@ -24,7 +28,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { Role, canActOnTarget } from "@/features/auth/types";
+import { Role } from "@/features/auth/types";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useDebouncedValue } from "@/features/projects/utils/use-debounced-value";
 import { usePositions, useCreatePosition } from "../hooks/use-positions";
@@ -32,11 +36,15 @@ import {
   useAdminUsers,
   useBulkCreateUsers,
   useCreateUser,
-  useDeleteUser,
   useResetPassword,
   useUpdateUser,
 } from "../hooks/use-admin-users";
-import type { AdminUser, BulkCreateUsersResult } from "../api/users.api";
+import type {
+  AdminUser,
+  AdminUserSortField,
+  BulkCreateUsersResult,
+  SortDirection,
+} from "../api/users.api";
 import type { DocumentType } from "@/features/projects/types/api.types";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/projects/types/labels";
 import { parseUsersCsv, type ParsedUsersCsv } from "../utils/parse-users-csv";
@@ -134,18 +142,20 @@ function NewPositionInlineForm({
   onCreated: (value: string) => void;
   onCancel: () => void;
 }) {
-  const [key, setKey] = useState("");
+  // Un solo campo: el cargo tal cual se lee ("Diseñador Gráfico"). La clave
+  // interna la deriva el backend; pedírsela al administrador no le aportaba
+  // nada y hacía el formulario más difícil de completar.
   const [label, setLabel] = useState("");
   const createPosition = useCreatePosition();
 
-  const canSubmit = /^[a-z][a-z0-9_]*$/.test(key) && label.trim().length >= 2;
+  const canSubmit = label.trim().length >= 2 && !createPosition.isPending;
 
   const handleSubmit = () => {
     if (!canSubmit) {
       return;
     }
     createPosition.mutate(
-      { key, label: label.trim() },
+      { label: label.trim() },
       {
         onSuccess: (created) => {
           onCreated(created.value);
@@ -156,26 +166,27 @@ function NewPositionInlineForm({
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
-      <div className="grid grid-cols-2 gap-2">
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">Nombre del cargo</span>
         <input
           className={inputCls}
-          placeholder="clave_del_cargo"
-          aria-label="Clave del cargo"
-          value={key}
-          onChange={(e) => {
-            setKey(e.target.value.toLowerCase().replace(/\s+/g, "_"));
-          }}
-        />
-        <input
-          className={inputCls}
-          placeholder="Etiqueta visible"
-          aria-label="Etiqueta del cargo"
+          placeholder="Ej.: Diseñador Gráfico"
+          aria-label="Nombre del cargo"
           value={label}
           onChange={(e) => {
             setLabel(e.target.value);
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
         />
-      </div>
+      </label>
+      <p className="text-[11px] text-muted-foreground">
+        Escríbelo tal como quieres que se vea, con tildes y mayúsculas.
+      </p>
       {createPosition.isError && (
         <p role="alert" className="text-xs text-red-600 dark:text-red-400">
           {getErrorMessage(createPosition.error, "No se pudo crear el cargo")}
@@ -192,7 +203,7 @@ function NewPositionInlineForm({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!canSubmit || createPosition.isPending}
+          disabled={!canSubmit}
           className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-60"
         >
           {createPosition.isPending ? "Creando…" : "Crear cargo"}
@@ -609,6 +620,23 @@ function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () => void
   );
 }
 
+// Fecha de alta en formato corto es-CO ("12 mar 2026"): la tabla solo necesita
+// el día, no la hora.
+function formatJoinDate(iso: string | null): string {
+  if (!iso) {
+    return "—";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return date.toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 // ── Fila de la tabla ──────────────────────────────────────────────────────────
 function UserRow({
   user,
@@ -621,30 +649,37 @@ function UserRow({
 }) {
   const updateUser = useUpdateUser();
   const resetPassword = useResetPassword();
-  const deleteUser = useDeleteUser();
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   // El developer/super_admin no se editan desde esta UI (evita pisar privilegios).
   const locked = user.role === "developer" || user.role === "super_admin";
   const assignableRoles = useMemo(() => getAssignableRoles(actorRole), [actorRole]);
-  // Solo se puede eliminar a alguien de rango estrictamente menor (un admin no
-  // puede eliminar a un super_admin, pero un super_admin sí a un admin).
-  const canDelete = canActOnTarget(actorRole, user.role);
 
   return (
     <>
-      <tr className={cn("border-b border-border", !user.is_active && "opacity-60")}>
-        <td className="px-3 py-2.5">
-          <p className="text-sm font-medium text-foreground">
+      <tr
+        className={cn(
+          "border-b border-border transition-colors last:border-0 hover:bg-accent/40",
+          // La cuenta inactiva se atenúa: sigue visible y accionable, pero se
+          // lee de un vistazo que no puede entrar al sistema.
+          !user.is_active && "bg-muted/30",
+        )}
+      >
+        <td className="px-5 py-3">
+          <p
+            className={cn(
+              "text-sm font-medium text-foreground",
+              !user.is_active && "text-muted-foreground",
+            )}
+          >
             {user.name} {user.last_name}
           </p>
           <p className="text-xs text-muted-foreground">{user.email}</p>
         </td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3 text-center">
           {locked ? (
-            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-foreground">
+            <span className="inline-block rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-foreground">
               {ROLE_LABEL[user.role] ?? user.role}
             </span>
           ) : (
@@ -665,24 +700,41 @@ function UserRow({
             </select>
           )}
         </td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3 text-center">
           <button
             type="button"
             disabled={locked || updateUser.isPending}
             onClick={() => {
               setConfirmToggle(true);
             }}
+            title={
+              user.is_active
+                ? "Desactivar: la cuenta deja de poder iniciar sesión"
+                : "Activar: la cuenta vuelve a poder iniciar sesión"
+            }
             className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
               user.is_active
                 ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
                 : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300",
             )}
           >
+            <span
+              aria-hidden
+              className={cn(
+                "size-1.5 rounded-full",
+                user.is_active ? "bg-emerald-500" : "bg-slate-400",
+              )}
+            />
             {user.is_active ? "Activo" : "Inactivo"}
           </button>
         </td>
-        <td className="px-3 py-2.5 text-right">
+        <td className="px-3 py-3 text-center text-xs text-muted-foreground">
+          {/* Las cuentas privilegiadas no exponen su fecha de alta: son cuentas
+              de plataforma, no personal que se dé de alta y de baja. */}
+          {locked ? "—" : formatJoinDate(user.created_at)}
+        </td>
+        <td className="px-5 py-3">
           <div className="flex items-center justify-end gap-1.5">
             {!locked && (
               <button
@@ -706,19 +758,6 @@ function UserRow({
             >
               <KeyRound className="size-3" /> Contraseña
             </button>
-            {canDelete && (
-              <button
-                type="button"
-                disabled={deleteUser.isPending}
-                onClick={() => {
-                  setConfirmDelete(true);
-                }}
-                aria-label={`Eliminar a ${user.name} ${user.last_name}`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950/30"
-              >
-                <Trash2 className="size-3" /> Eliminar
-              </button>
-            )}
           </div>
         </td>
       </tr>
@@ -775,31 +814,6 @@ function UserRow({
           }}
           onCancel={() => {
             setConfirmReset(false);
-          }}
-        />
-      )}
-
-      {confirmDelete && (
-        <ConfirmDialog
-          title="Eliminar usuario"
-          message={`Se eliminará la cuenta de ${user.name} ${user.last_name} (${user.email}). Esta acción no se puede deshacer desde aquí. ¿Continuar?`}
-          confirmLabel="Eliminar"
-          destructive
-          loading={deleteUser.isPending}
-          errorMessage={
-            deleteUser.isError
-              ? getErrorMessage(deleteUser.error, "No se pudo eliminar el usuario")
-              : null
-          }
-          onConfirm={() => {
-            deleteUser.mutate(user.id, {
-              onSuccess: () => {
-                setConfirmDelete(false);
-              },
-            });
-          }}
-          onCancel={() => {
-            setConfirmDelete(false);
           }}
         />
       )}
@@ -1209,6 +1223,60 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Cabecera ordenable ──────────────────────────────────────────────────────
+// El orden lo resuelve el backend (la lista está paginada), así que la
+// cabecera solo publica "por qué columna y en qué sentido".
+function SortableHeader({
+  field,
+  label,
+  sort,
+  onSort,
+  align = "center",
+}: {
+  field: AdminUserSortField;
+  label: string;
+  sort: { by: AdminUserSortField; dir: SortDirection };
+  onSort: (field: AdminUserSortField) => void;
+  align?: "left" | "center" | "right";
+}) {
+  const active = sort.by === field;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
+
+  return (
+    <th
+      scope="col"
+      // aria-sort le dice al lector de pantalla lo mismo que la flecha dice
+      // visualmente: por qué columna está ordenada la tabla.
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      className={cn(
+        "py-2.5",
+        // La tabla es text-left por defecto: la cabecera centrada tiene que
+        // pedir el centrado explícitamente para alinearse con su columna.
+        align === "left"
+          ? "px-5 text-left"
+          : align === "right"
+            ? "px-5 text-right"
+            : "px-3 text-center",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onSort(field);
+        }}
+        className={cn(
+          "inline-flex items-center gap-1 rounded transition hover:text-foreground",
+          align === "center" && "justify-center",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon className={cn("size-3.5", !active && "opacity-40")} />
+      </button>
+    </th>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export function AdminUsersPage() {
   const { user: authUser } = useAuth();
@@ -1216,14 +1284,30 @@ export function AdminUsersPage() {
   const assignableRoles = useMemo(() => getAssignableRoles(actorRole), [actorRole]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  // Por defecto la tabla muestra solo cuentas activas: las desactivadas son
+  // ruido en el día a día y se piden con el interruptor de abajo.
+  const [showInactive, setShowInactive] = useState(false);
+  const [sort, setSort] = useState<{ by: AdminUserSortField; dir: SortDirection }>({
+    by: "name",
+    dir: "asc",
+  });
   const debouncedSearch = useDebouncedValue(search);
 
-  // Al cambiar la búsqueda, volvemos a la página 1.
+  // Cualquier cambio que altere el conjunto de resultados nos devuelve a la
+  // página 1: quedarse en la 3 de una lista que ahora tiene 1 página deja la
+  // tabla vacía sin explicación.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, showInactive, sort]);
 
-  const query = useAdminUsers({ search: debouncedSearch, page, pageSize: PAGE_SIZE });
+  const query = useAdminUsers({
+    search: debouncedSearch,
+    page,
+    pageSize: PAGE_SIZE,
+    includeInactive: showInactive,
+    sortBy: sort.by,
+    sortDir: sort.dir,
+  });
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [creds, setCreds] = useState<{ title: string; email: string; password: string } | null>(
@@ -1234,8 +1318,17 @@ export function AdminUsersPage() {
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
   const users = query.data?.items ?? [];
 
+  // Click en la misma columna invierte el sentido; en otra, empieza ascendente.
+  const handleSort = (field: AdminUserSortField) => {
+    setSort((s) =>
+      s.by === field
+        ? { by: field, dir: s.dir === "asc" ? "desc" : "asc" }
+        : { by: field, dir: "asc" },
+    );
+  };
+
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden p-4 sm:p-6">
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden p-4 sm:p-6">
       <PageHeader
         title="Usuarios"
         description="Crea cuentas, asigna roles, activa/desactiva y restablece contraseñas."
@@ -1263,19 +1356,38 @@ export function AdminUsersPage() {
         }
       />
 
-      {/* Búsqueda (servidor, con debounce) */}
-      <div className="relative mb-3 shrink-0">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+      {/* Barra de filtros: búsqueda (servidor, con debounce) + inactivos */}
+      <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+            }}
+            placeholder="Buscar por nombre, correo o documento…"
+            aria-label="Buscar usuario"
+            className={`${inputCls} pl-9`}
+          />
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showInactive}
+          onClick={() => {
+            setShowInactive((v) => !v);
           }}
-          placeholder="Buscar por nombre o correo…"
-          aria-label="Buscar usuario"
-          className={`${inputCls} pl-9`}
-        />
+          className={cn(
+            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition",
+            showInactive
+              ? "border-brand-teal bg-brand-teal/10 text-brand-teal"
+              : "border-border text-muted-foreground hover:bg-accent",
+          )}
+        >
+          {showInactive ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+          Mostrar inactivos
+        </button>
       </div>
 
       {query.isLoading ? (
@@ -1289,17 +1401,37 @@ export function AdminUsersPage() {
         <EmptyState
           icon={Users}
           title="Sin resultados"
-          hint={debouncedSearch ? `Nada coincide con «${debouncedSearch}».` : "No hay usuarios."}
+          hint={
+            debouncedSearch
+              ? `Nada coincide con «${debouncedSearch}».`
+              : showInactive
+                ? "No hay usuarios."
+                : "No hay usuarios activos. Activa «Mostrar inactivos» para ver las cuentas desactivadas."
+          }
         />
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border">
-          <table className="w-full border-collapse text-left">
-            <thead className="sticky top-0 bg-card">
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b border-border text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2">Usuario</th>
-                <th className="px-15 py-2">Rol</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-0 py-2 text-right">Acciones</th>
+                <SortableHeader
+                  field="name"
+                  label="Usuario"
+                  sort={sort}
+                  onSort={handleSort}
+                  align="left"
+                />
+                <SortableHeader field="role" label="Rol" sort={sort} onSort={handleSort} />
+                <SortableHeader field="status" label="Estado" sort={sort} onSort={handleSort} />
+                <SortableHeader
+                  field="created_at"
+                  label="Fecha de alta"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <th scope="col" className="px-5 py-2.5 text-right">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1323,6 +1455,8 @@ export function AdminUsersPage() {
         <div className="mt-3 flex shrink-0 items-center justify-between text-xs text-muted-foreground">
           <span>
             {total} usuario{total !== 1 ? "s" : ""}
+            {!showInactive && " activo"}
+            {!showInactive && total !== 1 ? "s" : ""}
           </span>
           <div className="flex items-center gap-2">
             <button

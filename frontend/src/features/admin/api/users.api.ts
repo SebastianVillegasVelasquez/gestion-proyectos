@@ -12,6 +12,8 @@ export interface AdminUser {
   is_active: boolean;
   document_type: DocumentType | null;
   document_number: string | null;
+  /** Fecha de alta de la cuenta (ISO 8601) tal como la sirve el backend. */
+  created_at: string | null;
 }
 
 export interface CreateUserPayload {
@@ -67,17 +69,41 @@ export interface PaginatedUsers {
   page_size: number;
 }
 
+/** Columnas por las que el backend sabe ordenar la tabla de administración. */
+export type AdminUserSortField = "name" | "email" | "role" | "position" | "status" | "created_at";
+
+export type SortDirection = "asc" | "desc";
+
 export interface AdminUsersParams {
   search?: string;
   page?: number;
   pageSize?: number;
+  /** Falso oculta los usuarios desactivados (por defecto la tabla los oculta). */
+  includeInactive?: boolean;
+  sortBy?: AdminUserSortField;
+  sortDir?: SortDirection;
 }
 
 // Cliente HTTP de administración de usuarios. Solo traduce a la API.
 export const adminUsersApi = {
   // Paginado en el servidor: no traemos toda la tabla (puede haber miles).
-  search: ({ search, page = 1, pageSize = 20 }: AdminUsersParams = {}) => {
-    const params: Record<string, string | number> = { page, page_size: pageSize };
+  // El orden y el filtro de inactivos también van al servidor: ordenar en el
+  // cliente solo reordenaría la página ya recibida, no el total.
+  search: ({
+    search,
+    page = 1,
+    pageSize = 20,
+    includeInactive = true,
+    sortBy = "name",
+    sortDir = "asc",
+  }: AdminUsersParams = {}) => {
+    const params: Record<string, string | number | boolean> = {
+      page,
+      page_size: pageSize,
+      include_inactive: includeInactive,
+      sort_by: sortBy,
+      sort_dir: sortDir,
+    };
     if (search) {
       params.search = search;
     }
@@ -121,6 +147,4 @@ export const adminUsersApi = {
         temporary_password: string;
       }>(`/identity/users/${userId}/reset-password`)
       .then((r) => r.data),
-
-  delete: (userId: string) => http.delete(`/identity/users/${userId}`).then(() => undefined),
 };

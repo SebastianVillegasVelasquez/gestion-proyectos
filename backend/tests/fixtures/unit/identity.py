@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import List
 from uuid import UUID
 
@@ -19,6 +20,9 @@ class FakeUser:
     position: str = "sin_cargo"
     document_type: str | None = None
     document_number: str | None = None
+    # Espeja `TimestampMixin` del modelo real: las respuestas de usuario
+    # incluyen la fecha de alta.
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class FakeIdentityRepository:
