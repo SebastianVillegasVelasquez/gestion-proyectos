@@ -1389,6 +1389,15 @@ function NodeRow({
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
             {row.name}
           </span>
+          {/* Mismo aviso que en la Estructura: este elemento se sale del rango
+              de su padre. Aquí solo informa (las fechas se cuadran desde la
+              Estructura, que es donde se editan). */}
+          {row.conflictoFechas && (
+            <CalendarClock
+              className="size-3 shrink-0 text-rose-500"
+              aria-label={`${row.name} termina después que su elemento padre`}
+            />
+          )}
           {row.taskCount > 0 && (
             <span className="shrink-0 rounded-full bg-card px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
               {row.doneCount}/{row.taskCount}

@@ -87,6 +87,11 @@ class WorkItemResponse(BaseModelConfig):
     # no cuadran): prevalece el par de fechas, pero se avisa. Solo informativo y
     # transitorio (no se persiste); en lecturas siempre es False.
     advertencia_fechas: bool = False
+    # True cuando este elemento termina DESPUÉS que su padre. No bloquea nada:
+    # se puede recolocar y planificar libremente, y la UI marca el conflicto
+    # para que alguien decida si se recorta el hijo o se extiende el padre.
+    # Derivado en lectura (no se persiste): desaparece solo al cuadrar fechas.
+    conflicto_fechas: bool = False
 
 
 class WorkItemTreeResponse(WorkItemResponse):

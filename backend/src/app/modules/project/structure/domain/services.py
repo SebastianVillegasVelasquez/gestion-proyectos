@@ -121,7 +121,6 @@ class WorkTreeService:
             if parent.proyecto_id != proyecto_id:
                 raise ValidationError("El nodo padre pertenece a otro proyecto")
             self._validate_nesting(parent, tipo)
-            self._validate_end_date_within_parent(parent, data.fecha_fin_plan)
 
         orden = data.orden
         if orden is None:
@@ -157,9 +156,6 @@ class WorkTreeService:
             await self._get_valid_tipo_for_project(payload["tipo_id"], item.proyecto_id)
         for field, value in payload.items():
             setattr(item, field, value)
-        if item.parent_id is not None and "fecha_fin_plan" in payload:
-            parent = await self._get_active_item(item.parent_id)
-            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
         saved = await self.repo.save_item(item)
         return await self._respond_item(saved)
 
@@ -194,11 +190,13 @@ class WorkTreeService:
                 raise ValidationError(
                     "No se puede mover un nodo dentro de sí mismo o de un descendiente"
                 )
-            # El drag & drop del árbol es deliberadamente más permisivo que la
-            # creación guiada: solo bloqueamos ciclos, no las reglas de
-            # anidación por tipo (`tipos_hijos_permitidos`), para que
-            # cualquier nodo pueda reordenarse bajo cualquier otro.
-            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
+            # Recolocar es deliberadamente permisivo: solo bloqueamos ciclos.
+            # Ni las reglas de anidación por tipo (`tipos_hijos_permitidos`) ni
+            # las fechas impiden el movimiento; que un hijo termine después que
+            # su padre queda REGISTRADO y marcado como conflicto en lectura
+            # (`conflicto_fechas`), no rechazado. Bloquear obligaba a arreglar
+            # las fechas antes de poder reorganizar el árbol, que es justo al
+            # revés de como se planifica: primero se ordena, luego se ajusta.
 
         old_parent_id = item.parent_id
         item.parent_id = new_parent_id
@@ -508,12 +506,13 @@ class WorkTreeService:
 
     # ── Derivación de fechas (en lectura) ─────────────────────────────────────
     async def _respond_item(self, item: WorkItem) -> WorkItemResponse:
-        _, derivation = await self._project_derivation(item.proyecto_id)
+        items, derivation = await self._project_derivation(item.proyecto_id)
         derived = derivation.get(
             item.id,
             DerivedDates(item.fecha_inicio_plan, item.fecha_fin_plan, False),
         )
-        return self._to_item_response(item, derived)
+        conflicts = self._compute_date_conflicts(items, derivation)
+        return self._to_item_response(item, derived, item.id in conflicts)
 
     async def _project_derivation(
         self, proyecto_id: UUID
@@ -601,21 +600,27 @@ class WorkTreeService:
         return tipo
 
     @staticmethod
-    def _validate_end_date_within_parent(
-        parent: WorkItem, fecha_fin_plan: datetime.date | None
-    ) -> None:
-        """Un hijo no puede terminar después que su padre.
+    def _compute_date_conflicts(
+        items: list[WorkItem], derivation: dict[UUID, DerivedDates]
+    ) -> set[UUID]:
+        """Ids de los nodos que terminan después que su padre.
 
-        Compara fechas plan crudas (las que captura el usuario), no las
-        derivadas: si el hijo no tiene fecha de fin explícita (modo "solo
-        duración"), no hay nada que validar aquí.
+        Se calcula en LECTURA sobre las fechas derivadas (las efectivas, no las
+        que se escribieron), por dos motivos: un nodo en modo "solo duración"
+        no tiene fin propio y solo se sabe dónde acaba tras derivarlo, y así el
+        conflicto aparece venga de donde venga —recolocar el hijo, recortar el
+        padre o cambiar una duración— y no solo del drag & drop.
         """
-        if fecha_fin_plan is None or parent.fecha_fin_plan is None:
-            return
-        if fecha_fin_plan > parent.fecha_fin_plan:
-            raise ValidationError(
-                "La fecha de fin no puede ser posterior a la de su elemento padre"
-            )
+        items_by_id = {item.id: item for item in items}
+        conflicts: set[UUID] = set()
+        for item in items:
+            if item.parent_id is None or item.parent_id not in items_by_id:
+                continue
+            fin = derivation[item.id].fecha_fin_plan
+            fin_padre = derivation[item.parent_id].fecha_fin_plan
+            if fin is not None and fin_padre is not None and fin > fin_padre:
+                conflicts.add(item.id)
+        return conflicts
 
     @staticmethod
     def _validate_nesting(parent: WorkItem, child_tipo: TipoNodo) -> None:
@@ -668,8 +673,12 @@ class WorkTreeService:
     def _build_tree(
         self, items: list[WorkItem], derivation: dict[UUID, DerivedDates]
     ) -> list[WorkItemTreeResponse]:
+        conflicts = self._compute_date_conflicts(items, derivation)
         nodes = {
-            item.id: self._to_tree_response(item, derivation[item.id]) for item in items
+            item.id: self._to_tree_response(
+                item, derivation[item.id], item.id in conflicts
+            )
+            for item in items
         }
         roots: list[WorkItemTreeResponse] = []
         for item in items:
@@ -718,14 +727,20 @@ class WorkTreeService:
         }
 
     def _to_item_response(
-        self, item: WorkItem, derived: DerivedDates
+        self, item: WorkItem, derived: DerivedDates, conflicto: bool = False
     ) -> WorkItemResponse:
         return WorkItemResponse(
             **self._item_fields(item, derived),
             advertencia_fechas=derived.advertencia,
+            conflicto_fechas=conflicto,
         )
 
     def _to_tree_response(
-        self, item: WorkItem, derived: DerivedDates
+        self, item: WorkItem, derived: DerivedDates, conflicto: bool = False
     ) -> WorkItemTreeResponse:
-        return WorkItemTreeResponse(**self._item_fields(item, derived), children=[])
+        return WorkItemTreeResponse(
+            **self._item_fields(item, derived),
+            advertencia_fechas=derived.advertencia,
+            conflicto_fechas=conflicto,
+            children=[],
+        )

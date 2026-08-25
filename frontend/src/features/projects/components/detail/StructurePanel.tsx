@@ -6,6 +6,7 @@ import {
   Trash2,
   Repeat,
   AlertTriangle,
+  CalendarClock,
   Tag,
   ChevronRight,
   ChevronDown,
@@ -45,6 +46,7 @@ import {
   type DropPos,
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
+import { DateConflictModal } from "./DateConflictModal";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
@@ -197,7 +199,13 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
   );
 }
 
-function DateBadge({ node }: { node: WorkItemTree }) {
+function DateBadge({
+  node,
+  onResolveConflict,
+}: {
+  node: WorkItemTree;
+  onResolveConflict: () => void;
+}) {
   const hasRange = node.fecha_inicio_plan ?? node.fecha_fin_plan;
   if (!hasRange && node.duracion_valor == null) {
     return (
@@ -207,9 +215,30 @@ function DateBadge({ node }: { node: WorkItemTree }) {
   return (
     <span className="flex items-center gap-1.5">
       {hasRange && (
-        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <span
+          className={cn(
+            "rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+            // Termina más tarde que su padre: el rango se marca en rojo, pero
+            // el elemento se queda donde está. Cuadrar las fechas es una
+            // decisión de planificación, no un requisito para reorganizar.
+            node.conflicto_fechas
+              ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+          )}
+        >
           {fmt(node.fecha_inicio_plan)} → {fmt(node.fecha_fin_plan)}
         </span>
+      )}
+      {node.conflicto_fechas && (
+        <button
+          type="button"
+          onClick={onResolveConflict}
+          title={`«${node.nombre}» termina después que su elemento padre. Click para cuadrar las fechas.`}
+          aria-label={`Resolver conflicto de fechas de ${node.nombre}`}
+          className="flex shrink-0 items-center rounded-md p-0.5 text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+        >
+          <CalendarClock className="size-3.5" />
+        </button>
       )}
       {node.duracion_valor != null && (
         <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
@@ -235,6 +264,7 @@ interface TreeNodeProps {
   onClone: (node: WorkItemTree) => void;
   onDelete: (node: WorkItemTree) => void;
   onTasks: (node: WorkItemTree) => void;
+  onResolveConflict: (node: WorkItemTree) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   dropTarget: { id: string; pos: DropPos } | null;
@@ -257,6 +287,7 @@ function TreeNode({
   onClone,
   onDelete,
   onTasks,
+  onResolveConflict,
   draggingId,
   dropTarget,
   invalidDropIds,
@@ -391,7 +422,12 @@ function TreeNode({
               <span className="w-8 text-[11px] tabular-nums text-muted-foreground">{pct}%</span>
             </div>
           )}
-          <DateBadge node={node} />
+          <DateBadge
+            node={node}
+            onResolveConflict={() => {
+              onResolveConflict(node);
+            }}
+          />
           {/* Acciones rápidas (editar/eliminar) visibles al hover, además del
               menú kebab con el resto de opciones. */}
           <button
@@ -476,6 +512,7 @@ function TreeNode({
               onClone={onClone}
               onDelete={onDelete}
               onTasks={onTasks}
+              onResolveConflict={onResolveConflict}
               draggingId={draggingId}
               dropTarget={dropTarget}
               invalidDropIds={invalidDropIds}
@@ -732,6 +769,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
   const [tasksNode, setTasksNode] = useState<WorkItemTree | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkItemTree | null>(null);
+  // Elemento cuyo conflicto de fechas se está resolviendo (termina después que
+  // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
+  const [conflictItem, setConflictItem] = useState<WorkItemTree | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -1046,6 +1086,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onTasks={(n) => {
                     setTasksNode(n);
                   }}
+                  onResolveConflict={(n) => {
+                    setConflictItem(n);
+                  }}
                   draggingId={draggingId}
                   dropTarget={dropTarget}
                   invalidDropIds={invalidDropIds}
@@ -1062,6 +1105,26 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Conflicto de fechas: el elemento termina después que su padre. Solo
+          tiene sentido con un padre real (en la raíz no hay contra qué medir). */}
+      {conflictItem?.parent_id != null &&
+        (() => {
+          const parent = findNode(tree, conflictItem.parent_id);
+          if (!parent) {
+            return null;
+          }
+          return (
+            <DateConflictModal
+              projectId={projectId}
+              item={conflictItem}
+              parent={parent}
+              onClose={() => {
+                setConflictItem(null);
+              }}
+            />
+          );
+        })()}
 
       {modalOpen && (
         <WorkItemModal

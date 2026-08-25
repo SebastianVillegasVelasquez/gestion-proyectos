@@ -22,6 +22,7 @@ function node(over: Partial<WorkItemTree> & { id: string }): WorkItemTree {
     porcentaje_completado: null,
     es_transversal: false,
     advertencia_fechas: false,
+    conflicto_fechas: false,
     children: [],
     ...over,
   };

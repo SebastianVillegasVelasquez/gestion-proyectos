@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -39,7 +40,12 @@ vi.mock("../../utils/work-tree-dnd", async (importOriginal) => {
   return { ...actual, dropPosFromEvent: () => nextDropPos };
 });
 
-function node(id: string, children: WorkItemTree[] = [], parent_id: string | null): WorkItemTree {
+function node(
+  id: string,
+  children: WorkItemTree[] = [],
+  parent_id: string | null,
+  over: Partial<WorkItemTree> = {},
+): WorkItemTree {
   return {
     id,
     proyecto_id: "p1",
@@ -57,7 +63,9 @@ function node(id: string, children: WorkItemTree[] = [], parent_id: string | nul
     porcentaje_completado: null,
     es_transversal: false,
     advertencia_fechas: false,
+    conflicto_fechas: false,
     children,
+    ...over,
   };
 }
 
@@ -198,5 +206,77 @@ describe("StructurePanel · drag & drop de la estructura", () => {
 
     expect(structureApi.move).not.toHaveBeenCalled();
     expect(await screen.findByText(/es parte de su propio contenido/i)).toBeTruthy();
+  });
+});
+
+describe("StructurePanel · conflicto de fechas", () => {
+  // Padre2 termina el 31/01; Hijo2 se pasa hasta el 20/02 (p. ej. tras moverlo
+  // ahí): el movimiento se permitió y el conflicto queda marcado.
+  function conflictTree(): WorkItemTree[] {
+    const hijo2 = node("Hijo2", [], "Padre2", {
+      fecha_inicio_plan: "2026-01-05",
+      fecha_fin_plan: "2026-02-20",
+      conflicto_fechas: true,
+    });
+    const padre2 = node("Padre2", [hijo2], null, {
+      fecha_inicio_plan: "2026-01-01",
+      fecha_fin_plan: "2026-01-31",
+    });
+    return [padre2];
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(structureApi.tree).mockResolvedValue(conflictTree());
+    vi.mocked(structureApi.listTypes).mockResolvedValue(tipos);
+    vi.mocked(structureApi.update).mockResolvedValue({} as never);
+  });
+
+  it("ofrece recortar el hijo hasta el fin de su padre", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    await user.click(await screen.findByRole("button", { name: /Recortar Hijo2/i }));
+
+    await waitFor(() => {
+      expect(structureApi.update).toHaveBeenCalledWith("Hijo2", {
+        fecha_fin_plan: "2026-01-31",
+      });
+    });
+  });
+
+  it("ofrece extender el padre hasta el fin del hijo", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    await user.click(await screen.findByRole("button", { name: /Extender Padre2/i }));
+
+    await waitFor(() => {
+      expect(structureApi.update).toHaveBeenCalledWith("Padre2", {
+        fecha_fin_plan: "2026-02-20",
+      });
+    });
+  });
+
+  it("permite dejar el conflicto sin resolver", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByLabelText(/Resolver conflicto de fechas de Hijo2/i));
+    await user.click(await screen.findByRole("button", { name: /Dejarlo así por ahora/i }));
+
+    expect(structureApi.update).not.toHaveBeenCalled();
+  });
+
+  it("no marca conflicto cuando el hijo cabe en su padre", async () => {
+    vi.mocked(structureApi.tree).mockResolvedValue([
+      node("Padre2", [node("Hijo2", [], "Padre2")], null),
+    ]);
+    renderPanel();
+
+    await screen.findByText("Hijo2");
+    expect(screen.queryByLabelText(/Resolver conflicto de fechas/i)).toBeNull();
   });
 });
