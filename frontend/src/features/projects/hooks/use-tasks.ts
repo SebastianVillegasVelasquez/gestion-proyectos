@@ -3,6 +3,7 @@ import { tasksApi } from "@/features/projects/api/tasks.api";
 import { projectKeys, taskKeys } from "./query-keys";
 import type {
   BulkTasksFromBranchPayload,
+  CreateCommentPayload,
   CreateTaskPayload,
   CreateTimeEntryPayload,
   TaskStatus,
@@ -24,6 +25,31 @@ export function useWorkItemTasks(workItemId: string | undefined) {
     queryKey: taskKeys.byWorkItem(workItemId ?? ""),
     queryFn: () => tasksApi.listByWorkItem(workItemId!),
     enabled: Boolean(workItemId),
+  });
+}
+
+/** Conversación de una tarea. */
+export function useTaskComments(taskId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.comments(taskId ?? ""),
+    queryFn: () => tasksApi.comments(taskId!),
+    enabled: Boolean(taskId),
+  });
+}
+
+export function useAddComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCommentPayload) => tasksApi.addComment(taskId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.comments(taskId) }),
+  });
+}
+
+export function useDeleteComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => tasksApi.deleteComment(commentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.comments(taskId) }),
   });
 }
 

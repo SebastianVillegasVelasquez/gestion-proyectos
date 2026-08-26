@@ -113,6 +113,12 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # Dependencias finish-to-start: esta tarea no puede iniciar hasta que las
     # tareas de las que depende estén completadas.
+    comments: Mapped[list["TaskComment"]] = relationship(
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )
+
     time_entries: Mapped[list["TaskTimeEntry"]] = relationship(
         "TaskTimeEntry",
         back_populates="task",
@@ -216,3 +222,64 @@ class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     task: Mapped["Task"] = relationship("Task", back_populates="time_entries")
+
+
+class TaskComment(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Comentario en una tarea, con las personas mencionadas en él.
+
+    La conversación vive junto al trabajo y no en un chat aparte: quien llega
+    tarde a una tarea necesita leer por qué se decidió lo que se decidió.
+
+    Las menciones se guardan como filas propias (`TaskCommentMention`) y no
+    parseando el texto al vuelo: quién fue avisado es un hecho del pasado, y
+    editar el cuerpo del comentario no puede cambiarlo ni volver a notificar.
+    """
+
+    __tablename__ = "task_comments"
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    task: Mapped["Task"] = relationship("Task", back_populates="comments")
+    mentions: Mapped[list["TaskCommentMention"]] = relationship(
+        "TaskCommentMention",
+        back_populates="comment",
+        cascade="all, delete-orphan",
+    )
+
+
+class TaskCommentMention(Base, UUIDMixin, TimestampMixin):
+    """Persona mencionada en un comentario (y por tanto notificada)."""
+
+    __tablename__ = "task_comment_mentions"
+
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("task_comments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    comment: Mapped["TaskComment"] = relationship(
+        "TaskComment", back_populates="mentions"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("comment_id", "user_id", name="uq_comment_mention"),
+    )

@@ -32,6 +32,7 @@ export const taskKeys = {
   byWorkItem: (workItemId: string) => [...taskKeys.all, "work-item", workItemId] as const,
   dependencies: (taskId: string) => [...taskKeys.all, "deps", taskId] as const,
   effort: (taskId: string) => [...taskKeys.all, "effort", taskId] as const,
+  comments: (taskId: string) => [...taskKeys.all, "comments", taskId] as const,
   projectDependencies: (projectId: string) => [...taskKeys.all, "project-deps", projectId] as const,
 };
 

@@ -103,6 +103,23 @@ export interface WorkItem {
   conflicto_fechas: boolean;
 }
 
+/** Comentario de una tarea, con las personas mencionadas en él. */
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  author_name: string | null;
+  body: string;
+  mentioned_user_ids: string[];
+  created_at: string | null;
+}
+
+export interface CreateCommentPayload {
+  body: string;
+  /** Ids EXPLÍCITOS: el backend no adivina a quién apunta un "@algo". */
+  mentioned_user_ids?: string[];
+}
+
 /** Apunte de horas dedicadas a una tarea por una persona en un día. */
 export interface TimeEntry {
   id: string;

@@ -6,6 +6,8 @@ from app.modules.project.infrastructure.models import Project, ProjectMember
 
 from app.modules.tasks.infrastructure.models import (
     Task,
+    TaskComment,
+    TaskCommentMention,
     TaskDependency,
     TaskHistory,
     TaskTimeEntry,
@@ -44,6 +46,8 @@ __all__ = [
     "TaskHistory",
     "TaskDependency",
     "TaskTimeEntry",
+    "TaskComment",
+    "TaskCommentMention",
     # Teams
     "Team",
     "TeamMember",

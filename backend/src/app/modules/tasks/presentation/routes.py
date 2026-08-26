@@ -18,9 +18,12 @@ from app.modules.tasks.application.use_cases import (
     AttachTaskToWorkItemUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
+    AddCommentUseCase,
     CreateTasksFromBranchUseCase,
+    DeleteCommentUseCase,
     DeleteTimeEntryUseCase,
     GetTaskEffortUseCase,
+    ListCommentsUseCase,
     LogTimeUseCase,
     DeleteTaskUseCase,
     DetachTaskUseCase,
@@ -37,6 +40,8 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskDependencyRequest,
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
+    CommentResponse,
+    CreateCommentRequest,
     CreateTaskRequest,
     CreateTimeEntryRequest,
     TaskEffortResponse,
@@ -95,6 +100,47 @@ async def create_tasks_from_branch(
     return await CreateTasksFromBranchUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
     ).execute(item_id, payload)
+
+
+# ── Comentarios y menciones ───────────────────────────────────────────────────
+@router.post(
+    "/tasks/{task_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_comment(
+    task_id: UUID,
+    payload: CreateCommentRequest,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """Comenta una tarea. Los mencionados y el responsable reciben aviso."""
+    return await AddCommentUseCase(task_repo, bus).execute(
+        task_id, current_user.id, payload
+    )
+
+
+@router.get("/tasks/{task_id}/comments", response_model=list[CommentResponse])
+async def list_comments(
+    task_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Conversación de la tarea, del comentario más antiguo al más nuevo."""
+    return await ListCommentsUseCase(task_repo).execute(task_id)
+
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    comment_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Borra un comentario propio (o cualquiera si administras)."""
+    await DeleteCommentUseCase(task_repo).execute(
+        comment_id, current_user.id, current_user.role
+    )
 
 
 # ── Esfuerzo: estimación vs. horas dedicadas ──────────────────────────────────

@@ -10,12 +10,18 @@ from app.modules.tasks.domain.services import (
     TaskStatusService,
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
-from app.modules.tasks.infrastructure.models import TaskTimeEntry
+from app.modules.tasks.infrastructure.models import (
+    TaskComment,
+    TaskCommentMention,
+    TaskTimeEntry,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.tasks.presentation.schemas import (
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
+    CommentResponse,
+    CreateCommentRequest,
     CreateTaskRequest,
     CreateTimeEntryRequest,
     SkippedElementResponse,
@@ -34,6 +40,7 @@ from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import (
+    TaskCommented,
     TaskCompleted,
     TaskCreated,
     TaskReturned,
@@ -239,6 +246,97 @@ def _flatten_branch(branch, only_leaves: bool) -> list:
 
     walk(branch)
     return out
+
+
+class AddCommentUseCase:
+    """Publica un comentario en una tarea y avisa a quien corresponda.
+
+    Cualquiera con acceso puede comentar: la conversación es el mecanismo por
+    el que se pide una corrección o se explica una decisión, y limitarla a
+    administración la mandaría de vuelta a WhatsApp.
+    """
+
+    def __init__(self, task_repo: TaskRepository, bus: EventBus | None = None):
+        self.task_repo = task_repo
+        self._bus = bus
+
+    async def execute(
+        self, task_id: UUID, author_id: UUID, data: CreateCommentRequest
+    ) -> CommentResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        # Sin duplicados y sin autopmenciones: mencionarte a ti mismo no es una
+        # petición a nadie.
+        mentioned = [uid for uid in dict.fromkeys(data.mentioned_user_ids)]
+        comment = await self.task_repo.add_comment(
+            TaskComment(
+                task_id=task_id,
+                author_id=author_id,
+                body=data.body,
+                mentions=[TaskCommentMention(user_id=uid) for uid in mentioned],
+            )
+        )
+
+        if self._bus:
+            await self._bus.publish(
+                TaskCommented(
+                    task_id=task_id,
+                    comment_id=comment.id,
+                    author_id=author_id,
+                    assignee_id=task.assignee_id,
+                    mentioned_user_ids=tuple(mentioned),
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+
+        return CommentResponse(
+            id=comment.id,
+            task_id=comment.task_id,
+            author_id=comment.author_id,
+            body=comment.body,
+            mentioned_user_ids=mentioned,
+            created_at=comment.created_at,
+        )
+
+
+class ListCommentsUseCase:
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, task_id: UUID) -> list[CommentResponse]:
+        rows = await self.task_repo.get_comments(task_id)
+        return [
+            CommentResponse(
+                id=comment.id,
+                task_id=comment.task_id,
+                author_id=comment.author_id,
+                author_name=f"{name} {last_name}".strip(),
+                body=comment.body,
+                mentioned_user_ids=[m.user_id for m in comment.mentions],
+                created_at=comment.created_at,
+            )
+            for comment, name, last_name in rows
+        ]
+
+
+class DeleteCommentUseCase:
+    """Borra un comentario. Solo su autor o administración: lo que otro dijo no
+    se borra por la espalda."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, comment_id: UUID, actor_id: UUID, actor_role: str) -> None:
+        comment = await self.task_repo.get_comment(comment_id)
+        if comment is None or comment.is_deleted:
+            raise NotFoundError("El comentario no existe")
+        is_admin = role_satisfies(actor_role, ("admin", "super_admin", "developer"))
+        if comment.author_id != actor_id and not is_admin:
+            raise ForbiddenError("Solo puedes borrar tus propios comentarios")
+        # Borrado lógico: la conversación es la memoria de por qué se hizo algo.
+        comment.soft_delete()
 
 
 class LogTimeUseCase:

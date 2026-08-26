@@ -7,7 +7,12 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.structure.infrastructure.models import WorkItem
-from app.modules.tasks.infrastructure.models import Task, TaskDependency, TaskTimeEntry
+from app.modules.tasks.infrastructure.models import (
+    Task,
+    TaskComment,
+    TaskDependency,
+    TaskTimeEntry,
+)
 from app.shared.base_repository import BaseRepository
 
 
@@ -31,6 +36,28 @@ class TaskRepository(BaseRepository[Task]):
             .order_by(Task.start_date)
         )
         return list((await self._session.execute(query)).scalars().all())
+
+    # ── Comentarios ───────────────────────────────────────────────────────────
+    async def add_comment(self, comment: TaskComment) -> TaskComment:
+        self._session.add(comment)
+        await self._session.flush()
+        await self._session.refresh(comment)
+        return comment
+
+    async def get_comment(self, comment_id: UUID) -> TaskComment | None:
+        return await self._session.get(TaskComment, comment_id)
+
+    async def get_comments(self, task_id: UUID) -> Sequence[Row]:
+        """Comentarios de una tarea (los vivos), del más antiguo al más nuevo:
+        una conversación se lee en el orden en que ocurrió."""
+        query = (
+            select(TaskComment, User.name, User.last_name)
+            .join(User, TaskComment.author_id == User.id)
+            .where(TaskComment.task_id == task_id, TaskComment.deleted_at.is_(None))
+            .options(selectinload(TaskComment.mentions))
+            .order_by(TaskComment.created_at)
+        )
+        return (await self._session.execute(query)).all()
 
     # ── Registro de esfuerzo ──────────────────────────────────────────────────
     async def add_time_entry(self, entry: TaskTimeEntry) -> TaskTimeEntry:

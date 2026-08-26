@@ -1,5 +1,6 @@
 from app.modules.notifications.application.handlers import (
     NotifyOnMemberAssignedToProject,
+    NotifyOnTaskCommented,
     NotifyOnTaskCompleted,
     NotifyOnTaskCreated,
     NotifyOnTaskReturned,
@@ -14,6 +15,7 @@ from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events import EventBus
 from app.shared.events.events import (
     MemberAssigned,
+    TaskCommented,
     TaskCompleted,
     TaskCreated,
     TaskReturned,
@@ -36,6 +38,7 @@ def register_notification_handlers(
     bus.subscribe(TaskCreated, NotifyOnTaskCreated(notification_repo, broadcaster))
     bus.subscribe(TaskCompleted, NotifyOnTaskCompleted(notification_repo, broadcaster))
     bus.subscribe(TaskReturned, NotifyOnTaskReturned(notification_repo, broadcaster))
+    bus.subscribe(TaskCommented, NotifyOnTaskCommented(notification_repo, broadcaster))
 
     # Traceability handlers (record task actions in history)
     bus.subscribe(TaskCreated, RecordTaskCreationInTraceability(db))

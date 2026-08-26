@@ -71,6 +71,29 @@ class BulkTasksResultResponse(BaseModelConfig):
     total_elementos: int = 0
 
 
+class CreateCommentRequest(BaseModelConfig):
+    """Comentario en una tarea, con las personas mencionadas.
+
+    Las menciones llegan como una lista EXPLÍCITA de ids, no parseando "@algo"
+    del texto: dos personas pueden llamarse igual y un nombre puede escribirse
+    de varias formas. Quien escribe elige en un desplegable; el backend no
+    adivina a quién se refería.
+    """
+
+    body: Annotated[str, StringConstraints(min_length=1, max_length=4000)]
+    mentioned_user_ids: list[UUID] = []
+
+
+class CommentResponse(BaseModelConfig):
+    id: UUID
+    task_id: UUID
+    author_id: UUID
+    author_name: Optional[str] = None
+    body: str
+    mentioned_user_ids: list[UUID] = []
+    created_at: Optional[datetime] = None
+
+
 class CreateTaskRequest(TaskBase):
     # Las tareas pueden colgar del árbol flexible (un WorkItem, cualquier
     # nivel) o crearse sueltas, sin estructura todavía. `project_id` es
