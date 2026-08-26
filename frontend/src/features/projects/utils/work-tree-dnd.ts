@@ -88,6 +88,29 @@ export function computeMovePayload(
   return { new_parent_id: parentId, orden: index };
 }
 
+/**
+ * Ids que hay que plegar para "colapsar todo", dejando el primer nivel a la vista.
+ *
+ * Plegar TODOS los elementos con contenido —incluidos los de arriba— esconde el
+ * proyecto entero detrás de una sola fila, que no es lo que nadie busca al
+ * pulsar "colapsar": lo que se quiere es la foto de conjunto, ver de qué se
+ * compone el proyecto sin el detalle de dentro. Por eso los elementos raíz se
+ * quedan abiertos (sus hijos siguen visibles) y se pliega de ahí hacia dentro.
+ */
+export function collapsibleIdsBelowRoot(nodes: WorkItemTree[], depth = 0): string[] {
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.children.length === 0) {
+      continue;
+    }
+    if (depth > 0) {
+      ids.push(node.id);
+    }
+    ids.push(...collapsibleIdsBelowRoot(node.children, depth + 1));
+  }
+  return ids;
+}
+
 /** Movimiento para sacar un elemento un nivel hacia afuera: pasa a ser hermano
  * de quien lo contenía, colocado justo detrás de él.
  *

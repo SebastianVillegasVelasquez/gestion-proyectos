@@ -40,6 +40,7 @@ import {
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
 import {
+  collapsibleIdsBelowRoot,
   computeOutdentPayload,
   dropPosFromEvent,
   findNode,
@@ -72,16 +73,6 @@ function nodeMatches(node: WorkItemTree, query: string): boolean {
 }
 
 /** ids de todos los nodos que tienen hijos (para "colapsar todo"). */
-function collectParentIds(nodes: WorkItemTree[], acc: Set<string>): Set<string> {
-  for (const node of nodes) {
-    if (node.children.length > 0) {
-      acc.add(node.id);
-      collectParentIds(node.children, acc);
-    }
-  }
-  return acc;
-}
-
 /** Poda el árbol a los nodos que coinciden con la búsqueda o tienen un
  * descendiente que coincide. Los ancestros de un match quedan siempre
  * visibles: el llamador fuerza su expansión mientras hay búsqueda activa. */
@@ -524,19 +515,6 @@ function TreeNode({
                   onAddChild(node);
                 },
               },
-              // Solo tiene sentido si está dentro de algo: en el nivel
-              // principal no hay nivel del que salir.
-              ...(node.parent_id != null
-                ? [
-                    {
-                      label: "Sacar un nivel",
-                      icon: CornerLeftUp,
-                      onClick: () => {
-                        onOutdent(node);
-                      },
-                    },
-                  ]
-                : []),
               {
                 label: "Ordenar (dependencias)",
                 icon: Link2,
@@ -1104,7 +1082,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           type="button"
           onClick={() => {
             setCollapsedIds((prev) =>
-              prev.size > 0 ? new Set() : collectParentIds(tree, new Set()),
+              prev.size > 0 ? new Set() : new Set(collapsibleIdsBelowRoot(tree)),
             );
           }}
           className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

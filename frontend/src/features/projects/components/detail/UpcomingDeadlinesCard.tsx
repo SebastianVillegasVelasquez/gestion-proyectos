@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { CalendarClock, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/common/Skeleton";
 import { cn } from "@/lib/utils";
 import type { Task, TaskStatus } from "../../types/api.types";
 
@@ -40,7 +41,16 @@ function chip(due: string): { day: string; month: string } {
   return { day: d, month: MONTHS[Number(m) - 1] };
 }
 
-export function UpcomingDeadlinesCard({ projectId, tasks }: { projectId: string; tasks: Task[] }) {
+export function UpcomingDeadlinesCard({
+  projectId,
+  tasks,
+  loading = false,
+}: {
+  projectId: string;
+  tasks: Task[];
+  /** Las tareas aún no llegaron: la tarjeta se dibuja igual, con sus huecos. */
+  loading?: boolean;
+}) {
   const navigate = useNavigate();
 
   const items = useMemo(
@@ -71,7 +81,21 @@ export function UpcomingDeadlinesCard({ projectId, tasks }: { projectId: string;
           </button>
         </div>
 
-        {items.length === 0 ? (
+        {loading ? (
+          // Cinco huecos con la forma de una fila de vencimiento: al llegar
+          // los datos ocupan el mismo sitio y nada salta.
+          <div className="flex flex-1 flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="size-11 shrink-0 rounded-xl" />
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Skeleton className="h-3.5 w-3/4" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
             <CalendarClock className="size-7 text-muted-foreground/40" />
             <p className="text-sm italic text-muted-foreground">

@@ -16,6 +16,7 @@ import type { PieSectorDataItem } from "recharts/types/polar/Pie";
 import { CalendarRange, ChartPie, ListChecks, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/common/Skeleton";
 import type { Task, TaskPriority } from "../../types/api.types";
 import { deriveTaskMetrics, type StatusSegment } from "../../utils/task-metrics";
 import {
@@ -411,7 +412,14 @@ const VIEW_META: Record<View, { label: string; subtitle: string; icon: typeof Li
  * estado (donut) y el desempeño de entregas en el tiempo (barras). Se alternan
  * con un selector en la cabecera en vez de ocupar dos cards separados.
  */
-export function ProjectChartsCard({ tasks }: { tasks: Task[] }) {
+export function ProjectChartsCard({
+  tasks,
+  loading = false,
+}: {
+  tasks: Task[];
+  /** Las tareas aún no llegaron: la tarjeta se dibuja igual, con su hueco. */
+  loading?: boolean;
+}) {
   const [view, setView] = useState<View>("estado");
   const meta = VIEW_META[view];
   const Icon = meta.icon;
@@ -458,7 +466,24 @@ export function ProjectChartsCard({ tasks }: { tasks: Task[] }) {
           </div>
         </div>
 
-        {view === "estado" ? <StatusView tasks={tasks} /> : <DeliveryView tasks={tasks} />}
+        {loading ? (
+          // El hueco imita la forma del gráfico (aro + leyenda) para que al
+          // llegar los datos nada se mueva de sitio.
+          <div className="flex w-full flex-1 items-center justify-center gap-8 py-6">
+            <Skeleton className="size-36 rounded-full" />
+            <div className="flex flex-col gap-2.5">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-3.5 w-28" />
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Al montar, el contenido entra con un fundido corto: se percibe que
+          // el dato llegó sin hacer esperar a quien ya sabe lo que busca.
+          <div className="flex w-full flex-1 flex-col items-center animate-in fade-in-0 duration-500 motion-reduce:animate-none">
+            {view === "estado" ? <StatusView tasks={tasks} /> : <DeliveryView tasks={tasks} />}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  collapsibleIdsBelowRoot,
   findNode,
   subtreeIds,
   computeMovePayload,
@@ -202,5 +203,50 @@ describe("computeOutdentPayload", () => {
 
   it("devuelve null si el elemento no existe", () => {
     expect(computeOutdentPayload(deepTree(), "missing")).toBeNull();
+  });
+});
+
+describe("collapsibleIdsBelowRoot", () => {
+  // Raíz ─ 3 padres, cada uno con 3 hijos.
+  function proyecto(): WorkItemTree[] {
+    const padres = ["A", "B", "C"].map((p) =>
+      node(
+        p,
+        ["1", "2", "3"].map((h) => node(`${p}${h}`, [], p)),
+        "Raiz",
+      ),
+    );
+    return [node("Raiz", padres, null)];
+  }
+
+  it("deja la raíz abierta y pliega a sus hijos", () => {
+    // Se ve la raíz y sus 3 padres; el detalle de dentro queda plegado.
+    expect(collapsibleIdsBelowRoot(proyecto()).sort()).toEqual(["A", "B", "C"]);
+  });
+
+  it("no incluye la raíz: plegarla escondería el proyecto entero", () => {
+    expect(collapsibleIdsBelowRoot(proyecto())).not.toContain("Raiz");
+  });
+
+  it("pliega también los niveles más profundos", () => {
+    const nieto = node("A1a", [node("A1a1", [], "A1a")], "A1");
+    const hijo = node("A1", [nieto], "A");
+    const padre = node("A", [hijo], "Raiz");
+    const ids = collapsibleIdsBelowRoot([node("Raiz", [padre], null)]);
+    expect(ids.sort()).toEqual(["A", "A1", "A1a"]);
+  });
+
+  it("con varias raíces, todas quedan abiertas", () => {
+    const tree = [
+      node("R1", [node("R1a", [node("R1a1", [], "R1a")], "R1")], null),
+      node("R2", [node("R2a", [], "R2")], null),
+    ];
+    // R1 y R2 abiertas; se pliega R1a (que tiene contenido). R2a es hoja.
+    expect(collapsibleIdsBelowRoot(tree)).toEqual(["R1a"]);
+  });
+
+  it("no devuelve nada cuando no hay nada que plegar", () => {
+    expect(collapsibleIdsBelowRoot([node("Solo", [], null)])).toEqual([]);
+    expect(collapsibleIdsBelowRoot([])).toEqual([]);
   });
 });

@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree, useNodeTypes, useMoveWorkItem } from "../../hooks/use-structure";
 import { getErrorMessage } from "@/utils/get-error-message";
 import {
+  collapsibleIdsBelowRoot,
   dropPosFromEvent,
   findNode,
   subtreeIds,
@@ -654,21 +655,10 @@ export function GanttView({
     });
   };
 
-  // Todos los ids de nodo con hijos (para "colapsar / expandir todo"), tomados
-  // del árbol completo (no solo lo visible) para poder re-expandir desde cero.
-  const collapsibleIds = useMemo(() => {
-    const ids: string[] = [];
-    const walk = (nodes: typeof tree) => {
-      for (const n of nodes) {
-        if (n.children.length > 0) {
-          ids.push(n.id);
-          walk(n.children);
-        }
-      }
-    };
-    walk(tree);
-    return ids;
-  }, [tree]);
+  // Ids a plegar en "colapsar todo", tomados del árbol completo (no solo de lo
+  // visible) para poder re-expandir desde cero. Los elementos raíz se quedan
+  // abiertos: plegarlos también dejaría el cronograma en una sola fila.
+  const collapsibleIds = useMemo(() => collapsibleIdsBelowRoot(tree), [tree]);
   const allCollapsed =
     collapsibleIds.length > 0 && collapsibleIds.every((id) => collapsedNodes.has(id));
   const toggleAllNodes = () => {

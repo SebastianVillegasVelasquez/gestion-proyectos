@@ -359,11 +359,11 @@ describe("StructurePanel · sacar un elemento un nivel", () => {
     vi.mocked(structureApi.move).mockResolvedValue({} as never);
   });
 
-  /** Abre el menú de opciones de la fila que contiene `name`. */
-  async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
-    const row = rowFor(name);
-    const menuButton = within(row).getByLabelText("Opciones del elemento");
-    await user.click(menuButton);
+  /** El botón de sacar un nivel vive en la propia fila (no en el menú): con
+   * cientos de elementos, una acción escondida en la cabecera queda fuera de
+   * alcance desde el final del scroll. */
+  function outdentButton(name: string) {
+    return within(rowFor(name)).getByLabelText(new RegExp(`Sacar ${name} un nivel`, "i"));
   }
 
   it("saca un nieto para dejarlo junto a lo que lo contenía", async () => {
@@ -371,8 +371,7 @@ describe("StructurePanel · sacar un elemento un nivel", () => {
     renderPanel();
     await screen.findByText("Nieto1");
 
-    await openRowMenu(user, "Nieto1");
-    await user.click(await screen.findByRole("menuitem", { name: /Sacar un nivel/i }));
+    await user.click(outdentButton("Nieto1"));
 
     // Nieto1 estaba en Hijo1 (dentro de Padre1): sale a Padre1, detrás de Hijo1.
     await waitFor(() => {
@@ -388,8 +387,7 @@ describe("StructurePanel · sacar un elemento un nivel", () => {
     renderPanel();
     await screen.findByText("Hijo1");
 
-    await openRowMenu(user, "Hijo1");
-    await user.click(await screen.findByRole("menuitem", { name: /Sacar un nivel/i }));
+    await user.click(outdentButton("Hijo1"));
 
     await waitFor(() => {
       expect(structureApi.move).toHaveBeenCalledWith("Hijo1", {
@@ -399,12 +397,21 @@ describe("StructurePanel · sacar un elemento un nivel", () => {
     });
   });
 
-  it("no ofrece la opción en el nivel principal", async () => {
-    const user = userEvent.setup();
+  it("no ofrece sacar un nivel en el nivel principal", async () => {
     renderPanel();
     await screen.findByText("Padre1");
 
-    await openRowMenu(user, "Padre1");
+    // Padre1 ya está fuera de todo: no hay nivel del que salir.
+    expect(within(rowFor("Padre1")).queryByLabelText(/Sacar .* un nivel/i)).toBeNull();
+    expect(within(rowFor("Hijo1")).queryByLabelText(/Sacar .* un nivel/i)).toBeTruthy();
+  });
+
+  it("ya no duplica la acción en el menú de tres puntos", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Hijo1");
+
+    await user.click(within(rowFor("Hijo1")).getByLabelText("Opciones del elemento"));
 
     expect(await screen.findByRole("menu")).toBeTruthy();
     expect(screen.queryByRole("menuitem", { name: /Sacar un nivel/i })).toBeNull();

@@ -292,11 +292,10 @@ export function ProjectDetailView({
         </header>
 
         {/* Hero de estado */}
-        {tasksQuery.isLoading ? (
-          <div className="h-24 animate-pulse rounded-2xl bg-muted" />
-        ) : (
-          <ProjectHero project={project} metrics={metrics} />
-        )}
+        {/* Las cajas se dibujan desde el principio y esperan el dato dentro:
+            reemplazarlas por un rectángulo gris dejaba la pantalla sin forma y
+            hacía saltar todo el layout al llegar la respuesta. */}
+        <ProjectHero project={project} metrics={metrics} loading={tasksQuery.isLoading} />
 
         {/* Cuerpo en grid 60/40 */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
@@ -304,13 +303,13 @@ export function ProjectDetailView({
               alto sobrante: si no, la columna más corta termina antes y deja
               una franja en blanco a un lado. */}
           <div className="flex flex-col gap-5 lg:col-span-3">
-            {tasksQuery.isLoading ? (
-              <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-            ) : (
-              <ProjectChartsCard tasks={tasks} />
-            )}
+            <ProjectChartsCard tasks={tasks} loading={tasksQuery.isLoading} />
             <div className="flex flex-1 flex-col">
-              <UpcomingDeadlinesCard projectId={project.id} tasks={tasks} />
+              <UpcomingDeadlinesCard
+                projectId={project.id}
+                tasks={tasks}
+                loading={tasksQuery.isLoading}
+              />
             </div>
           </div>
 
