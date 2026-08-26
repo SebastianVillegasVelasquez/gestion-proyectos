@@ -28,6 +28,22 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def work_items_with_tasks(self, work_item_ids: list[UUID]) -> set[UUID]:
+        """De los elementos dados, cuáles ya tienen alguna tarea viva.
+
+        Una sola consulta para toda la rama: la carga masiva necesita saberlo de
+        cientos de piezas a la vez, y preguntarlo una por una era el cuello de
+        botella de la operación.
+        """
+        if not work_item_ids:
+            return set()
+        rows = await self._session.execute(
+            select(Task.work_item_id)
+            .where(Task.work_item_id.in_(work_item_ids), Task.deleted_at.is_(None))
+            .distinct()
+        )
+        return {row[0] for row in rows.all()}
+
     async def get_all_by_project(self, project_id: UUID) -> list[Task]:
         """Todas las tareas del proyecto: adjuntas a un elemento o sueltas."""
         query = (

@@ -66,7 +66,7 @@ export function ProjectActivityCard({ projectId }: { projectId: string }) {
   const items = activityQuery.data?.items ?? [];
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="flex flex-1 flex-col rounded-2xl">
       <CardContent className="flex h-full flex-col gap-3 py-5">
         <span className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground">
           <span className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">

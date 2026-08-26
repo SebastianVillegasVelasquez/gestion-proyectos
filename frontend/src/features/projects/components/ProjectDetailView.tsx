@@ -112,25 +112,30 @@ function SectionsCard({ projectId }: { projectId: string }) {
           </span>
           <p className="text-[15px] font-semibold text-foreground">Secciones del proyecto</p>
         </div>
-        {SECTIONS.map(({ to, label, meta, icon: Icon, accent }) => (
-          <button
-            key={to}
-            type="button"
-            onClick={() => void navigate(`/projects/${projectId}/${to}`)}
-            className="group flex items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-accent"
-          >
-            <div
-              className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${accent}`}
+        {/* Dos por fila: con seis secciones, la lista en columna estiraba esta
+            tarjeta muy por encima de la de al lado y dejaba un hueco blanco
+            debajo. En rejilla ocupan tres filas exactas, sin sobrantes. */}
+        <div className="grid flex-1 grid-cols-1 gap-1 sm:grid-cols-2">
+          {SECTIONS.map(({ to, label, meta, icon: Icon, accent }) => (
+            <button
+              key={to}
+              type="button"
+              onClick={() => void navigate(`/projects/${projectId}/${to}`)}
+              className="group flex items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-accent"
             >
-              <Icon className="size-[18px]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-foreground">{label}</p>
-              <p className="truncate text-xs text-muted-foreground">{meta}</p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-          </button>
-        ))}
+              <div
+                className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${accent}`}
+              >
+                <Icon className="size-[18px]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">{label}</p>
+                <p className="truncate text-xs text-muted-foreground">{meta}</p>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+            </button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
@@ -295,20 +300,26 @@ export function ProjectDetailView({
 
         {/* Cuerpo en grid 60/40 */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-          {/* Columna izquierda (~60%) */}
+          {/* Columna izquierda (~60%). La última tarjeta crece para ocupar el
+              alto sobrante: si no, la columna más corta termina antes y deja
+              una franja en blanco a un lado. */}
           <div className="flex flex-col gap-5 lg:col-span-3">
             {tasksQuery.isLoading ? (
               <div className="h-96 animate-pulse rounded-2xl bg-muted" />
             ) : (
               <ProjectChartsCard tasks={tasks} />
             )}
-            <UpcomingDeadlinesCard projectId={project.id} tasks={tasks} />
+            <div className="flex flex-1 flex-col">
+              <UpcomingDeadlinesCard projectId={project.id} tasks={tasks} />
+            </div>
           </div>
 
           {/* Columna derecha (~40%) */}
           <div className="flex flex-col gap-5 lg:col-span-2">
             <SectionsCard projectId={project.id} />
-            <ProjectActivityCard projectId={project.id} />
+            <div className="flex flex-1 flex-col">
+              <ProjectActivityCard projectId={project.id} />
+            </div>
           </div>
         </div>
 

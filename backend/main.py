@@ -63,6 +63,14 @@ async def lifespan(app: FastAPI):
     if not settings.IS_DEV and len(settings.SECRET_KEY) < 32:
         logger.warning("SECRET_KEY débil o ausente en un entorno no-dev: ...")
 
+    # Antes que nada: si la base se quedó atrás en migraciones, decirlo aquí y
+    # con claridad. Si no, se descubre pantalla por pantalla en forma de 500.
+    from app.core.database import AsyncSessionLocal
+    from app.core.schema_check import warn_if_schema_is_behind
+
+    engine = AsyncSessionLocal.kw["bind"]
+    await warn_if_schema_is_behind(engine)
+
     from app.core.seeding import run_seed
 
     await run_seed()

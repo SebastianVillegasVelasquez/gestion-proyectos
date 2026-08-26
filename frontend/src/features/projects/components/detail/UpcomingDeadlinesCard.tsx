@@ -53,7 +53,7 @@ export function UpcomingDeadlinesCard({ projectId, tasks }: { projectId: string;
   );
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="flex flex-1 flex-col rounded-2xl">
       <CardContent className="flex h-full flex-col gap-4 py-5">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-[15px] font-semibold text-foreground">

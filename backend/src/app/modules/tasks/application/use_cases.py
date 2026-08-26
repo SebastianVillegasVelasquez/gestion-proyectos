@@ -169,20 +169,27 @@ class CreateTasksFromBranchUseCase:
 
         candidates = _flatten_branch(branch, only_leaves=data.only_leaves)
 
+        # Qué elementos de la rama ya tienen tarea, en UNA consulta. Preguntarlo
+        # elemento a elemento era una consulta por pieza: sobre una unidad con
+        # cientos de piezas, cientos de idas y vueltas antes de crear nada.
+        already_with_tasks: set[UUID] = set()
+        if data.skip_with_tasks:
+            already_with_tasks = await self.task_repo.work_items_with_tasks(
+                [element.id for element in candidates]
+            )
+
         created: list[TaskResponse] = []
         skipped: list[SkippedElementResponse] = []
         for element in candidates:
-            if data.skip_with_tasks:
-                existing = await self.task_repo.get_by_work_item(element.id)
-                if any(not t.is_deleted for t in existing):
-                    skipped.append(
-                        SkippedElementResponse(
-                            work_item_id=element.id,
-                            nombre=element.nombre,
-                            motivo="Ya tiene una tarea",
-                        )
+            if element.id in already_with_tasks:
+                skipped.append(
+                    SkippedElementResponse(
+                        work_item_id=element.id,
+                        nombre=element.nombre,
+                        motivo="Ya tiene una tarea",
                     )
-                    continue
+                )
+                continue
             try:
                 task = await self.create_task.execute(
                     CreateTaskRequest(
