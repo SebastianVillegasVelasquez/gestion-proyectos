@@ -12,7 +12,7 @@ export interface AdminUser {
   is_active: boolean;
   document_type: DocumentType | null;
   document_number: string | null;
-  /** Fecha de alta de la cuenta (ISO 8601) tal como la sirve el backend. */
+  /** Ingreso al sistema: alta de la cuenta (ISO 8601), tal como la sirve el backend. */
   created_at: string | null;
 }
 

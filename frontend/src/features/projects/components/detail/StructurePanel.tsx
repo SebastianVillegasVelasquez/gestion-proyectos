@@ -14,6 +14,7 @@ import {
   Pencil,
   Link2,
   ListChecks,
+  ListPlus,
   Search,
   GanttChartSquare,
   ChevronsDownUp,
@@ -47,6 +48,8 @@ import {
   type DropPos,
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
+import { useProjectTasks } from "../../hooks/use-tasks";
+import { CreateTaskModal } from "../../tasks/CreateTaskModal";
 import { DateConflictModal } from "./DateConflictModal";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
@@ -276,6 +279,7 @@ interface TreeNodeProps {
   onTasks: (node: WorkItemTree) => void;
   onResolveConflict: (node: WorkItemTree) => void;
   onOutdent: (node: WorkItemTree) => void;
+  onCreateTask: (node: WorkItemTree) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -304,6 +308,7 @@ function TreeNode({
   onTasks,
   onResolveConflict,
   onOutdent,
+  onCreateTask,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -474,6 +479,27 @@ function TreeNode({
           >
             <Trash2 className="size-3.5" />
           </button>
+          {/* Sacar un nivel: acción rápida visible en CADA fila (además del
+              menú). Con cientos de elementos, cualquier cosa que viva solo en
+              la cabecera de la lista queda inalcanzable desde el final del
+              scroll; la salida tiene que estar en el propio elemento.
+              Se lleva consigo todo su contenido. */}
+          {node.parent_id != null && (
+            <button
+              onClick={() => {
+                onOutdent(node);
+              }}
+              title={
+                containerName
+                  ? `Sacar de «${containerName}», con todo su contenido`
+                  : "Sacar un nivel, con todo su contenido"
+              }
+              aria-label={`Sacar ${node.nombre} un nivel`}
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-teal/10 hover:text-brand-teal-dark group-hover:opacity-100 dark:hover:text-brand-teal"
+            >
+              <CornerLeftUp className="size-3.5" />
+            </button>
+          )}
           {/* Acción rápida (añadir dentro) visible al hover + resto en el menú.
               Un solo botón por fila mantiene limpia la vista con muchos nodos. */}
           <button
@@ -515,6 +541,16 @@ function TreeNode({
                 },
               },
               {
+                // Atajo al caso habitual: el elemento de la estructura ES la
+                // tarea que alguien tiene que hacer (un video, un guion). Abre
+                // el alta con el nombre ya puesto, para asignarla y poco más.
+                label: "Crear tarea de este elemento",
+                icon: ListPlus,
+                onClick: () => {
+                  onCreateTask(node);
+                },
+              },
+              {
                 label: "Tareas",
                 icon: ListChecks,
                 onClick: () => {
@@ -552,6 +588,7 @@ function TreeNode({
               onTasks={onTasks}
               onResolveConflict={onResolveConflict}
               onOutdent={onOutdent}
+              onCreateTask={onCreateTask}
               draggingId={draggingId}
               draggingIdRef={draggingIdRef}
               dropTarget={dropTarget}
@@ -796,6 +833,33 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
   );
 }
 
+/** Alta de una tarea a partir de un elemento de la estructura.
+ *
+ * Envuelve a `CreateTaskModal` solo para traer las tareas del proyecto (las
+ * necesita el selector de dependencias). Al vivir en un componente que se monta
+ * al abrir el modal, la Estructura no las pide mientras nadie las necesite.
+ */
+function CreateTaskFromNode({
+  projectId,
+  node,
+  onClose,
+}: {
+  projectId: string;
+  node: WorkItemTree;
+  onClose: () => void;
+}) {
+  const tasksQuery = useProjectTasks(projectId);
+  return (
+    <CreateTaskModal
+      projectId={projectId}
+      tasks={tasksQuery.data ?? []}
+      initialWorkItemId={node.id}
+      initialTitle={node.nombre}
+      onClose={onClose}
+    />
+  );
+}
+
 export function StructurePanel({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
   const treeQuery = useWorkTree(projectId);
@@ -808,6 +872,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const [depsItem, setDepsItem] = useState<WorkItemTree | null>(null);
   const [cloneSource, setCloneSource] = useState<WorkItemTree | null>(null);
   const [tasksNode, setTasksNode] = useState<WorkItemTree | null>(null);
+  // Elemento del que se está creando una tarea directamente (sin pasar por la
+  // lista de tareas del elemento).
+  const [taskFromNode, setTaskFromNode] = useState<WorkItemTree | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkItemTree | null>(null);
   // Elemento cuyo conflicto de fechas se está resolviendo (termina después que
   // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
@@ -1169,6 +1236,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setConflictItem(n);
                   }}
                   onOutdent={handleOutdent}
+                  onCreateTask={(n) => {
+                    setTaskFromNode(n);
+                  }}
                   draggingId={draggingId}
                   draggingIdRef={draggingIdRef}
                   dropTarget={dropTarget}
@@ -1185,6 +1255,16 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {taskFromNode && (
+        <CreateTaskFromNode
+          projectId={projectId}
+          node={taskFromNode}
+          onClose={() => {
+            setTaskFromNode(null);
+          }}
+        />
       )}
 
       {/* Conflicto de fechas: el elemento termina después que su padre. Solo

@@ -9,8 +9,8 @@ import { useResetPassword, useUpdateUser } from "../../hooks/use-admin-users";
 import { EditUserModal } from "./EditUserModal";
 import { getAssignableRoles, ROLE_LABEL } from "./users-ui";
 
-// Fecha de alta en formato corto es-CO ("12 mar 2026"): la tabla solo necesita
-// el día, no la hora.
+// Ingreso al sistema en formato corto es-CO ("12 mar 2026"): la tabla solo
+// necesita el día, no la hora.
 function formatJoinDate(iso: string | null): string {
   if (!iso) {
     return "—";

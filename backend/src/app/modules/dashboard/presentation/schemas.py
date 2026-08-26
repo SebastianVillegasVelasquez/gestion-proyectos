@@ -17,6 +17,9 @@ class TaskBoardItemResponse(BaseModelConfig):
     title: str
     status: str  # value del enum de tareas (ej. "en_progreso")
     project_name: str | None = None
+    # Permite que la vista del usuario agrupe sus tareas por proyecto y enlace
+    # a cada uno (con el nombre solo no se puede navegar).
+    project_id: UUID | None = None
     due_date: datetime.date
 
 

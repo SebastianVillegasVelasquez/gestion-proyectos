@@ -723,6 +723,29 @@ class TestMoveWorkItem:
         assert await self._ordered_children(service, hijo1.id) == []
         assert await self._ordered_children(service, padre2.id) == ["Nieto"]
 
+    async def test_moved_item_takes_its_whole_subtree_along(self, service):
+        """Al recolocar un elemento se lleva TODO lo que contiene: los hijos
+        cuelgan de él, no de su antigua posición, así que no hace falta mover
+        nada más a mano."""
+        t = await _tipo(service, "Nodo")
+        origen = await _item(service, t.id, "Origen")
+        familia = await _item(service, t.id, "Familia", parent_id=origen.id)
+        hijo = await _item(service, t.id, "Hijo", parent_id=familia.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=hijo.id)
+        destino = await _item(service, t.id, "Destino")
+
+        await service.move_item(familia.id, destino.id, None)
+
+        tree = await service.get_tree(PROYECTO)
+        destino_node = _find_in_tree(tree, destino.id)
+        familia_node = destino_node.children[0]
+        assert familia_node.id == familia.id
+        # La rama entera viaja con él, intacta y en el mismo orden.
+        assert [c.id for c in familia_node.children] == [hijo.id]
+        assert [c.id for c in familia_node.children[0].children] == [nieto.id]
+        # Y ya no queda nada colgando del origen.
+        assert _find_in_tree(tree, origen.id).children == []
+
     async def test_rejects_move_into_a_deep_descendant(self, service):
         """El ciclo se bloquea a cualquier profundidad, no solo con el hijo
         directo: meter el abuelo bajo su nieto desconectaría la rama."""

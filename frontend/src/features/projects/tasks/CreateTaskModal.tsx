@@ -33,18 +33,25 @@ export function CreateTaskModal({
   projectId,
   tasks,
   initialWorkItemId,
+  initialTitle,
   onClose,
 }: {
   projectId: string;
   tasks: Task[];
   /** Preselecciona el elemento (p. ej. al crear desde un nodo de la estructura). */
   initialWorkItemId?: string;
+  /** Título de partida. Al crear la tarea desde un elemento se precarga con su
+   * nombre: normalmente la tarea ES ese elemento ("Video 1", "Guion"), y quien
+   * la crea solo tiene que asignarla. Sigue siendo editable. */
+  initialTitle?: string;
   onClose: () => void;
 }) {
   const treeQuery = useWorkTree(projectId);
   const createTask = useCreateTask(projectId);
 
-  const [form, setForm] = useState<TaskFormState>(() => emptyTaskForm(initialWorkItemId));
+  const [form, setForm] = useState<TaskFormState>(() =>
+    emptyTaskForm(initialWorkItemId, initialTitle),
+  );
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
 

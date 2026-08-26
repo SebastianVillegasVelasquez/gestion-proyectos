@@ -27,6 +27,7 @@ def _panels_to_response(panels) -> DashboardPanelsResponse:
                 title=item.title,
                 status=item.status,
                 project_name=item.project_name,
+                project_id=item.project_id,
                 due_date=item.due_date,
             )
             for item in panels.task_board

@@ -174,7 +174,7 @@ export function AdminUsersPage() {
                 <SortableHeader field="status" label="Estado" sort={sort} onSort={handleSort} />
                 <SortableHeader
                   field="created_at"
-                  label="Fecha de alta"
+                  label="Ingreso al sistema"
                   sort={sort}
                   onSort={handleSort}
                 />

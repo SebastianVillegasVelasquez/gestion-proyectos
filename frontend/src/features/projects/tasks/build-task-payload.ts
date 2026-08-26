@@ -21,9 +21,9 @@ export interface TaskFormState {
   durationDays: string;
 }
 
-export function emptyTaskForm(workItemId = ""): TaskFormState {
+export function emptyTaskForm(workItemId = "", title = ""): TaskFormState {
   return {
-    title: "",
+    title,
     description: "",
     workItemId,
     assignmentMode: "none",

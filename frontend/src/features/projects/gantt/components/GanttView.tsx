@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import {
   Moon,
   Sun,
+  FolderTree,
   GanttChartSquare,
   Plus,
   TrendingUp,
@@ -717,6 +718,16 @@ export function GanttView({
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Atajo a la Estructura: es el viaje de ida y vuelta natural
+              (allí ya existe el botón "Cronograma"), y las fechas se editan
+              desde ese lado. */}
+          <button
+            type="button"
+            onClick={() => void navigate(`/projects/${project.id}/estructura`)}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+          >
+            <FolderTree className="size-4 text-brand-teal" /> Estructura
+          </button>
           <button
             type="button"
             onClick={() => void navigate(`/projects/${project.id}/tareas`)}
