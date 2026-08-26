@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_PRIORITY_LABELS } from "../../types/labels";
 import type { Task, TaskStatus } from "../../types/api.types";
 import { TaskEditForm } from "./TaskEditForm";
+import { TaskEffortPanel } from "../../tasks/TaskEffortPanel";
+import { TaskComments } from "../../tasks/TaskComments";
 import {
   useAttachTask,
   useChangeTaskStatus,
@@ -212,6 +214,16 @@ export function TaskDetailPanel({
                 </div>
               )}
             </dl>
+
+            {/* Esfuerzo: lo estimado frente a lo dedicado, y los apuntes de horas. */}
+            <div className="mt-5">
+              <TaskEffortPanel projectId={projectId} taskId={task.id} />
+            </div>
+
+            {/* Conversación: por qué se decidió lo que se decidió, junto a la tarea. */}
+            <div className="mt-5">
+              <TaskComments taskId={task.id} />
+            </div>
 
             {/* Ubicación en la estructura del proyecto: adjuntar, cambiar o quitar. */}
             <div className="mt-5">

@@ -52,6 +52,11 @@ const TaskDashboardPage = lazy(() =>
 const TasksPage = lazy(() =>
   import("@/features/projects/tasks/TasksPage.tsx").then((m) => ({ default: m.TasksPage })),
 );
+const ProjectReportPage = lazy(() =>
+  import("@/features/reports/components/ProjectReportPage.tsx").then((m) => ({
+    default: m.ProjectReportPage,
+  })),
+);
 const ProjectEstructuraPage = lazy(() =>
   import("@/features/projects/components/detail/ProjectEstructuraPage.tsx").then((m) => ({
     default: m.ProjectEstructuraPage,
@@ -118,6 +123,7 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
+          <Route path="/projects/:projectId/informe" element={<ProjectReportPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Route>

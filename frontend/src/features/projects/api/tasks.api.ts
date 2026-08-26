@@ -1,6 +1,13 @@
 import http from "@/lib/http";
 import type {
   AttachTaskPayload,
+  BulkTasksFromBranchPayload,
+  BulkTasksResult,
+  CreateCommentPayload,
+  CreateTimeEntryPayload,
+  TaskComment,
+  TaskEffort,
+  TimeEntry,
   CreateTaskPayload,
   Task,
   TaskDependency,
@@ -19,6 +26,28 @@ export const tasksApi = {
 
   // Crea una tarea bajo un WorkItem (el payload lleva work_item_id).
   create: (payload: CreateTaskPayload) => http.post<Task>("/tasks", payload).then((r) => r.data),
+
+  /** Crea de una vez una tarea por cada elemento de la rama que cuelga de `itemId`. */
+  createFromBranch: (itemId: string, payload: BulkTasksFromBranchPayload) =>
+    http.post<BulkTasksResult>(`/work-items/${itemId}/tasks/bulk`, payload).then((r) => r.data),
+
+  // ── Comentarios y menciones ─────────────────────────────────────────────
+  comments: (taskId: string) =>
+    http.get<TaskComment[]>(`/tasks/${taskId}/comments`).then((r) => r.data),
+
+  addComment: (taskId: string, payload: CreateCommentPayload) =>
+    http.post<TaskComment>(`/tasks/${taskId}/comments`, payload).then((r) => r.data),
+
+  deleteComment: (commentId: string) => http.delete(`/comments/${commentId}`).then(() => undefined),
+
+  // ── Esfuerzo: estimación vs. horas dedicadas ────────────────────────────
+  effort: (taskId: string) => http.get<TaskEffort>(`/tasks/${taskId}/effort`).then((r) => r.data),
+
+  logTime: (taskId: string, payload: CreateTimeEntryPayload) =>
+    http.post<TimeEntry>(`/tasks/${taskId}/time-entries`, payload).then((r) => r.data),
+
+  deleteTimeEntry: (entryId: string) =>
+    http.delete(`/time-entries/${entryId}`).then(() => undefined),
 
   update: (taskId: string, payload: UpdateTaskPayload) =>
     http.patch<Task>(`/tasks/${taskId}`, payload).then((r) => r.data),

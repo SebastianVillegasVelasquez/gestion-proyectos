@@ -7,6 +7,7 @@ import {
   ChevronRight,
   FolderTree,
   GanttChartSquare,
+  FileSpreadsheet,
   History,
   LayoutGrid,
   ListChecks,
@@ -80,6 +81,13 @@ const SECTIONS: {
     label: "Trazabilidad",
     meta: "Historial de cambios y eventos",
     icon: History,
+    accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  },
+  {
+    to: "informe",
+    label: "Informe",
+    meta: "Estado del proyecto y exportación",
+    icon: FileSpreadsheet,
     accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
   },
 ];

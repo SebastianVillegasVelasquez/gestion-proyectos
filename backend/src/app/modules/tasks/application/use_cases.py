@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
@@ -9,9 +10,23 @@ from app.modules.tasks.domain.services import (
     TaskStatusService,
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.tasks.infrastructure.models import (
+    TaskComment,
+    TaskCommentMention,
+    TaskTimeEntry,
+)
 from app.modules.tasks.infrastructure.repository import TaskRepository
+from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.tasks.presentation.schemas import (
+    BulkTasksFromBranchRequest,
+    BulkTasksResultResponse,
+    CommentResponse,
+    CreateCommentRequest,
     CreateTaskRequest,
+    CreateTimeEntryRequest,
+    SkippedElementResponse,
+    TaskEffortResponse,
+    TimeEntryResponse,
     TaskDependencyResponse,
     TaskResponse,
     TeamTaskItemResponse,
@@ -25,6 +40,7 @@ from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import (
+    TaskCommented,
     TaskCompleted,
     TaskCreated,
     TaskReturned,
@@ -110,6 +126,308 @@ class CreateTaskUseCase:
             )
 
         return created
+
+
+class CreateTasksFromBranchUseCase:
+    """Da de alta una tarea por cada elemento de una rama de la estructura.
+
+    Montar un proyecto significa convertir decenas de piezas del árbol en
+    trabajo asignado; hacerlo de una en una es el cuello de botella. Reutiliza
+    `CreateTaskUseCase` para cada elemento en vez de escribir en la tabla por su
+    cuenta: así las validaciones, las dependencias y los eventos (y por tanto
+    las notificaciones) son exactamente los mismos que al crear una tarea suelta.
+
+    Es idempotente en la práctica: por defecto salta los elementos que ya
+    tienen tarea, así que relanzarlo sobre la misma rama solo crea lo que falta.
+    """
+
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        user_repo: Repository,
+        project_repo: Repository,
+        bus: EventBus | None = None,
+    ):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+        self.create_task = CreateTaskUseCase(
+            task_repo, work_tree_repo, user_repo, project_repo, bus
+        )
+
+    async def execute(
+        self, root_item_id: UUID, data: BulkTasksFromBranchRequest
+    ) -> BulkTasksResultResponse:
+        root = await _get_work_item(self.work_tree_repo, root_item_id)
+        # Tomamos la rama del ÁRBOL (no de la tabla) para heredar las fechas
+        # efectivas, que es lo que se ve en el cronograma: un elemento puede no
+        # tener fechas propias y recibirlas de su duración o de su contenedor.
+        tree = await WorkTreeService(self.work_tree_repo).get_tree(root.proyecto_id)
+        branch = _find_branch(tree, root_item_id)
+        if branch is None:
+            raise NotFoundError("El elemento del árbol de trabajo no existe")
+
+        candidates = _flatten_branch(branch, only_leaves=data.only_leaves)
+
+        created: list[TaskResponse] = []
+        skipped: list[SkippedElementResponse] = []
+        for element in candidates:
+            if data.skip_with_tasks:
+                existing = await self.task_repo.get_by_work_item(element.id)
+                if any(not t.is_deleted for t in existing):
+                    skipped.append(
+                        SkippedElementResponse(
+                            work_item_id=element.id,
+                            nombre=element.nombre,
+                            motivo="Ya tiene una tarea",
+                        )
+                    )
+                    continue
+            try:
+                task = await self.create_task.execute(
+                    CreateTaskRequest(
+                        title=element.nombre,
+                        work_item_id=element.id,
+                        priority=data.priority,
+                        assignee_id=data.assignee_id,
+                        team_id=data.team_id,
+                        start_date=(
+                            element.fecha_inicio_plan if data.inherit_dates else None
+                        ),
+                        due_date=element.fecha_fin_plan if data.inherit_dates else None,
+                    )
+                )
+                created.append(task)
+            except (ValidationError, NotFoundError) as exc:
+                # Una pieza problemática (un nombre de una letra, fechas
+                # imposibles) no puede tumbar la carga entera: se reporta y se
+                # sigue, igual que en la carga masiva de usuarios por CSV.
+                skipped.append(
+                    SkippedElementResponse(
+                        work_item_id=element.id,
+                        nombre=element.nombre,
+                        motivo=str(exc),
+                    )
+                )
+
+        return BulkTasksResultResponse(
+            created=created, skipped=skipped, total_elementos=len(candidates)
+        )
+
+
+def _find_branch(nodes, item_id: UUID):
+    for node in nodes:
+        if node.id == item_id:
+            return node
+        found = _find_branch(node.children, item_id)
+        if found is not None:
+            return found
+    return None
+
+
+def _flatten_branch(branch, only_leaves: bool) -> list:
+    """Elementos candidatos de la rama, incluida su raíz cuando corresponde.
+
+    Con `only_leaves` nos quedamos con lo que no contiene nada más: los
+    elementos con contenido suelen ser agrupadores ("Unidad 3"), y lo que
+    alguien produce de verdad son sus piezas.
+    """
+    out: list = []
+
+    def walk(node) -> None:
+        # Recorrido en profundidad respetando `orden` DENTRO de cada nivel: así
+        # las tareas se crean en el mismo orden en que se lee el árbol. Ordenar
+        # la lista plana por `orden` mezclaría niveles (el 0 de una unidad con
+        # el 0 de sus piezas) y daría una secuencia arbitraria.
+        if not only_leaves or not node.children:
+            out.append(node)
+        for child in sorted(node.children, key=lambda c: (c.orden, c.nombre)):
+            walk(child)
+
+    walk(branch)
+    return out
+
+
+class AddCommentUseCase:
+    """Publica un comentario en una tarea y avisa a quien corresponda.
+
+    Cualquiera con acceso puede comentar: la conversación es el mecanismo por
+    el que se pide una corrección o se explica una decisión, y limitarla a
+    administración la mandaría de vuelta a WhatsApp.
+    """
+
+    def __init__(self, task_repo: TaskRepository, bus: EventBus | None = None):
+        self.task_repo = task_repo
+        self._bus = bus
+
+    async def execute(
+        self, task_id: UUID, author_id: UUID, data: CreateCommentRequest
+    ) -> CommentResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        # Sin duplicados y sin autopmenciones: mencionarte a ti mismo no es una
+        # petición a nadie.
+        mentioned = [uid for uid in dict.fromkeys(data.mentioned_user_ids)]
+        comment = await self.task_repo.add_comment(
+            TaskComment(
+                task_id=task_id,
+                author_id=author_id,
+                body=data.body,
+                mentions=[TaskCommentMention(user_id=uid) for uid in mentioned],
+            )
+        )
+
+        if self._bus:
+            await self._bus.publish(
+                TaskCommented(
+                    task_id=task_id,
+                    comment_id=comment.id,
+                    author_id=author_id,
+                    assignee_id=task.assignee_id,
+                    mentioned_user_ids=tuple(mentioned),
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+
+        return CommentResponse(
+            id=comment.id,
+            task_id=comment.task_id,
+            author_id=comment.author_id,
+            body=comment.body,
+            mentioned_user_ids=mentioned,
+            created_at=comment.created_at,
+        )
+
+
+class ListCommentsUseCase:
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, task_id: UUID) -> list[CommentResponse]:
+        rows = await self.task_repo.get_comments(task_id)
+        return [
+            CommentResponse(
+                id=comment.id,
+                task_id=comment.task_id,
+                author_id=comment.author_id,
+                author_name=f"{name} {last_name}".strip(),
+                body=comment.body,
+                mentioned_user_ids=[m.user_id for m in comment.mentions],
+                created_at=comment.created_at,
+            )
+            for comment, name, last_name in rows
+        ]
+
+
+class DeleteCommentUseCase:
+    """Borra un comentario. Solo su autor o administración: lo que otro dijo no
+    se borra por la espalda."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, comment_id: UUID, actor_id: UUID, actor_role: str) -> None:
+        comment = await self.task_repo.get_comment(comment_id)
+        if comment is None or comment.is_deleted:
+            raise NotFoundError("El comentario no existe")
+        is_admin = role_satisfies(actor_role, ("admin", "super_admin", "developer"))
+        if comment.author_id != actor_id and not is_admin:
+            raise ForbiddenError("Solo puedes borrar tus propios comentarios")
+        # Borrado lógico: la conversación es la memoria de por qué se hizo algo.
+        comment.soft_delete()
+
+
+class LogTimeUseCase:
+    """Apunta horas dedicadas a una tarea.
+
+    Cualquiera que trabaje en la tarea puede apuntar SUS horas: el apunte
+    queda a nombre de quien lo hace (no se puede registrar tiempo por otro),
+    que es lo que hace fiable el dato para pagar o para estimar mejor.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(
+        self, task_id: UUID, user_id: UUID, data: CreateTimeEntryRequest
+    ) -> TimeEntryResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        entry = await self.task_repo.add_time_entry(
+            TaskTimeEntry(
+                task_id=task_id,
+                user_id=user_id,
+                hours=data.hours,
+                work_date=data.work_date,
+                notes=data.notes,
+            )
+        )
+        return TimeEntryResponse(
+            id=entry.id,
+            task_id=entry.task_id,
+            user_id=entry.user_id,
+            hours=entry.hours,
+            work_date=entry.work_date,
+            notes=entry.notes,
+            created_at=entry.created_at,
+        )
+
+
+class GetTaskEffortUseCase:
+    """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, task_id: UUID) -> TaskEffortResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        rows = await self.task_repo.get_time_entries(task_id)
+        entries = [
+            TimeEntryResponse(
+                id=entry.id,
+                task_id=entry.task_id,
+                user_id=entry.user_id,
+                user_name=f"{name} {last_name}".strip(),
+                hours=entry.hours,
+                work_date=entry.work_date,
+                notes=entry.notes,
+                created_at=entry.created_at,
+            )
+            for entry, name, last_name in rows
+        ]
+        return TaskEffortResponse(
+            task_id=task_id,
+            estimated_hours=task.estimated_hours,
+            logged_hours=sum((e.hours for e in entries), Decimal("0")),
+            entries=entries,
+        )
+
+
+class DeleteTimeEntryUseCase:
+    """Borra un apunte de horas.
+
+    Solo su autor o alguien de administración: un apunte ajeno equivocado se
+    corrige hablando, no borrándolo por la espalda.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, entry_id: UUID, actor_id: UUID, actor_role: str) -> None:
+        entry = await self.task_repo.get_time_entry(entry_id)
+        if entry is None:
+            raise NotFoundError("El registro de horas no existe")
+        is_admin = role_satisfies(actor_role, ("admin", "super_admin", "developer"))
+        if entry.user_id != actor_id and not is_admin:
+            raise ForbiddenError("Solo puedes borrar tus propios registros de horas")
+        await self.task_repo.delete_time_entry(entry)
 
 
 class GetTasksByProjectUseCase:

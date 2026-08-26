@@ -103,6 +103,84 @@ export interface WorkItem {
   conflicto_fechas: boolean;
 }
 
+/** Comentario de una tarea, con las personas mencionadas en él. */
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  author_name: string | null;
+  body: string;
+  mentioned_user_ids: string[];
+  created_at: string | null;
+}
+
+export interface CreateCommentPayload {
+  body: string;
+  /** Ids EXPLÍCITOS: el backend no adivina a quién apunta un "@algo". */
+  mentioned_user_ids?: string[];
+}
+
+/** Apunte de horas dedicadas a una tarea por una persona en un día. */
+export interface TimeEntry {
+  id: string;
+  task_id: string;
+  user_id: string;
+  user_name: string | null;
+  hours: string;
+  work_date: string;
+  notes: string | null;
+  created_at: string | null;
+}
+
+export interface CreateTimeEntryPayload {
+  hours: string;
+  work_date: string;
+  notes?: string | null;
+}
+
+/** Estimado vs. dedicado de una tarea, con el detalle de los apuntes. */
+export interface TaskEffort {
+  task_id: string;
+  estimated_hours: string | null;
+  logged_hours: string;
+  entries: TimeEntry[];
+}
+
+/** Alta masiva de tareas a partir de una rama de la estructura. */
+export interface BulkTasksFromBranchPayload {
+  /** Solo los elementos sin contenido (los agrupadores no generan tarea). */
+  only_leaves?: boolean;
+  /** No duplicar: saltar los elementos que ya tienen tarea. */
+  skip_with_tasks?: boolean;
+  /** Heredar las fechas efectivas del elemento. */
+  inherit_dates?: boolean;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  team_id?: string | null;
+}
+
+export interface SkippedElement {
+  work_item_id: string;
+  nombre: string;
+  motivo: string;
+}
+
+export interface BulkTasksResult {
+  created: Task[];
+  skipped: SkippedElement[];
+  total_elementos: number;
+}
+
+/** Elemento borrado tal como lo lista la papelera del proyecto. */
+export interface TrashedItem {
+  id: string;
+  nombre: string;
+  tipo_nombre: string | null;
+  deleted_at: string | null;
+  /** Cuántos elementos volverían con él (los que contenía). */
+  contenido: number;
+}
+
 export interface WorkItemTree extends WorkItem {
   children: WorkItemTree[];
 }
@@ -175,6 +253,10 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string | null;
+  /** Esfuerzo estimado en horas (null = sin estimar). */
+  estimated_hours: string | null;
+  /** Horas realmente dedicadas: suma de los apuntes, calculada en lectura. */
+  logged_hours: string;
 }
 
 export interface CreateTaskPayload {
@@ -206,6 +288,7 @@ export interface UpdateTaskPayload {
   team_id?: string | null;
   start_date?: string;
   due_date?: string;
+  estimated_hours?: string | null;
 }
 
 export interface AttachTaskPayload {

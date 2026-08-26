@@ -16,6 +16,8 @@ from app.modules.project.structure.application.use_cases import (
     CreateWorkItemUseCase,
     DeleteTipoNodoUseCase,
     DeleteWorkItemUseCase,
+    ListTrashUseCase,
+    RestoreWorkItemUseCase,
     GetWorkItemUseCase,
     GetWorkTreeUseCase,
     ListTiposNodoUseCase,
@@ -33,6 +35,7 @@ from app.modules.project.structure.presentation.schemas import (
     MoveWorkItemRequest,
     ShiftWorkItemSubtreeRequest,
     TipoNodoResponse,
+    TrashedItemResponse,
     UpdateTipoNodoRequest,
     UpdateWorkItemRequest,
     WorkItemDependencyRequest,
@@ -149,6 +152,30 @@ async def delete_work_item(
     current_user=Depends(_admin),
 ):
     await DeleteWorkItemUseCase(repo).execute(item_id)
+
+
+@router.get("/projects/{proyecto_id}/trash", response_model=list[TrashedItemResponse])
+async def list_trash(
+    proyecto_id: UUID,
+    repo=Depends(worktree_repo_dependency),
+    current_user=Depends(_admin),
+):
+    """Papelera del proyecto: lo borrado que aún se puede recuperar.
+
+    Borrar un elemento se lleva por delante todo su contenido, así que la
+    papelera es la red de seguridad de esa operación.
+    """
+    return await ListTrashUseCase(repo).execute(proyecto_id)
+
+
+@router.post("/work-items/{item_id}/restore", response_model=WorkItemResponse)
+async def restore_work_item(
+    item_id: UUID,
+    repo=Depends(worktree_repo_dependency),
+    current_user=Depends(_admin),
+):
+    """Saca un elemento de la papelera junto con todo lo que contenía."""
+    return await RestoreWorkItemUseCase(repo).execute(item_id)
 
 
 @router.post("/work-items/{item_id}/move", response_model=WorkItemResponse)

@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/features/projects/api/tasks.api";
-import { taskKeys } from "./query-keys";
+import { projectKeys, taskKeys } from "./query-keys";
 import type {
+  BulkTasksFromBranchPayload,
+  CreateCommentPayload,
   CreateTaskPayload,
+  CreateTimeEntryPayload,
   TaskStatus,
   UpdateTaskPayload,
 } from "@/features/projects/types/api.types";
@@ -22,6 +25,78 @@ export function useWorkItemTasks(workItemId: string | undefined) {
     queryKey: taskKeys.byWorkItem(workItemId ?? ""),
     queryFn: () => tasksApi.listByWorkItem(workItemId!),
     enabled: Boolean(workItemId),
+  });
+}
+
+/** Conversación de una tarea. */
+export function useTaskComments(taskId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.comments(taskId ?? ""),
+    queryFn: () => tasksApi.comments(taskId!),
+    enabled: Boolean(taskId),
+  });
+}
+
+export function useAddComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCommentPayload) => tasksApi.addComment(taskId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.comments(taskId) }),
+  });
+}
+
+export function useDeleteComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => tasksApi.deleteComment(commentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.comments(taskId) }),
+  });
+}
+
+/** Esfuerzo de una tarea: estimación, horas dedicadas y sus apuntes. */
+export function useTaskEffort(taskId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.effort(taskId ?? ""),
+    queryFn: () => tasksApi.effort(taskId!),
+    enabled: Boolean(taskId),
+  });
+}
+
+export function useLogTime(projectId: string, taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateTimeEntryPayload) => tasksApi.logTime(taskId, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
+      // La lista del proyecto muestra "3 / 8 h" por fila: también cambia.
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+    },
+  });
+}
+
+export function useDeleteTimeEntry(projectId: string, taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: string) => tasksApi.deleteTimeEntry(entryId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+    },
+  });
+}
+
+/** Alta masiva de tareas desde una rama de la estructura. */
+export function useCreateTasksFromBranch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, payload }: { itemId: string; payload: BulkTasksFromBranchPayload }) =>
+      tasksApi.createFromBranch(itemId, payload),
+    onSuccess: () => {
+      // Toca a muchos elementos a la vez: invalidamos las tareas del proyecto
+      // en bloque en vez de intentar acertar con cada elemento tocado.
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+    },
   });
 }
 

@@ -8,6 +8,7 @@ export const projectKeys = {
   detail: (id: string) => [...projectKeys.all, "detail", id] as const,
   tree: (id: string) => [...projectKeys.detail(id), "tree"] as const,
   nodeTypes: (id: string) => [...projectKeys.detail(id), "node-types"] as const,
+  trash: (id: string) => [...projectKeys.detail(id), "trash"] as const,
   members: (id: string) => [...projectKeys.detail(id), "members"] as const,
   traceability: (id: string) => [...projectKeys.detail(id), "traceability"] as const,
   areas: (id: string) => [...projectKeys.detail(id), "areas"] as const,
@@ -30,6 +31,8 @@ export const taskKeys = {
   byProject: (projectId: string) => [...taskKeys.all, "project", projectId] as const,
   byWorkItem: (workItemId: string) => [...taskKeys.all, "work-item", workItemId] as const,
   dependencies: (taskId: string) => [...taskKeys.all, "deps", taskId] as const,
+  effort: (taskId: string) => [...taskKeys.all, "effort", taskId] as const,
+  comments: (taskId: string) => [...taskKeys.all, "comments", taskId] as const,
   projectDependencies: (projectId: string) => [...taskKeys.all, "project-deps", projectId] as const,
 };
 

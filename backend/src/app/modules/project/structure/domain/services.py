@@ -17,6 +17,7 @@ from app.modules.project.structure.presentation.schemas import (
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
+    TrashedItemResponse,
     UpdateTipoNodoRequest,
     UpdateWorkItemRequest,
     WorkItemDependencyResponse,
@@ -165,6 +166,74 @@ class WorkTreeService:
         all_items = await self.repo.list_items(item.proyecto_id)
         ids = self._descendant_ids(item_id, all_items)
         await self.repo.soft_delete_many(ids)
+
+    async def list_trash(self, proyecto_id: UUID) -> list[TrashedItemResponse]:
+        """Elementos borrados del proyecto, listos para restaurar.
+
+        Solo se listan las RAÍCES de cada borrado: al borrar un elemento se
+        borra con él todo su contenido, y enseñar las 300 piezas de una rama
+        junto a la rama misma no ayuda a nadie. Se indica cuántos elementos
+        volverían con cada uno.
+        """
+        deleted = await self.repo.list_deleted_items(proyecto_id)
+        deleted_ids = {item.id for item in deleted}
+        # Una raíz de borrado es la que no tiene a su contenedor también en la
+        # papelera: las demás cuelgan de ella y vuelven con ella.
+        roots = [
+            item
+            for item in deleted
+            if item.parent_id is None or item.parent_id not in deleted_ids
+        ]
+        children: dict[UUID, list[UUID]] = {}
+        for item in deleted:
+            if item.parent_id is not None:
+                children.setdefault(item.parent_id, []).append(item.id)
+
+        def descendants(root_id: UUID) -> int:
+            total = 0
+            stack = list(children.get(root_id, []))
+            while stack:
+                total += 1
+                stack.extend(children.get(stack.pop(), []))
+            return total
+
+        return [
+            TrashedItemResponse(
+                id=item.id,
+                nombre=item.nombre,
+                tipo_nombre=item.tipo.nombre if item.tipo else None,
+                deleted_at=item.deleted_at,
+                contenido=descendants(item.id),
+            )
+            for item in roots
+        ]
+
+    async def restore_item(self, item_id: UUID) -> WorkItemResponse:
+        """Saca un elemento de la papelera junto con todo lo que contenía.
+
+        Si el elemento que lo contenía sigue borrado, este vuelve al nivel
+        principal en vez de arrastrar de vuelta a sus ancestros: restaurar algo
+        no debería resucitar de paso una rama entera que nadie pidió. La
+        papelera solo ofrece las raíces de cada borrado (que sí vuelven a su
+        sitio), así que este caso llega por la API, no desde la pantalla.
+        """
+        item = await self.repo.get_item(item_id)
+        if item is None:
+            raise NotFoundError("Nodo de trabajo no encontrado")
+        if not item.is_deleted:
+            raise ValidationError("Este elemento no está en la papelera")
+
+        deleted = await self.repo.list_deleted_items(item.proyecto_id)
+        deleted_ids = {i.id for i in deleted}
+        ids = self._descendant_ids(item_id, deleted)
+        await self.repo.restore_many(ids)
+
+        if item.parent_id is not None and item.parent_id in deleted_ids:
+            item.parent_id = None
+            item.orden = await self.repo.next_orden(item.proyecto_id, None)
+            await self.repo.save_item(item)
+
+        return await self._respond_item(item)
 
     async def move_item(
         self, item_id: UUID, new_parent_id: UUID | None, orden: int | None

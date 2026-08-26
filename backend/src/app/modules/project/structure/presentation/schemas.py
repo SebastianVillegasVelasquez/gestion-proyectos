@@ -98,6 +98,20 @@ class WorkItemTreeResponse(WorkItemResponse):
     children: list["WorkItemTreeResponse"] = []
 
 
+class TrashedItemResponse(BaseModelConfig):
+    """Un elemento borrado, tal como se ve en la papelera del proyecto.
+
+    Se listan solo las raíces de cada borrado (lo que se borró explícitamente),
+    con `contenido` = cuántos elementos volverían con él.
+    """
+
+    id: UUID
+    nombre: str
+    tipo_nombre: Optional[str] = None
+    deleted_at: Optional[datetime.datetime] = None
+    contenido: int = 0
+
+
 # ── Clonado de subárbol (copiar / pegar) ──────────────────────────────────────
 class CloneWorkItemRequest(BaseModelConfig):
     """Pega un subárbol bajo `target_parent_id` (null = raíz del proyecto).

@@ -56,6 +56,7 @@ export function TaskEditForm({
   const [assignment, setAssignment] = useState<Assignment>(initialAssignment(task));
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
   const [teamId, setTeamId] = useState(task.team_id ?? "");
+  const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours ?? "");
 
   const save = () => {
     const payload: UpdateTaskPayload = {};
@@ -74,6 +75,10 @@ export function TaskEditForm({
     }
     if ((dueDate || null) !== (task.due_date ?? null)) {
       payload.due_date = dueDate || undefined;
+    }
+    if ((estimatedHours || null) !== (task.estimated_hours ?? null)) {
+      // Vacío = sin estimar (null), no cero: son cosas distintas.
+      payload.estimated_hours = estimatedHours || null;
     }
 
     // Reasignación: persona XOR equipo. Se envía el otro campo en null para
@@ -157,7 +162,23 @@ export function TaskEditForm({
             ))}
           </select>
         </div>
-        <div />
+        <div>
+          <label className={labelClass} htmlFor="task-estimated">
+            Horas estimadas
+          </label>
+          <input
+            id="task-estimated"
+            type="number"
+            step="0.25"
+            min="0"
+            placeholder="Sin estimar"
+            value={estimatedHours}
+            onChange={(e) => {
+              setEstimatedHours(e.target.value);
+            }}
+            className={fieldClass}
+          />
+        </div>
         <div>
           <label className={labelClass} htmlFor="task-start">
             Inicio
