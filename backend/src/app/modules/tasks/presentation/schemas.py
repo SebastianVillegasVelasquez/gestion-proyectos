@@ -22,6 +22,51 @@ class TaskBase(BaseModelConfig):
     status: Optional[TaskStatus] = None
 
 
+class BulkTasksFromBranchRequest(BaseModelConfig):
+    """Crea de una vez una tarea por cada elemento de una rama.
+
+    El caso real: una unidad con decenas de piezas (video, guion, quiz) donde
+    cada pieza es una tarea de alguien. Darlas de alta una por una es el cuello
+    de botella de montar un proyecto.
+    """
+
+    # Por defecto solo las HOJAS: los elementos con contenido suelen ser
+    # agrupadores ("Unidad 3"), y lo que alguien produce son sus piezas.
+    only_leaves: bool = True
+    # Un elemento que ya tiene tarea no se duplica; volver a lanzar la carga
+    # sobre la misma rama solo crea lo que falta.
+    skip_with_tasks: bool = True
+    # Hereda las fechas del elemento (las efectivas del cronograma). Si no,
+    # la tarea nace sin fechas y se planifica luego.
+    inherit_dates: bool = True
+
+    priority: TaskPriority = TaskPriority.MEDIA
+    assignee_id: Optional[UUID] = None
+    team_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def person_xor_team(self) -> "BulkTasksFromBranchRequest":
+        if self.assignee_id is not None and self.team_id is not None:
+            raise ValueError(
+                "Asigna las tareas a una persona o a un equipo, no a ambos"
+            )
+        return self
+
+
+class SkippedElementResponse(BaseModelConfig):
+    """Elemento de la rama para el que no se creó tarea, y por qué."""
+
+    work_item_id: UUID
+    nombre: str
+    motivo: str
+
+
+class BulkTasksResultResponse(BaseModelConfig):
+    created: list["TaskResponse"] = []
+    skipped: list[SkippedElementResponse] = []
+    total_elementos: int = 0
+
+
 class CreateTaskRequest(TaskBase):
     # Las tareas pueden colgar del árbol flexible (un WorkItem, cualquier
     # nivel) o crearse sueltas, sin estructura todavía. `project_id` es

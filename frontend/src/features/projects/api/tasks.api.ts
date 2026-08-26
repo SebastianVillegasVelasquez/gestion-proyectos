@@ -1,6 +1,8 @@
 import http from "@/lib/http";
 import type {
   AttachTaskPayload,
+  BulkTasksFromBranchPayload,
+  BulkTasksResult,
   CreateTaskPayload,
   Task,
   TaskDependency,
@@ -19,6 +21,10 @@ export const tasksApi = {
 
   // Crea una tarea bajo un WorkItem (el payload lleva work_item_id).
   create: (payload: CreateTaskPayload) => http.post<Task>("/tasks", payload).then((r) => r.data),
+
+  /** Crea de una vez una tarea por cada elemento de la rama que cuelga de `itemId`. */
+  createFromBranch: (itemId: string, payload: BulkTasksFromBranchPayload) =>
+    http.post<BulkTasksResult>(`/work-items/${itemId}/tasks/bulk`, payload).then((r) => r.data),
 
   update: (taskId: string, payload: UpdateTaskPayload) =>
     http.patch<Task>(`/tasks/${taskId}`, payload).then((r) => r.data),

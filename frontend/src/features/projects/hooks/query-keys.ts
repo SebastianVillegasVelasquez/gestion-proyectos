@@ -8,6 +8,7 @@ export const projectKeys = {
   detail: (id: string) => [...projectKeys.all, "detail", id] as const,
   tree: (id: string) => [...projectKeys.detail(id), "tree"] as const,
   nodeTypes: (id: string) => [...projectKeys.detail(id), "node-types"] as const,
+  trash: (id: string) => [...projectKeys.detail(id), "trash"] as const,
   members: (id: string) => [...projectKeys.detail(id), "members"] as const,
   traceability: (id: string) => [...projectKeys.detail(id), "traceability"] as const,
   areas: (id: string) => [...projectKeys.detail(id), "areas"] as const,

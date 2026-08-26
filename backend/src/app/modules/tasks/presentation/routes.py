@@ -18,6 +18,7 @@ from app.modules.tasks.application.use_cases import (
     AttachTaskToWorkItemUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
+    CreateTasksFromBranchUseCase,
     DeleteTaskUseCase,
     DetachTaskUseCase,
     GetProjectTaskDependenciesUseCase,
@@ -31,6 +32,8 @@ from app.modules.tasks.application.use_cases import (
 from app.modules.tasks.presentation.schemas import (
     AttachTaskRequest,
     CreateTaskDependencyRequest,
+    BulkTasksFromBranchRequest,
+    BulkTasksResultResponse,
     CreateTaskRequest,
     TaskDependencyResponse,
     TaskResponse,
@@ -60,6 +63,32 @@ async def create_task(
     return await CreateTaskUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
     ).execute(payload)
+
+
+@router.post(
+    "/work-items/{item_id}/tasks/bulk",
+    response_model=BulkTasksResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_tasks_from_branch(
+    item_id: UUID,
+    payload: BulkTasksFromBranchRequest,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """Crea una tarea por cada elemento de la rama que cuelga de `item_id`.
+
+    Pensado para montar de golpe el trabajo de una unidad completa. Los
+    elementos que ya tienen tarea se saltan (no se duplican), así que se puede
+    relanzar sobre la misma rama para crear solo lo que falta.
+    """
+    return await CreateTasksFromBranchUseCase(
+        task_repo, work_tree_repo, user_repo, project_repo, bus
+    ).execute(item_id, payload)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)

@@ -72,6 +72,27 @@ export function useUpdateWorkItem(projectId: string) {
   });
 }
 
+/** Papelera del proyecto. Solo se consulta al abrirla (`enabled`). */
+export function useProjectTrash(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: projectKeys.trash(projectId),
+    queryFn: () => structureApi.trash(projectId),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useRestoreWorkItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => structureApi.restore(itemId),
+    onSuccess: () => {
+      // Vuelve al árbol y desaparece de la papelera: las dos vistas cambian.
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: projectKeys.trash(projectId) });
+    },
+  });
+}
+
 export function useMoveWorkItem(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

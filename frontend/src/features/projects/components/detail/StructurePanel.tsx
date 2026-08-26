@@ -50,7 +50,9 @@ import {
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks } from "../../hooks/use-tasks";
 import { CreateTaskModal } from "../../tasks/CreateTaskModal";
+import { BulkTasksFromBranchModal } from "./BulkTasksFromBranchModal";
 import { DateConflictModal } from "./DateConflictModal";
+import { TrashModal } from "./TrashModal";
 import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
@@ -280,6 +282,7 @@ interface TreeNodeProps {
   onResolveConflict: (node: WorkItemTree) => void;
   onOutdent: (node: WorkItemTree) => void;
   onCreateTask: (node: WorkItemTree) => void;
+  onBulkTasks: (node: WorkItemTree) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -309,6 +312,7 @@ function TreeNode({
   onResolveConflict,
   onOutdent,
   onCreateTask,
+  onBulkTasks,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -550,6 +554,19 @@ function TreeNode({
                   onCreateTask(node);
                 },
               },
+              // Solo con contenido: sobre una pieza suelta ya está "Crear tarea
+              // de este elemento", que hace justo eso sin preguntar nada.
+              ...(node.children.length > 0
+                ? [
+                    {
+                      label: "Crear tareas de toda la rama",
+                      icon: ListPlus,
+                      onClick: () => {
+                        onBulkTasks(node);
+                      },
+                    },
+                  ]
+                : []),
               {
                 label: "Tareas",
                 icon: ListChecks,
@@ -589,6 +606,7 @@ function TreeNode({
               onResolveConflict={onResolveConflict}
               onOutdent={onOutdent}
               onCreateTask={onCreateTask}
+              onBulkTasks={onBulkTasks}
               draggingId={draggingId}
               draggingIdRef={draggingIdRef}
               dropTarget={dropTarget}
@@ -875,6 +893,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // Elemento del que se está creando una tarea directamente (sin pasar por la
   // lista de tareas del elemento).
   const [taskFromNode, setTaskFromNode] = useState<WorkItemTree | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
+  // Rama sobre la que se está creando trabajo en bloque.
+  const [bulkTasksNode, setBulkTasksNode] = useState<WorkItemTree | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkItemTree | null>(null);
   // Elemento cuyo conflicto de fechas se está resolviendo (termina después que
   // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
@@ -1112,6 +1133,16 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               secciones del proyecto). */}
           <button
             type="button"
+            onClick={() => {
+              setShowTrash(true);
+            }}
+            title="Ver y restaurar elementos borrados"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+          >
+            <Trash2 className="size-4 text-muted-foreground" /> Papelera
+          </button>
+          <button
+            type="button"
             onClick={() => void navigate(`/projects/${projectId}/gantt`)}
             className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
           >
@@ -1239,6 +1270,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onCreateTask={(n) => {
                     setTaskFromNode(n);
                   }}
+                  onBulkTasks={(n) => {
+                    setBulkTasksNode(n);
+                  }}
                   draggingId={draggingId}
                   draggingIdRef={draggingIdRef}
                   dropTarget={dropTarget}
@@ -1255,6 +1289,25 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {showTrash && (
+        <TrashModal
+          projectId={projectId}
+          onClose={() => {
+            setShowTrash(false);
+          }}
+        />
+      )}
+
+      {bulkTasksNode && (
+        <BulkTasksFromBranchModal
+          projectId={projectId}
+          node={bulkTasksNode}
+          onClose={() => {
+            setBulkTasksNode(null);
+          }}
+        />
       )}
 
       {taskFromNode && (

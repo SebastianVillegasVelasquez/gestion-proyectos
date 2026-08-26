@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/features/projects/api/tasks.api";
-import { taskKeys } from "./query-keys";
+import { projectKeys, taskKeys } from "./query-keys";
 import type {
+  BulkTasksFromBranchPayload,
   CreateTaskPayload,
   TaskStatus,
   UpdateTaskPayload,
@@ -22,6 +23,21 @@ export function useWorkItemTasks(workItemId: string | undefined) {
     queryKey: taskKeys.byWorkItem(workItemId ?? ""),
     queryFn: () => tasksApi.listByWorkItem(workItemId!),
     enabled: Boolean(workItemId),
+  });
+}
+
+/** Alta masiva de tareas desde una rama de la estructura. */
+export function useCreateTasksFromBranch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, payload }: { itemId: string; payload: BulkTasksFromBranchPayload }) =>
+      tasksApi.createFromBranch(itemId, payload),
+    onSuccess: () => {
+      // Toca a muchos elementos a la vez: invalidamos las tareas del proyecto
+      // en bloque en vez de intentar acertar con cada elemento tocado.
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+    },
   });
 }
 

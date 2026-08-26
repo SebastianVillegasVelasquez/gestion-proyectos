@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type * as workTreeDnd from "../../utils/work-tree-dnd";
 import { StructurePanel } from "./StructurePanel";
 import { structureApi } from "../../api/structure.api";
+import { tasksApi } from "../../api/tasks.api";
 import type { TipoNodo, WorkItemTree } from "../../types/api.types";
 
 vi.mock("../../api/structure.api", () => ({
@@ -20,6 +21,8 @@ vi.mock("../../api/structure.api", () => ({
     update: vi.fn(),
     remove: vi.fn(),
     move: vi.fn(),
+    trash: vi.fn(),
+    restore: vi.fn(),
     shift: vi.fn(),
     clone: vi.fn(),
     addDependency: vi.fn(),
@@ -29,6 +32,14 @@ vi.mock("../../api/structure.api", () => ({
 }));
 
 vi.mock("react-router", () => ({ useNavigate: () => vi.fn() }));
+
+vi.mock("../../api/tasks.api", () => ({
+  tasksApi: {
+    listByProject: vi.fn().mockResolvedValue([]),
+    createFromBranch: vi.fn(),
+    create: vi.fn(),
+  },
+}));
 
 // jsdom no calcula layout (getBoundingClientRect devuelve ceros) ni deja fijar
 // clientY en un DragEvent, así que la zona de suelta no se puede simular con
@@ -397,5 +408,132 @@ describe("StructurePanel · sacar un elemento un nivel", () => {
 
     expect(await screen.findByRole("menu")).toBeTruthy();
     expect(screen.queryByRole("menuitem", { name: /Sacar un nivel/i })).toBeNull();
+  });
+});
+
+describe("StructurePanel · papelera", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(structureApi.tree).mockResolvedValue(buildTree());
+    vi.mocked(structureApi.listTypes).mockResolvedValue(tipos);
+    vi.mocked(structureApi.restore).mockResolvedValue({} as never);
+    vi.mocked(structureApi.trash).mockResolvedValue([
+      {
+        id: "Borrado1",
+        nombre: "Unidad 4",
+        tipo_nombre: "Unidad",
+        deleted_at: new Date().toISOString(),
+        contenido: 12,
+      },
+    ]);
+  });
+
+  it("no consulta la papelera hasta que se abre", async () => {
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    expect(structureApi.trash).not.toHaveBeenCalled();
+  });
+
+  it("lista lo borrado con lo que contiene y lo restaura", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await user.click(screen.getByRole("button", { name: /Papelera/i }));
+
+    expect(await screen.findByText("Unidad 4")).toBeTruthy();
+    // La cuenta de lo que volvería con él es lo que decide si merece la pena.
+    expect(screen.getByText(/contiene 12 elementos/i)).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /Restaurar/i }));
+
+    await waitFor(() => {
+      expect(structureApi.restore).toHaveBeenCalledWith("Borrado1");
+    });
+  });
+
+  it("avisa cuando no hay nada borrado", async () => {
+    vi.mocked(structureApi.trash).mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await user.click(screen.getByRole("button", { name: /Papelera/i }));
+
+    expect(await screen.findByText(/No has borrado nada/i)).toBeTruthy();
+  });
+});
+
+describe("StructurePanel · tareas de toda la rama", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(structureApi.tree).mockResolvedValue(buildTree());
+    vi.mocked(structureApi.listTypes).mockResolvedValue(tipos);
+    vi.mocked(tasksApi.createFromBranch).mockResolvedValue({
+      created: [{ id: "t1" }, { id: "t2" }] as never,
+      skipped: [{ work_item_id: "Nieto1", nombre: "Nieto1", motivo: "Ya tiene una tarea" }],
+      total_elementos: 3,
+    });
+  });
+
+  async function openBulk(user: ReturnType<typeof userEvent.setup>, name: string) {
+    const row = rowFor(name);
+    await user.click(within(row).getByLabelText("Opciones del elemento"));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /Crear tareas de toda la rama/i }),
+    );
+  }
+
+  it("no ofrece la carga en bloque sobre un elemento sin contenido", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Nieto1");
+
+    const row = rowFor("Nieto1");
+    await user.click(within(row).getByLabelText("Opciones del elemento"));
+
+    expect(screen.queryByRole("menuitem", { name: /toda la rama/i })).toBeNull();
+  });
+
+  it("anticipa cuántas tareas saldrán y las crea", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await openBulk(user, "Padre1");
+    // Padre1 ─ Hijo1 ─ Nieto1: solo "Nieto1" es hoja, así que sale 1 tarea.
+    await user.click(await screen.findByRole("button", { name: /Crear 1 tareas/i }));
+
+    await waitFor(() => {
+      expect(tasksApi.createFromBranch).toHaveBeenCalledWith(
+        "Padre1",
+        expect.objectContaining({ only_leaves: true, skip_with_tasks: true }),
+      );
+    });
+  });
+
+  it("incluye los agrupadores al desmarcar «solo los que no contienen nada»", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await openBulk(user, "Padre1");
+    await user.click(screen.getByRole("checkbox", { name: /no contienen nada/i }));
+
+    // Ahora entran los tres elementos de la rama.
+    expect(await screen.findByRole("button", { name: /Crear 3 tareas/i })).toBeTruthy();
+  });
+
+  it("resume lo creado y lo que se saltó", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("Padre1");
+
+    await openBulk(user, "Padre1");
+    await user.click(await screen.findByRole("button", { name: /Crear 1 tareas/i }));
+
+    expect(await screen.findByText(/2 tareas creadas/i)).toBeTruthy();
+    expect(screen.getByText(/Ya tiene una tarea/i)).toBeTruthy();
   });
 });

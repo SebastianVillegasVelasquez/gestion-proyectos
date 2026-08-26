@@ -109,6 +109,23 @@ class FakeWorkTreeRepository(WorkTreeRepository):
             if item is not None:
                 item.soft_delete()
 
+    async def list_deleted_items(self, proyecto_id):
+        items = [
+            i
+            for i in self._items.values()
+            if i.proyecto_id == proyecto_id and i.is_deleted
+        ]
+        for item in items:
+            self._attach_tipo(item)
+        items.sort(key=lambda i: i.deleted_at, reverse=True)
+        return items
+
+    async def restore_many(self, item_ids):
+        for item_id in item_ids:
+            item = self._items.get(item_id)
+            if item is not None:
+                item.deleted_at = None
+
     async def add_dependency(self, dependency):
         if dependency.id is None:
             dependency.id = uuid.uuid4()
@@ -790,6 +807,85 @@ class TestMoveWorkItem:
         # nuevo padre el 31/01.
         assert moved.conflicto_fechas is True
         assert moved.fecha_fin_plan == D(2026, 3, 31)
+
+
+class TestTrash:
+    """Papelera: borrar es reversible mientras nadie vacíe nada.
+
+    Es la red de seguridad de una operación cara: borrar un elemento se lleva
+    por delante toda su rama.
+    """
+
+    async def _find(self, service, item_id):
+        return _find_in_tree(await service.get_tree(PROYECTO), item_id)
+
+    async def test_deleted_item_appears_in_trash_with_its_content_count(self, service):
+        t = await _tipo(service, "Nodo")
+        rama = await _item(service, t.id, "Rama")
+        hijo = await _item(service, t.id, "Hijo", parent_id=rama.id)
+        await _item(service, t.id, "Nieto", parent_id=hijo.id)
+
+        await service.delete_item(rama.id)
+        trash = await service.list_trash(PROYECTO)
+
+        # Solo la raíz del borrado, no las tres piezas por separado.
+        assert [t.nombre for t in trash] == ["Rama"]
+        assert trash[0].contenido == 2
+
+    async def test_restore_brings_back_the_whole_branch(self, service):
+        t = await _tipo(service, "Nodo")
+        rama = await _item(service, t.id, "Rama")
+        hijo = await _item(service, t.id, "Hijo", parent_id=rama.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=hijo.id)
+        await service.delete_item(rama.id)
+
+        await service.restore_item(rama.id)
+
+        tree = await service.get_tree(PROYECTO)
+        restaurada = _find_in_tree(tree, rama.id)
+        assert restaurada is not None
+        assert [c.id for c in restaurada.children] == [hijo.id]
+        assert [c.id for c in restaurada.children[0].children] == [nieto.id]
+        assert await service.list_trash(PROYECTO) == []
+
+    async def test_restores_to_its_original_place(self, service):
+        t = await _tipo(service, "Nodo")
+        contenedor = await _item(service, t.id, "Contenedor")
+        dentro = await _item(service, t.id, "Dentro", parent_id=contenedor.id)
+        await service.delete_item(dentro.id)
+
+        restored = await service.restore_item(dentro.id)
+
+        assert restored.parent_id == contenedor.id
+
+    async def test_restoring_into_a_deleted_container_lands_at_root(self, service):
+        """Si lo que lo contenía sigue borrado, vuelve al nivel principal en vez
+        de resucitar de paso una rama que nadie pidió."""
+        t = await _tipo(service, "Nodo")
+        contenedor = await _item(service, t.id, "Contenedor")
+        dentro = await _item(service, t.id, "Dentro", parent_id=contenedor.id)
+        await service.delete_item(contenedor.id)  # borra ambos
+
+        # La papelera solo ofrece "Contenedor" (la raíz del borrado); llegar a
+        # "Dentro" por separado solo es posible vía API.
+        assert [i.nombre for i in await service.list_trash(PROYECTO)] == ["Contenedor"]
+
+        restored = await service.restore_item(dentro.id)
+
+        assert restored.parent_id is None
+        # El contenedor sigue en la papelera: restaurar uno no arrastra al otro.
+        assert [i.nombre for i in await service.list_trash(PROYECTO)] == ["Contenedor"]
+
+    async def test_restoring_something_not_deleted_is_rejected(self, service):
+        t = await _tipo(service, "Nodo")
+        vivo = await _item(service, t.id, "Vivo")
+
+        with pytest.raises(ValidationError):
+            await service.restore_item(vivo.id)
+
+    async def test_restoring_an_unknown_item_is_rejected(self, service):
+        with pytest.raises(NotFoundError):
+            await service.restore_item(uuid.uuid4())
 
 
 class TestDateConflicts:

@@ -10,8 +10,12 @@ from app.modules.tasks.domain.services import (
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.repository import TaskRepository
+from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.tasks.presentation.schemas import (
+    BulkTasksFromBranchRequest,
+    BulkTasksResultResponse,
     CreateTaskRequest,
+    SkippedElementResponse,
     TaskDependencyResponse,
     TaskResponse,
     TeamTaskItemResponse,
@@ -110,6 +114,126 @@ class CreateTaskUseCase:
             )
 
         return created
+
+
+class CreateTasksFromBranchUseCase:
+    """Da de alta una tarea por cada elemento de una rama de la estructura.
+
+    Montar un proyecto significa convertir decenas de piezas del árbol en
+    trabajo asignado; hacerlo de una en una es el cuello de botella. Reutiliza
+    `CreateTaskUseCase` para cada elemento en vez de escribir en la tabla por su
+    cuenta: así las validaciones, las dependencias y los eventos (y por tanto
+    las notificaciones) son exactamente los mismos que al crear una tarea suelta.
+
+    Es idempotente en la práctica: por defecto salta los elementos que ya
+    tienen tarea, así que relanzarlo sobre la misma rama solo crea lo que falta.
+    """
+
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        user_repo: Repository,
+        project_repo: Repository,
+        bus: EventBus | None = None,
+    ):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+        self.create_task = CreateTaskUseCase(
+            task_repo, work_tree_repo, user_repo, project_repo, bus
+        )
+
+    async def execute(
+        self, root_item_id: UUID, data: BulkTasksFromBranchRequest
+    ) -> BulkTasksResultResponse:
+        root = await _get_work_item(self.work_tree_repo, root_item_id)
+        # Tomamos la rama del ÁRBOL (no de la tabla) para heredar las fechas
+        # efectivas, que es lo que se ve en el cronograma: un elemento puede no
+        # tener fechas propias y recibirlas de su duración o de su contenedor.
+        tree = await WorkTreeService(self.work_tree_repo).get_tree(root.proyecto_id)
+        branch = _find_branch(tree, root_item_id)
+        if branch is None:
+            raise NotFoundError("El elemento del árbol de trabajo no existe")
+
+        candidates = _flatten_branch(branch, only_leaves=data.only_leaves)
+
+        created: list[TaskResponse] = []
+        skipped: list[SkippedElementResponse] = []
+        for element in candidates:
+            if data.skip_with_tasks:
+                existing = await self.task_repo.get_by_work_item(element.id)
+                if any(not t.is_deleted for t in existing):
+                    skipped.append(
+                        SkippedElementResponse(
+                            work_item_id=element.id,
+                            nombre=element.nombre,
+                            motivo="Ya tiene una tarea",
+                        )
+                    )
+                    continue
+            try:
+                task = await self.create_task.execute(
+                    CreateTaskRequest(
+                        title=element.nombre,
+                        work_item_id=element.id,
+                        priority=data.priority,
+                        assignee_id=data.assignee_id,
+                        team_id=data.team_id,
+                        start_date=(
+                            element.fecha_inicio_plan if data.inherit_dates else None
+                        ),
+                        due_date=element.fecha_fin_plan if data.inherit_dates else None,
+                    )
+                )
+                created.append(task)
+            except (ValidationError, NotFoundError) as exc:
+                # Una pieza problemática (un nombre de una letra, fechas
+                # imposibles) no puede tumbar la carga entera: se reporta y se
+                # sigue, igual que en la carga masiva de usuarios por CSV.
+                skipped.append(
+                    SkippedElementResponse(
+                        work_item_id=element.id,
+                        nombre=element.nombre,
+                        motivo=str(exc),
+                    )
+                )
+
+        return BulkTasksResultResponse(
+            created=created, skipped=skipped, total_elementos=len(candidates)
+        )
+
+
+def _find_branch(nodes, item_id: UUID):
+    for node in nodes:
+        if node.id == item_id:
+            return node
+        found = _find_branch(node.children, item_id)
+        if found is not None:
+            return found
+    return None
+
+
+def _flatten_branch(branch, only_leaves: bool) -> list:
+    """Elementos candidatos de la rama, incluida su raíz cuando corresponde.
+
+    Con `only_leaves` nos quedamos con lo que no contiene nada más: los
+    elementos con contenido suelen ser agrupadores ("Unidad 3"), y lo que
+    alguien produce de verdad son sus piezas.
+    """
+    out: list = []
+
+    def walk(node) -> None:
+        # Recorrido en profundidad respetando `orden` DENTRO de cada nivel: así
+        # las tareas se crean en el mismo orden en que se lee el árbol. Ordenar
+        # la lista plana por `orden` mezclaría niveles (el 0 de una unidad con
+        # el 0 de sus piezas) y daría una secuencia arbitraria.
+        if not only_leaves or not node.children:
+            out.append(node)
+        for child in sorted(node.children, key=lambda c: (c.orden, c.nombre)):
+            walk(child)
+
+    walk(branch)
+    return out
 
 
 class GetTasksByProjectUseCase:

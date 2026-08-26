@@ -8,6 +8,7 @@ from app.modules.project.structure.presentation.schemas import (
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
+    TrashedItemResponse,
     UpdateTipoNodoRequest,
     UpdateWorkItemRequest,
     WorkItemDependencyResponse,
@@ -95,6 +96,24 @@ class DeleteWorkItemUseCase:
 
     async def execute(self, item_id: UUID) -> None:
         await self.service.delete_item(item_id)
+
+
+class ListTrashUseCase:
+    """Papelera del proyecto: lo borrado que todavía se puede recuperar."""
+
+    def __init__(self, repo: WorkTreeRepository):
+        self.service = WorkTreeService(repo)
+
+    async def execute(self, proyecto_id: UUID) -> list[TrashedItemResponse]:
+        return await self.service.list_trash(proyecto_id)
+
+
+class RestoreWorkItemUseCase:
+    def __init__(self, repo: WorkTreeRepository):
+        self.service = WorkTreeService(repo)
+
+    async def execute(self, item_id: UUID) -> WorkItemResponse:
+        return await self.service.restore_item(item_id)
 
 
 class MoveWorkItemUseCase:
