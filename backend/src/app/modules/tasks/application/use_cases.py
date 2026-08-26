@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
@@ -9,13 +10,17 @@ from app.modules.tasks.domain.services import (
     TaskStatusService,
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.tasks.infrastructure.models import TaskTimeEntry
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.tasks.presentation.schemas import (
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
     CreateTaskRequest,
+    CreateTimeEntryRequest,
     SkippedElementResponse,
+    TaskEffortResponse,
+    TimeEntryResponse,
     TaskDependencyResponse,
     TaskResponse,
     TeamTaskItemResponse,
@@ -234,6 +239,97 @@ def _flatten_branch(branch, only_leaves: bool) -> list:
 
     walk(branch)
     return out
+
+
+class LogTimeUseCase:
+    """Apunta horas dedicadas a una tarea.
+
+    Cualquiera que trabaje en la tarea puede apuntar SUS horas: el apunte
+    queda a nombre de quien lo hace (no se puede registrar tiempo por otro),
+    que es lo que hace fiable el dato para pagar o para estimar mejor.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(
+        self, task_id: UUID, user_id: UUID, data: CreateTimeEntryRequest
+    ) -> TimeEntryResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        entry = await self.task_repo.add_time_entry(
+            TaskTimeEntry(
+                task_id=task_id,
+                user_id=user_id,
+                hours=data.hours,
+                work_date=data.work_date,
+                notes=data.notes,
+            )
+        )
+        return TimeEntryResponse(
+            id=entry.id,
+            task_id=entry.task_id,
+            user_id=entry.user_id,
+            hours=entry.hours,
+            work_date=entry.work_date,
+            notes=entry.notes,
+            created_at=entry.created_at,
+        )
+
+
+class GetTaskEffortUseCase:
+    """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, task_id: UUID) -> TaskEffortResponse:
+        task = await self.task_repo.get_by_id(task_id)
+        if task is None or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        rows = await self.task_repo.get_time_entries(task_id)
+        entries = [
+            TimeEntryResponse(
+                id=entry.id,
+                task_id=entry.task_id,
+                user_id=entry.user_id,
+                user_name=f"{name} {last_name}".strip(),
+                hours=entry.hours,
+                work_date=entry.work_date,
+                notes=entry.notes,
+                created_at=entry.created_at,
+            )
+            for entry, name, last_name in rows
+        ]
+        return TaskEffortResponse(
+            task_id=task_id,
+            estimated_hours=task.estimated_hours,
+            logged_hours=sum((e.hours for e in entries), Decimal("0")),
+            entries=entries,
+        )
+
+
+class DeleteTimeEntryUseCase:
+    """Borra un apunte de horas.
+
+    Solo su autor o alguien de administración: un apunte ajeno equivocado se
+    corrige hablando, no borrándolo por la espalda.
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, entry_id: UUID, actor_id: UUID, actor_role: str) -> None:
+        entry = await self.task_repo.get_time_entry(entry_id)
+        if entry is None:
+            raise NotFoundError("El registro de horas no existe")
+        is_admin = role_satisfies(actor_role, ("admin", "super_admin", "developer"))
+        if entry.user_id != actor_id and not is_admin:
+            raise ForbiddenError("Solo puedes borrar tus propios registros de horas")
+        await self.task_repo.delete_time_entry(entry)
 
 
 class GetTasksByProjectUseCase:

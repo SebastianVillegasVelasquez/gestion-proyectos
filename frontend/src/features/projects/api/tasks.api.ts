@@ -3,6 +3,9 @@ import type {
   AttachTaskPayload,
   BulkTasksFromBranchPayload,
   BulkTasksResult,
+  CreateTimeEntryPayload,
+  TaskEffort,
+  TimeEntry,
   CreateTaskPayload,
   Task,
   TaskDependency,
@@ -25,6 +28,15 @@ export const tasksApi = {
   /** Crea de una vez una tarea por cada elemento de la rama que cuelga de `itemId`. */
   createFromBranch: (itemId: string, payload: BulkTasksFromBranchPayload) =>
     http.post<BulkTasksResult>(`/work-items/${itemId}/tasks/bulk`, payload).then((r) => r.data),
+
+  // ── Esfuerzo: estimación vs. horas dedicadas ────────────────────────────
+  effort: (taskId: string) => http.get<TaskEffort>(`/tasks/${taskId}/effort`).then((r) => r.data),
+
+  logTime: (taskId: string, payload: CreateTimeEntryPayload) =>
+    http.post<TimeEntry>(`/tasks/${taskId}/time-entries`, payload).then((r) => r.data),
+
+  deleteTimeEntry: (entryId: string) =>
+    http.delete(`/time-entries/${entryId}`).then(() => undefined),
 
   update: (taskId: string, payload: UpdateTaskPayload) =>
     http.patch<Task>(`/tasks/${taskId}`, payload).then((r) => r.data),

@@ -103,6 +103,32 @@ export interface WorkItem {
   conflicto_fechas: boolean;
 }
 
+/** Apunte de horas dedicadas a una tarea por una persona en un día. */
+export interface TimeEntry {
+  id: string;
+  task_id: string;
+  user_id: string;
+  user_name: string | null;
+  hours: string;
+  work_date: string;
+  notes: string | null;
+  created_at: string | null;
+}
+
+export interface CreateTimeEntryPayload {
+  hours: string;
+  work_date: string;
+  notes?: string | null;
+}
+
+/** Estimado vs. dedicado de una tarea, con el detalle de los apuntes. */
+export interface TaskEffort {
+  task_id: string;
+  estimated_hours: string | null;
+  logged_hours: string;
+  entries: TimeEntry[];
+}
+
 /** Alta masiva de tareas a partir de una rama de la estructura. */
 export interface BulkTasksFromBranchPayload {
   /** Solo los elementos sin contenido (los agrupadores no generan tarea). */
@@ -210,6 +236,10 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string | null;
+  /** Esfuerzo estimado en horas (null = sin estimar). */
+  estimated_hours: string | null;
+  /** Horas realmente dedicadas: suma de los apuntes, calculada en lectura. */
+  logged_hours: string;
 }
 
 export interface CreateTaskPayload {
@@ -241,6 +271,7 @@ export interface UpdateTaskPayload {
   team_id?: string | null;
   start_date?: string;
   due_date?: string;
+  estimated_hours?: string | null;
 }
 
 export interface AttachTaskPayload {

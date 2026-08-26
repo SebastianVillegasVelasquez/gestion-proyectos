@@ -8,6 +8,7 @@ from app.modules.tasks.infrastructure.models import (
     Task,
     TaskDependency,
     TaskHistory,
+    TaskTimeEntry,
 )
 
 # ── Teams models ──────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ __all__ = [
     "Task",
     "TaskHistory",
     "TaskDependency",
+    "TaskTimeEntry",
     # Teams
     "Team",
     "TeamMember",

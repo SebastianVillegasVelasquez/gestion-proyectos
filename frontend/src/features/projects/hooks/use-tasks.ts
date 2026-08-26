@@ -4,6 +4,7 @@ import { projectKeys, taskKeys } from "./query-keys";
 import type {
   BulkTasksFromBranchPayload,
   CreateTaskPayload,
+  CreateTimeEntryPayload,
   TaskStatus,
   UpdateTaskPayload,
 } from "@/features/projects/types/api.types";
@@ -23,6 +24,38 @@ export function useWorkItemTasks(workItemId: string | undefined) {
     queryKey: taskKeys.byWorkItem(workItemId ?? ""),
     queryFn: () => tasksApi.listByWorkItem(workItemId!),
     enabled: Boolean(workItemId),
+  });
+}
+
+/** Esfuerzo de una tarea: estimación, horas dedicadas y sus apuntes. */
+export function useTaskEffort(taskId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.effort(taskId ?? ""),
+    queryFn: () => tasksApi.effort(taskId!),
+    enabled: Boolean(taskId),
+  });
+}
+
+export function useLogTime(projectId: string, taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateTimeEntryPayload) => tasksApi.logTime(taskId, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
+      // La lista del proyecto muestra "3 / 8 h" por fila: también cambia.
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+    },
+  });
+}
+
+export function useDeleteTimeEntry(projectId: string, taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: string) => tasksApi.deleteTimeEntry(entryId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+    },
   });
 }
 

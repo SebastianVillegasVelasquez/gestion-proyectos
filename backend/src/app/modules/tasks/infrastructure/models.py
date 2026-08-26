@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from datetime import date
+from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, UUID, Enum, UniqueConstraint
+from sqlalchemy import ForeignKey, Numeric, UUID, Enum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import String, Text, Date, DateTime
 
@@ -41,6 +43,13 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # Toda tarea pertenece a un proyecto desde su creación, exista o no todavía
     # una estructura para colgarla. Es la referencia estable para listarlas.
+    # Esfuerzo ESTIMADO en horas (lo que se cree que costará). Lo realmente
+    # dedicado vive en `time_entries`: comparar ambos es lo que permite
+    # planificar mejor la próxima vez y sostener un modelo de pago por horas.
+    estimated_hours: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(6, 2), nullable=True
+    )
+
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
@@ -104,6 +113,12 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # Dependencias finish-to-start: esta tarea no puede iniciar hasta que las
     # tareas de las que depende estén completadas.
+    time_entries: Mapped[list["TaskTimeEntry"]] = relationship(
+        "TaskTimeEntry",
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )
+
     dependencies: Mapped[list["TaskDependency"]] = relationship(
         "TaskDependency",
         foreign_keys="TaskDependency.task_id",
@@ -170,3 +185,34 @@ class TaskDependency(Base, UUIDMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("task_id", "depends_on_id", name="uq_task_dependency"),
     )
+
+
+class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
+    """Horas dedicadas a una tarea por una persona en un día.
+
+    Se registra por DÍA y no como un cronómetro: aquí nadie va a arrancar y
+    parar un contador mientras graba un video; lo que se hace es apuntar al
+    final de la jornada. Cada apunte es una fila (no un acumulador) para poder
+    corregir uno sin recalcular nada, y para saber quién dedicó qué.
+    """
+
+    __tablename__ = "task_time_entries"
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    # Día al que se imputan las horas (no cuándo se apuntaron).
+    work_date: Mapped[date] = mapped_column(Date, nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    task: Mapped["Task"] = relationship("Task", back_populates="time_entries")

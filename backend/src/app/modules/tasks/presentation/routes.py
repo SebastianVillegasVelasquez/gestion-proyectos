@@ -19,6 +19,9 @@ from app.modules.tasks.application.use_cases import (
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
     CreateTasksFromBranchUseCase,
+    DeleteTimeEntryUseCase,
+    GetTaskEffortUseCase,
+    LogTimeUseCase,
     DeleteTaskUseCase,
     DetachTaskUseCase,
     GetProjectTaskDependenciesUseCase,
@@ -35,6 +38,9 @@ from app.modules.tasks.presentation.schemas import (
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
     CreateTaskRequest,
+    CreateTimeEntryRequest,
+    TaskEffortResponse,
+    TimeEntryResponse,
     TaskDependencyResponse,
     TaskResponse,
     TeamTaskItemResponse,
@@ -89,6 +95,48 @@ async def create_tasks_from_branch(
     return await CreateTasksFromBranchUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
     ).execute(item_id, payload)
+
+
+# ── Esfuerzo: estimación vs. horas dedicadas ──────────────────────────────────
+@router.post(
+    "/tasks/{task_id}/time-entries",
+    response_model=TimeEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def log_time(
+    task_id: UUID,
+    payload: CreateTimeEntryRequest,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Apunta horas dedicadas a una tarea, a nombre de quien las apunta.
+
+    No se registra tiempo por otra persona: el dato solo sirve para estimar y
+    para pagar si quien lo escribe es quien lo trabajó.
+    """
+    return await LogTimeUseCase(task_repo).execute(task_id, current_user.id, payload)
+
+
+@router.get("/tasks/{task_id}/effort", response_model=TaskEffortResponse)
+async def get_task_effort(
+    task_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
+    return await GetTaskEffortUseCase(task_repo).execute(task_id)
+
+
+@router.delete("/time-entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_time_entry(
+    entry_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Borra un apunte de horas (solo el propio, o cualquiera si administras)."""
+    await DeleteTimeEntryUseCase(task_repo).execute(
+        entry_id, current_user.id, current_user.role
+    )
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
