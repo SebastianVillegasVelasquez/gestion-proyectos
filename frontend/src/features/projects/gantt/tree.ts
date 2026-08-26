@@ -32,6 +32,9 @@ export interface GanttNodeRow {
    * sus tareas se ocultan con el toggle global "Tareas", no fila por fila.
    */
   hasChildren: boolean;
+  /** Termina después que su elemento padre: se marca en rojo en el panel
+   * izquierdo, igual que en la Estructura (mismo árbol, mismo aviso). */
+  conflictoFechas: boolean;
 }
 
 /** Fila de tarea: cuelga de su elemento, una profundidad más adentro. */
@@ -136,6 +139,7 @@ function visit(node: WorkItemTree, depth: number, params: BuildRowsParams): Subt
       taskCount,
       doneCount,
       hasChildren,
+      conflictoFechas: node.conflicto_fechas,
     },
   ];
   // Solo los padres responden al colapso; las hojas siempre muestran sus tareas.

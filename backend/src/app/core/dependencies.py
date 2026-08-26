@@ -191,6 +191,7 @@ async def get_current_user(
         is_active=user.is_active,
         document_type=user.document_type,
         document_number=user.document_number,
+        created_at=user.created_at,
     )
 
 

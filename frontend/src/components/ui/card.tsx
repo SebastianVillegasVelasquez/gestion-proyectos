@@ -29,8 +29,15 @@ function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("flex flex-col space-y-1 p-5", className)} {...props} />;
 }
 
-function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-5 pt-0", className)} {...props} />;
+// `ref` incluido en las props: React 19 lo trata como una prop normal en
+// componentes de función, y algunas vistas necesitan el nodo del contenedor
+// (p. ej. para auto-scroll mientras se arrastra dentro de él).
+function CardContent({
+  className,
+  ref,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
+  return <div ref={ref} className={cn("p-5 pt-0", className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {

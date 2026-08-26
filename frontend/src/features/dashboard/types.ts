@@ -31,6 +31,8 @@ export interface DashboardTaskItem {
   title: string;
   status: string; // value del enum de tareas del backend (ej. "en_progreso")
   project_name: string | null;
+  /** Proyecto al que pertenece: permite agrupar y enlazar desde "Mis tareas". */
+  project_id: string | null;
   due_date: string; // YYYY-MM-DD
 }
 

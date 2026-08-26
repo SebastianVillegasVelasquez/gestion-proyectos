@@ -19,7 +19,6 @@ from app.modules.identity.application.use_cases import (
     ChangeMyPasswordUseCase,
     CreatePositionUseCase,
     CreateUserUseCase,
-    DeleteUserUseCase,
     GetUserByIdUseCase,
     ListPositionsUseCase,
     LoginUseCase,
@@ -37,6 +36,7 @@ from app.modules.identity.infrastructure.repository import (
     UserRepository,
 )
 from app.modules.identity.presentation.schemas import (
+    AdminUserSortField,
     BulkCreateUsersResponse,
     ChangePasswordRequest,
     CreatePositionRequest,
@@ -50,6 +50,7 @@ from app.modules.identity.presentation.schemas import (
     RefreshRequest,
     ResetPasswordResponse,
     SeenReleasesResponse,
+    SortDirection,
     TokenResponse,
     UpdateUserRequest,
     UserResponse,
@@ -256,12 +257,25 @@ async def search_users(
 @router.get("/users/manage", response_model=PaginatedUsersResponse)
 async def manage_users(
     search: str | None = None,
+    include_inactive: bool = True,
+    sort_by: AdminUserSortField = AdminUserSortField.NAME,
+    sort_dir: SortDirection = SortDirection.ASC,
     pagination: Pagination = Depends(pagination_params),
     repo: UserRepository = Depends(user_repo_dependency),
     current_user=Depends(require_role(*MANAGEMENT_ROLES)),
 ):
-    """Lista paginada de usuarios (con rol e is_active) para la gestión admin."""
-    return await SearchUsersAdminUseCase(repo).execute(search, pagination)
+    """Lista paginada de usuarios (con rol e is_active) para la gestión admin.
+
+    El orden y el filtro de inactivos van en el servidor porque la lista está
+    paginada: ordenar solo la página que ya llegó daría un orden falso.
+    """
+    return await SearchUsersAdminUseCase(repo).execute(
+        search,
+        pagination,
+        include_inactive=include_inactive,
+        sort_by=sort_by.value,
+        sort_dir=sort_dir.value,
+    )
 
 
 @router.get(
@@ -315,17 +329,3 @@ async def update_user(
         user_id=user_id,
         data=data,
     )
-
-
-@router.delete("/users/{user_id}", status_code=200)
-async def delete_user(
-    user_id: UUID,
-    repo: UserRepository = Depends(user_repo_dependency),
-    current_user=Depends(
-        require_role(
-            "admin",
-            "super_admin",
-        )
-    ),
-):
-    await DeleteUserUseCase(repo).execute(user_id, actor_role=current_user.role)

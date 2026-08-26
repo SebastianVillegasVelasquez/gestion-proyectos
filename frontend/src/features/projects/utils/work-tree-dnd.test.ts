@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { findNode, subtreeIds, computeMovePayload } from "./work-tree-dnd";
+import {
+  findNode,
+  subtreeIds,
+  computeMovePayload,
+  computeOutdentPayload,
+  resolveDrop,
+} from "./work-tree-dnd";
 import type { WorkItemTree } from "../types/api.types";
 
 function node(
@@ -24,6 +30,7 @@ function node(
     porcentaje_completado: null,
     es_transversal: false,
     advertencia_fechas: false,
+    conflicto_fechas: false,
     children,
   };
 }
@@ -100,5 +107,100 @@ describe("computeMovePayload", () => {
   it("returns null when the target does not exist", () => {
     const tree = buildTree();
     expect(computeMovePayload(tree, "B", "missing", "inside")).toBeNull();
+  });
+});
+
+describe("resolveDrop", () => {
+  // Árbol más profundo para los casos de anidación:
+  // A ─ B ─ B1
+  // D
+  function deepTree(): WorkItemTree[] {
+    const b1 = node("B1", [], "B");
+    const b = node("B", [b1], "A");
+    const a = node("A", [b], null);
+    const d = node("D", [], null);
+    return [a, d];
+  }
+
+  it("permite mover un hijo dentro de otro padre", () => {
+    expect(resolveDrop(deepTree(), "B", "D", "inside")).toEqual({
+      ok: true,
+      payload: { new_parent_id: "D" },
+    });
+  });
+
+  it("permite mover un nieto dentro de otro padre", () => {
+    expect(resolveDrop(deepTree(), "B1", "D", "inside")).toEqual({
+      ok: true,
+      payload: { new_parent_id: "D" },
+    });
+  });
+
+  it("permite mover un nieto al nivel principal como hermano", () => {
+    expect(resolveDrop(deepTree(), "B1", "D", "after")).toEqual({
+      ok: true,
+      payload: { new_parent_id: null, orden: 2 },
+    });
+  });
+
+  it("rechaza mover un elemento dentro de su propio hijo", () => {
+    const decision = resolveDrop(deepTree(), "A", "B", "inside");
+    expect(decision).toMatchObject({ ok: false });
+    expect(decision && !decision.ok && decision.reason).toMatch(/su propio contenido/i);
+  });
+
+  it("rechaza mover un elemento dentro de su nieto", () => {
+    expect(resolveDrop(deepTree(), "A", "B1", "inside")).toMatchObject({ ok: false });
+  });
+
+  it("rechaza colocarse como hermano de un descendiente propio", () => {
+    // Soltar A "antes de B1" lo dejaría como hijo de B, que es descendiente
+    // suyo: el mismo ciclo, por la puerta de atrás.
+    expect(resolveDrop(deepTree(), "A", "B1", "before")).toMatchObject({ ok: false });
+  });
+
+  it("ignora soltar un elemento sobre sí mismo", () => {
+    expect(resolveDrop(deepTree(), "B", "B", "inside")).toBeNull();
+  });
+
+  it("devuelve null si el destino ya no existe", () => {
+    expect(resolveDrop(deepTree(), "B", "missing", "inside")).toBeNull();
+  });
+});
+
+describe("computeOutdentPayload", () => {
+  // A ─ B ─ B1
+  // D
+  function deepTree(): WorkItemTree[] {
+    const b1 = node("B1", [], "B");
+    const b = node("B", [b1], "A");
+    const a = node("A", [b], null);
+    const d = node("D", [], null);
+    return [a, d];
+  }
+
+  it("saca un nieto para dejarlo junto a quien lo contenía", () => {
+    // B1 sale de B y pasa a ser hijo de A, justo detrás de B.
+    expect(computeOutdentPayload(deepTree(), "B1")).toEqual({
+      new_parent_id: "A",
+      orden: 1,
+    });
+  });
+
+  it("saca un hijo de primer nivel al nivel principal, tras su contenedor", () => {
+    // B sale de A: nivel principal, detrás de A (que ocupa el índice 0).
+    expect(computeOutdentPayload(deepTree(), "B")).toEqual({
+      new_parent_id: null,
+      orden: 1,
+    });
+  });
+
+  it("no hace nada con un elemento que ya está en el nivel principal", () => {
+    expect(computeOutdentPayload(deepTree(), "A")).toBeNull();
+    expect(computeOutdentPayload(deepTree(), "D")).toBeNull();
+  });
+
+  it("devuelve null si el elemento no existe", () => {
+    expect(computeOutdentPayload(deepTree(), "missing")).toBeNull();
   });
 });

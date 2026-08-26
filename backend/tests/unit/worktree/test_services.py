@@ -20,6 +20,7 @@ from app.modules.project.structure.infrastructure.models import (
 from app.modules.project.structure.presentation.schemas import (
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
+    UpdateWorkItemRequest,
 )
 from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
 
@@ -706,6 +707,197 @@ class TestMoveWorkItem:
         orphan = await _item(service, t_forbidden.id, "Huérfano")
         moved = await service.move_item(orphan.id, parent.id, None)
         assert moved.parent_id == parent.id
+
+    async def test_moves_a_grandchild_under_another_branch(self, service):
+        """Cualquier nodo, a cualquier profundidad, puede recolocarse bajo otro:
+        el drag & drop no está limitado a las ramas de primer nivel."""
+        t = await _tipo(service, "Nodo")
+        padre1 = await _item(service, t.id, "Padre 1")
+        hijo1 = await _item(service, t.id, "Hijo 1", parent_id=padre1.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=hijo1.id)
+        padre2 = await _item(service, t.id, "Padre 2")
+
+        moved = await service.move_item(nieto.id, padre2.id, None)
+
+        assert moved.parent_id == padre2.id
+        assert await self._ordered_children(service, hijo1.id) == []
+        assert await self._ordered_children(service, padre2.id) == ["Nieto"]
+
+    async def test_moved_item_takes_its_whole_subtree_along(self, service):
+        """Al recolocar un elemento se lleva TODO lo que contiene: los hijos
+        cuelgan de él, no de su antigua posición, así que no hace falta mover
+        nada más a mano."""
+        t = await _tipo(service, "Nodo")
+        origen = await _item(service, t.id, "Origen")
+        familia = await _item(service, t.id, "Familia", parent_id=origen.id)
+        hijo = await _item(service, t.id, "Hijo", parent_id=familia.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=hijo.id)
+        destino = await _item(service, t.id, "Destino")
+
+        await service.move_item(familia.id, destino.id, None)
+
+        tree = await service.get_tree(PROYECTO)
+        destino_node = _find_in_tree(tree, destino.id)
+        familia_node = destino_node.children[0]
+        assert familia_node.id == familia.id
+        # La rama entera viaja con él, intacta y en el mismo orden.
+        assert [c.id for c in familia_node.children] == [hijo.id]
+        assert [c.id for c in familia_node.children[0].children] == [nieto.id]
+        # Y ya no queda nada colgando del origen.
+        assert _find_in_tree(tree, origen.id).children == []
+
+    async def test_rejects_move_into_a_deep_descendant(self, service):
+        """El ciclo se bloquea a cualquier profundidad, no solo con el hijo
+        directo: meter el abuelo bajo su nieto desconectaría la rama."""
+        t = await _tipo(service, "Nodo")
+        abuelo = await _item(service, t.id, "Abuelo")
+        padre = await _item(service, t.id, "Padre", parent_id=abuelo.id)
+        nieto = await _item(service, t.id, "Nieto", parent_id=padre.id)
+
+        with pytest.raises(ValidationError):
+            await service.move_item(abuelo.id, nieto.id, None)
+
+    async def test_move_is_allowed_when_child_outlasts_new_parent(self, service):
+        """Terminar después que el padre ya NO bloquea el movimiento: el árbol
+        se reorganiza primero y las fechas se cuadran después, con el conflicto
+        marcado en lectura (`conflicto_fechas`) para que se vea y se resuelva."""
+        t = await _tipo(service, "Nodo")
+        origen = await _item(service, t.id, "Origen")
+        largo = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id,
+                nombre="Tarea larga",
+                parent_id=origen.id,
+                fecha_inicio_plan=D(2026, 1, 1),
+                fecha_fin_plan=D(2026, 3, 31),
+            ),
+        )
+        corto = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id,
+                nombre="Fase corta",
+                fecha_inicio_plan=D(2026, 1, 1),
+                fecha_fin_plan=D(2026, 1, 31),
+            ),
+        )
+
+        moved = await service.move_item(largo.id, corto.id, None)
+
+        assert moved.parent_id == corto.id
+        # El elemento queda donde se soltó, pero marcado: termina el 31/03 y su
+        # nuevo padre el 31/01.
+        assert moved.conflicto_fechas is True
+        assert moved.fecha_fin_plan == D(2026, 3, 31)
+
+
+class TestDateConflicts:
+    """`conflicto_fechas`: un hijo que termina después que su padre.
+
+    Sustituye a la antigua validación que rechazaba esas fechas. Ya no se
+    bloquea nada: se registra lo que la persona planificó y se marca para que
+    decida si recorta el hijo o extiende el padre.
+    """
+
+    async def _dated(self, service, tipo_id, nombre, inicio, fin, parent_id=None):
+        return await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=tipo_id,
+                nombre=nombre,
+                parent_id=parent_id,
+                fecha_inicio_plan=inicio,
+                fecha_fin_plan=fin,
+            ),
+        )
+
+    async def _tree_node(self, service, item_id):
+        def walk(nodes):
+            for n in nodes:
+                if n.id == item_id:
+                    return n
+                found = walk(n.children)
+                if found:
+                    return found
+            return None
+
+        return walk(await service.get_tree(PROYECTO))
+
+    async def test_child_ending_after_parent_is_flagged(self, service):
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 1, 31))
+        hijo = await self._dated(
+            service, t.id, "Hijo", D(2026, 1, 5), D(2026, 2, 20), parent_id=padre.id
+        )
+
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is True
+        # El padre no está en conflicto: el suyo se mide contra SU padre.
+        assert (await self._tree_node(service, padre.id)).conflicto_fechas is False
+
+    async def test_child_within_parent_is_not_flagged(self, service):
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 3, 31))
+        hijo = await self._dated(
+            service, t.id, "Hijo", D(2026, 1, 5), D(2026, 2, 20), parent_id=padre.id
+        )
+
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is False
+
+    async def test_shortening_the_parent_raises_the_conflict(self, service):
+        """El conflicto no es solo cosa del drag & drop: recortar el padre deja
+        al hijo fuera y también se marca (por eso se calcula en lectura)."""
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 3, 31))
+        hijo = await self._dated(
+            service, t.id, "Hijo", D(2026, 1, 5), D(2026, 2, 20), parent_id=padre.id
+        )
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is False
+
+        await service.update_item(
+            padre.id, UpdateWorkItemRequest(fecha_fin_plan=D(2026, 1, 31))
+        )
+
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is True
+
+    async def test_conflict_clears_when_the_child_is_trimmed(self, service):
+        """La corrección que ofrece la UI ("recortar el hijo al fin del padre")
+        apaga el aviso, sin pasos extra."""
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 1, 31))
+        hijo = await self._dated(
+            service, t.id, "Hijo", D(2026, 1, 5), D(2026, 2, 20), parent_id=padre.id
+        )
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is True
+
+        updated = await service.update_item(
+            hijo.id, UpdateWorkItemRequest(fecha_fin_plan=D(2026, 1, 31))
+        )
+
+        assert updated.conflicto_fechas is False
+
+    async def test_conflict_clears_when_the_parent_is_extended(self, service):
+        """La otra corrección: estirar el padre hasta el fin del hijo."""
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 1, 31))
+        hijo = await self._dated(
+            service, t.id, "Hijo", D(2026, 1, 5), D(2026, 2, 20), parent_id=padre.id
+        )
+
+        await service.update_item(
+            padre.id, UpdateWorkItemRequest(fecha_fin_plan=D(2026, 2, 20))
+        )
+
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is False
+
+    async def test_item_without_dates_is_never_in_conflict(self, service):
+        """Sin fecha de fin (modo "solo duración" o sin planificar) no hay nada
+        que comparar: marcar un conflicto ahí sería ruido."""
+        t = await _tipo(service, "Nodo")
+        padre = await self._dated(service, t.id, "Padre", D(2026, 1, 1), D(2026, 1, 31))
+        hijo = await _item(service, t.id, "Sin fechas", parent_id=padre.id)
+
+        assert (await self._tree_node(service, hijo.id)).conflicto_fechas is False
 
 
 class TestShiftSubtree:

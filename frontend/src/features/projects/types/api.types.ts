@@ -98,6 +98,9 @@ export interface WorkItem {
   es_transversal: boolean;
   // True cuando se dieron inicio+fin+duración inconsistentes (informativo).
   advertencia_fechas: boolean;
+  // True cuando este elemento termina DESPUÉS que su padre. No impide nada:
+  // el árbol se reorganiza libremente y la UI ofrece cuadrar las fechas.
+  conflicto_fechas: boolean;
 }
 
 export interface WorkItemTree extends WorkItem {
