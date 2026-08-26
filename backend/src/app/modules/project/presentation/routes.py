@@ -1,9 +1,12 @@
+import re
+from dataclasses import asdict
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from starlette import status
 
+from app.core.database import get_db
 from app.core.dependencies import (
     event_bus_dependency,
     project_members_repo_dependency,
@@ -30,6 +33,10 @@ from app.modules.project.application.use_cases import (
     UpdateProjectMemberRoleUseCase,
     UpdateProjectUseCase,
 )
+from app.modules.project.application.reports import (
+    ProjectReportBuilder,
+    report_to_csv,
+)
 from app.modules.project.presentation.schemas import (
     AssignTeamResponse,
     ClientAccessResponse,
@@ -39,6 +46,7 @@ from app.modules.project.presentation.schemas import (
     ProjectMemberRequest,
     ProjectMemberResponse,
     ProjectNoteResponse,
+    ProjectReportResponse,
     ProjectResponse,
     UpdateProjectMemberRoleRequest,
     UpdateProjectRequest,
@@ -253,3 +261,35 @@ async def assign_team_to_project(
     return await AssignTeamToProjectUseCase(
         project_repo=project_repo, member_repo=member_repo, team_repo=team_repo
     ).execute(project_id, team_id)
+
+
+# ── Informes y exportación ────────────────────────────────────────────────────
+@router.get("/{project_id}/report", response_model=ProjectReportResponse)
+async def get_project_report(
+    project_id: UUID,
+    db=Depends(get_db),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    """Estado del proyecto: tareas por estado, horas y detalle por tarea."""
+    report = await ProjectReportBuilder(db).build(project_id)
+    return ProjectReportResponse(**asdict(report))
+
+
+@router.get("/{project_id}/report.csv")
+async def export_project_report(
+    project_id: UUID,
+    db=Depends(get_db),
+    _=Depends(require_role("admin", "super_admin")),
+):
+    """El mismo informe en CSV, para abrirlo en Excel o Google Sheets."""
+    report = await ProjectReportBuilder(db).build(project_id)
+    # Nombre de archivo con el del proyecto: quien descarga varios informes
+    # necesita distinguirlos sin abrirlos.
+    safe_name = re.sub(r"[^\w\-]+", "_", report.project_name).strip("_") or "proyecto"
+    return Response(
+        content=report_to_csv(report),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="informe_{safe_name}.csv"'
+        },
+    )
