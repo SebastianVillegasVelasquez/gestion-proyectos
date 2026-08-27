@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, AlertCircle, CheckCircle2, Send, AtSign, Lock } from "lucide-react";
+import { MessageSquare, AlertCircle, CheckCircle2, Send, AtSign, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { FeedbackComment, WorkspaceMember, CommentType, DeliverableStatus } from "../types";
+import type { FeedbackComment, WorkspaceMember, CommentType } from "../types";
 import { TEAM_ROLE_LABELS } from "../types";
 
 // ── date helper ───────────────────────────────────────────────────────────
@@ -45,6 +45,12 @@ const COMMENT_TYPE_CONFIG: Record<
     Icon: CheckCircle2,
     cardCls: "border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/20",
     labelCls: "text-emerald-700 dark:text-emerald-400",
+  },
+  rechazo: {
+    label: "Rechazado",
+    Icon: XCircle,
+    cardCls: "border-rose-200 bg-rose-50 dark:border-rose-800/50 dark:bg-rose-950/20",
+    labelCls: "text-rose-700 dark:text-rose-400",
   },
 };
 
@@ -142,13 +148,13 @@ function CommentItem({ comment, members }: CommentItemProps) {
 interface ComposeAreaProps {
   members: WorkspaceMember[];
   currentUserId: string;
-  /** Solo líder o supervisor del equipo pueden solicitar cambios / aprobar. */
-  canReview: boolean;
-  deliverableStatus: DeliverableStatus;
   onSubmit: (content: string, type: CommentType, mentions: string[]) => void;
 }
 
-function ComposeArea({ members, currentUserId, canReview, onSubmit }: ComposeAreaProps) {
+// Solo conversación. Aprobar / solicitar cambios / rechazar viven en el panel
+// central (`ReviewActions`): son decisiones sobre el entregable, no mensajes,
+// y tenerlas en dos sitios invitaba a enviarlas sin motivo escrito.
+function ComposeArea({ members, currentUserId, onSubmit }: ComposeAreaProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -219,42 +225,7 @@ function ComposeArea({ members, currentUserId, canReview, onSubmit }: ComposeAre
       />
 
       {/* Action buttons */}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {/* Acciones de revisión — solo líder o supervisor del equipo */}
-        {canReview ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                handleSend("solicitud_cambio");
-              }}
-              disabled={!text.trim()}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
-            >
-              <AlertCircle className="size-3.5" />
-              Solicitar Cambios
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleSend("aprobacion");
-              }}
-              disabled={!text.trim()}
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
-            >
-              <CheckCircle2 className="size-3.5" />
-              Aprobar Entregable
-            </button>
-          </>
-        ) : (
-          <span className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-            <Lock className="size-3" />
-            Solo el líder o supervisor puede solicitar cambios o aprobar.
-          </span>
-        )}
-
-        <div className="flex-1" />
-
+      <div className="mt-2 flex items-center justify-end">
         <button
           type="button"
           onClick={() => {
@@ -276,19 +247,14 @@ function ComposeArea({ members, currentUserId, canReview, onSubmit }: ComposeAre
 interface FeedbackThreadProps {
   comments: FeedbackComment[];
   members: WorkspaceMember[];
-  /** ¿El usuario actual puede revisar (líder/supervisor del equipo)? */
-  canReview: boolean;
   currentUserId: string;
-  deliverableStatus: DeliverableStatus;
   onAddComment: (content: string, type: CommentType, mentions: string[]) => void;
 }
 
 export function FeedbackThread({
   comments,
   members,
-  canReview,
   currentUserId,
-  deliverableStatus,
   onAddComment,
 }: FeedbackThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -324,13 +290,7 @@ export function FeedbackThread({
       </div>
 
       {/* Compose */}
-      <ComposeArea
-        members={members}
-        currentUserId={currentUserId}
-        canReview={canReview}
-        deliverableStatus={deliverableStatus}
-        onSubmit={onAddComment}
-      />
+      <ComposeArea members={members} currentUserId={currentUserId} onSubmit={onAddComment} />
     </div>
   );
 }

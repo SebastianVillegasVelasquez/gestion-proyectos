@@ -3,7 +3,16 @@ from __future__ import annotations
 import uuid
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, Text, UUID, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UUID,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -125,3 +134,39 @@ class DeliverableComment(Base, UUIDMixin, TimestampMixin):
         "Deliverable", back_populates="comments"
     )
     author: Mapped["User"] = relationship("User")
+
+
+class TeamNotificationSetting(Base, UUIDMixin, TimestampMixin):
+    """Preferencias de aviso de UN usuario dentro de UN equipo.
+
+    Por (equipo, usuario) y no global: la misma persona puede querer que le
+    avisen de todo en el equipo de Contenidos y de casi nada en el de TI. La
+    ausencia de fila significa "todo activado" (ver `WorkspaceService`), asi
+    que no hace falta crear filas para los integrantes existentes.
+    """
+
+    __tablename__ = "team_notification_settings"
+
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    nueva_tarea_asignada: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    entregable_rechazado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    comentario_nuevo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    entregable_aprobado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "user_id", name="uq_team_notification_setting"),
+    )

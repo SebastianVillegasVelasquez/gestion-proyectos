@@ -57,6 +57,14 @@ export interface BuildRowsParams {
   showTasks: boolean;
   /** Tipos activos; vacío = todos. Se conservan los ancestros de un match. */
   activeTypeIds: Set<string>;
+  /**
+   * Poda las ramas sin ninguna tarea. Pensado para el cronograma recortado a
+   * un equipo: la estructura completa del proyecto son cientos de nodos, y
+   * mostrar los que no contienen trabajo suyo entierra las pocas filas que sí
+   * le importan. Se conservan los ancestros de un nodo con tareas, para no
+   * perder el "de dónde cuelga".
+   */
+  onlyWithTasks?: boolean;
 }
 
 const minIso = (a: string, b: string) => (a < b ? a : b);
@@ -84,7 +92,7 @@ interface Subtree {
 }
 
 function visit(node: WorkItemTree, depth: number, params: BuildRowsParams): Subtree {
-  const { tasksByItem, isCollapsed, showTasks, activeTypeIds } = params;
+  const { tasksByItem, isCollapsed, showTasks, activeTypeIds, onlyWithTasks } = params;
   const directTasks = tasksByItem.get(node.id) ?? [];
 
   // Punto de partida del rango: el plan del propio nodo, si lo tiene.
@@ -113,9 +121,10 @@ function visit(node: WorkItemTree, depth: number, params: BuildRowsParams): Subt
     }
   }
 
-  // Sin fechas en todo el subárbol, o podado por el filtro de tipos: no aporta
-  // filas ni contamina el rango del ancestro.
-  if (!span || !typeMatch) {
+  // Sin fechas en todo el subárbol, podado por el filtro de tipos, o —en el
+  // modo recortado a un equipo— sin una sola tarea suya: no aporta filas ni
+  // contamina el rango del ancestro.
+  if (!span || !typeMatch || (onlyWithTasks === true && taskCount === 0)) {
     return { rows: [], span: null, taskCount, doneCount, typeMatch };
   }
 

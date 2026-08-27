@@ -10,6 +10,7 @@ from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
     DeliverableVersion,
+    TeamNotificationSetting,
 )
 
 _ADMIN_SYSTEM_ROLES = {"admin", "super_admin"}
@@ -92,6 +93,18 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def add_comment(self, comment: DeliverableComment) -> DeliverableComment: ...
+
+    # ── Preferencias de aviso (por equipo y usuario) ─────────────────────────
+
+    @abstractmethod
+    async def get_notification_setting(
+        self, team_id: UUID, user_id: UUID
+    ) -> TeamNotificationSetting | None: ...
+
+    @abstractmethod
+    async def save_notification_setting(
+        self, setting: TeamNotificationSetting
+    ) -> TeamNotificationSetting: ...
 
     # ── Puerto hacia el mundo Task (Fase 2) ──────────────────────────────────
     # No expone la API de tareas: solo las 3 operaciones que el workspace

@@ -182,7 +182,14 @@ class TaskRepository(BaseRepository[Task]):
                 WorkItem.nombre.label("work_item_name"),
                 Project.id.label("project_id"),
                 Project.name.label("project_name"),
-                func.concat(User.name, " ", User.last_name).label("assignee_name"),
+                # NULLIF + TRIM: con LEFT JOIN sin responsable, concat() de
+                # Postgres trata NULL como cadena vacia y devolveria " " (un
+                # espacio), no NULL. La UI hace `assignee_name ?? "Sin
+                # responsable"`, asi que ese espacio se colaba como un nombre
+                # en blanco. Normalizamos en el origen: sin responsable, NULL.
+                func.nullif(
+                    func.trim(func.concat(User.name, " ", User.last_name)), ""
+                ).label("assignee_name"),
             )
             .outerjoin(WorkItem, Task.work_item_id == WorkItem.id)
             .join(Project, Task.project_id == Project.id)
@@ -213,6 +220,21 @@ class TaskRepository(BaseRepository[Task]):
             select(TaskDependency)
             .join(Task, TaskDependency.task_id == Task.id)
             .where(Task.project_id == project_id, Task.deleted_at.is_(None))
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def get_dependencies_by_team(self, team_id: UUID) -> list[TaskDependency]:
+        """Dependencias FtS de las tareas delegadas a un equipo, en UNA consulta.
+
+        El workspace pinta "Bloqueada por: <tarea>" en cada fila; pedir las
+        dependencias tarea por tarea sería un N+1. `selectinload(depends_on)`
+        trae el título de la tarea bloqueante sin una consulta extra por fila.
+        """
+        query = (
+            select(TaskDependency)
+            .join(Task, TaskDependency.task_id == Task.id)
+            .where(Task.team_id == team_id, Task.deleted_at.is_(None))
+            .options(selectinload(TaskDependency.depends_on))
         )
         return list((await self._session.execute(query)).scalars().all())
 

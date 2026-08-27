@@ -8,6 +8,10 @@ class DeliverableStatus(str, enum.Enum):
     EN_REVISION = "en_revision"
     APROBADO = "aprobado"
     CAMBIOS_SOLICITADOS = "cambios_solicitados"
+    # Rechazo ≠ solicitud de cambios: "cambios_solicitados" espera una nueva
+    # versión sobre el mismo enfoque; "rechazado" cierra la entrega tal como
+    # está (el integrante debe replantearla). Ambos devuelven la Task.
+    RECHAZADO = "rechazado"
 
 
 class ResourceType(str, enum.Enum):
@@ -25,3 +29,4 @@ class CommentType(str, enum.Enum):
     COMENTARIO = "comentario"
     SOLICITUD_CAMBIO = "solicitud_cambio"
     APROBACION = "aprobacion"
+    RECHAZO = "rechazo"

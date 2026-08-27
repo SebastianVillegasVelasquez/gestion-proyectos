@@ -6,12 +6,12 @@ import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion, WorkspaceMember } from "../types";
-import { TEAM_ROLE_LABELS } from "../types";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
 import { DeliverableDetailView } from "./DeliverableDetailView";
 import { FeedbackThread } from "./FeedbackThread";
+import { GroupSettingsView } from "./GroupSettingsView";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
 import {
@@ -32,78 +32,6 @@ const TABS: { id: WorkspaceTab; label: string; Icon: React.ElementType }[] = [
   { id: "entregables", label: "Entregables y Revisiones", Icon: Package },
   { id: "configuracion", label: "Configuración del Grupo", Icon: Settings },
 ];
-
-// ── Group settings (datos reales del equipo) ───────────────────────────────
-
-function GroupSettings({
-  name,
-  description,
-  members,
-}: {
-  name: string;
-  description: string;
-  members: WorkspaceMember[];
-}) {
-  return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <div>
-        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Nombre del equipo
-        </label>
-        <input
-          type="text"
-          defaultValue={name}
-          readOnly
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-        />
-      </div>
-      <div>
-        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Descripción
-        </label>
-        <textarea
-          defaultValue={description}
-          readOnly
-          rows={3}
-          className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-        />
-      </div>
-      <div>
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Integrantes ({members.length})
-        </p>
-        <div className="space-y-2">
-          {members.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <span
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white",
-                  m.avatarColor,
-                )}
-              >
-                {m.initials}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{m.name}</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  {TEAM_ROLE_LABELS[m.role]}
-                </p>
-              </div>
-              {m.role !== "integrante" && (
-                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                  {TEAM_ROLE_LABELS[m.role]}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── New deliverable modal ──────────────────────────────────────────────────
 
@@ -329,6 +257,34 @@ function MemberWorkspace() {
     addComment.mutate({ deliverableId: selectedDeliverable.id, body: { content, type, mentions } });
   };
 
+  /**
+   * Una decisión de revisión ES un comentario tipado: el motivo queda en el
+   * hilo y el backend mueve el estado del entregable y de la tarea vinculada.
+   * Aprobar admite motivo vacío, así que ponemos un texto por defecto para no
+   * guardar un comentario en blanco.
+   */
+  const handleReview = (type: CommentType, reason: string) => {
+    if (!selectedDeliverable) {
+      return;
+    }
+    addComment.mutate({
+      deliverableId: selectedDeliverable.id,
+      body: {
+        content: reason || "Entregable aprobado.",
+        type,
+        mentions: [],
+      },
+    });
+  };
+
+  // Al archivar el equipo activo su espacio desaparece: volvemos al primero
+  // que quede (`selectedTeamId = null` hace que el efecto tome teams[0]).
+  const handleArchived = () => {
+    setSelectedTeamId(null);
+    setSelectedDeliverableId(null);
+    setActiveTab("tareas");
+  };
+
   const handleCreate = (taskTitle: string, assigneeId: string, taskId: string | null) => {
     createDeliverable.mutate(
       { task_title: taskTitle, assignee_id: assigneeId, task_id: taskId },
@@ -431,7 +387,11 @@ function MemberWorkspace() {
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {activeTab === "tareas" && (
             <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
-              <TeamTasksView teamId={activeTeam.id} />
+              <TeamTasksView
+                teamId={activeTeam.id}
+                projectId={activeTeam.project_id}
+                members={members}
+              />
             </div>
           )}
 
@@ -460,16 +420,17 @@ function MemberWorkspace() {
                       members={members}
                       currentUserId={currentUserId}
                       canDeliver={canDeliver}
+                      canReview={canReview}
+                      reviewPending={addComment.isPending}
                       onAddVersion={handleAddVersion}
+                      onReview={handleReview}
                     />
                   </div>
                   <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
                     <FeedbackThread
                       comments={selectedDeliverable.comments}
                       members={members}
-                      canReview={canReview}
                       currentUserId={currentUserId}
-                      deliverableStatus={selectedDeliverable.status}
                       onAddComment={handleAddComment}
                     />
                   </div>
@@ -482,10 +443,16 @@ function MemberWorkspace() {
 
           {activeTab === "configuracion" && (
             <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
-              <GroupSettings
+              <GroupSettingsView
+                projectId={activeTeam.project_id}
+                teamId={activeTeam.id}
                 name={activeTeam.name}
                 description={activeTeam.description ?? ""}
                 members={members}
+                tasks={tasksQuery.data ?? []}
+                deliverables={deliverables}
+                isMember={access?.team_role != null}
+                onArchived={handleArchived}
               />
             </div>
           )}
