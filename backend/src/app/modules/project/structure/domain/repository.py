@@ -52,6 +52,12 @@ class WorkTreeRepository(ABC):
     @abstractmethod
     async def soft_delete_many(self, item_ids: list[UUID]) -> None: ...
 
+    @abstractmethod
+    async def list_deleted_items(self, proyecto_id: UUID) -> list[WorkItem]: ...
+
+    @abstractmethod
+    async def restore_many(self, item_ids: list[UUID]) -> None: ...
+
     # ── Dependencias Finish-to-Start ──────────────────────────────────────────
     @abstractmethod
     async def add_dependency(

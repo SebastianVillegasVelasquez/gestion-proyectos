@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from app.modules.tasks.domain import rules
@@ -27,17 +28,27 @@ class TaskService:
         return self._to_response(await self.repo.add(Task(**payload)))
 
     async def get_task_by_id(self, task_id: UUID) -> "TaskResponse":
-        return self._to_response(await self._get_active(task_id))
+        task = await self._get_active(task_id)
+        return self._to_response(task, await self.repo.logged_hours(task_id))
 
     async def get_tasks_by_work_item(self, work_item_id: UUID) -> list["TaskResponse"]:
-        return [
-            self._to_response(t) for t in await self.repo.get_by_work_item(work_item_id)
-        ]
+        return await self._with_logged_hours(
+            await self.repo.get_by_work_item(work_item_id)
+        )
 
     async def get_tasks_by_project(self, project_id: UUID) -> list["TaskResponse"]:
-        return [
-            self._to_response(t) for t in await self.repo.get_all_by_project(project_id)
-        ]
+        return await self._with_logged_hours(
+            await self.repo.get_all_by_project(project_id)
+        )
+
+    async def _with_logged_hours(self, tasks: list[Task]) -> list["TaskResponse"]:
+        """Añade a cada tarea sus horas dedicadas con UNA consulta agregada.
+
+        Preguntarlas tarea a tarea sería una consulta por fila (N+1), y estas
+        listas se pintan enteras en el cronograma y en el tablero.
+        """
+        totals = await self.repo.logged_hours_by_task([t.id for t in tasks])
+        return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
 
     async def update_task(
         self, task_id: UUID, data: "UpdateTaskRequest"
@@ -57,7 +68,9 @@ class TaskService:
         return task
 
     @staticmethod
-    def _to_response(task: "Task") -> "TaskResponse":
+    def _to_response(
+        task: "Task", logged_hours: Decimal = Decimal("0")
+    ) -> "TaskResponse":
         return TaskResponse(
             id=task.id,
             project_id=task.project_id,
@@ -74,6 +87,8 @@ class TaskService:
             completed_at=task.completed_at,
             created_at=task.created_at or datetime.now(timezone.utc),
             updated_at=getattr(task, "updated_at", None),
+            estimated_hours=task.estimated_hours,
+            logged_hours=logged_hours,
         )
 
 

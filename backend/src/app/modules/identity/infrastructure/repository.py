@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.identity.infrastructure.models import (
     Position,
@@ -83,16 +84,38 @@ class UserRepository(BaseRepository[User]):
         )
         return list(rows), int(total or 0)
 
+    # Columnas por las que la tabla de administración deja ordenar. El mapa
+    # existe para no interpolar nunca texto del cliente en el ORDER BY: lo que
+    # no esté aquí se ignora y cae en el orden por defecto.
+    ADMIN_SORT_COLUMNS: dict[str, list[InstrumentedAttribute]] = {
+        "name": [User.name, User.last_name],
+        "email": [User.email],
+        "role": [User.role],
+        "position": [User.position],
+        "status": [User.is_active],
+        "created_at": [User.created_at],
+    }
+
     async def search_users_admin(
         self,
         search: str | None,
         limit: int,
         offset: int,
+        include_inactive: bool = True,
+        sort_by: str = "name",
+        sort_dir: str = "asc",
     ) -> tuple[list[User], int]:
-        """Búsqueda paginada para administración: INCLUYE inactivos (para poder
-        reactivarlos), excluye solo los borrados. Filtra por nombre/apellido/correo.
+        """Búsqueda paginada para administración: puede INCLUIR inactivos (para
+        poder reactivarlos), excluye solo los borrados. Filtra por
+        nombre/apellido/correo/documento y ordena por la columna pedida.
+
+        El orden se resuelve en la base de datos (no en el cliente) porque la
+        lista viene paginada: ordenar solo la página visible daría un orden
+        falso respecto del total.
         """
         conditions: list[ColumnElement[bool]] = [User.deleted_at.is_(None)]
+        if not include_inactive:
+            conditions.append(User.is_active.is_(True))
         if search:
             like = f"%{search.strip()}%"
             conditions.append(
@@ -104,6 +127,15 @@ class UserRepository(BaseRepository[User]):
                 )
             )
 
+        columns = (
+            self.ADMIN_SORT_COLUMNS.get(sort_by) or self.ADMIN_SORT_COLUMNS["name"]
+        )
+        descending = sort_dir == "desc"
+        order_by = [c.desc() if descending else c.asc() for c in columns]
+        # Desempate estable: sin él, dos filas iguales en la columna elegida
+        # pueden bailar entre páginas.
+        order_by.append(User.id.asc())
+
         total = await self._session.scalar(
             select(func.count()).select_from(User).where(*conditions)
         )
@@ -112,7 +144,7 @@ class UserRepository(BaseRepository[User]):
                 await self._session.execute(
                     select(User)
                     .where(*conditions)
-                    .order_by(User.name, User.last_name)
+                    .order_by(*order_by)
                     .limit(limit)
                     .offset(offset)
                 )
@@ -129,11 +161,6 @@ class UserRepository(BaseRepository[User]):
         if user is None:
             return True
         return exclude_id is not None and user.id == exclude_id
-
-    async def soft_delete(self, user: User) -> User:
-        user.is_active = False
-
-        return await self.save(user)
 
     # ── Novedades vistas por el usuario (modal "what's new") ──────────────────
     async def get_seen_release_ids(self, user_id: UUID) -> list[str]:

@@ -31,6 +31,8 @@ export interface DashboardTaskItem {
   title: string;
   status: string; // value del enum de tareas del backend (ej. "en_progreso")
   project_name: string | null;
+  /** Proyecto al que pertenece: permite agrupar y enlazar desde "Mis tareas". */
+  project_id: string | null;
   due_date: string; // YYYY-MM-DD
 }
 
@@ -71,7 +73,12 @@ export type ActivityKind =
   | "devolucion"
   | "cancelacion"
   | "comentario"
-  | "cambio_estado";
+  | "cambio_estado"
+  // Cambios de gestión: explican la historia de la tarea aunque no muevan su estado.
+  | "equipo"
+  | "ubicacion"
+  | "reprogramacion"
+  | "prioridad";
 
 export interface ActivityItem {
   id: string;

@@ -87,10 +87,29 @@ class WorkItemResponse(BaseModelConfig):
     # no cuadran): prevalece el par de fechas, pero se avisa. Solo informativo y
     # transitorio (no se persiste); en lecturas siempre es False.
     advertencia_fechas: bool = False
+    # True cuando este elemento termina DESPUÉS que su padre. No bloquea nada:
+    # se puede recolocar y planificar libremente, y la UI marca el conflicto
+    # para que alguien decida si se recorta el hijo o se extiende el padre.
+    # Derivado en lectura (no se persiste): desaparece solo al cuadrar fechas.
+    conflicto_fechas: bool = False
 
 
 class WorkItemTreeResponse(WorkItemResponse):
     children: list["WorkItemTreeResponse"] = []
+
+
+class TrashedItemResponse(BaseModelConfig):
+    """Un elemento borrado, tal como se ve en la papelera del proyecto.
+
+    Se listan solo las raíces de cada borrado (lo que se borró explícitamente),
+    con `contenido` = cuántos elementos volverían con él.
+    """
+
+    id: UUID
+    nombre: str
+    tipo_nombre: Optional[str] = None
+    deleted_at: Optional[datetime.datetime] = None
+    contenido: int = 0
 
 
 # ── Clonado de subárbol (copiar / pegar) ──────────────────────────────────────

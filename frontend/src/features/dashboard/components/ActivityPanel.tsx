@@ -1,15 +1,19 @@
 import { useState } from "react";
 import {
   Activity,
+  CalendarClock,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Flag,
+  FolderTree,
   MessageSquare,
   PlayCircle,
   Plus,
   RotateCcw,
   Send,
   UserPlus,
+  UsersRound,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -66,12 +70,32 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
     icon: Activity,
     tone: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
   },
+  equipo: {
+    verb: "cambió de equipo la tarea",
+    icon: UsersRound,
+    tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+  ubicacion: {
+    verb: "movió de ubicación la tarea",
+    icon: FolderTree,
+    tone: "bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold",
+  },
+  reprogramacion: {
+    verb: "movió las fechas de la tarea",
+    icon: CalendarClock,
+    tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  prioridad: {
+    verb: "cambió la prioridad de la tarea",
+    icon: Flag,
+    tone: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  },
 };
 
 function ActivityRow({ item }: { item: ActivityItem }) {
   const meta = KIND_META[item.kind] ?? KIND_META.cambio_estado;
   const Icon = meta.icon;
-  const actor = item.actor_name ?? "Alguien";
+  const actor = item.actor_name ?? "El sistema";
 
   return (
     <div className="flex items-start gap-3 rounded-md p-2 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-800/50">

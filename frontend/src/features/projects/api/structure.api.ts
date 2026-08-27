@@ -6,6 +6,7 @@ import type {
   MoveWorkItemPayload,
   ShiftWorkItemSubtreePayload,
   TipoNodo,
+  TrashedItem,
   UpdateTipoNodoPayload,
   UpdateWorkItemPayload,
   WorkItem,
@@ -37,6 +38,14 @@ export const structureApi = {
     http.patch<WorkItem>(`/work-items/${itemId}`, payload).then((r) => r.data),
 
   remove: (itemId: string) => http.delete(`/work-items/${itemId}`).then(() => undefined),
+
+  /** Papelera del proyecto: elementos borrados que aún se pueden recuperar. */
+  trash: (projectId: string) =>
+    http.get<TrashedItem[]>(`/projects/${projectId}/trash`).then((r) => r.data),
+
+  /** Saca un elemento de la papelera, con todo lo que contenía. */
+  restore: (itemId: string) =>
+    http.post<WorkItem>(`/work-items/${itemId}/restore`).then((r) => r.data),
 
   /** Recoloca un elemento (drag & drop del árbol): nuevo padre y/o orden. */
   move: (itemId: string, payload: MoveWorkItemPayload) =>

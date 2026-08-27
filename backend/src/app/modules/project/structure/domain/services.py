@@ -17,6 +17,7 @@ from app.modules.project.structure.presentation.schemas import (
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
     TipoNodoResponse,
+    TrashedItemResponse,
     UpdateTipoNodoRequest,
     UpdateWorkItemRequest,
     WorkItemDependencyResponse,
@@ -121,7 +122,6 @@ class WorkTreeService:
             if parent.proyecto_id != proyecto_id:
                 raise ValidationError("El nodo padre pertenece a otro proyecto")
             self._validate_nesting(parent, tipo)
-            self._validate_end_date_within_parent(parent, data.fecha_fin_plan)
 
         orden = data.orden
         if orden is None:
@@ -157,9 +157,6 @@ class WorkTreeService:
             await self._get_valid_tipo_for_project(payload["tipo_id"], item.proyecto_id)
         for field, value in payload.items():
             setattr(item, field, value)
-        if item.parent_id is not None and "fecha_fin_plan" in payload:
-            parent = await self._get_active_item(item.parent_id)
-            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
         saved = await self.repo.save_item(item)
         return await self._respond_item(saved)
 
@@ -169,6 +166,74 @@ class WorkTreeService:
         all_items = await self.repo.list_items(item.proyecto_id)
         ids = self._descendant_ids(item_id, all_items)
         await self.repo.soft_delete_many(ids)
+
+    async def list_trash(self, proyecto_id: UUID) -> list[TrashedItemResponse]:
+        """Elementos borrados del proyecto, listos para restaurar.
+
+        Solo se listan las RAÍCES de cada borrado: al borrar un elemento se
+        borra con él todo su contenido, y enseñar las 300 piezas de una rama
+        junto a la rama misma no ayuda a nadie. Se indica cuántos elementos
+        volverían con cada uno.
+        """
+        deleted = await self.repo.list_deleted_items(proyecto_id)
+        deleted_ids = {item.id for item in deleted}
+        # Una raíz de borrado es la que no tiene a su contenedor también en la
+        # papelera: las demás cuelgan de ella y vuelven con ella.
+        roots = [
+            item
+            for item in deleted
+            if item.parent_id is None or item.parent_id not in deleted_ids
+        ]
+        children: dict[UUID, list[UUID]] = {}
+        for item in deleted:
+            if item.parent_id is not None:
+                children.setdefault(item.parent_id, []).append(item.id)
+
+        def descendants(root_id: UUID) -> int:
+            total = 0
+            stack = list(children.get(root_id, []))
+            while stack:
+                total += 1
+                stack.extend(children.get(stack.pop(), []))
+            return total
+
+        return [
+            TrashedItemResponse(
+                id=item.id,
+                nombre=item.nombre,
+                tipo_nombre=item.tipo.nombre if item.tipo else None,
+                deleted_at=item.deleted_at,
+                contenido=descendants(item.id),
+            )
+            for item in roots
+        ]
+
+    async def restore_item(self, item_id: UUID) -> WorkItemResponse:
+        """Saca un elemento de la papelera junto con todo lo que contenía.
+
+        Si el elemento que lo contenía sigue borrado, este vuelve al nivel
+        principal en vez de arrastrar de vuelta a sus ancestros: restaurar algo
+        no debería resucitar de paso una rama entera que nadie pidió. La
+        papelera solo ofrece las raíces de cada borrado (que sí vuelven a su
+        sitio), así que este caso llega por la API, no desde la pantalla.
+        """
+        item = await self.repo.get_item(item_id)
+        if item is None:
+            raise NotFoundError("Nodo de trabajo no encontrado")
+        if not item.is_deleted:
+            raise ValidationError("Este elemento no está en la papelera")
+
+        deleted = await self.repo.list_deleted_items(item.proyecto_id)
+        deleted_ids = {i.id for i in deleted}
+        ids = self._descendant_ids(item_id, deleted)
+        await self.repo.restore_many(ids)
+
+        if item.parent_id is not None and item.parent_id in deleted_ids:
+            item.parent_id = None
+            item.orden = await self.repo.next_orden(item.proyecto_id, None)
+            await self.repo.save_item(item)
+
+        return await self._respond_item(item)
 
     async def move_item(
         self, item_id: UUID, new_parent_id: UUID | None, orden: int | None
@@ -194,11 +259,13 @@ class WorkTreeService:
                 raise ValidationError(
                     "No se puede mover un nodo dentro de sí mismo o de un descendiente"
                 )
-            # El drag & drop del árbol es deliberadamente más permisivo que la
-            # creación guiada: solo bloqueamos ciclos, no las reglas de
-            # anidación por tipo (`tipos_hijos_permitidos`), para que
-            # cualquier nodo pueda reordenarse bajo cualquier otro.
-            self._validate_end_date_within_parent(parent, item.fecha_fin_plan)
+            # Recolocar es deliberadamente permisivo: solo bloqueamos ciclos.
+            # Ni las reglas de anidación por tipo (`tipos_hijos_permitidos`) ni
+            # las fechas impiden el movimiento; que un hijo termine después que
+            # su padre queda REGISTRADO y marcado como conflicto en lectura
+            # (`conflicto_fechas`), no rechazado. Bloquear obligaba a arreglar
+            # las fechas antes de poder reorganizar el árbol, que es justo al
+            # revés de como se planifica: primero se ordena, luego se ajusta.
 
         old_parent_id = item.parent_id
         item.parent_id = new_parent_id
@@ -508,12 +575,13 @@ class WorkTreeService:
 
     # ── Derivación de fechas (en lectura) ─────────────────────────────────────
     async def _respond_item(self, item: WorkItem) -> WorkItemResponse:
-        _, derivation = await self._project_derivation(item.proyecto_id)
+        items, derivation = await self._project_derivation(item.proyecto_id)
         derived = derivation.get(
             item.id,
             DerivedDates(item.fecha_inicio_plan, item.fecha_fin_plan, False),
         )
-        return self._to_item_response(item, derived)
+        conflicts = self._compute_date_conflicts(items, derivation)
+        return self._to_item_response(item, derived, item.id in conflicts)
 
     async def _project_derivation(
         self, proyecto_id: UUID
@@ -601,21 +669,27 @@ class WorkTreeService:
         return tipo
 
     @staticmethod
-    def _validate_end_date_within_parent(
-        parent: WorkItem, fecha_fin_plan: datetime.date | None
-    ) -> None:
-        """Un hijo no puede terminar después que su padre.
+    def _compute_date_conflicts(
+        items: list[WorkItem], derivation: dict[UUID, DerivedDates]
+    ) -> set[UUID]:
+        """Ids de los nodos que terminan después que su padre.
 
-        Compara fechas plan crudas (las que captura el usuario), no las
-        derivadas: si el hijo no tiene fecha de fin explícita (modo "solo
-        duración"), no hay nada que validar aquí.
+        Se calcula en LECTURA sobre las fechas derivadas (las efectivas, no las
+        que se escribieron), por dos motivos: un nodo en modo "solo duración"
+        no tiene fin propio y solo se sabe dónde acaba tras derivarlo, y así el
+        conflicto aparece venga de donde venga —recolocar el hijo, recortar el
+        padre o cambiar una duración— y no solo del drag & drop.
         """
-        if fecha_fin_plan is None or parent.fecha_fin_plan is None:
-            return
-        if fecha_fin_plan > parent.fecha_fin_plan:
-            raise ValidationError(
-                "La fecha de fin no puede ser posterior a la de su elemento padre"
-            )
+        items_by_id = {item.id: item for item in items}
+        conflicts: set[UUID] = set()
+        for item in items:
+            if item.parent_id is None or item.parent_id not in items_by_id:
+                continue
+            fin = derivation[item.id].fecha_fin_plan
+            fin_padre = derivation[item.parent_id].fecha_fin_plan
+            if fin is not None and fin_padre is not None and fin > fin_padre:
+                conflicts.add(item.id)
+        return conflicts
 
     @staticmethod
     def _validate_nesting(parent: WorkItem, child_tipo: TipoNodo) -> None:
@@ -668,8 +742,12 @@ class WorkTreeService:
     def _build_tree(
         self, items: list[WorkItem], derivation: dict[UUID, DerivedDates]
     ) -> list[WorkItemTreeResponse]:
+        conflicts = self._compute_date_conflicts(items, derivation)
         nodes = {
-            item.id: self._to_tree_response(item, derivation[item.id]) for item in items
+            item.id: self._to_tree_response(
+                item, derivation[item.id], item.id in conflicts
+            )
+            for item in items
         }
         roots: list[WorkItemTreeResponse] = []
         for item in items:
@@ -718,14 +796,20 @@ class WorkTreeService:
         }
 
     def _to_item_response(
-        self, item: WorkItem, derived: DerivedDates
+        self, item: WorkItem, derived: DerivedDates, conflicto: bool = False
     ) -> WorkItemResponse:
         return WorkItemResponse(
             **self._item_fields(item, derived),
             advertencia_fechas=derived.advertencia,
+            conflicto_fechas=conflicto,
         )
 
     def _to_tree_response(
-        self, item: WorkItem, derived: DerivedDates
+        self, item: WorkItem, derived: DerivedDates, conflicto: bool = False
     ) -> WorkItemTreeResponse:
-        return WorkItemTreeResponse(**self._item_fields(item, derived), children=[])
+        return WorkItemTreeResponse(
+            **self._item_fields(item, derived),
+            advertencia_fechas=derived.advertencia,
+            conflicto_fechas=conflicto,
+            children=[],
+        )

@@ -22,6 +22,7 @@ function node(over: Partial<WorkItemTree> & { id: string }): WorkItemTree {
     porcentaje_completado: null,
     es_transversal: false,
     advertencia_fechas: false,
+    conflicto_fechas: false,
     children: [],
     ...over,
   };
@@ -40,6 +41,8 @@ function task(over: Partial<DatedTask> & { id: string; work_item_id: string }): 
     due_date: "2026-01-10",
     status: "pendiente_por_iniciar",
     completed_at: null,
+    estimated_hours: null,
+    logged_hours: "0",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: null,
     ...over,

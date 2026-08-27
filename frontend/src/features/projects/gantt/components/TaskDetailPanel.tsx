@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_PRIORITY_LABELS } from "../../types/labels";
 import type { Task, TaskStatus } from "../../types/api.types";
 import { TaskEditForm } from "./TaskEditForm";
+import { TaskEffortPanel } from "../../tasks/TaskEffortPanel";
+import { TaskComments } from "../../tasks/TaskComments";
 import {
   useAttachTask,
   useChangeTaskStatus,
@@ -13,8 +15,9 @@ import {
 } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
-import { useWorkTree } from "../../hooks/use-structure";
-import { flattenWorkTree } from "../../utils/flatten-work-tree";
+import { useWorkTree, useNodeTypes } from "../../hooks/use-structure";
+import { workItemPath } from "../../utils/flatten-work-tree";
+import { WorkItemPickerModal } from "../../tasks/WorkItemPickerModal";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
 
@@ -66,16 +69,16 @@ export function TaskDetailPanel({
   const membersQuery = useProjectMembers(projectId);
   const teamsQuery = useTeams(projectId);
   const treeQuery = useWorkTree(projectId);
+  const nodeTypesQuery = useNodeTypes(projectId);
   const attachTask = useAttachTask(projectId);
   const detachTask = useDetachTask(projectId);
-  const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [pickingLocation, setPickingLocation] = useState(false);
   const [editing, setEditing] = useState(false);
   const { user } = useAuth();
 
-  const nodeOptions = useMemo(() => flattenWorkTree(treeQuery.data ?? []), [treeQuery.data]);
-  const currentNodeLabel = useMemo(
-    () => nodeOptions.find((n) => n.id === task.work_item_id)?.label.trim() ?? null,
-    [nodeOptions, task.work_item_id],
+  const currentNodePath = useMemo(
+    () => workItemPath(treeQuery.data ?? [], task.work_item_id),
+    [treeQuery.data, task.work_item_id],
   );
 
   const assigneeName = useMemo(() => {
@@ -213,66 +216,40 @@ export function TaskDetailPanel({
               )}
             </dl>
 
-            {/* Ubicación en la estructura del proyecto: adjuntar, cambiar o quitar. */}
+            {/* Esfuerzo: lo estimado frente a lo dedicado, y los apuntes de horas. */}
+            <div className="mt-5">
+              <TaskEffortPanel projectId={projectId} taskId={task.id} />
+            </div>
+
+            {/* Conversación: por qué se decidió lo que se decidió, junto a la tarea. */}
+            <div className="mt-5">
+              <TaskComments taskId={task.id} />
+            </div>
+
+            {/* Ubicación en la estructura: un solo control para las tres cosas
+                (adjuntar, cambiar y quitar), porque para quien planifica son la
+                misma decisión — "¿de dónde cuelga esto?". El árbol se elige en
+                un modal grande y no en un desplegable: con cuatro niveles, una
+                lista aplanada no deja ver el contexto. */}
             <div className="mt-5">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 <FolderTree className="size-3.5" /> Ubicación en la estructura
               </p>
-              {currentNodeLabel ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50">
-                  <span className="truncate text-slate-700 dark:text-slate-200">
-                    {currentNodeLabel}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={detachTask.isPending}
-                    onClick={() => {
-                      detachTask.mutate(task.id);
-                    }}
-                    className="shrink-0 text-xs text-slate-400 underline-offset-2 hover:text-rose-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedNodeId}
-                    onChange={(e) => {
-                      setSelectedNodeId(e.target.value);
-                    }}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  >
-                    <option value="">
-                      {nodeOptions.length === 0
-                        ? "Sin estructura todavía"
-                        : "Selecciona un elemento…"}
-                    </option>
-                    {nodeOptions.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!selectedNodeId || attachTask.isPending}
-                    onClick={() => {
-                      attachTask.mutate(
-                        { taskId: task.id, workItemId: selectedNodeId },
-                        {
-                          onSuccess: () => {
-                            setSelectedNodeId("");
-                          },
-                        },
-                      );
-                    }}
-                    className="shrink-0 rounded-lg border border-brand-blue/40 bg-brand-blue/10 px-3 py-2 text-xs font-medium text-brand-blue-dark transition hover:bg-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-brand-blue"
-                  >
-                    Adjuntar
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                disabled={attachTask.isPending || detachTask.isPending}
+                onClick={() => {
+                  setPickingLocation(true);
+                }}
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm transition hover:border-brand-teal dark:border-slate-700 dark:bg-slate-800/50"
+              >
+                <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">
+                  {currentNodePath ?? "Sin ubicación (tarea independiente)"}
+                </span>
+                <span className="shrink-0 text-xs font-medium text-brand-teal">
+                  {currentNodePath ? "Cambiar" : "Ubicar"}
+                </span>
+              </button>
               {(attachTask.isError || detachTask.isError) && (
                 <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
                   {getErrorMessage(
@@ -400,6 +377,26 @@ export function TaskDetailPanel({
           </>
         )}
       </aside>
+
+      {pickingLocation && (
+        <WorkItemPickerModal
+          tree={treeQuery.data ?? []}
+          nodeTypes={nodeTypesQuery.data ?? []}
+          value={task.work_item_id}
+          onSelect={(workItemId) => {
+            // Elegir "sin ubicación" es quitarla; elegir un elemento la adjunta
+            // o la mueve. Un mismo control, dos endpoints distintos.
+            if (workItemId) {
+              attachTask.mutate({ taskId: task.id, workItemId });
+            } else if (task.work_item_id) {
+              detachTask.mutate(task.id);
+            }
+          }}
+          onClose={() => {
+            setPickingLocation(false);
+          }}
+        />
+      )}
     </div>
   );
 }

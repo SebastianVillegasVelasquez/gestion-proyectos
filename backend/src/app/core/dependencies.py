@@ -151,7 +151,7 @@ def event_bus_dependency(
     """
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
-    register_notification_handlers(bus, notification_repo, broadcaster, db)
+    register_notification_handlers(bus, notification_repo, broadcaster)
     bus.subscribe(
         UserCreated, NotifyUserCreatedByEmail(SmtpEmailSender(get_settings()))
     )
@@ -191,6 +191,7 @@ async def get_current_user(
         is_active=user.is_active,
         document_type=user.document_type,
         document_number=user.document_number,
+        created_at=user.created_at,
     )
 
 

@@ -15,6 +15,7 @@ from app.core.logger import get_logger
 from app.core.seed import ensure_developer, ensure_prod_users, ensure_super_admin
 from app.core.seed_demo import ensure_demo_data, ensure_demo_traceability
 from app.core.seed_project_structure import ensure_project_structure
+from app.core.seed_project_work import ensure_project_work
 
 logger = get_logger(__name__)
 
@@ -31,6 +32,9 @@ async def run_seed() -> None:
         await ensure_demo_data()
         await ensure_demo_traceability()
         await ensure_project_structure()
+        # Reparte trabajo sobre esa estructura (equipos, personas y tareas):
+        # sin esto el cronograma va vacío y el informe da ceros.
+        await ensure_project_work()
     else:
         # logger.info("Seed: entorno de producción → usuarios de OBJ Digital")
         await ensure_prod_users()

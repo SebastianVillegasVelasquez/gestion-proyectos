@@ -18,6 +18,13 @@ from app.modules.tasks.application.use_cases import (
     AttachTaskToWorkItemUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
+    AddCommentUseCase,
+    CreateTasksFromBranchUseCase,
+    DeleteCommentUseCase,
+    DeleteTimeEntryUseCase,
+    GetTaskEffortUseCase,
+    ListCommentsUseCase,
+    LogTimeUseCase,
     DeleteTaskUseCase,
     DetachTaskUseCase,
     GetProjectTaskDependenciesUseCase,
@@ -31,7 +38,14 @@ from app.modules.tasks.application.use_cases import (
 from app.modules.tasks.presentation.schemas import (
     AttachTaskRequest,
     CreateTaskDependencyRequest,
+    BulkTasksFromBranchRequest,
+    BulkTasksResultResponse,
+    CommentResponse,
+    CreateCommentRequest,
     CreateTaskRequest,
+    CreateTimeEntryRequest,
+    TaskEffortResponse,
+    TimeEntryResponse,
     TaskDependencyResponse,
     TaskResponse,
     TeamTaskItemResponse,
@@ -50,7 +64,7 @@ _any_user = require_role("admin", "super_admin", "user")
 @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     payload: CreateTaskRequest,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
@@ -59,7 +73,116 @@ async def create_task(
 ):
     return await CreateTaskUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
-    ).execute(payload)
+    ).execute(payload, actor_id=current_user.id)
+
+
+@router.post(
+    "/work-items/{item_id}/tasks/bulk",
+    response_model=BulkTasksResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_tasks_from_branch(
+    item_id: UUID,
+    payload: BulkTasksFromBranchRequest,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """Crea una tarea por cada elemento de la rama que cuelga de `item_id`.
+
+    Pensado para montar de golpe el trabajo de una unidad completa. Los
+    elementos que ya tienen tarea se saltan (no se duplican), así que se puede
+    relanzar sobre la misma rama para crear solo lo que falta.
+    """
+    return await CreateTasksFromBranchUseCase(
+        task_repo, work_tree_repo, user_repo, project_repo, bus
+    ).execute(item_id, payload)
+
+
+# ── Comentarios y menciones ───────────────────────────────────────────────────
+@router.post(
+    "/tasks/{task_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_comment(
+    task_id: UUID,
+    payload: CreateCommentRequest,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """Comenta una tarea. Los mencionados y el responsable reciben aviso."""
+    return await AddCommentUseCase(task_repo, bus).execute(
+        task_id, current_user.id, payload
+    )
+
+
+@router.get("/tasks/{task_id}/comments", response_model=list[CommentResponse])
+async def list_comments(
+    task_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Conversación de la tarea, del comentario más antiguo al más nuevo."""
+    return await ListCommentsUseCase(task_repo).execute(task_id)
+
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    comment_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Borra un comentario propio (o cualquiera si administras)."""
+    await DeleteCommentUseCase(task_repo).execute(
+        comment_id, current_user.id, current_user.role
+    )
+
+
+# ── Esfuerzo: estimación vs. horas dedicadas ──────────────────────────────────
+@router.post(
+    "/tasks/{task_id}/time-entries",
+    response_model=TimeEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def log_time(
+    task_id: UUID,
+    payload: CreateTimeEntryRequest,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Apunta horas dedicadas a una tarea, a nombre de quien las apunta.
+
+    No se registra tiempo por otra persona: el dato solo sirve para estimar y
+    para pagar si quien lo escribe es quien lo trabajó.
+    """
+    return await LogTimeUseCase(task_repo).execute(task_id, current_user.id, payload)
+
+
+@router.get("/tasks/{task_id}/effort", response_model=TaskEffortResponse)
+async def get_task_effort(
+    task_id: UUID,
+    _=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
+    return await GetTaskEffortUseCase(task_repo).execute(task_id)
+
+
+@router.delete("/time-entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_time_entry(
+    entry_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Borra un apunte de horas (solo el propio, o cualquiera si administras)."""
+    await DeleteTimeEntryUseCase(task_repo).execute(
+        entry_id, current_user.id, current_user.role
+    )
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -79,7 +202,9 @@ async def update_task(
     task_repo=Depends(task_repo_dependency),
     user_repo=Depends(user_repo_dependency),
 ):
-    return await UpdateTaskUseCase(task_repo, user_repo).execute(task_id, payload)
+    return await UpdateTaskUseCase(task_repo, user_repo).execute(
+        task_id, payload, actor_id=current_user.id
+    )
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -192,21 +317,21 @@ async def change_task_status(
 async def attach_task(
     task_id: UUID,
     payload: AttachTaskRequest,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
 ):
     """Adjunta una tarea (suelta o ya adjunta) al elemento indicado."""
     return await AttachTaskToWorkItemUseCase(task_repo, work_tree_repo).execute(
-        task_id, payload.work_item_id
+        task_id, payload.work_item_id, actor_id=current_user.id
     )
 
 
 @router.patch("/tasks/{task_id}/detach", response_model=TaskResponse)
 async def detach_task(
     task_id: UUID,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
     """Quita la tarea de la estructura; vuelve a quedar suelta."""
-    return await DetachTaskUseCase(task_repo).execute(task_id)
+    return await DetachTaskUseCase(task_repo).execute(task_id, actor_id=current_user.id)

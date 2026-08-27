@@ -11,6 +11,7 @@ class ProjectRole(str, enum.Enum):
     COORDINADOR = "coordinador"  # Líder del proyecto, asigna tareas, maneja el Gantt y aprueba entregas.
     REVISOR = "revisor"  # Encargado de la revisión intermedia (control de calidad antes de completar).
     INTEGRANTE = "integrante"  # El colaborador operativo encargado de ejecutar las tareas asignadas.
-    CLIENTE = (
-        "cliente"  # Stakeholder/Usuario final con permisos de observación o feedback.
-    )
+    # No hay rol de cliente: el cliente NO tiene cuenta en el sistema. Ve el
+    # avance por el portal público (/portal/{token}), que es de solo lectura y
+    # no pasa por login; darle un rol de proyecto sería una segunda puerta de
+    # entrada para el mismo caso de uso.

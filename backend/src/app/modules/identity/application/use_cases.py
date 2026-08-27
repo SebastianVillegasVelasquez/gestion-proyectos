@@ -90,6 +90,7 @@ def _token_response(user) -> TokenResponse:
             is_active=user.is_active,
             document_type=user.document_type,
             document_number=user.document_number,
+            created_at=user.created_at,
         ),
     )
 
@@ -215,10 +216,20 @@ class SearchUsersAdminUseCase:
         self.user_repo = user_repo
 
     async def execute(
-        self, search: str | None, pagination: Pagination
+        self,
+        search: str | None,
+        pagination: Pagination,
+        include_inactive: bool = True,
+        sort_by: str = "name",
+        sort_dir: str = "asc",
     ) -> PaginatedUsersResponse:
         items, total = await self.user_repo.search_users_admin(
-            search=search, limit=pagination.limit, offset=pagination.offset
+            search=search,
+            limit=pagination.limit,
+            offset=pagination.offset,
+            include_inactive=include_inactive,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         return PaginatedUsersResponse(
             items=[UserResponse.model_validate(u) for u in items],
@@ -248,15 +259,6 @@ class UpdateUserUseCase:
         data: UpdateUserRequest,
     ) -> UserResponse:
         return await self.user_service.update(user_id, data)
-
-
-class DeleteUserUseCase:
-    def __init__(self, user_repo: UserRepository):
-        self.user_repo = user_repo
-        self.user_service = UserService(user_repo)
-
-    async def execute(self, user_id: UUID, actor_role: str) -> None:
-        await self.user_service.delete(user_id=user_id, actor_role=actor_role)
 
 
 class ChangeMyPasswordUseCase:
@@ -310,14 +312,16 @@ class CreatePositionUseCase:
         self.position_repo = position_repo
 
     async def execute(self, data: CreatePositionRequest) -> PositionOption:
-        # Normalizamos igual que la carga masiva: la clave que se compara y
-        # persiste nunca lleva tildes, aunque la app hoy no deje escribirlas
-        # desde el formulario (defensa ante llamadas directas a la API).
-        key = _slugify_position_key(data.key)
+        # Quien crea el cargo solo escribe el nombre ("Diseñador Gráfico"):
+        # la clave estable la derivamos aquí, igual que en la carga masiva, así
+        # que dos formas de escribir el mismo cargo ("Diseñador Gráfico" vs.
+        # "diseñador grafico") no generan dos registros distintos.
+        label = data.label.strip()
+        key = _slugify_position_key(label)
         if await self.position_repo.key_exists(key):
-            raise ConflictError(f"Ya existe un cargo con la clave '{key}'")
+            raise ConflictError(f"Ya existe el cargo '{label}'")
 
-        position = await self.position_repo.add(Position(key=key, label=data.label))
+        position = await self.position_repo.add(Position(key=key, label=label))
         return PositionOption(value=position.key, label=position.label)
 
 

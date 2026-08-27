@@ -16,8 +16,9 @@ import type { PieSectorDataItem } from "recharts/types/polar/Pie";
 import { CalendarRange, ChartPie, ListChecks, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/common/Skeleton";
 import type { Task, TaskPriority } from "../../types/api.types";
-import { deriveTaskMetrics, type StatusSegment } from "../../utils/task-metrics";
+import { deriveTaskMetrics } from "../../utils/task-metrics";
 import {
   buildDeliveryBuckets,
   summarizeDelivery,
@@ -48,34 +49,6 @@ const TREND_META = {
   down: { icon: TrendingDown, label: "Empeorando", tone: "text-rose-600 dark:text-rose-400" },
   flat: { icon: Minus, label: "Estable", tone: "text-muted-foreground" },
 };
-
-function StatusTooltip({
-  active,
-  payload,
-  total,
-}: {
-  active?: boolean;
-  payload?: { payload: StatusSegment }[];
-  total: number;
-}) {
-  if (!active || !payload?.length) {
-    return null;
-  }
-  const seg = payload[0].payload;
-  const pct = total ? Math.round((seg.count / total) * 100) : 0;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
-      <div className="flex items-center gap-2">
-        <span className="size-2.5 rounded-sm" style={{ backgroundColor: seg.color }} />
-        <span className="font-semibold text-foreground">{seg.label}</span>
-      </div>
-      <p className="mt-1 text-muted-foreground">
-        <span className="font-semibold text-foreground">{seg.count}</span>{" "}
-        {seg.count === 1 ? "tarea" : "tareas"} · {pct}%
-      </p>
-    </div>
-  );
-}
 
 // Sector activo del donut: crece un poco y suma un anillo exterior fino al hover.
 function ActiveSlice(props: PieSectorDataItem) {
@@ -158,6 +131,11 @@ function StatusView({ tasks }: { tasks: Task[] }) {
   const metrics = useMemo(() => deriveTaskMetrics(filtered), [filtered]);
   const segments = metrics.segments;
 
+  // Sector bajo el cursor: su detalle se lee en el hueco del donut, no en un
+  // letrero flotante que seguiría al ratón por encima del propio anillo.
+  const active = activeIndex != null ? segments[activeIndex] : null;
+  const activePct = active && metrics.total ? Math.round((active.count / metrics.total) * 100) : 0;
+
   return (
     <>
       {/* Filtro por prioridad, centrado */}
@@ -227,22 +205,35 @@ function StatusView({ tasks }: { tasks: Task[] }) {
                     <Cell key={seg.status} fill={seg.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  content={<StatusTooltip total={metrics.total} />}
-                  wrapperStyle={{ outline: "none" }}
-                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-semibold tabular-nums text-foreground">
-                {activeIndex != null ? segments[activeIndex].count : metrics.progress}
-                {activeIndex == null && <span className="text-xl text-muted-foreground">%</span>}
-              </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {activeIndex != null
-                  ? segments[activeIndex].label
-                  : `${metrics.total} ${metrics.total === 1 ? "tarea" : "tareas"}`}
-              </span>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-11 text-center">
+              {active ? (
+                <>
+                  <span className="text-4xl font-semibold tabular-nums text-foreground">
+                    {active.count}
+                  </span>
+                  <span
+                    className="mt-0.5 line-clamp-2 text-[11px] font-semibold uppercase leading-tight tracking-wider"
+                    style={{ color: active.color }}
+                  >
+                    {active.label}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {active.count === 1 ? "tarea" : "tareas"} · {activePct}%
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-4xl font-semibold tabular-nums text-foreground">
+                    {metrics.progress}
+                    <span className="text-xl text-muted-foreground">%</span>
+                  </span>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {metrics.total} {metrics.total === 1 ? "tarea" : "tareas"}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -411,7 +402,14 @@ const VIEW_META: Record<View, { label: string; subtitle: string; icon: typeof Li
  * estado (donut) y el desempeño de entregas en el tiempo (barras). Se alternan
  * con un selector en la cabecera en vez de ocupar dos cards separados.
  */
-export function ProjectChartsCard({ tasks }: { tasks: Task[] }) {
+export function ProjectChartsCard({
+  tasks,
+  loading = false,
+}: {
+  tasks: Task[];
+  /** Las tareas aún no llegaron: la tarjeta se dibuja igual, con su hueco. */
+  loading?: boolean;
+}) {
   const [view, setView] = useState<View>("estado");
   const meta = VIEW_META[view];
   const Icon = meta.icon;
@@ -458,7 +456,24 @@ export function ProjectChartsCard({ tasks }: { tasks: Task[] }) {
           </div>
         </div>
 
-        {view === "estado" ? <StatusView tasks={tasks} /> : <DeliveryView tasks={tasks} />}
+        {loading ? (
+          // El hueco imita la forma del gráfico (aro + leyenda) para que al
+          // llegar los datos nada se mueva de sitio.
+          <div className="flex w-full flex-1 items-center justify-center gap-8 py-6">
+            <Skeleton className="size-36 rounded-full" />
+            <div className="flex flex-col gap-2.5">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-3.5 w-28" />
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Al montar, el contenido entra con un fundido corto: se percibe que
+          // el dato llegó sin hacer esperar a quien ya sabe lo que busca.
+          <div className="flex w-full flex-1 flex-col items-center animate-in fade-in-0 duration-500 motion-reduce:animate-none">
+            {view === "estado" ? <StatusView tasks={tasks} /> : <DeliveryView tasks={tasks} />}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,3 +1,5 @@
+from datetime import datetime
+from enum import Enum
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -153,6 +155,29 @@ class UserResponse(BaseModelConfig):
     is_active: bool
     document_type: Optional[str] = None
     document_number: Optional[str] = None
+    # Fecha de alta de la cuenta. Opcional porque algunas respuestas (p. ej.
+    # el login) se arman a mano; la administración de usuarios sí la envía.
+    created_at: Optional[datetime] = None
+
+
+class AdminUserSortField(str, Enum):
+    """Columnas ordenables de la tabla de administración de usuarios.
+
+    Es un enum (y no un string libre) para que FastAPI rechace con 422 lo que
+    no sea una columna válida, en vez de dejar que llegue al ORDER BY.
+    """
+
+    NAME = "name"
+    EMAIL = "email"
+    ROLE = "role"
+    POSITION = "position"
+    STATUS = "status"
+    CREATED_AT = "created_at"
+
+
+class SortDirection(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
 
 
 class PaginatedUsersResponse(BaseModelConfig):
@@ -177,18 +202,12 @@ class PositionOption(BaseModelConfig):
 class CreatePositionRequest(BaseModelConfig):
     """Alta de un cargo nuevo que la empresa nunca había tenido.
 
-    `key` es el identificador estable (minúsculas, snake_case) que queda
-    referenciado desde `users.position`.
+    Quien lo crea solo escribe el cargo en texto plano, tal cual se lee
+    ("Diseñador Gráfico"): la clave estable que referencia `users.position`
+    la deriva el backend (minúsculas, sin tildes, snake_case). Así la UI no
+    le pide al administrador un concepto técnico que no le aporta nada.
     """
 
-    key: Annotated[
-        str,
-        StringConstraints(
-            min_length=2,
-            max_length=64,
-            pattern=r"^[a-záéíóúñ][a-záéíóúñ0-9_]*$",
-        ),
-    ]
     label: Annotated[str, StringConstraints(min_length=2, max_length=150)]
 
 

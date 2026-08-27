@@ -29,6 +29,9 @@ class TaskBoardItem:
     title: str
     status: str  # value del enum (minúscula), tal cual lo espera el frontend
     project_name: str | None
+    # Id del proyecto: la vista del usuario agrupa SUS tareas por proyecto y
+    # enlaza a cada uno; con el nombre solo no se puede navegar.
+    project_id: uuid.UUID | None
     due_date: datetime.date
 
 
@@ -336,7 +339,9 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
     def _task_with_project(self):
         """Cada tarea con el nombre de su proyecto, vía el WorkItem del que cuelga."""
         return (
-            select(Task, Project.name.label("project_name"))
+            select(
+                Task, Project.name.label("project_name"), Project.id.label("project_id")
+            )
             .select_from(Task)
             .join(WorkItem, Task.work_item_id == WorkItem.id)
             .join(Project, WorkItem.proyecto_id == Project.id)
@@ -364,13 +369,14 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                     base.where(status_col.in_(names)).order_by(order).limit(limit)
                 )
             ).all()
-            for task, project_name in rows:
+            for task, project_name, project_id in rows:
                 items.append(
                     TaskBoardItem(
                         id=task.id,
                         title=task.title,
                         status=_status_value(task.status),
                         project_name=project_name,
+                        project_id=project_id,
                         due_date=task.due_date,
                     )
                 )
@@ -397,7 +403,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 project_name=project_name,
                 due_date=task.due_date,
             )
-            for task, project_name in rows
+            for task, project_name, _project_id in rows
         ]
 
     async def _get_projects_overview(
@@ -722,9 +728,10 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 title=task.title,
                 status=_status_value(task.status),
                 project_name=project_name,
+                project_id=row_project_id,
                 due_date=task.due_date,
             )
-            for task, project_name in my_tasks_rows
+            for task, project_name, row_project_id in my_tasks_rows
         ]
 
         return self._build_progress(project, counts, coordinator, my_tasks)

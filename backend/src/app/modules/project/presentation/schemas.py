@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -124,3 +125,39 @@ class ProjectNoteResponse(BaseModelConfig):
     author_id: Optional[UUID] = None
     author_name: Optional[str] = None
     created_at: datetime
+
+
+# ── Informe de proyecto ───────────────────────────────────────────────────────
+class ReportRowResponse(BaseModelConfig):
+    """Una tarea del informe con su contexto ya resuelto."""
+
+    elemento: Optional[str] = None
+    # Solo para pintar el elemento con el mismo color que en la estructura.
+    elemento_tipo_id: Optional[UUID] = None
+    tarea: str
+    responsable: Optional[str] = None
+    equipo: Optional[str] = None
+    estado: str
+    prioridad: str
+    inicio: Optional[str] = None
+    fin: Optional[str] = None
+    horas_estimadas: Optional[Decimal] = None
+    horas_dedicadas: Decimal = Decimal("0")
+
+
+class PersonEffortResponse(BaseModelConfig):
+    nombre: str
+    horas: Decimal
+
+
+class ProjectReportResponse(BaseModelConfig):
+    """Estado del proyecto para enseñar fuera: a dirección o a un cliente."""
+
+    project_id: UUID
+    project_name: str
+    total_tareas: int
+    tareas_por_estado: dict[str, int] = {}
+    horas_estimadas: Decimal = Decimal("0")
+    horas_dedicadas: Decimal = Decimal("0")
+    horas_por_persona: list[PersonEffortResponse] = []
+    filas: list[ReportRowResponse] = []

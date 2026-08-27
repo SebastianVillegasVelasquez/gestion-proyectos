@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -14,12 +15,83 @@ from app.shared.base_model import BaseModelConfig
 
 class TaskBase(BaseModelConfig):
     title: Annotated[str, StringConstraints(min_length=2, max_length=200)]
+    # Esfuerzo estimado en horas. Opcional: una tarea puede nacer sin estimar
+    # y estimarse cuando se sepa de qué va.
+    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
     assignee_id: Optional[UUID] = None
     # Equipo al que se delega la tarea (opcional). None = tarea normal del proyecto.
     team_id: Optional[UUID] = None
     status: Optional[TaskStatus] = None
+
+
+class BulkTasksFromBranchRequest(BaseModelConfig):
+    """Crea de una vez una tarea por cada elemento de una rama.
+
+    El caso real: una unidad con decenas de piezas (video, guion, quiz) donde
+    cada pieza es una tarea de alguien. Darlas de alta una por una es el cuello
+    de botella de montar un proyecto.
+    """
+
+    # Por defecto solo las HOJAS: los elementos con contenido suelen ser
+    # agrupadores ("Unidad 3"), y lo que alguien produce son sus piezas.
+    only_leaves: bool = True
+    # Un elemento que ya tiene tarea no se duplica; volver a lanzar la carga
+    # sobre la misma rama solo crea lo que falta.
+    skip_with_tasks: bool = True
+    # Hereda las fechas del elemento (las efectivas del cronograma). Si no,
+    # la tarea nace sin fechas y se planifica luego.
+    inherit_dates: bool = True
+
+    priority: TaskPriority = TaskPriority.MEDIA
+    assignee_id: Optional[UUID] = None
+    team_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def person_xor_team(self) -> "BulkTasksFromBranchRequest":
+        if self.assignee_id is not None and self.team_id is not None:
+            raise ValueError(
+                "Asigna las tareas a una persona o a un equipo, no a ambos"
+            )
+        return self
+
+
+class SkippedElementResponse(BaseModelConfig):
+    """Elemento de la rama para el que no se creó tarea, y por qué."""
+
+    work_item_id: UUID
+    nombre: str
+    motivo: str
+
+
+class BulkTasksResultResponse(BaseModelConfig):
+    created: list["TaskResponse"] = []
+    skipped: list[SkippedElementResponse] = []
+    total_elementos: int = 0
+
+
+class CreateCommentRequest(BaseModelConfig):
+    """Comentario en una tarea, con las personas mencionadas.
+
+    Las menciones llegan como una lista EXPLÍCITA de ids, no parseando "@algo"
+    del texto: dos personas pueden llamarse igual y un nombre puede escribirse
+    de varias formas. Quien escribe elige en un desplegable; el backend no
+    adivina a quién se refería.
+    """
+
+    body: Annotated[str, StringConstraints(min_length=1, max_length=4000)]
+    mentioned_user_ids: list[UUID] = []
+
+
+class CommentResponse(BaseModelConfig):
+    id: UUID
+    task_id: UUID
+    author_id: UUID
+    author_name: Optional[str] = None
+    body: str
+    mentioned_user_ids: list[UUID] = []
+    created_at: Optional[datetime] = None
 
 
 class CreateTaskRequest(TaskBase):
@@ -76,6 +148,39 @@ class TaskResponse(TaskBase):
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
+    # Horas realmente dedicadas (suma de los apuntes). Se calcula en lectura;
+    # 0 cuando nadie ha registrado nada todavía.
+    logged_hours: Decimal = Decimal("0")
+
+
+class CreateTimeEntryRequest(BaseModelConfig):
+    """Apunte de horas dedicadas a una tarea en un día."""
+
+    hours: Annotated[Decimal, Field(gt=0, le=24)]
+    work_date: date
+    notes: Optional[Annotated[str, StringConstraints(max_length=500)]] = None
+
+
+class TimeEntryResponse(BaseModelConfig):
+    id: UUID
+    task_id: UUID
+    user_id: UUID
+    # Nombre de quien dedicó las horas, resuelto en lectura para no pedir el
+    # directorio entero solo para pintar una lista de apuntes.
+    user_name: Optional[str] = None
+    hours: Decimal
+    work_date: date
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class TaskEffortResponse(BaseModelConfig):
+    """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
+
+    task_id: UUID
+    estimated_hours: Optional[Decimal] = None
+    logged_hours: Decimal = Decimal("0")
+    entries: list[TimeEntryResponse] = []
 
 
 class AttachTaskRequest(BaseModelConfig):
@@ -107,6 +212,7 @@ class UpdateTaskRequest(BaseModelConfig):
     team_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
+    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
 
     @model_validator(mode="after")
     def assignee_or_team_exclusive(self) -> "UpdateTaskRequest":

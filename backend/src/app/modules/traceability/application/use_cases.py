@@ -2,8 +2,11 @@ from uuid import UUID
 
 from app.modules.traceability.domain.events import (
     EVENT_APROBACION,
+    EVENT_ASIGNACION,
     EVENT_DEVOLUCION,
     EVENT_ENTREGA,
+    EVENT_EQUIPO,
+    EVENT_REPROGRAMACION,
     classify_event,
 )
 from app.modules.traceability.infrastructure.repository import TraceabilityRepository
@@ -15,6 +18,9 @@ from app.modules.traceability.presentation.schemas import (
 from app.shared.exceptions import NotFoundError
 
 _DELIVERY_KINDS = {EVENT_ENTREGA, EVENT_APROBACION}
+# Un cambio de responsable y uno de equipo cuentan igual: en ambos casos el
+# trabajo cambió de manos, que es lo que el coordinador quiere detectar.
+_HANDOVER_KINDS = {EVENT_ASIGNACION, EVENT_EQUIPO}
 
 
 class GetProjectTraceabilityUseCase:
@@ -34,7 +40,7 @@ class GetProjectTraceabilityUseCase:
         rows = await self._repo.list_events(project_id)
 
         events: list[TraceabilityEvent] = []
-        delays = deliveries = returns = 0
+        delays = deliveries = returns = reschedules = reassignments = 0
         for row in rows:
             classification = classify_event(
                 action=row.action,
@@ -48,6 +54,10 @@ class GetProjectTraceabilityUseCase:
                 deliveries += 1
             if classification.kind == EVENT_DEVOLUCION:
                 returns += 1
+            if classification.kind == EVENT_REPROGRAMACION:
+                reschedules += 1
+            if classification.kind in _HANDOVER_KINDS:
+                reassignments += 1
 
             events.append(
                 TraceabilityEvent(
@@ -59,7 +69,14 @@ class GetProjectTraceabilityUseCase:
                     old_status=row.old_status,
                     new_status=row.new_status,
                     change_reason=row.change_reason,
+                    old_value=row.old_value,
+                    new_value=row.new_value,
                     created_at=row.created_at,
+                    work_item_id=row.work_item_id,
+                    work_item_name=row.work_item_name,
+                    team_id=row.team_id,
+                    team_name=row.team_name,
+                    assignee_name=row.assignee_name,
                     kind=classification.kind,
                     is_delay=classification.is_delay,
                 )
@@ -72,6 +89,8 @@ class GetProjectTraceabilityUseCase:
                 delays=delays,
                 deliveries=deliveries,
                 returns=returns,
+                reschedules=reschedules,
+                reassignments=reassignments,
             ),
             events=events,
         )

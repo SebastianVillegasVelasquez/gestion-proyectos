@@ -39,6 +39,7 @@ describe("toTask", () => {
     title: "Maquetar unidad",
     status: "en_progreso",
     project_name: "Diplomado",
+    project_id: "p1",
     due_date: "2026-06-14",
   };
 

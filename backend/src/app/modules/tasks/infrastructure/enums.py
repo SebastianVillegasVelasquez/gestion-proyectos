@@ -19,7 +19,21 @@ class TaskPriority(str, Enum):
 
 
 class HistoryAction(str, Enum):
+    """Qué clase de cambio quedó registrado en el historial de una tarea.
+
+    Auditar no es lo mismo que notificar: aquí entra TODO cambio relevante,
+    tenga o no a quién avisar. Un coordinador que pregunta "¿por qué esta
+    tarea se retrasó?" necesita ver que cambió de equipo el martes y que le
+    movieron la fecha el jueves, no solo las entregas.
+    """
+
     CREACION = "creacion"
     CAMBIO_ESTADO = "cambio_estado"
     REASIGNACION = "reasignacion"
     COMENTARIO = "comentario"
+    # Añadidos para una trazabilidad profunda: el "qué cambió" concreto va en
+    # `old_value` / `new_value` del historial, en texto legible.
+    CAMBIO_EQUIPO = "cambio_equipo"
+    CAMBIO_UBICACION = "cambio_ubicacion"
+    CAMBIO_FECHAS = "cambio_fechas"
+    CAMBIO_PRIORIDAD = "cambio_prioridad"

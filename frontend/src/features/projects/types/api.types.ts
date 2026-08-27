@@ -98,6 +98,87 @@ export interface WorkItem {
   es_transversal: boolean;
   // True cuando se dieron inicio+fin+duración inconsistentes (informativo).
   advertencia_fechas: boolean;
+  // True cuando este elemento termina DESPUÉS que su padre. No impide nada:
+  // el árbol se reorganiza libremente y la UI ofrece cuadrar las fechas.
+  conflicto_fechas: boolean;
+}
+
+/** Comentario de una tarea, con las personas mencionadas en él. */
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  author_name: string | null;
+  body: string;
+  mentioned_user_ids: string[];
+  created_at: string | null;
+}
+
+export interface CreateCommentPayload {
+  body: string;
+  /** Ids EXPLÍCITOS: el backend no adivina a quién apunta un "@algo". */
+  mentioned_user_ids?: string[];
+}
+
+/** Apunte de horas dedicadas a una tarea por una persona en un día. */
+export interface TimeEntry {
+  id: string;
+  task_id: string;
+  user_id: string;
+  user_name: string | null;
+  hours: string;
+  work_date: string;
+  notes: string | null;
+  created_at: string | null;
+}
+
+export interface CreateTimeEntryPayload {
+  hours: string;
+  work_date: string;
+  notes?: string | null;
+}
+
+/** Estimado vs. dedicado de una tarea, con el detalle de los apuntes. */
+export interface TaskEffort {
+  task_id: string;
+  estimated_hours: string | null;
+  logged_hours: string;
+  entries: TimeEntry[];
+}
+
+/** Alta masiva de tareas a partir de una rama de la estructura. */
+export interface BulkTasksFromBranchPayload {
+  /** Solo los elementos sin contenido (los agrupadores no generan tarea). */
+  only_leaves?: boolean;
+  /** No duplicar: saltar los elementos que ya tienen tarea. */
+  skip_with_tasks?: boolean;
+  /** Heredar las fechas efectivas del elemento. */
+  inherit_dates?: boolean;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  team_id?: string | null;
+}
+
+export interface SkippedElement {
+  work_item_id: string;
+  nombre: string;
+  motivo: string;
+}
+
+export interface BulkTasksResult {
+  created: Task[];
+  skipped: SkippedElement[];
+  total_elementos: number;
+}
+
+/** Elemento borrado tal como lo lista la papelera del proyecto. */
+export interface TrashedItem {
+  id: string;
+  nombre: string;
+  tipo_nombre: string | null;
+  deleted_at: string | null;
+  /** Cuántos elementos volverían con él (los que contenía). */
+  contenido: number;
 }
 
 export interface WorkItemTree extends WorkItem {
@@ -172,6 +253,10 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string | null;
+  /** Esfuerzo estimado en horas (null = sin estimar). */
+  estimated_hours: string | null;
+  /** Horas realmente dedicadas: suma de los apuntes, calculada en lectura. */
+  logged_hours: string;
 }
 
 export interface CreateTaskPayload {
@@ -203,6 +288,7 @@ export interface UpdateTaskPayload {
   team_id?: string | null;
   start_date?: string;
   due_date?: string;
+  estimated_hours?: string | null;
 }
 
 export interface AttachTaskPayload {
@@ -217,7 +303,9 @@ export interface TaskDependency {
 
 // ── Members / team ───────────────────────────────────────────────────────────
 
-export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante" | "cliente";
+// Sin rol de cliente: el cliente no tiene cuenta, ve el avance por el portal
+// público (/portal/:token), que no pasa por login.
+export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante";
 
 export interface ProjectMember {
   id: string;
@@ -355,7 +443,15 @@ export interface TeamSearchParams {
 }
 
 // ── Trazabilidad (historial de eventos de un proyecto) ───────────────────────
-export type HistoryAction = "creacion" | "cambio_estado" | "reasignacion" | "comentario";
+export type HistoryAction =
+  | "creacion"
+  | "cambio_estado"
+  | "reasignacion"
+  | "comentario"
+  | "cambio_equipo"
+  | "cambio_ubicacion"
+  | "cambio_fechas"
+  | "cambio_prioridad";
 
 // Tipo de evento clasificado por el backend (espejo del dominio).
 export type TraceabilityEventKind =
@@ -367,7 +463,12 @@ export type TraceabilityEventKind =
   | "devolucion"
   | "cancelacion"
   | "comentario"
-  | "cambio_estado";
+  | "cambio_estado"
+  // Cambios de gestión: no mueven el estado pero explican la historia de la tarea.
+  | "equipo"
+  | "ubicacion"
+  | "reprogramacion"
+  | "prioridad";
 
 export interface TraceabilityEvent {
   id: string;
@@ -378,11 +479,16 @@ export interface TraceabilityEvent {
   old_status: TaskStatus | null;
   new_status: TaskStatus | null;
   change_reason: string | null;
+  /** Delta legible de los cambios que no son de estado ("Contenidos" → "Producción"). */
+  old_value: string | null;
+  new_value: string | null;
   created_at: string;
   kind: TraceabilityEventKind;
   is_delay: boolean;
-  // Contexto adicional del evento (el backend puede omitirlos; el frontend los muestra si existen).
+  // Contexto ACTUAL de la tarea, para poder filtrar la línea de tiempo.
+  work_item_id?: string | null;
   work_item_name?: string | null;
+  team_id?: string | null;
   team_name?: string | null;
   assignee_name?: string | null;
 }
@@ -392,6 +498,8 @@ export interface TraceabilitySummary {
   delays: number;
   deliveries: number;
   returns: number;
+  reschedules: number;
+  reassignments: number;
 }
 
 export interface ProjectTraceability {

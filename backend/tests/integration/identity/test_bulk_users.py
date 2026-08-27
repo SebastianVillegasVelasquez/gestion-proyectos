@@ -247,7 +247,7 @@ class TestBulkCreateUsers:
         self, client, admin_headers, member_user
     ):
         csv_content = (
-            "email,nombre,apellido\n" f"{member_user.email.upper()},Otra,Persona\n"
+            f"email,nombre,apellido\n{member_user.email.upper()},Otra,Persona\n"
         )
 
         response = await client.post(

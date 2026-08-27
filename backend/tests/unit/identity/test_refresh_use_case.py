@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import uuid
 
 import pytest
@@ -19,6 +20,7 @@ class FakeUser:
         self.is_active = is_active
         self.document_type = None
         self.document_number = None
+        self.created_at = datetime.now(timezone.utc)
 
 
 class FakeUserRepo:

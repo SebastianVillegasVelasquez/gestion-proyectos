@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import {
   Moon,
   Sun,
+  FolderTree,
   GanttChartSquare,
   Plus,
   TrendingUp,
@@ -24,14 +25,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useWorkTree, useNodeTypes, useMoveWorkItem } from "../../hooks/use-structure";
 import { getErrorMessage } from "@/utils/get-error-message";
 import {
+  collapsibleIdsBelowRoot,
   dropPosFromEvent,
   findNode,
   subtreeIds,
-  computeMovePayload,
+  resolveDrop,
   type DropPos,
 } from "../../utils/work-tree-dnd";
+import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
+import { AssigneeCardModal } from "./AssigneeCardModal";
 import { useTeams } from "../../hooks/use-teams";
 import { tipoStyle } from "../../utils/tipo-style";
 import {
@@ -62,6 +66,7 @@ import type { DatedTask } from "../task";
 import { STATUS_BAR_COLOR, STATUS_BAR_SOFT, STATUS_DOT } from "../types";
 import { TASK_STATUS_LABELS, USER_POSITION_LABELS } from "../../types/labels";
 import type { Project, TaskStatus, UserPosition } from "../../types/api.types";
+import { DateConflictModal } from "../../components/detail/DateConflictModal";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 
 // Ancho por defecto de la columna de etiquetas (el usuario puede redimensionarla).
@@ -443,6 +448,34 @@ export function GanttView({
 
   // Scroll horizontal: centrar la línea de "hoy" en el área visible.
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Barra de desplazamiento horizontal propia, fuera del área con scroll.
+  // La nativa se oculta (`scrollbar-none`) porque al ir DENTRO del contenedor
+  // se dibuja encima de la última fila y tapa las barras del cronograma; esta
+  // vive debajo, ocupa su propio alto y no cubre nada.
+  const hBarRef = useRef<HTMLDivElement>(null);
+  // Evita el bucle de realimentación: mover uno programa el scroll del otro,
+  // que a su vez dispara su propio evento.
+  const syncingRef = useRef(false);
+  // Los refs se leen DENTRO del manejador y no al construirlo: pasarlos a una
+  // fábrica durante el render los estaría accediendo en fase de render.
+  const syncFrom = useCallback((from: HTMLDivElement | null, to: HTMLDivElement | null) => {
+    if (syncingRef.current || !from || !to) {
+      return;
+    }
+    syncingRef.current = true;
+    to.scrollLeft = from.scrollLeft;
+    // Se libera en el siguiente frame: el `scroll` del otro elemento es
+    // asíncrono y llegaría después de un reset inmediato.
+    requestAnimationFrame(() => {
+      syncingRef.current = false;
+    });
+  }, []);
+  const handleGridScroll = useCallback(() => {
+    syncFrom(scrollRef.current, hBarRef.current);
+  }, [syncFrom]);
+  const handleBarScroll = useCallback(() => {
+    syncFrom(hBarRef.current, scrollRef.current);
+  }, [syncFrom]);
   const autoScrolledRef = useRef(false);
   const scrollToToday = useCallback(
     (behavior: ScrollBehavior = "smooth") => {
@@ -547,8 +580,17 @@ export function GanttView({
   // ── Drag & drop del panel izquierdo: recoloca nodos igual que el árbol de
   // Estructura (misma lógica, mismo query key → ambos paneles quedan en sync). ──
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  // Escrito de forma síncrona al empezar el arrastre: el estado de React puede
+  // llegar tarde al primer `dragover` y, sin `preventDefault()`, el navegador
+  // marca esa fila como destino inválido (ver StructurePanel).
+  const draggingNodeIdRef = useRef<string | null>(null);
   const [nodeDropTarget, setNodeDropTarget] = useState<{ id: string; pos: DropPos } | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Elemento cuyo desajuste de fechas se está resolviendo. Guardamos el id (no
+  // el nodo) para que el modal lea siempre el árbol recién cargado.
+  const [conflictItemId, setConflictItemId] = useState<string | null>(null);
+  // Ficha de quién lleva una tarea, abierta desde el avatar de su fila.
+  const [assigneeTaskId, setAssigneeTaskId] = useState<string | null>(null);
   const moveWorkItem = useMoveWorkItem(project.id);
 
   const invalidNodeDropIds = useMemo(() => {
@@ -559,7 +601,48 @@ export function GanttView({
     return dragged ? subtreeIds(dragged) : new Set<string>();
   }, [draggingNodeId, tree]);
 
+  // El cronograma también se auto-desplaza al arrastrar cerca de sus bordes: sin
+  // esto no se puede alcanzar una fila que quedó fuera de la parte visible.
+  useDragAutoScroll(scrollRef, draggingNodeId != null);
+
+  // Apertura automática de una rama plegada al posarse sobre ella (igual que en
+  // el panel de Estructura), para poder soltar dentro sin abrirla antes.
+  const nodeSpringRef = useRef<{ id: string; timer: number } | null>(null);
+
+  function cancelNodeSpringOpen() {
+    if (nodeSpringRef.current) {
+      clearTimeout(nodeSpringRef.current.timer);
+      nodeSpringRef.current = null;
+    }
+  }
+
+  function scheduleNodeSpringOpen(id: string, pos: DropPos) {
+    if (nodeSpringRef.current?.id === id) {
+      return;
+    }
+    cancelNodeSpringOpen();
+    if (pos !== "inside" || !collapsedNodes.has(id)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCollapsedNodes((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      nodeSpringRef.current = null;
+    }, 600);
+    nodeSpringRef.current = { id, timer };
+  }
+
+  function startNodeDrag(id: string) {
+    draggingNodeIdRef.current = id;
+    setDraggingNodeId(id);
+  }
+
   function resetNodeDrag() {
+    cancelNodeSpringOpen();
+    draggingNodeIdRef.current = null;
     setDraggingNodeId(null);
     setNodeDropTarget(null);
   }
@@ -567,25 +650,22 @@ export function GanttView({
   function handleNodeDropOn(targetId: string, pos: DropPos) {
     const itemId = draggingNodeId;
     resetNodeDrag();
-    if (!itemId || itemId === targetId) {
+    if (!itemId) {
       return;
     }
-    if (invalidNodeDropIds.has(targetId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+    // Las reglas viven en `resolveDrop`, compartidas con el panel de Estructura:
+    // ambas vistas muestran el mismo árbol y deben aceptar lo mismo.
+    const decision = resolveDrop(tree, itemId, targetId, pos);
+    if (!decision) {
       return;
     }
-    const target = findNode(tree, targetId);
-    const parentId = target?.parent_id ?? null;
-    if (pos !== "inside" && parentId != null && invalidNodeDropIds.has(parentId)) {
-      setMoveError("No se puede mover un elemento dentro de sí mismo o de uno de sus hijos.");
+    if (!decision.ok) {
+      setMoveError(decision.reason);
       return;
     }
-    const payload = computeMovePayload(tree, itemId, targetId, pos);
-    if (!payload) {
-      return;
-    }
+    setMoveError(null);
     moveWorkItem.mutate(
-      { itemId, payload },
+      { itemId, payload: decision.payload },
       {
         onError: (err) => {
           setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
@@ -606,21 +686,10 @@ export function GanttView({
     });
   };
 
-  // Todos los ids de nodo con hijos (para "colapsar / expandir todo"), tomados
-  // del árbol completo (no solo lo visible) para poder re-expandir desde cero.
-  const collapsibleIds = useMemo(() => {
-    const ids: string[] = [];
-    const walk = (nodes: typeof tree) => {
-      for (const n of nodes) {
-        if (n.children.length > 0) {
-          ids.push(n.id);
-          walk(n.children);
-        }
-      }
-    };
-    walk(tree);
-    return ids;
-  }, [tree]);
+  // Ids a plegar en "colapsar todo", tomados del árbol completo (no solo de lo
+  // visible) para poder re-expandir desde cero. Los elementos raíz se quedan
+  // abiertos: plegarlos también dejaría el cronograma en una sola fila.
+  const collapsibleIds = useMemo(() => collapsibleIdsBelowRoot(tree), [tree]);
   const allCollapsed =
     collapsibleIds.length > 0 && collapsibleIds.every((id) => collapsedNodes.has(id));
   const toggleAllNodes = () => {
@@ -670,6 +739,16 @@ export function GanttView({
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Atajo a la Estructura: es el viaje de ida y vuelta natural
+              (allí ya existe el botón "Cronograma"), y las fechas se editan
+              desde ese lado. */}
+          <button
+            type="button"
+            onClick={() => void navigate(`/projects/${project.id}/estructura`)}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+          >
+            <FolderTree className="size-4 text-brand-teal" /> Estructura
+          </button>
           <button
             type="button"
             onClick={() => void navigate(`/projects/${project.id}/tareas`)}
@@ -1002,230 +1081,295 @@ export function GanttView({
       ) : (
         // Contenedor con scroll en ambos ejes: el eje de tiempo queda fijo
         // arriba y la columna de etiquetas fija a la izquierda.
-        <div
-          ref={scrollRef}
-          className={cn(
-            "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm",
-            (drag != null || resizing) && "select-none",
-          )}
-        >
-          <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
-            {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
-            <div className="sticky top-0 z-30 flex border-b border-border bg-card">
-              <div
-                style={{ width: labelW }}
-                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
-              >
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Estructura · {nodeCount} · {taskRowCount} tareas
-                </span>
-                {/* Manija para redimensionar la columna de etiquetas */}
+        <div className="flex min-h-0 flex-col">
+          <div
+            id="gantt-scroll"
+            ref={scrollRef}
+            onScroll={handleGridScroll}
+            className={cn(
+              "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-t-xl border border-b-0 border-border bg-card shadow-sm",
+              (drag != null || resizing) && "select-none",
+            )}
+          >
+            <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
+              {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
+              <div className="sticky top-0 z-30 flex border-b border-border bg-card">
                 <div
-                  onPointerDown={startResize}
-                  role="separator"
-                  aria-label="Redimensionar la columna de nombres"
-                  aria-orientation="vertical"
-                  title="Arrastra para ampliar la columna de nombres"
-                  className={cn(
-                    "absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize touch-none transition-colors hover:bg-brand-gold/50",
-                    resizing && "bg-brand-gold/60",
-                  )}
-                />
+                  style={{ width: labelW }}
+                  className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Estructura · {nodeCount} · {taskRowCount} tareas
+                  </span>
+                  {/* Manija para redimensionar la columna de etiquetas */}
+                  <div
+                    onPointerDown={startResize}
+                    role="separator"
+                    aria-label="Redimensionar la columna de nombres"
+                    aria-orientation="vertical"
+                    title="Arrastra para ampliar la columna de nombres"
+                    className={cn(
+                      "absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize touch-none transition-colors hover:bg-brand-gold/50",
+                      resizing && "bg-brand-gold/60",
+                    )}
+                  />
+                </div>
+                <div className="relative shrink-0" style={{ width: trackWidth }}>
+                  <div className="relative h-6">
+                    {months.map((b) => (
+                      <div
+                        key={b.key}
+                        className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
+                        style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
+                      >
+                        {pctToPx(b.widthPct) >= 48 && (
+                          <span className="truncate text-[10px] font-semibold text-muted-foreground">
+                            {b.label}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative h-5 border-t border-border/70">
+                    {ticks.map((t) => {
+                      if (t.offsetPct > 97) {
+                        return null;
+                      }
+                      const centered = zoom === "dia";
+                      return (
+                        <span
+                          key={t.key}
+                          className={cn(
+                            "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground",
+                            centered && "-translate-x-1/2",
+                          )}
+                          style={{
+                            left: pctToPx(t.offsetPct) + (centered ? pxPerDay / 2 : 4),
+                          }}
+                        >
+                          {t.label}
+                        </span>
+                      );
+                    })}
+                    {todayPct != null && (
+                      <span
+                        className="absolute bottom-0.5 z-10 -translate-x-1/2 rounded-full bg-rose-500 px-1.5 py-px text-[9px] font-semibold leading-tight text-white shadow-sm"
+                        style={{ left: pctToPx(todayPct) }}
+                      >
+                        Hoy
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="relative shrink-0" style={{ width: trackWidth }}>
-                <div className="relative h-6">
-                  {months.map((b) => (
+
+              {/* ── Cuerpo ── */}
+              <div className="relative">
+                {/* Capa de fondo: fines de semana y rejilla, alineadas al eje */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 z-0"
+                  style={{ left: labelW, width: trackWidth }}
+                >
+                  {weekends.map((b) => (
                     <div
                       key={b.key}
-                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
+                      className="absolute inset-y-0 bg-muted/60"
                       style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
-                    >
-                      {pctToPx(b.widthPct) >= 48 && (
-                        <span className="truncate text-[10px] font-semibold text-muted-foreground">
-                          {b.label}
-                        </span>
-                      )}
-                    </div>
+                    />
+                  ))}
+                  {ticks.map((t) => (
+                    <div
+                      key={`grid-${t.key}`}
+                      className="absolute inset-y-0 w-px bg-border/50"
+                      style={{ left: pctToPx(t.offsetPct) }}
+                    />
+                  ))}
+                  {months.slice(1).map((b) => (
+                    <div
+                      key={`mline-${b.key}`}
+                      className="absolute inset-y-0 w-px bg-border"
+                      style={{ left: pctToPx(b.startPct) }}
+                    />
                   ))}
                 </div>
-                <div className="relative h-5 border-t border-border/70">
-                  {ticks.map((t) => {
-                    if (t.offsetPct > 97) {
-                      return null;
-                    }
-                    const centered = zoom === "dia";
-                    return (
-                      <span
-                        key={t.key}
-                        className={cn(
-                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground",
-                          centered && "-translate-x-1/2",
-                        )}
-                        style={{
-                          left: pctToPx(t.offsetPct) + (centered ? pxPerDay / 2 : 4),
-                        }}
+
+                {/* Línea de hoy (sobre las barras, bajo la columna fija) */}
+                {todayPct != null && (
+                  <div
+                    className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
+                    style={{ left: labelW + pctToPx(todayPct) }}
+                  />
+                )}
+
+                {/* Flechas de dependencia (finish-to-start) sobre las barras */}
+                {arrows.length > 0 && (
+                  <svg
+                    className="pointer-events-none absolute z-10 text-brand-teal/70"
+                    style={{ left: labelW, top: 0, width: trackWidth, height: layout.height }}
+                    aria-hidden
+                  >
+                    <defs>
+                      <marker
+                        id={`gantt-arrow-${project.id}`}
+                        markerUnits="userSpaceOnUse"
+                        markerWidth="8"
+                        markerHeight="8"
+                        refX="6"
+                        refY="3"
+                        orient="auto"
                       >
-                        {t.label}
-                      </span>
-                    );
-                  })}
-                  {todayPct != null && (
-                    <span
-                      className="absolute bottom-0.5 z-10 -translate-x-1/2 rounded-full bg-rose-500 px-1.5 py-px text-[9px] font-semibold leading-tight text-white shadow-sm"
-                      style={{ left: pctToPx(todayPct) }}
-                    >
-                      Hoy
-                    </span>
-                  )}
-                </div>
+                        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" />
+                      </marker>
+                    </defs>
+                    {arrows.map((a) => (
+                      <path
+                        key={a.id}
+                        d={a.d}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                        markerEnd={`url(#gantt-arrow-${project.id})`}
+                      />
+                    ))}
+                  </svg>
+                )}
+
+                {rows.length === 0 ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
+                      No hay elementos que coincidan con los filtros.
+                    </p>
+                  </div>
+                ) : (
+                  rows.map((row) =>
+                    row.kind === "node" ? (
+                      <NodeRow
+                        key={row.id}
+                        row={row}
+                        range={range}
+                        labelW={labelW}
+                        pctToPx={pctToPx}
+                        typeName={typeNameById.get(row.tipoId) ?? "elemento"}
+                        collapsed={collapsedNodes.has(row.id)}
+                        drag={drag}
+                        dragDelta={dragDelta}
+                        startDrag={startDrag}
+                        draggedRef={draggedRef}
+                        onToggle={() => {
+                          if (row.hasChildren) {
+                            toggleNode(row.id);
+                          }
+                        }}
+                        isDraggingNode={draggingNodeId === row.id}
+                        nodeDropPos={
+                          nodeDropTarget?.id === row.id &&
+                          draggingNodeId != null &&
+                          !invalidNodeDropIds.has(row.id)
+                            ? nodeDropTarget.pos
+                            : null
+                        }
+                        onDragStartNode={() => {
+                          startNodeDrag(row.id);
+                        }}
+                        onDragEndNode={resetNodeDrag}
+                        isInvalidNodeDrop={draggingNodeId != null && invalidNodeDropIds.has(row.id)}
+                        onDragOverNode={(pos) => {
+                          if (draggingNodeIdRef.current == null || invalidNodeDropIds.has(row.id)) {
+                            return;
+                          }
+                          setNodeDropTarget({ id: row.id, pos });
+                          scheduleNodeSpringOpen(row.id, pos);
+                        }}
+                        onDropNode={(pos) => {
+                          handleNodeDropOn(row.id, pos);
+                        }}
+                        onResolveConflict={() => {
+                          setConflictItemId(row.id);
+                        }}
+                      />
+                    ) : (
+                      <TaskRow
+                        key={row.id}
+                        task={row.task}
+                        depth={row.depth}
+                        range={range}
+                        labelW={labelW}
+                        trackWidth={trackWidth}
+                        pctToPx={pctToPx}
+                        assignee={row.task.assignee_id ? assignees.get(row.task.assignee_id) : null}
+                        teamLabel={row.task.team_id ? teamNameById.get(row.task.team_id) : null}
+                        drag={drag}
+                        dragDelta={dragDelta}
+                        startDrag={startDrag}
+                        draggedRef={draggedRef}
+                        onOpen={() => {
+                          setSelectedId(row.task.id);
+                        }}
+                        onOpenAssignee={() => {
+                          setAssigneeTaskId(row.task.id);
+                        }}
+                      />
+                    ),
+                  )
+                )}
               </div>
             </div>
+          </div>
 
-            {/* ── Cuerpo ── */}
-            <div className="relative">
-              {/* Capa de fondo: fines de semana y rejilla, alineadas al eje */}
-              <div
-                className="pointer-events-none absolute inset-y-0 z-0"
-                style={{ left: labelW, width: trackWidth }}
-              >
-                {weekends.map((b) => (
-                  <div
-                    key={b.key}
-                    className="absolute inset-y-0 bg-muted/60"
-                    style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
-                  />
-                ))}
-                {ticks.map((t) => (
-                  <div
-                    key={`grid-${t.key}`}
-                    className="absolute inset-y-0 w-px bg-border/50"
-                    style={{ left: pctToPx(t.offsetPct) }}
-                  />
-                ))}
-                {months.slice(1).map((b) => (
-                  <div
-                    key={`mline-${b.key}`}
-                    className="absolute inset-y-0 w-px bg-border"
-                    style={{ left: pctToPx(b.startPct) }}
-                  />
-                ))}
-              </div>
-
-              {/* Línea de hoy (sobre las barras, bajo la columna fija) */}
-              {todayPct != null && (
-                <div
-                  className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
-                  style={{ left: labelW + pctToPx(todayPct) }}
-                />
-              )}
-
-              {/* Flechas de dependencia (finish-to-start) sobre las barras */}
-              {arrows.length > 0 && (
-                <svg
-                  className="pointer-events-none absolute z-10 text-brand-teal/70"
-                  style={{ left: labelW, top: 0, width: trackWidth, height: layout.height }}
-                  aria-hidden
-                >
-                  <defs>
-                    <marker
-                      id={`gantt-arrow-${project.id}`}
-                      markerUnits="userSpaceOnUse"
-                      markerWidth="8"
-                      markerHeight="8"
-                      refX="6"
-                      refY="3"
-                      orient="auto"
-                    >
-                      <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" />
-                    </marker>
-                  </defs>
-                  {arrows.map((a) => (
-                    <path
-                      key={a.id}
-                      d={a.d}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                      markerEnd={`url(#gantt-arrow-${project.id})`}
-                    />
-                  ))}
-                </svg>
-              )}
-
-              {rows.length === 0 ? (
-                <div className="flex h-32 items-center justify-center">
-                  <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
-                    No hay elementos que coincidan con los filtros.
-                  </p>
-                </div>
-              ) : (
-                rows.map((row) =>
-                  row.kind === "node" ? (
-                    <NodeRow
-                      key={row.id}
-                      row={row}
-                      range={range}
-                      labelW={labelW}
-                      pctToPx={pctToPx}
-                      typeName={typeNameById.get(row.tipoId) ?? "elemento"}
-                      collapsed={collapsedNodes.has(row.id)}
-                      drag={drag}
-                      dragDelta={dragDelta}
-                      startDrag={startDrag}
-                      draggedRef={draggedRef}
-                      onToggle={() => {
-                        if (row.hasChildren) {
-                          toggleNode(row.id);
-                        }
-                      }}
-                      isDraggingNode={draggingNodeId === row.id}
-                      nodeDropPos={
-                        nodeDropTarget?.id === row.id &&
-                        draggingNodeId != null &&
-                        !invalidNodeDropIds.has(row.id)
-                          ? nodeDropTarget.pos
-                          : null
-                      }
-                      onDragStartNode={() => {
-                        setDraggingNodeId(row.id);
-                      }}
-                      onDragEndNode={resetNodeDrag}
-                      onDragOverNode={(pos) => {
-                        if (draggingNodeId == null || invalidNodeDropIds.has(row.id)) {
-                          return;
-                        }
-                        setNodeDropTarget({ id: row.id, pos });
-                      }}
-                      onDropNode={(pos) => {
-                        handleNodeDropOn(row.id, pos);
-                      }}
-                    />
-                  ) : (
-                    <TaskRow
-                      key={row.id}
-                      task={row.task}
-                      depth={row.depth}
-                      range={range}
-                      labelW={labelW}
-                      trackWidth={trackWidth}
-                      pctToPx={pctToPx}
-                      assignee={row.task.assignee_id ? assignees.get(row.task.assignee_id) : null}
-                      teamLabel={row.task.team_id ? teamNameById.get(row.task.team_id) : null}
-                      drag={drag}
-                      dragDelta={dragDelta}
-                      startDrag={startDrag}
-                      draggedRef={draggedRef}
-                      onOpen={() => {
-                        setSelectedId(row.task.id);
-                      }}
-                    />
-                  ),
-                )
-              )}
-            </div>
+          {/* Barra horizontal: el contenido es un espaciador del ancho REAL del
+            cronograma, así el navegador dibuja una barra con la misma
+            proporción que tendría la nativa. Va fuera del área con scroll para
+            no montarse sobre la última fila. */}
+          <div
+            ref={hBarRef}
+            onScroll={handleBarScroll}
+            role="scrollbar"
+            aria-label="Desplazar el cronograma horizontalmente"
+            aria-controls="gantt-scroll"
+            aria-orientation="horizontal"
+            className="shrink-0 overflow-x-auto overflow-y-hidden rounded-b-xl border border-t-0 border-border bg-card"
+          >
+            <div style={{ width: labelW + trackWidth, height: 1 }} aria-hidden />
           </div>
         </div>
       )}
+
+      {/* Ajuste de fechas: el mismo modal que en la Estructura, para que el
+          aviso haga lo mismo se mire desde donde se mire. */}
+      {(() => {
+        const item = conflictItemId ? findNode(tree, conflictItemId) : null;
+        const container = item?.parent_id ? findNode(tree, item.parent_id) : null;
+        if (!item || !container) {
+          return null;
+        }
+        return (
+          <DateConflictModal
+            projectId={project.id}
+            item={item}
+            container={container}
+            onClose={() => {
+              setConflictItemId(null);
+            }}
+          />
+        );
+      })()}
+
+      {(() => {
+        const task = assigneeTaskId ? tasks.find((t) => t.id === assigneeTaskId) : null;
+        if (!task) {
+          return null;
+        }
+        return (
+          <AssigneeCardModal
+            task={task}
+            member={(membersQuery.data ?? []).find((m) => m.user_id === task.assignee_id) ?? null}
+            teamName={task.team_id ? (teamNameById.get(task.team_id) ?? null) : null}
+            onClose={() => {
+              setAssigneeTaskId(null);
+            }}
+          />
+        );
+      })()}
 
       {selected && (
         <TaskDetailPanel
@@ -1256,10 +1400,12 @@ function NodeRow({
   onToggle,
   isDraggingNode,
   nodeDropPos,
+  isInvalidNodeDrop,
   onDragStartNode,
   onDragEndNode,
   onDragOverNode,
   onDropNode,
+  onResolveConflict,
 }: {
   row: GanttNodeRow;
   range: TimelineRange;
@@ -1275,10 +1421,12 @@ function NodeRow({
   // ── Drag & drop de reordenamiento del árbol (distinto del drag de la barra) ──
   isDraggingNode: boolean;
   nodeDropPos: DropPos | null;
+  isInvalidNodeDrop: boolean;
   onDragStartNode: () => void;
   onDragEndNode: () => void;
   onDragOverNode: (pos: DropPos) => void;
   onDropNode: (pos: DropPos) => void;
+  onResolveConflict: () => void;
 }) {
   const style = tipoStyle(row.tipoId);
   const isDragging = drag?.id === row.id;
@@ -1289,7 +1437,7 @@ function NodeRow({
   const target: DragTarget = { kind: "node", id: row.id, start: row.start, due: row.due };
   return (
     <div className="flex items-stretch border-b border-border/70" style={{ height: ROW_H }}>
-      <div className="sticky left-0 z-20 shrink-0" style={{ width: labelW }}>
+      <div className="sticky left-0 z-20 shrink-0 relative" style={{ width: labelW }}>
         <button
           type="button"
           draggable
@@ -1301,6 +1449,12 @@ function NodeRow({
           }}
           onDragEnd={onDragEndNode}
           onDragOver={(e) => {
+            // Sin preventDefault el navegador marca la fila como destino no
+            // válido: así el cursor "no-drop" aparece justo sobre el propio
+            // subárbol, en vez de aceptar la suelta y rechazarla después.
+            if (isInvalidNodeDrop) {
+              return;
+            }
             e.preventDefault();
             e.stopPropagation();
             onDragOverNode(dropPosFromEvent(e));
@@ -1317,6 +1471,7 @@ function NodeRow({
             "relative flex shrink-0 items-center gap-1.5 border-r border-r-border bg-muted pr-2 text-left transition-colors",
             row.hasChildren ? "hover:bg-accent" : "cursor-default",
             isDraggingNode && "opacity-40",
+            isInvalidNodeDrop && !isDraggingNode && "opacity-50",
             nodeDropPos === "inside" && "ring-2 ring-inset ring-brand-teal bg-brand-teal/5",
           )}
         >
@@ -1350,7 +1505,27 @@ function NodeRow({
               {row.doneCount}/{row.taskCount}
             </span>
           )}
+          {/* Hueco para el aviso de fechas, que va fuera de este botón (no se
+              pueden anidar botones). Tiene que ser el ÚLTIMO hijo: el aviso se
+              posiciona contra el borde derecho del contenedor, así que un hueco
+              colocado antes del contador reservaba espacio en el sitio
+              equivocado y el icono acababa encima del "hechas/total". */}
+          {row.conflictoFechas && <span className="w-6 shrink-0" aria-hidden />}
         </button>
+        {/* Mismo aviso que en la Estructura y con el mismo comportamiento: abre
+            el ajuste de fechas. Va como hermano del botón de la fila —y no
+            dentro— porque un botón no puede contener otro botón. */}
+        {row.conflictoFechas && (
+          <button
+            type="button"
+            onClick={onResolveConflict}
+            title={`${row.name} termina más tarde que lo que lo contiene. Click para ajustar las fechas.`}
+            aria-label={`Ajustar fechas de ${row.name}`}
+            className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+          >
+            <CalendarClock className="size-3.5" />
+          </button>
+        )}
       </div>
       <div className="relative flex-1 bg-muted/40">
         {/* Barra resumen del nodo: arrastrar desplaza TODO el subárbol. */}
@@ -1400,6 +1575,7 @@ function TaskRow({
   startDrag,
   draggedRef,
   onOpen,
+  onOpenAssignee,
 }: {
   task: DatedTask;
   depth: number;
@@ -1414,6 +1590,7 @@ function TaskRow({
   startDrag: (e: React.PointerEvent, target: DragTarget, mode: DragMode) => void;
   draggedRef: React.RefObject<boolean>;
   onOpen: () => void;
+  onOpenAssignee: () => void;
 }) {
   const target: DragTarget = {
     kind: "task",
@@ -1439,34 +1616,50 @@ function TaskRow({
       className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
       style={{ height: ROW_H, contentVisibility: "auto", containIntrinsicSize: `auto ${ROW_H}px` }}
     >
-      <button
-        type="button"
-        onClick={onOpen}
-        title="Ver y editar la tarea"
-        style={{ width: labelW, paddingLeft: 8 + depth * INDENT }}
-        className="sticky left-0 z-20 flex shrink-0 cursor-pointer items-center gap-2 border-r border-border bg-card pr-3 text-left transition-colors group-hover/row:bg-muted hover:bg-muted"
-      >
-        <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[task.status])} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-foreground">{task.title}</p>
-          {teamLabel && (
-            <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
-              {teamLabel}
-            </p>
-          )}
-        </div>
-        <span
-          title={assignee?.name ?? "Sin responsable"}
+      <div className="relative sticky left-0 z-20 shrink-0" style={{ width: labelW }}>
+        <button
+          type="button"
+          onClick={onOpen}
+          title="Ver y editar la tarea"
+          style={{ width: labelW, height: ROW_H, paddingLeft: 8 + depth * INDENT }}
+          className="flex cursor-pointer items-center gap-2 border-r border-border bg-card pr-9 text-left transition-colors group-hover/row:bg-muted hover:bg-muted"
+        >
+          <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[task.status])} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-foreground">{task.title}</p>
+            {teamLabel && (
+              <p className="truncate text-[9px] font-medium text-violet-500 dark:text-violet-400">
+                {teamLabel}
+              </p>
+            )}
+          </div>
+        </button>
+        {/* El responsable es su propio botón y por eso va FUERA del de la fila:
+            un <button> no puede contener otro. El `pr-9` de arriba es el hueco
+            que le reserva, medido contra el mismo borde. */}
+        <button
+          type="button"
+          onClick={onOpenAssignee}
+          title={
+            assignee
+              ? `${assignee.name} — ver ficha`
+              : teamLabel
+                ? `${teamLabel} — ver ficha`
+                : "Sin responsable"
+          }
+          aria-label={`Ver quién lleva ${task.title}`}
           className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
+            "absolute right-2.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-[9px] font-semibold transition hover:ring-2 hover:ring-brand-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold",
             assignee
               ? "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal"
-              : "bg-muted text-muted-foreground",
+              : teamLabel
+                ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300"
+                : "bg-muted text-muted-foreground",
           )}
         >
-          {assignee?.initials ?? "—"}
-        </span>
-      </button>
+          {assignee?.initials ?? (teamLabel ? "EQ" : "—")}
+        </button>
+      </div>
       <div className="relative flex-1 transition-colors group-hover/row:bg-muted/40">
         <button
           type="button"

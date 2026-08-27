@@ -115,6 +115,28 @@ class SqlAlchemyWorkTreeRepository(WorkTreeRepository):
         )
         await self._session.flush()
 
+    async def list_deleted_items(self, proyecto_id: UUID) -> list[WorkItem]:
+        """Elementos en la papelera del proyecto, del borrado más reciente al
+        más antiguo (lo que se acaba de borrar por error es lo que se busca)."""
+        result = await self._session.execute(
+            select(WorkItem)
+            .where(
+                WorkItem.proyecto_id == proyecto_id,
+                WorkItem.deleted_at.is_not(None),
+            )
+            .options(selectinload(WorkItem.tipo))
+            .order_by(WorkItem.deleted_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def restore_many(self, item_ids: list[UUID]) -> None:
+        if not item_ids:
+            return
+        await self._session.execute(
+            update(WorkItem).where(WorkItem.id.in_(item_ids)).values(deleted_at=None)
+        )
+        await self._session.flush()
+
     # ── Dependencias Finish-to-Start ──────────────────────────────────────────
     async def add_dependency(
         self, dependency: WorkItemDependency

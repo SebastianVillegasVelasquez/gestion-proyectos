@@ -54,6 +54,22 @@ class TaskReturned(DomainEvent):
 
 
 @dataclass(frozen=True)
+class TaskCommented(DomainEvent):
+    """Alguien comentó una tarea, quizá mencionando a otras personas.
+
+    Lleva los ids de los mencionados para que el manejador de notificaciones
+    no tenga que volver a la base de datos ni interpretar el texto.
+    """
+
+    task_id: uuid.UUID
+    comment_id: uuid.UUID
+    author_id: uuid.UUID
+    # Responsable de la tarea, si lo hay: se entera de que le comentaron.
+    assignee_id: uuid.UUID | None
+    mentioned_user_ids: tuple[uuid.UUID, ...] = ()
+
+
+@dataclass(frozen=True)
 class UserCreated(DomainEvent):
     """Se creó una cuenta nueva (alta individual o carga masiva por CSV)."""
 

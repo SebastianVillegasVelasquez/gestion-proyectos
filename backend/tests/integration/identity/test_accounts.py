@@ -128,3 +128,86 @@ class TestManageUsersPagination:
             "/api/v1/identity/users/manage", headers=member_headers
         )
         assert denied.status_code == 403
+
+
+class TestManageUsersSortingAndFilters:
+    """Orden y filtro de inactivos: se resuelven en el servidor porque la
+    lista viene paginada (ordenar la página ya recibida daría un orden falso).
+    """
+
+    async def _create(self, client, headers, email, name):
+        resp = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": email,
+                "password": "Passw0rd1",
+                "name": name,
+                "last_name": "Orden",
+                "role": "user",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    async def test_includes_created_at(self, client, super_admin_headers):
+        await self._create(client, super_admin_headers, "fecha@test.com", "Fecha")
+
+        page = await client.get(
+            "/api/v1/identity/users/manage?search=fecha@test.com",
+            headers=super_admin_headers,
+        )
+        assert page.status_code == 200, page.text
+        assert page.json()["items"][0]["created_at"] is not None
+
+    async def test_sorts_by_email_descending(self, client, super_admin_headers):
+        await self._create(client, super_admin_headers, "aaa.orden@test.com", "Ana")
+        await self._create(client, super_admin_headers, "zzz.orden@test.com", "Zoe")
+
+        page = await client.get(
+            "/api/v1/identity/users/manage?search=orden@test.com"
+            "&sort_by=email&sort_dir=desc",
+            headers=super_admin_headers,
+        )
+        assert page.status_code == 200, page.text
+        emails = [u["email"] for u in page.json()["items"]]
+        assert emails == sorted(emails, reverse=True)
+
+    async def test_can_exclude_inactive_users(self, client, super_admin_headers):
+        created = await self._create(
+            client, super_admin_headers, "inactivo.orden@test.com", "Ina"
+        )
+        patched = await client.patch(
+            f"/api/v1/identity/users/{created['id']}",
+            json={
+                # PATCH pide los datos base además del cambio (igual que la UI).
+                "email": created["email"],
+                "name": created["name"],
+                "last_name": created["last_name"],
+                "is_active": False,
+            },
+            headers=super_admin_headers,
+        )
+        assert patched.status_code == 200, patched.text
+
+        hidden = await client.get(
+            "/api/v1/identity/users/manage"
+            "?search=inactivo.orden@test.com&include_inactive=false",
+            headers=super_admin_headers,
+        )
+        assert hidden.json()["total"] == 0
+
+        shown = await client.get(
+            "/api/v1/identity/users/manage"
+            "?search=inactivo.orden@test.com&include_inactive=true",
+            headers=super_admin_headers,
+        )
+        assert shown.json()["total"] == 1
+
+    async def test_rejects_unknown_sort_column(self, client, super_admin_headers):
+        # El enum del enrutador corta la entrada inválida antes del ORDER BY.
+        resp = await client.get(
+            "/api/v1/identity/users/manage?sort_by=password",
+            headers=super_admin_headers,
+        )
+        assert resp.status_code == 422
