@@ -73,7 +73,12 @@ export type ActivityKind =
   | "devolucion"
   | "cancelacion"
   | "comentario"
-  | "cambio_estado";
+  | "cambio_estado"
+  // Cambios de gestión: explican la historia de la tarea aunque no muevan su estado.
+  | "equipo"
+  | "ubicacion"
+  | "reprogramacion"
+  | "prioridad";
 
 export interface ActivityItem {
   id: string;

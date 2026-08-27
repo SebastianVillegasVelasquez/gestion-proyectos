@@ -151,7 +151,7 @@ def event_bus_dependency(
     """
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
-    register_notification_handlers(bus, notification_repo, broadcaster, db)
+    register_notification_handlers(bus, notification_repo, broadcaster)
     bus.subscribe(
         UserCreated, NotifyUserCreatedByEmail(SmtpEmailSender(get_settings()))
     )

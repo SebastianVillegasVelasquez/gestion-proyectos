@@ -14,10 +14,23 @@ EVENT_DEVOLUCION = "devolucion"  # rechazo / retrabajo
 EVENT_CANCELACION = "cancelacion"
 EVENT_COMENTARIO = "comentario"
 EVENT_CAMBIO_ESTADO = "cambio_estado"  # cambio genérico sin un significado especial
+# Cambios de gestión: no mueven el estado de la tarea pero explican su historia
+# (por qué acabó en otro equipo, en otro sitio del árbol o con otra fecha).
+EVENT_EQUIPO = "equipo"
+EVENT_UBICACION = "ubicacion"
+EVENT_REPROGRAMACION = "reprogramacion"
+EVENT_PRIORIDAD = "prioridad"
 
 # Estados que "cierran" la tarea: un evento posterior a la fecha límite con uno
 # de estos NO cuenta como retraso (ya está resuelta).
 _TERMINAL = {TaskStatus.COMPLETADA, TaskStatus.CANCELADA}
+
+_MANAGEMENT_KINDS = {
+    HistoryAction.CAMBIO_EQUIPO: EVENT_EQUIPO,
+    HistoryAction.CAMBIO_UBICACION: EVENT_UBICACION,
+    HistoryAction.CAMBIO_FECHAS: EVENT_REPROGRAMACION,
+    HistoryAction.CAMBIO_PRIORIDAD: EVENT_PRIORIDAD,
+}
 
 _STATUS_TO_KIND = {
     TaskStatus.EN_PROGRESO: EVENT_INICIO,
@@ -52,6 +65,8 @@ def classify_event(
         kind = EVENT_ASIGNACION
     elif action == HistoryAction.COMENTARIO:
         kind = EVENT_COMENTARIO
+    elif action in _MANAGEMENT_KINDS:
+        kind = _MANAGEMENT_KINDS[action]
     elif action == HistoryAction.CAMBIO_ESTADO:
         kind = (
             _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)

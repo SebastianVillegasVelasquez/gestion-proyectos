@@ -64,7 +64,7 @@ _any_user = require_role("admin", "super_admin", "user")
 @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     payload: CreateTaskRequest,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
     user_repo=Depends(user_repo_dependency),
@@ -73,7 +73,7 @@ async def create_task(
 ):
     return await CreateTaskUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
-    ).execute(payload)
+    ).execute(payload, actor_id=current_user.id)
 
 
 @router.post(
@@ -202,7 +202,9 @@ async def update_task(
     task_repo=Depends(task_repo_dependency),
     user_repo=Depends(user_repo_dependency),
 ):
-    return await UpdateTaskUseCase(task_repo, user_repo).execute(task_id, payload)
+    return await UpdateTaskUseCase(task_repo, user_repo).execute(
+        task_id, payload, actor_id=current_user.id
+    )
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -315,21 +317,21 @@ async def change_task_status(
 async def attach_task(
     task_id: UUID,
     payload: AttachTaskRequest,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
     work_tree_repo=Depends(worktree_repo_dependency),
 ):
     """Adjunta una tarea (suelta o ya adjunta) al elemento indicado."""
     return await AttachTaskToWorkItemUseCase(task_repo, work_tree_repo).execute(
-        task_id, payload.work_item_id
+        task_id, payload.work_item_id, actor_id=current_user.id
     )
 
 
 @router.patch("/tasks/{task_id}/detach", response_model=TaskResponse)
 async def detach_task(
     task_id: UUID,
-    _=Depends(_admin),
+    current_user=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
     """Quita la tarea de la estructura; vuelve a quedar suelta."""
-    return await DetachTaskUseCase(task_repo).execute(task_id)
+    return await DetachTaskUseCase(task_repo).execute(task_id, actor_id=current_user.id)

@@ -50,6 +50,10 @@ import {
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks } from "../../hooks/use-tasks";
+import { useProjectMembers } from "../../hooks/use-members";
+import { useTeams } from "../../hooks/use-teams";
+import { indexById } from "../../utils/task-assignment";
+import { formatShortDate } from "../../utils/task-dates";
 import { CreateTaskModal } from "../../tasks/CreateTaskModal";
 import { BulkTasksFromBranchModal } from "./BulkTasksFromBranchModal";
 import { DateConflictModal } from "./DateConflictModal";
@@ -58,42 +62,52 @@ import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
 import { NodeTasksModal } from "./NodeTasksModal";
-import type { TipoNodo, WorkItemTree } from "../../types/api.types";
+import { StructureTaskRow } from "./StructureTaskRow";
+import { TaskDetailModal } from "./TaskDetailModal";
+import type { ProjectMember, Task, Team, TipoNodo, WorkItemTree } from "../../types/api.types";
 
-function fmt(iso: string | null): string {
-  if (!iso) {
-    return "—";
+function nodeMatches(node: WorkItemTree, query: string, tasksByItem: Map<string, Task[]>): boolean {
+  if (node.nombre.toLowerCase().includes(query)) {
+    return true;
   }
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y.slice(2)}`;
-}
-
-function nodeMatches(node: WorkItemTree, query: string): boolean {
-  return node.nombre.toLowerCase().includes(query);
+  // Las tareas se ven en el árbol, así que también se buscan en él: si no,
+  // buscar «Guion» no encontraría nada aunque esté ahí delante.
+  return (tasksByItem.get(node.id) ?? []).some((t) => t.title.toLowerCase().includes(query));
 }
 
 /** ids de todos los nodos que tienen hijos (para "colapsar todo"). */
 /** Poda el árbol a los nodos que coinciden con la búsqueda o tienen un
  * descendiente que coincide. Los ancestros de un match quedan siempre
  * visibles: el llamador fuerza su expansión mientras hay búsqueda activa. */
-function pruneForSearch(nodes: WorkItemTree[], query: string): WorkItemTree[] {
+function pruneForSearch(
+  nodes: WorkItemTree[],
+  query: string,
+  tasksByItem: Map<string, Task[]>,
+): WorkItemTree[] {
   const result: WorkItemTree[] = [];
   for (const node of nodes) {
-    const children = pruneForSearch(node.children, query);
-    if (nodeMatches(node, query) || children.length > 0) {
+    const children = pruneForSearch(node.children, query, tasksByItem);
+    if (nodeMatches(node, query, tasksByItem) || children.length > 0) {
       result.push({ ...node, children });
     }
   }
   return result;
 }
 
-/** Nº de descendientes (hijos, nietos…) de un nodo. Se muestra en los nodos
- * colapsados para saber cuánto contenido queda oculto en árboles grandes. */
-function descendantCount(node: WorkItemTree): number {
-  return node.children.reduce((total, child) => total + 1 + descendantCount(child), 0);
+/** Nº de descendientes (sub-elementos, nietos… y sus tareas) de un nodo. Se
+ * muestra en los nodos colapsados para saber cuánto contenido queda oculto en
+ * árboles grandes. Las tareas cuentan porque también se pliegan con el nodo. */
+function descendantCount(node: WorkItemTree, tasksByItem?: Map<string, Task[]>): number {
+  const ownTasks = tasksByItem?.get(node.id)?.length ?? 0;
+  return node.children.reduce(
+    (total, child) => total + 1 + descendantCount(child, tasksByItem),
+    ownTasks,
+  );
 }
 
-/** Nº total de elementos en una lista de árboles (raíces + descendientes). */
+/** Nº total de elementos en una lista de árboles (raíces + descendientes).
+ * Sin el mapa de tareas: es el número que acompaña a «N elementos» en la barra
+ * de herramientas, que cuenta estructura, no trabajo. */
 function totalNodes(nodes: WorkItemTree[]): number {
   return nodes.reduce((total, node) => total + 1 + descendantCount(node), 0);
 }
@@ -226,7 +240,7 @@ function DateBadge({
               : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
           )}
         >
-          {fmt(node.fecha_inicio_plan)} → {fmt(node.fecha_fin_plan)}
+          {formatShortDate(node.fecha_inicio_plan)} → {formatShortDate(node.fecha_fin_plan)}
         </span>
       )}
       {node.conflicto_fechas && (
@@ -274,6 +288,11 @@ interface TreeNodeProps {
   onOutdent: (node: WorkItemTree) => void;
   onCreateTask: (node: WorkItemTree) => void;
   onBulkTasks: (node: WorkItemTree) => void;
+  /** Tareas colgadas de cada elemento, ya agrupadas por el panel. */
+  tasksByItem: Map<string, Task[]>;
+  memberById: Map<string, ProjectMember>;
+  teamById: Map<string, Team>;
+  onOpenTask: (task: Task, containerName: string) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -304,6 +323,10 @@ function TreeNode({
   onOutdent,
   onCreateTask,
   onBulkTasks,
+  tasksByItem,
+  memberById,
+  teamById,
+  onOpenTask,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -315,7 +338,11 @@ function TreeNode({
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
   const style = tipoStyle(node.tipo_id);
-  const hasChildren = node.children.length > 0;
+  // Las tareas del elemento son hijas suyas en el árbol, igual que los
+  // elementos: se pliegan con la misma flecha y cuentan para saber si hay algo
+  // dentro. Un módulo sin sub-elementos pero con tareas ya no se ve vacío.
+  const tasks = tasksByItem.get(node.id) ?? [];
+  const hasChildren = node.children.length > 0 || tasks.length > 0;
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
   // ¿Este nodo es un destino de suelta válido, y en qué zona?
@@ -409,9 +436,9 @@ function TreeNode({
         {hasChildren && !open && (
           <span
             className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-muted-foreground"
-            title={`${descendantCount(node)} elementos dentro`}
+            title={`${descendantCount(node, tasksByItem)} elementos y tareas dentro`}
           >
-            {descendantCount(node)}
+            {descendantCount(node, tasksByItem)}
           </span>
         )}
 
@@ -593,6 +620,24 @@ function TreeNode({
               onDragEndNode={onDragEndNode}
               onDragOverNode={onDragOverNode}
               onDropNode={onDropNode}
+              tasksByItem={tasksByItem}
+              memberById={memberById}
+              teamById={teamById}
+              onOpenTask={onOpenTask}
+            />
+          ))}
+          {/* Las tareas van DESPUÉS de los sub-elementos: primero se lee cómo
+              se descompone el elemento y al final qué trabajo concreto cuelga
+              directamente de él. */}
+          {tasks.map((task) => (
+            <StructureTaskRow
+              key={task.id}
+              task={task}
+              memberById={memberById}
+              teamById={teamById}
+              onOpen={() => {
+                onOpenTask(task, node.nombre);
+              }}
             />
           ))}
         </div>
@@ -879,6 +924,10 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
   const [conflictItem, setConflictItem] = useState<WorkItemTree | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Tarea cuya ficha se está viendo, junto al elemento del que cuelga (el nodo
+  // ya se conoce en el punto del árbol donde se pulsa; buscarlo otra vez aquí
+  // sería recorrer el árbol para un dato que ya teníamos).
+  const [openTask, setOpenTask] = useState<{ task: Task; containerName: string } | null>(null);
 
   const [search, setSearch] = useState("");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
@@ -897,13 +946,47 @@ export function StructurePanel({ projectId }: { projectId: string }) {
 
   const tree = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
 
+  // ── Tareas como parte del árbol ─────────────────────────────────────────
+  // El árbol de elementos y las tareas viven en endpoints distintos (son
+  // agregados distintos en el backend); se cruzan aquí, en la vista, por
+  // `work_item_id`. Las sueltas (`work_item_id === null`) no aparecen en la
+  // estructura: no cuelgan de ningún elemento, se ven en la vista de Tareas.
+  const tasksQuery = useProjectTasks(projectId);
+  const membersQuery = useProjectMembers(projectId);
+  const teamsQuery = useTeams(projectId);
+
+  const tasksByItem = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const task of tasksQuery.data ?? []) {
+      if (!task.work_item_id) {
+        continue;
+      }
+      const bucket = map.get(task.work_item_id);
+      if (bucket) {
+        bucket.push(task);
+      } else {
+        map.set(task.work_item_id, [task]);
+      }
+    }
+    return map;
+  }, [tasksQuery.data]);
+
+  const memberById = useMemo(
+    () => indexById(membersQuery.data ?? [], (m) => m.user_id),
+    [membersQuery.data],
+  );
+  const teamById = useMemo(
+    () => indexById(teamsQuery.data?.items ?? [], (t) => t.id),
+    [teamsQuery.data],
+  );
+
   const query = search.trim().toLowerCase();
   const visibleTree = useMemo(() => {
     if (!query) {
       return tree;
     }
-    return pruneForSearch(tree, query);
-  }, [tree, query]);
+    return pruneForSearch(tree, query, tasksByItem);
+  }, [tree, query, tasksByItem]);
 
   const totalCount = useMemo(() => totalNodes(tree), [tree]);
   const visibleCount = useMemo(() => totalNodes(visibleTree), [visibleTree]);
@@ -1044,22 +1127,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
     );
   }
 
-  /** Suelta en la zona "nivel principal": mueve a la raíz al final. */
-  function handleDropRoot() {
-    const itemId = draggingId;
-    resetDrag();
-    if (itemId) {
-      moveItem.mutate(
-        { itemId, payload: { new_parent_id: null } },
-        {
-          onError: (err) => {
-            setMoveError(getErrorMessage(err, "No se pudo mover el elemento"));
-          },
-        },
-      );
-    }
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Toolbar: buscador, colapsar-expandir todo, + añadir, ir al cronograma */}
@@ -1182,40 +1249,6 @@ export function StructurePanel({ projectId }: { projectId: string }) {
       ) : (
         <Card className="flex min-h-[400px] min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
           <CardContent ref={treeScrollRef} className="flex flex-1 flex-col overflow-y-auto p-0">
-            {/* Zona para soltar en el nivel principal (des-anidar).
-                Se renderiza SIEMPRE, aunque no se esté arrastrando: cuando solo
-                aparecía al empezar el arrastre, insertarla empujaba hacia abajo
-                todas las filas justo en ese momento, y lo que quedaba bajo el
-                puntero dejaba de ser la fila que se había apuntado (el fallo se
-                notaba sobre todo en los primeros elementos, los que más cerca
-                están de la zona). Ocupando su sitio desde el principio, nada se
-                mueve al empezar a arrastrar. */}
-            <div
-              onDragOver={(e) => {
-                if (draggingIdRef.current == null) {
-                  return;
-                }
-                e.preventDefault();
-                setDropTarget({ id: "__root__", pos: "inside" });
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDropRoot();
-              }}
-              className={cn(
-                "m-2 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-2 text-xs font-semibold transition-colors",
-                dropTarget?.id === "__root__"
-                  ? "border-brand-teal bg-brand-teal/5 text-brand-teal-dark dark:text-brand-teal"
-                  : draggingId != null
-                    ? "border-border text-muted-foreground"
-                    : "border-border/50 text-muted-foreground/50",
-              )}
-            >
-              <CornerLeftUp className="size-3.5" />
-              {draggingId != null
-                ? "Soltar aquí para mover al nivel principal"
-                : "Arrastra aquí para mover al nivel principal"}
-            </div>
             {visibleTree.map((node, idx) => (
               <div key={node.id} className={cn(idx > 0 && "border-t border-accent/60")}>
                 <TreeNode
@@ -1262,6 +1295,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     scheduleSpringOpen(id, pos);
                   }}
                   onDropNode={handleDropOn}
+                  tasksByItem={tasksByItem}
+                  memberById={memberById}
+                  teamById={teamById}
+                  onOpenTask={(task, containerName) => {
+                    setOpenTask({ task, containerName });
+                  }}
                 />
               </div>
             ))}
@@ -1359,6 +1398,19 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           tree={tree}
           onClose={() => {
             setCloneSource(null);
+          }}
+        />
+      )}
+
+      {openTask && (
+        <TaskDetailModal
+          projectId={projectId}
+          task={openTask.task}
+          containerName={openTask.containerName}
+          memberById={memberById}
+          teamById={teamById}
+          onClose={() => {
+            setOpenTask(null);
           }}
         />
       )}

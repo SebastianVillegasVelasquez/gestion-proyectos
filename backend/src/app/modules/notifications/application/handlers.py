@@ -4,8 +4,6 @@ from app.core.logger import get_logger
 from app.modules.notifications.domain.repository import NotificationRepository
 from app.modules.notifications.infrastructure.enums import NotificationType
 from app.modules.notifications.infrastructure.models import Notification
-from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
-from app.modules.tasks.infrastructure.models import TaskHistory
 from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events.events import MemberAssigned
 from app.shared.events.events import (
@@ -15,7 +13,6 @@ from app.shared.events.events import (
     TaskReturned,
     TaskSubmitted,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 
@@ -245,79 +242,3 @@ class NotifyOnTaskReturned:
             logger.exception(
                 "Error al publicar la notificacion al usuario %s", event.assigned_id
             )
-
-
-# ── Handlers de Trazabilidad ────────────────────────────────────────────────
-# Registran eventos de tareas en el historial (TaskHistory) para que los
-# coordinadores y supervisores puedan ver la trazabilidad completa de
-# acciones dentro del proyecto.
-
-
-class RecordTaskCreationInTraceability:
-    """Registra en la trazabilidad cuando se crea una tarea."""
-
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def __call__(self, event: TaskCreated) -> None:
-        history = TaskHistory(
-            task_id=event.task_id,
-            changed_by_id=event.assigned_id,
-            action=HistoryAction.CREACION,
-        )
-        self._db.add(history)
-        await self._db.flush()
-
-
-class RecordTaskSubmissionInTraceability:
-    """Registra en la trazabilidad cuando se entrega una tarea (cambio a EN_REVISION)."""
-
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def __call__(self, event: TaskSubmitted) -> None:
-        history = TaskHistory(
-            task_id=event.task_id,
-            changed_by_id=event.assigned_id,
-            action=HistoryAction.CAMBIO_ESTADO,
-            old_status=TaskStatus.EN_PROGRESO,
-            new_status=TaskStatus.EN_REVISION,
-        )
-        self._db.add(history)
-        await self._db.flush()
-
-
-class RecordTaskCompletionInTraceability:
-    """Registra en la trazabilidad cuando se aprueba una entrega (cambio a COMPLETADA)."""
-
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def __call__(self, event: TaskCompleted) -> None:
-        history = TaskHistory(
-            task_id=event.task_id,
-            changed_by_id=event.assigned_id,
-            action=HistoryAction.CAMBIO_ESTADO,
-            old_status=TaskStatus.EN_REVISION,
-            new_status=TaskStatus.COMPLETADA,
-        )
-        self._db.add(history)
-        await self._db.flush()
-
-
-class RecordTaskReturnInTraceability:
-    """Registra en la trazabilidad cuando se devuelve una entrega (cambio a DEVUELTA)."""
-
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def __call__(self, event: TaskReturned) -> None:
-        history = TaskHistory(
-            task_id=event.task_id,
-            changed_by_id=event.assigned_id,
-            action=HistoryAction.CAMBIO_ESTADO,
-            old_status=TaskStatus.EN_REVISION,
-            new_status=TaskStatus.DEVUELTA,
-        )
-        self._db.add(history)
-        await self._db.flush()

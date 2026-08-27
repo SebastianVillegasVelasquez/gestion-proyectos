@@ -159,6 +159,14 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
     # El campo más importante para devoluciones: ¿Por qué se rechazó o reasignó?
     change_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Delta genérico para los cambios que no son de estado (equipo, ubicación,
+    # fechas, prioridad). Se guarda ya RESUELTO a texto legible —"Contenidos",
+    # "Unidad 3", "2026-09-01 → 2026-09-15"— y no como ids: el historial es un
+    # hecho del pasado y debe seguir leyéndose aunque el equipo se renombre o
+    # el elemento se borre. Nadie filtra por estos valores; solo se leen.
+    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Navegación
     task: Mapped["Task"] = relationship("Task", back_populates="history")
     changed_by: Mapped["User"] = relationship("User", back_populates="task_history")

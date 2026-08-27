@@ -132,6 +132,8 @@ class ReportRowResponse(BaseModelConfig):
     """Una tarea del informe con su contexto ya resuelto."""
 
     elemento: Optional[str] = None
+    # Solo para pintar el elemento con el mismo color que en la estructura.
+    elemento_tipo_id: Optional[UUID] = None
     tarea: str
     responsable: Optional[str] = None
     equipo: Optional[str] = None

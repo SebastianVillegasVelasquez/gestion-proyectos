@@ -32,6 +32,10 @@ class ReportRow:
     """Una fila del informe: una tarea con su contexto ya resuelto."""
 
     elemento: str | None
+    # Tipo del elemento: el informe lo usa solo para pintarlo con el MISMO
+    # color que en la estructura y el cronograma. Sin esto, el mismo objeto se
+    # ve de tres formas distintas en tres pantallas.
+    elemento_tipo_id: UUID | None
     tarea: str
     responsable: str | None
     equipo: str | None
@@ -105,6 +109,7 @@ class ProjectReportBuilder:
             select(
                 Task,
                 WorkItem.nombre,
+                WorkItem.tipo_id,
                 User.name,
                 User.last_name,
                 Team.name,
@@ -122,6 +127,7 @@ class ProjectReportBuilder:
         return [
             ReportRow(
                 elemento=element_name,
+                elemento_tipo_id=element_tipo_id,
                 tarea=task.title,
                 responsable=(
                     f"{first_name} {last_name}".strip() if first_name else None
@@ -134,7 +140,15 @@ class ProjectReportBuilder:
                 horas_estimadas=task.estimated_hours,
                 horas_dedicadas=Decimal(total or 0),
             )
-            for task, element_name, first_name, last_name, team_name, total in rows
+            for (
+                task,
+                element_name,
+                element_tipo_id,
+                first_name,
+                last_name,
+                team_name,
+                total,
+            ) in rows
         ]
 
     async def _effort_by_person(self, project_id: UUID) -> list[PersonEffort]:

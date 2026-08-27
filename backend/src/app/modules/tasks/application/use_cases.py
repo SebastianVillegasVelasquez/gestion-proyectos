@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.tasks.domain.audit import TaskAuditor, snapshot
 from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
@@ -77,7 +78,9 @@ class CreateTaskUseCase:
         self.service = TaskService(task_repo)
         self._bus = bus
 
-    async def execute(self, data: CreateTaskRequest) -> TaskResponse:
+    async def execute(
+        self, data: CreateTaskRequest, actor_id: UUID | None = None
+    ) -> TaskResponse:
         # La tarea puede colgar de un elemento existente (se deriva el
         # proyecto de ahí) o crearse suelta apuntando directo al proyecto.
         if data.work_item_id is not None:
@@ -114,6 +117,13 @@ class CreateTaskUseCase:
             await TaskDependencyService(self.task_repo).add_dependency(
                 created.id, data.depends_on_id
             )
+
+        # El historial se escribe aquí y no en un manejador del bus: el actor
+        # es quien ejecuta la petición, un dato que el evento de notificación
+        # no lleva (lleva el asignado, que es otra persona).
+        await TaskAuditor(self.task_repo, actor_id).created(
+            created.id, created.title, created.status
+        )
 
         if self._bus:
             await self._bus.publish(
@@ -501,15 +511,29 @@ class GetTaskByIdUseCase:
 
 class UpdateTaskUseCase:
     def __init__(self, task_repo: TaskRepository, user_repo: Repository):
+        self.task_repo = task_repo
         self.user_repo = user_repo
         self.service = TaskService(task_repo)
 
-    async def execute(self, task_id: UUID, data: UpdateTaskRequest) -> TaskResponse:
+    async def execute(
+        self,
+        task_id: UUID,
+        data: UpdateTaskRequest,
+        actor_id: UUID | None = None,
+    ) -> TaskResponse:
         if data.assignee_id:
             user = await self.user_repo.get_by_id(data.assignee_id)
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
-        return await self.service.update_task(task_id, data)
+
+        # Foto de los campos auditables ANTES de mutar: un PATCH puede tocar
+        # varios a la vez y cada uno se registra como un hecho aparte.
+        task = await _get_active_task(self.task_repo, task_id)
+        before = snapshot(task)
+
+        updated = await self.service.update_task(task_id, data)
+        await TaskAuditor(self.task_repo, actor_id).diff(before, task)
+        return updated
 
 
 class DeleteTaskUseCase:
@@ -539,13 +563,17 @@ class AttachTaskToWorkItemUseCase:
         self.task_repo = task_repo
         self.work_tree_repo = work_tree_repo
 
-    async def execute(self, task_id: UUID, work_item_id: UUID) -> TaskResponse:
+    async def execute(
+        self, task_id: UUID, work_item_id: UUID, actor_id: UUID | None = None
+    ) -> TaskResponse:
         task = await _get_active_task(self.task_repo, task_id)
         work_item = await _get_work_item(self.work_tree_repo, work_item_id)
         if work_item.proyecto_id != task.project_id:
             raise ValidationError("El elemento pertenece a otro proyecto")
 
+        previous = task.work_item_id
         updated = await self.task_repo.set_work_item(task, work_item_id)
+        await TaskAuditor(self.task_repo, actor_id).location_changed(updated, previous)
         return TaskService._to_response(updated)
 
 
@@ -555,9 +583,13 @@ class DetachTaskUseCase:
     def __init__(self, task_repo: TaskRepository):
         self.task_repo = task_repo
 
-    async def execute(self, task_id: UUID) -> TaskResponse:
+    async def execute(
+        self, task_id: UUID, actor_id: UUID | None = None
+    ) -> TaskResponse:
         task = await _get_active_task(self.task_repo, task_id)
+        previous = task.work_item_id
         updated = await self.task_repo.set_work_item(task, None)
+        await TaskAuditor(self.task_repo, actor_id).location_changed(updated, previous)
         return TaskService._to_response(updated)
 
 
@@ -639,11 +671,21 @@ class ChangeTaskStatusUseCase:
                 new_status=data.status,
             )
 
+        previous_status = task.status
         new_status = await self.service.change_status(task_id, data)
 
-        # Los eventos de flujo asumen una tarea con responsable (entrega/aprobación).
-        # Con el override de gestión el estado puede cambiar en tareas sin asignar:
-        # en ese caso no hay a quién notificar, así que se omite el evento.
+        # El historial se escribe SIEMPRE, tenga o no responsable la tarea:
+        # notificar necesita a alguien a quien avisar, auditar no. Antes esto
+        # colgaba del evento y una tarea sin asignar no dejaba rastro alguno.
+        await TaskAuditor(self.task_repo, current_user_id).status_changed(
+            task_id,
+            previous_status,
+            data.status,
+            reason=data.change_reason,
+        )
+
+        # Los eventos de flujo sí asumen una tarea con responsable
+        # (entrega/aprobación): sin él no hay a quién notificar.
         if self._bus and new_status.assignee_id:
             await self._emit_status_event(new_status, data.status, project_id)
         return new_status

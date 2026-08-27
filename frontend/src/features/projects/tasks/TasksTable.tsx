@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, Pencil, Replace, UserPlus, Users, X } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronDown,
+  FolderTree,
+  Pencil,
+  Replace,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useSortableData } from "@/hooks/use-sortable-data";
@@ -12,8 +21,11 @@ import type {
   TaskPriority,
   TaskStatus,
   Team,
+  WorkItemTree,
 } from "../types/api.types";
-import { useChangeTaskStatus, useUpdateTask } from "../hooks/use-tasks";
+import { useAttachTask, useChangeTaskStatus, useUpdateTask } from "../hooks/use-tasks";
+import { WorkItemPickerModal } from "./WorkItemPickerModal";
+import { useNodeTypes } from "../hooks/use-structure";
 import { commonPrefix, replaceInTitle } from "./bulk-title";
 import { AssignTaskModal } from "./AssignTaskModal";
 
@@ -124,6 +136,7 @@ export function TasksTable({
   tasks,
   members,
   teams,
+  tree,
   locationById,
   currentUserId,
   isElevated,
@@ -133,6 +146,7 @@ export function TasksTable({
   tasks: Task[];
   members: ProjectMember[];
   teams: Team[];
+  tree: WorkItemTree[];
   locationById: Map<string, { name: string; tipoId: string }>;
   // Quién mira la tabla: decide qué transiciones de estado puede fijar cada fila.
   currentUserId: string | undefined;
@@ -141,6 +155,8 @@ export function TasksTable({
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
   const updateTask = useUpdateTask(projectId);
+  const attachTask = useAttachTask(projectId);
+  const nodeTypesQuery = useNodeTypes(projectId);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [find, setFind] = useState("");
@@ -151,6 +167,8 @@ export function TasksTable({
   // Último error al cambiar un estado (el backend rechaza transiciones fuera de
   // flujo o con dependencias sin completar); antes fallaba en silencio.
   const [statusError, setStatusError] = useState<string | null>(null);
+  // Ubicación masiva: el mismo modal de árbol que usan crear y editar.
+  const [pickingBulkLocation, setPickingBulkLocation] = useState(false);
 
   const myProjectRole = useMemo(
     () => members.find((m) => m.user_id === currentUserId)?.project_role,
@@ -228,6 +246,56 @@ export function TasksTable({
     return null;
   };
 
+  /** Aplica un cambio a toda la selección y la limpia.
+   *
+   * Se lanza una mutación por tarea (no hay endpoint masivo): cada una
+   * invalida las mismas queries, pero React Query agrupa las invalidaciones,
+   * así que el coste real es una refetch al final, no una por tarea. */
+  const applyToSelection = (apply: (task: Task) => void) => {
+    selectedTasks.forEach(apply);
+    setSelected(new Set());
+  };
+
+  const bulkPriority = (priority: TaskPriority) => {
+    applyToSelection((task) => {
+      if (task.priority !== priority) {
+        updateTask.mutate({ taskId: task.id, payload: { priority } });
+      }
+    });
+  };
+
+  const bulkStatus = (status: TaskStatus) => {
+    // Solo las tareas donde ESTE usuario puede fijar ese estado: el backend
+    // rechazaría el resto y el usuario vería una ristra de errores por algo
+    // que la tabla no debió ofrecerle.
+    applyToSelection((task) => {
+      if (
+        task.status !== status &&
+        allowedStatuses(task, currentUserId, isElevated, myProjectRole).includes(status)
+      ) {
+        changeStatus.mutate(
+          { taskId: task.id, status },
+          {
+            onError: (error) => {
+              setStatusError(getErrorMessage(error, "No se pudo cambiar el estado"));
+            },
+          },
+        );
+      }
+    });
+  };
+
+  const bulkLocation = (workItemId: string | null) => {
+    if (!workItemId) {
+      return;
+    }
+    applyToSelection((task) => {
+      if (task.work_item_id !== workItemId) {
+        attachTask.mutate({ taskId: task.id, workItemId });
+      }
+    });
+  };
+
   const applyBulkRename = () => {
     if (!effectiveFind) {
       return;
@@ -265,54 +333,106 @@ export function TasksTable({
         </div>
       )}
 
-      {/* Barra de edición masiva: aparece al seleccionar tareas. */}
+      {/* Barra de acciones masivas: aparece al seleccionar tareas. Repartir el
+          trabajo de un módulo entero es la operación real de esta pantalla, y
+          hacerlo fila a fila es lo que la hacía sentirse corta. */}
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border border-b-0 border-border bg-accent/40 px-3 py-2 text-xs">
-          <span className="font-semibold text-foreground">
-            {selected.size} seleccionada{selected.size === 1 ? "" : "s"}
-          </span>
-          <span className="text-muted-foreground">·</span>
-          <span className="flex items-center gap-1 text-muted-foreground">
-            <Replace className="size-3.5" /> Reemplazar en el título:
-          </span>
-          <input
-            value={effectiveFind}
-            onChange={(e) => {
-              setDirtyFind(true);
-              setFind(e.target.value);
-            }}
-            placeholder="buscar (ej. C1 - )"
-            aria-label="Texto a buscar en el título"
-            className="w-32 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold"
-          />
-          <span className="text-muted-foreground">→</span>
-          <input
-            value={replace}
-            onChange={(e) => {
-              setReplace(e.target.value);
-            }}
-            placeholder="reemplazo (ej. C2 - )"
-            aria-label="Texto de reemplazo"
-            className="w-32 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold"
-          />
-          <button
-            type="button"
-            onClick={applyBulkRename}
-            disabled={!effectiveFind || updateTask.isPending}
-            className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-50"
-          >
-            Aplicar a {selected.size}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(new Set());
-            }}
-            aria-label="Quitar selección"
-            className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-          >
-            <X className="size-3.5" /> Limpiar
-          </button>
+        <div className="flex flex-col gap-2 rounded-t-2xl border border-b-0 border-border bg-accent/40 px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-foreground">
+              {selected.size} seleccionada{selected.size === 1 ? "" : "s"}
+            </span>
+
+            <span className="text-muted-foreground">·</span>
+            <CellSelect
+              value=""
+              ariaLabel="Cambiar el estado de la selección"
+              onChange={(value) => {
+                if (value) {
+                  bulkStatus(value as TaskStatus);
+                }
+              }}
+            >
+              <option value="">Cambiar estado…</option>
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {TASK_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </CellSelect>
+
+            <CellSelect
+              value=""
+              ariaLabel="Cambiar la prioridad de la selección"
+              onChange={(value) => {
+                if (value) {
+                  bulkPriority(value as TaskPriority);
+                }
+              }}
+            >
+              <option value="">Cambiar prioridad…</option>
+              {PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {TASK_PRIORITY_LABELS[priority]}
+                </option>
+              ))}
+            </CellSelect>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPickingBulkLocation(true);
+              }}
+              className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 font-medium text-foreground transition hover:border-brand-gold"
+            >
+              <FolderTree className="size-3.5" /> Ubicar…
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(new Set());
+              }}
+              aria-label="Quitar selección"
+              className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-3.5" /> Limpiar
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-2">
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Replace className="size-3.5" /> Reemplazar en el título:
+            </span>
+            <input
+              value={effectiveFind}
+              onChange={(e) => {
+                setDirtyFind(true);
+                setFind(e.target.value);
+              }}
+              placeholder="buscar (ej. C1 - )"
+              aria-label="Texto a buscar en el título"
+              className="w-32 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold"
+            />
+            <span className="text-muted-foreground">→</span>
+            <input
+              value={replace}
+              onChange={(e) => {
+                setReplace(e.target.value);
+              }}
+              placeholder="reemplazo (ej. C2 - )"
+              aria-label="Texto de reemplazo"
+              className="w-32 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold"
+            />
+            <button
+              type="button"
+              onClick={applyBulkRename}
+              disabled={!effectiveFind || updateTask.isPending}
+              className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition hover:bg-brand-gold-dark disabled:opacity-50"
+            >
+              Aplicar a {selected.size}
+            </button>
+          </div>
         </div>
       )}
 
@@ -560,6 +680,20 @@ export function TasksTable({
           teams={teams}
           onClose={() => {
             setAssigningTask(null);
+          }}
+        />
+      )}
+
+      {pickingBulkLocation && (
+        <WorkItemPickerModal
+          tree={tree}
+          nodeTypes={nodeTypesQuery.data ?? []}
+          // Sin valor de partida: la selección puede venir de sitios distintos
+          // y presuponer uno haría creer que ya comparten ubicación.
+          value={null}
+          onSelect={bulkLocation}
+          onClose={() => {
+            setPickingBulkLocation(false);
           }}
         />
       )}

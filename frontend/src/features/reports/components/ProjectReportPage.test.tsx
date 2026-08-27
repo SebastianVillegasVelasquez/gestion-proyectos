@@ -37,6 +37,7 @@ function report(over: Partial<ProjectReport> = {}): ProjectReport {
     filas: [
       {
         elemento: "Unidad 1",
+        elemento_tipo_id: "tipo-1",
         tarea: "Grabar video",
         responsable: "Ana García",
         equipo: null,
@@ -49,6 +50,7 @@ function report(over: Partial<ProjectReport> = {}): ProjectReport {
       },
       {
         elemento: "Unidad 1",
+        elemento_tipo_id: "tipo-1",
         tarea: "Editar video",
         responsable: null,
         equipo: "Producción",

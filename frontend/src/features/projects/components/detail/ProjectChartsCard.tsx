@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/common/Skeleton";
 import type { Task, TaskPriority } from "../../types/api.types";
-import { deriveTaskMetrics, type StatusSegment } from "../../utils/task-metrics";
+import { deriveTaskMetrics } from "../../utils/task-metrics";
 import {
   buildDeliveryBuckets,
   summarizeDelivery,
@@ -49,34 +49,6 @@ const TREND_META = {
   down: { icon: TrendingDown, label: "Empeorando", tone: "text-rose-600 dark:text-rose-400" },
   flat: { icon: Minus, label: "Estable", tone: "text-muted-foreground" },
 };
-
-function StatusTooltip({
-  active,
-  payload,
-  total,
-}: {
-  active?: boolean;
-  payload?: { payload: StatusSegment }[];
-  total: number;
-}) {
-  if (!active || !payload?.length) {
-    return null;
-  }
-  const seg = payload[0].payload;
-  const pct = total ? Math.round((seg.count / total) * 100) : 0;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
-      <div className="flex items-center gap-2">
-        <span className="size-2.5 rounded-sm" style={{ backgroundColor: seg.color }} />
-        <span className="font-semibold text-foreground">{seg.label}</span>
-      </div>
-      <p className="mt-1 text-muted-foreground">
-        <span className="font-semibold text-foreground">{seg.count}</span>{" "}
-        {seg.count === 1 ? "tarea" : "tareas"} · {pct}%
-      </p>
-    </div>
-  );
-}
 
 // Sector activo del donut: crece un poco y suma un anillo exterior fino al hover.
 function ActiveSlice(props: PieSectorDataItem) {
@@ -159,6 +131,11 @@ function StatusView({ tasks }: { tasks: Task[] }) {
   const metrics = useMemo(() => deriveTaskMetrics(filtered), [filtered]);
   const segments = metrics.segments;
 
+  // Sector bajo el cursor: su detalle se lee en el hueco del donut, no en un
+  // letrero flotante que seguiría al ratón por encima del propio anillo.
+  const active = activeIndex != null ? segments[activeIndex] : null;
+  const activePct = active && metrics.total ? Math.round((active.count / metrics.total) * 100) : 0;
+
   return (
     <>
       {/* Filtro por prioridad, centrado */}
@@ -228,22 +205,35 @@ function StatusView({ tasks }: { tasks: Task[] }) {
                     <Cell key={seg.status} fill={seg.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  content={<StatusTooltip total={metrics.total} />}
-                  wrapperStyle={{ outline: "none" }}
-                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-semibold tabular-nums text-foreground">
-                {activeIndex != null ? segments[activeIndex].count : metrics.progress}
-                {activeIndex == null && <span className="text-xl text-muted-foreground">%</span>}
-              </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {activeIndex != null
-                  ? segments[activeIndex].label
-                  : `${metrics.total} ${metrics.total === 1 ? "tarea" : "tareas"}`}
-              </span>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-11 text-center">
+              {active ? (
+                <>
+                  <span className="text-4xl font-semibold tabular-nums text-foreground">
+                    {active.count}
+                  </span>
+                  <span
+                    className="mt-0.5 line-clamp-2 text-[11px] font-semibold uppercase leading-tight tracking-wider"
+                    style={{ color: active.color }}
+                  >
+                    {active.label}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {active.count === 1 ? "tarea" : "tareas"} · {activePct}%
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-4xl font-semibold tabular-nums text-foreground">
+                    {metrics.progress}
+                    <span className="text-xl text-muted-foreground">%</span>
+                  </span>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {metrics.total} {metrics.total === 1 ? "tarea" : "tareas"}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 

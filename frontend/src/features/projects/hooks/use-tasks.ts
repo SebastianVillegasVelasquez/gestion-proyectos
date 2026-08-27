@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/features/projects/api/tasks.api";
 import { projectKeys, taskKeys } from "./query-keys";
+import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard-summary";
 import type {
   BulkTasksFromBranchPayload,
   CreateCommentPayload,
@@ -11,6 +12,20 @@ import type {
 } from "@/features/projects/types/api.types";
 
 /** Todas las tareas del proyecto (resueltas vía su WorkItem). */
+/**
+ * Invalidaciones comunes a toda mutación de una tarea.
+ *
+ * Cualquier cambio deja huella en el historial, así que la trazabilidad y la
+ * actividad reciente quedan obsoletas igual que el listado. Centralizado aquí
+ * para que añadir una mutación nueva no se olvide de refrescarlas.
+ */
+function invalidateTaskViews(qc: ReturnType<typeof useQueryClient>, projectId: string) {
+  void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+  void qc.invalidateQueries({ queryKey: projectKeys.traceability(projectId) });
+  // Prefijo: cubre la actividad global y la del proyecto.
+  void qc.invalidateQueries({ queryKey: dashboardKeys.activity() });
+}
+
 export function useProjectTasks(projectId: string | undefined) {
   return useQuery({
     queryKey: taskKeys.byProject(projectId ?? ""),
@@ -69,7 +84,7 @@ export function useLogTime(projectId: string, taskId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
       // La lista del proyecto muestra "3 / 8 h" por fila: también cambia.
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
     },
   });
 }
@@ -80,7 +95,7 @@ export function useDeleteTimeEntry(projectId: string, taskId: string) {
     mutationFn: (entryId: string) => tasksApi.deleteTimeEntry(entryId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: taskKeys.effort(taskId) });
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
     },
   });
 }
@@ -94,7 +109,7 @@ export function useCreateTasksFromBranch(projectId: string) {
     onSuccess: () => {
       // Toca a muchos elementos a la vez: invalidamos las tareas del proyecto
       // en bloque en vez de intentar acertar con cada elemento tocado.
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
       void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
     },
   });
@@ -105,7 +120,7 @@ export function useCreateTask(projectId: string) {
   return useMutation({
     mutationFn: (payload: CreateTaskPayload) => tasksApi.create(payload),
     onSuccess: (task) => {
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
       if (task.work_item_id) {
         void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
       }
@@ -120,7 +135,7 @@ export function useAttachTask(projectId: string) {
     mutationFn: ({ taskId, workItemId }: { taskId: string; workItemId: string }) =>
       tasksApi.attach(taskId, { work_item_id: workItemId }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
       // Cualquier vista "tareas por elemento" puede haber cambiado.
       void qc.invalidateQueries({ queryKey: [...taskKeys.all, "work-item"] });
     },
@@ -133,7 +148,7 @@ export function useDetachTask(projectId: string) {
   return useMutation({
     mutationFn: (taskId: string) => tasksApi.detach(taskId),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
       void qc.invalidateQueries({ queryKey: [...taskKeys.all, "work-item"] });
     },
   });
@@ -151,7 +166,7 @@ export function useUpdateTask(projectId: string) {
     mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateTaskPayload }) =>
       tasksApi.update(taskId, payload),
     onSuccess: (task) => {
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      invalidateTaskViews(qc, projectId);
       if (task.work_item_id) {
         void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
       }

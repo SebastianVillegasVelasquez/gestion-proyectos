@@ -45,6 +45,10 @@ def make_event_row():
         task_title: str = "Tarea demo",
         actor_name: str | None = "Ana García",
         change_reason: str | None = None,
+        old_value: str | None = None,
+        new_value: str | None = None,
+        team_name: str | None = None,
+        work_item_name: str | None = None,
     ) -> TraceabilityEventRow:
         return TraceabilityEventRow(
             id=uuid4(),
@@ -58,6 +62,10 @@ def make_event_row():
             due_date=due_date,
             created_at=created_at
             or datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+            old_value=old_value,
+            new_value=new_value,
+            team_name=team_name,
+            work_item_name=work_item_name,
         )
 
     return _make

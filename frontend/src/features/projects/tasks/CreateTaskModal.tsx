@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { X, ListPlus } from "lucide-react";
+import { X, ListPlus, FolderTree } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useCreateTask } from "../hooks/use-tasks";
-import { useWorkTree } from "../hooks/use-structure";
+import { useWorkTree, useNodeTypes } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
 import type { Task, TaskPriority, UserPosition } from "../types/api.types";
-import { flattenWorkTree } from "../utils/flatten-work-tree";
+import { workItemPath } from "../utils/flatten-work-tree";
+import { WorkItemPickerModal } from "./WorkItemPickerModal";
 import {
   buildTaskPayload,
   emptyTaskForm,
@@ -47,7 +48,9 @@ export function CreateTaskModal({
   onClose: () => void;
 }) {
   const treeQuery = useWorkTree(projectId);
+  const nodeTypesQuery = useNodeTypes(projectId);
   const createTask = useCreateTask(projectId);
+  const [pickingLocation, setPickingLocation] = useState(false);
 
   const [form, setForm] = useState<TaskFormState>(() =>
     emptyTaskForm(initialWorkItemId, initialTitle),
@@ -63,7 +66,12 @@ export function CreateTaskModal({
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const nodeOptions = useMemo(() => flattenWorkTree(treeQuery.data ?? []), [treeQuery.data]);
+  // Ruta legible del elemento elegido ("Curso / Módulo 2 / Unidad 3"): es lo
+  // que se enseña en el formulario, ya que el árbol vive dentro del modal.
+  const selectedPath = useMemo(
+    () => workItemPath(treeQuery.data ?? [], form.workItemId),
+    [treeQuery.data, form.workItemId],
+  );
 
   const handleSubmit = () => {
     const error = validateTaskForm(form);
@@ -121,27 +129,25 @@ export function CreateTaskModal({
 
           {/* Nodo del árbol de trabajo al que cuelga la tarea (opcional: la
               tarea puede crearse suelta y adjuntarse después). */}
+          {/* Un botón que abre el árbol completo, no un desplegable: con cuatro
+              niveles de estructura, elegir a ciegas en una lista aplanada es
+              justo lo que hacía fallar la ubicación. */}
           <Field label="Ubicación en la estructura (opcional)">
-            <select
-              className={inputCls}
-              value={form.workItemId}
-              onChange={(e) => {
-                set("workItemId", e.target.value);
+            <button
+              type="button"
+              onClick={() => {
+                setPickingLocation(true);
               }}
+              className={`${inputCls} flex items-center justify-between gap-2 text-left`}
             >
-              <option value="">Sin asignar (tarea independiente)</option>
-              {nodeOptions.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.label}
-                </option>
-              ))}
-            </select>
-            {nodeOptions.length === 0 && (
-              <span className="text-[11px] text-slate-400">
-                Aún no hay estructura en este proyecto. Podrás adjuntar esta tarea a un elemento
-                cuando la crees.
+              <span className="flex min-w-0 items-center gap-2">
+                <FolderTree className="size-4 shrink-0 text-brand-teal" />
+                <span className="truncate">
+                  {selectedPath ?? "Sin asignar (tarea independiente)"}
+                </span>
               </span>
-            )}
+              <span className="shrink-0 text-xs font-medium text-brand-teal">Elegir</span>
+            </button>
           </Field>
 
           {/* Asignación: excluyente. Una tarea se da a una persona O a un equipo
@@ -350,6 +356,20 @@ export function CreateTaskModal({
           </button>
         </div>
       </div>
+
+      {pickingLocation && (
+        <WorkItemPickerModal
+          tree={treeQuery.data ?? []}
+          nodeTypes={nodeTypesQuery.data ?? []}
+          value={form.workItemId || null}
+          onSelect={(workItemId) => {
+            set("workItemId", workItemId ?? "");
+          }}
+          onClose={() => {
+            setPickingLocation(false);
+          }}
+        />
+      )}
     </div>
   );
 }

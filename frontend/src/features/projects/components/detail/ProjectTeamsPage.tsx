@@ -10,6 +10,7 @@ import { colorForName } from "../../utils/entity-color";
 import type { Team } from "../../types/api.types";
 import { TeamFormModal } from "../teams/TeamFormModal";
 import { TeamMembersManager } from "../teams/TeamMembersManager";
+import { TeamWorkPanel } from "../teams/TeamWorkPanel";
 
 // El avance de un equipo se calcula igual que el avance individual: tareas
 // completadas sobre asignadas de todos sus integrantes (las tareas son las
@@ -164,7 +165,14 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
             </div>
           </header>
 
-          <div className="mt-5">
+          {/* Primero QUÉ hay que hacer y para cuándo, después QUIÉN lo compone:
+              al abrir un equipo la pregunta habitual es por su carga de
+              trabajo, no por su lista de integrantes. */}
+          <div className="mt-5 border-t border-border pt-5">
+            <TeamWorkPanel projectId={projectId} team={open} />
+          </div>
+
+          <div className="mt-5 border-t border-border pt-5">
             <TeamMembersManager projectId={projectId} teamId={open.id} />
           </div>
         </div>

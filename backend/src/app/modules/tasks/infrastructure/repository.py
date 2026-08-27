@@ -11,8 +11,10 @@ from app.modules.tasks.infrastructure.models import (
     Task,
     TaskComment,
     TaskDependency,
+    TaskHistory,
     TaskTimeEntry,
 )
+from app.modules.teams.infrastructure.models import Team
 from app.shared.base_repository import BaseRepository
 
 
@@ -125,6 +127,34 @@ class TaskRepository(BaseRepository[Task]):
             )
         ).all()
         return {task_id: Decimal(total or 0) for task_id, total in rows}
+
+    # ── Historial (trazabilidad) ──────────────────────────────────────────────
+    async def add_history(self, entry: TaskHistory) -> TaskHistory:
+        """Guarda un evento del historial dentro de la MISMA transacción que el
+        cambio que lo provocó: o quedan los dos, o no queda ninguno. Un
+        historial que puede desincronizarse del hecho que narra no sirve para
+        auditar."""
+        self._session.add(entry)
+        await self._session.flush()
+        return entry
+
+    async def user_label(self, user_id: UUID) -> str:
+        row = (
+            await self._session.execute(
+                select(User.name, User.last_name).where(User.id == user_id)
+            )
+        ).first()
+        return f"{row[0]} {row[1]}".strip() if row else "Usuario eliminado"
+
+    async def team_label(self, team_id: UUID) -> str:
+        name = await self._session.scalar(select(Team.name).where(Team.id == team_id))
+        return name or "Equipo eliminado"
+
+    async def work_item_label(self, work_item_id: UUID) -> str:
+        name = await self._session.scalar(
+            select(WorkItem.nombre).where(WorkItem.id == work_item_id)
+        )
+        return name or "Elemento eliminado"
 
     async def set_work_item(self, task: Task, work_item_id: UUID | None) -> Task:
         """Adjunta/desadjunta la tarea de un elemento. `None` = tarea suelta."""

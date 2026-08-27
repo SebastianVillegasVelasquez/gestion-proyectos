@@ -2,6 +2,9 @@ import http from "@/lib/http";
 
 export interface ReportRow {
   elemento: string | null;
+  /** Tipo del elemento, solo para pintarlo con el mismo color que en la
+   * estructura y el cronograma. */
+  elemento_tipo_id: string | null;
   tarea: string;
   responsable: string | null;
   equipo: string | null;

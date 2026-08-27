@@ -303,7 +303,9 @@ export interface TaskDependency {
 
 // ── Members / team ───────────────────────────────────────────────────────────
 
-export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante" | "cliente";
+// Sin rol de cliente: el cliente no tiene cuenta, ve el avance por el portal
+// público (/portal/:token), que no pasa por login.
+export type ProjectRole = "supervisor" | "coordinador" | "revisor" | "integrante";
 
 export interface ProjectMember {
   id: string;
@@ -441,7 +443,15 @@ export interface TeamSearchParams {
 }
 
 // ── Trazabilidad (historial de eventos de un proyecto) ───────────────────────
-export type HistoryAction = "creacion" | "cambio_estado" | "reasignacion" | "comentario";
+export type HistoryAction =
+  | "creacion"
+  | "cambio_estado"
+  | "reasignacion"
+  | "comentario"
+  | "cambio_equipo"
+  | "cambio_ubicacion"
+  | "cambio_fechas"
+  | "cambio_prioridad";
 
 // Tipo de evento clasificado por el backend (espejo del dominio).
 export type TraceabilityEventKind =
@@ -453,7 +463,12 @@ export type TraceabilityEventKind =
   | "devolucion"
   | "cancelacion"
   | "comentario"
-  | "cambio_estado";
+  | "cambio_estado"
+  // Cambios de gestión: no mueven el estado pero explican la historia de la tarea.
+  | "equipo"
+  | "ubicacion"
+  | "reprogramacion"
+  | "prioridad";
 
 export interface TraceabilityEvent {
   id: string;
@@ -464,11 +479,16 @@ export interface TraceabilityEvent {
   old_status: TaskStatus | null;
   new_status: TaskStatus | null;
   change_reason: string | null;
+  /** Delta legible de los cambios que no son de estado ("Contenidos" → "Producción"). */
+  old_value: string | null;
+  new_value: string | null;
   created_at: string;
   kind: TraceabilityEventKind;
   is_delay: boolean;
-  // Contexto adicional del evento (el backend puede omitirlos; el frontend los muestra si existen).
+  // Contexto ACTUAL de la tarea, para poder filtrar la línea de tiempo.
+  work_item_id?: string | null;
   work_item_name?: string | null;
+  team_id?: string | null;
   team_name?: string | null;
   assignee_name?: string | null;
 }
@@ -478,6 +498,8 @@ export interface TraceabilitySummary {
   delays: number;
   deliveries: number;
   returns: number;
+  reschedules: number;
+  reassignments: number;
 }
 
 export interface ProjectTraceability {
