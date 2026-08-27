@@ -10,6 +10,7 @@ from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
     DeliverableVersion,
+    TeamNotificationSetting,
 )
 from app.modules.teams.presentation.schemas import TeamMemberResponse
 from app.modules.teams.presentation.workspace_schemas import (
@@ -18,6 +19,8 @@ from app.modules.teams.presentation.workspace_schemas import (
     CreateDeliverableRequest,
     DeliverableResponse,
     MyTeamResponse,
+    TeamNotificationSettingsResponse,
+    UpdateTeamNotificationSettingsRequest,
     WorkspaceAccessResponse,
 )
 from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
@@ -26,6 +29,7 @@ from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
 _STATUS_BY_COMMENT = {
     CommentType.APROBACION: DeliverableStatus.APROBADO,
     CommentType.SOLICITUD_CAMBIO: DeliverableStatus.CAMBIOS_SOLICITADOS,
+    CommentType.RECHAZO: DeliverableStatus.RECHAZADO,
 }
 
 # Fase 2: cómo el estado de la Task vinculada acompaña al del entregable. Una
@@ -50,7 +54,12 @@ class WorkspaceService:
     async def list_my_teams(self, current_user) -> list[MyTeamResponse]:
         teams = await self._repo.list_member_teams(current_user.id)
         return [
-            MyTeamResponse(id=t.id, name=t.name, description=t.description)
+            MyTeamResponse(
+                id=t.id,
+                name=t.name,
+                description=t.description,
+                project_id=t.project_id,
+            )
             for t in teams
         ]
 
@@ -200,7 +209,9 @@ class WorkspaceService:
                 await self._sync_task_status(
                     deliverable, _TASK_STATUS_ON_APPROVE, current_user
                 )
-            elif data.type == CommentType.SOLICITUD_CAMBIO:
+            elif data.type in (CommentType.SOLICITUD_CAMBIO, CommentType.RECHAZO):
+                # Ambos devuelven la tarea al integrante; el motivo del rechazo
+                # viaja al historial (los jefes leen el porque en Trazabilidad).
                 await self._sync_task_status(
                     deliverable,
                     _TASK_STATUS_ON_REJECT,
@@ -210,6 +221,44 @@ class WorkspaceService:
 
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
+        )
+
+    # ── Preferencias de aviso (propias, dentro de este equipo) ───────────────
+    async def get_notifications(
+        self, team_id: UUID, current_user
+    ) -> TeamNotificationSettingsResponse:
+        """Sin fila guardada devuelve los valores por defecto (todo activado)."""
+        if not (await self._access(team_id, current_user)).can_view:
+            raise ForbiddenError("No tienes acceso al espacio de este equipo")
+        row = await self._repo.get_notification_setting(team_id, current_user.id)
+        if row is None:
+            return TeamNotificationSettingsResponse()
+        return TeamNotificationSettingsResponse(
+            nueva_tarea_asignada=row.nueva_tarea_asignada,
+            entregable_rechazado=row.entregable_rechazado,
+            comentario_nuevo=row.comentario_nuevo,
+            entregable_aprobado=row.entregable_aprobado,
+        )
+
+    async def update_notifications(
+        self, team_id: UUID, data: UpdateTeamNotificationSettingsRequest, current_user
+    ) -> TeamNotificationSettingsResponse:
+        """Solo un integrante ajusta SUS avisos; el admin observador no tiene."""
+        if not (await self._access(team_id, current_user)).is_member:
+            raise ForbiddenError("Solo los integrantes del equipo ajustan sus avisos")
+        row = await self._repo.get_notification_setting(team_id, current_user.id)
+        if row is None:
+            row = TeamNotificationSetting(team_id=team_id, user_id=current_user.id)
+        row.nueva_tarea_asignada = data.nueva_tarea_asignada
+        row.entregable_rechazado = data.entregable_rechazado
+        row.comentario_nuevo = data.comentario_nuevo
+        row.entregable_aprobado = data.entregable_aprobado
+        saved = await self._repo.save_notification_setting(row)
+        return TeamNotificationSettingsResponse(
+            nueva_tarea_asignada=saved.nueva_tarea_asignada,
+            entregable_rechazado=saved.entregable_rechazado,
+            comentario_nuevo=saved.comentario_nuevo,
+            entregable_aprobado=saved.entregable_aprobado,
         )
 
     # ── Sincronía Deliverable → Task (Fase 2) ────────────────────────────────

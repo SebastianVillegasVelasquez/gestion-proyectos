@@ -123,3 +123,24 @@ class MyTeamResponse(BaseModelConfig):
     id: UUID
     name: str
     description: Optional[str] = None
+    # El equipo vive dentro de un proyecto y su gestion (renombrar, cambiar
+    # roles, archivar) cuelga de /projects/{project_id}/teams/... Exponer el
+    # project_id evita que la Configuracion del Grupo tenga que adivinarlo.
+    project_id: UUID
+
+
+class TeamNotificationSettingsResponse(BaseModelConfig):
+    """Preferencias de aviso del usuario actual en este equipo.
+
+    Sin fila guardada, el servidor responde todo en `True`: el usuario nuevo
+    recibe avisos por defecto y solo persistimos cuando decide cambiarlos.
+    """
+
+    nueva_tarea_asignada: bool = True
+    entregable_rechazado: bool = True
+    comentario_nuevo: bool = True
+    entregable_aprobado: bool = True
+
+
+class UpdateTeamNotificationSettingsRequest(TeamNotificationSettingsResponse):
+    """PUT completo: el formulario envia siempre los cuatro interruptores."""

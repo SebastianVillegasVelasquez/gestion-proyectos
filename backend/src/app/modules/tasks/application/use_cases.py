@@ -19,6 +19,7 @@ from app.modules.tasks.infrastructure.models import (
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.project.structure.domain.services import WorkTreeService
 from app.modules.tasks.presentation.schemas import (
+    BlockingTaskResponse,
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
     CommentResponse,
@@ -471,6 +472,19 @@ class GetTasksByTeamUseCase:
 
     async def execute(self, team_id: UUID) -> list[TeamTaskItemResponse]:
         rows = await self.task_repo.get_by_team(team_id)
+
+        # Dos consultas en total (tareas + dependencias), no una por tarea:
+        # agrupamos las bloqueantes por task_id antes de armar la respuesta.
+        blocking: dict[UUID, list[BlockingTaskResponse]] = {}
+        for dep in await self.task_repo.get_dependencies_by_team(team_id):
+            blocking.setdefault(dep.task_id, []).append(
+                BlockingTaskResponse(
+                    id=dep.depends_on.id,
+                    title=dep.depends_on.title,
+                    status=dep.depends_on.status or TaskStatus.PENDIENTE_POR_INICIAR,
+                )
+            )
+
         return [
             TeamTaskItemResponse(
                 id=task.id,
@@ -486,6 +500,7 @@ class GetTasksByTeamUseCase:
                 parent_task_id=task.parent_task_id,
                 start_date=task.start_date,
                 due_date=task.due_date,
+                blocked_by=blocking.get(task.id, []),
             )
             for task, work_item_name, project_id, project_name, assignee_name in rows
         ]

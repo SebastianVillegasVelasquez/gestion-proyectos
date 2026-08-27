@@ -222,6 +222,18 @@ class UpdateTaskRequest(BaseModelConfig):
         return self
 
 
+class BlockingTaskResponse(BaseModelConfig):
+    """Tarea bloqueante (dependencia FtS) resumida para pintar el indicador.
+
+    Solo id, título y estado: el workspace muestra "Bloqueada por: <título>" y
+    atenúa el aviso cuando la bloqueante ya está completada.
+    """
+
+    id: UUID
+    title: str
+    status: TaskStatus
+
+
 class TeamTaskItemResponse(BaseModelConfig):
     """Tarea delegada a un equipo, con su módulo y responsable para el workspace.
 
@@ -242,6 +254,9 @@ class TeamTaskItemResponse(BaseModelConfig):
     parent_task_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
+    # Dependencias finish-to-start ya resueltas a título: la vista de equipo
+    # necesita mostrar el bloqueo sin pedir /tasks/{id}/dependencies por fila.
+    blocked_by: list[BlockingTaskResponse] = []
 
 
 ###############

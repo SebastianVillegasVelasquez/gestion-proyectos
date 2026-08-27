@@ -14,6 +14,7 @@ from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
     DeliverableVersion,
+    TeamNotificationSetting,
 )
 
 
@@ -90,6 +91,22 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
 
     async def add_comment(self, comment: DeliverableComment) -> DeliverableComment:
         return await self._persist(comment)
+
+    # ── Preferencias de aviso ────────────────────────────────────────────────
+    async def get_notification_setting(
+        self, team_id: UUID, user_id: UUID
+    ) -> TeamNotificationSetting | None:
+        return await self._session.scalar(
+            select(TeamNotificationSetting).where(
+                TeamNotificationSetting.team_id == team_id,
+                TeamNotificationSetting.user_id == user_id,
+            )
+        )
+
+    async def save_notification_setting(
+        self, setting: TeamNotificationSetting
+    ) -> TeamNotificationSetting:
+        return await self._persist(setting)
 
     # ── Puerto hacia Task (Fase 2) ───────────────────────────────────────────
     async def get_task(self, task_id: UUID) -> Task | None:

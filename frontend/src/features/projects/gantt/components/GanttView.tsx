@@ -170,14 +170,27 @@ function KpiCard({
   );
 }
 
+/**
+ * Modo incrustado: el mismo cronograma dentro de otra pantalla (hoy, el espacio
+ * de trabajo de un equipo). Fija el filtro de equipo y oculta la cabecera de
+ * página, porque ahí ya hay una: lo que se reutiliza es el cronograma, no el
+ * marco del proyecto.
+ */
+export interface GanttEmbed {
+  /** Equipo al que se recorta el cronograma. El filtro queda bloqueado. */
+  teamId: string;
+}
+
 export function GanttView({
   project,
   dark,
   onToggleDark,
+  embed,
 }: {
   project: Project;
   dark: boolean;
   onToggleDark: () => void;
+  embed?: GanttEmbed;
 }) {
   const navigate = useNavigate();
   const treeQuery = useWorkTree(project.id);
@@ -221,7 +234,14 @@ export function GanttView({
 
   // El colapso/expansión del cronograma se recuerda entre visitas (por proyecto):
   // si dejas todo colapsado, así lo encuentras la próxima vez.
-  const collapsedStorageKey = `gantt-collapsed:${project.id}`;
+  //
+  // Incrustado usa SU PROPIA clave: el equipo entra a su cronograma para ver
+  // sus tareas, y heredar el árbol colapsado del cronograma del proyecto se lo
+  // enseñaría vacío. Son dos lecturas distintas del mismo dato, cada una con
+  // su preferencia.
+  const collapsedStorageKey = embed
+    ? `gantt-collapsed:${project.id}:team:${embed.teamId}`
+    : `gantt-collapsed:${project.id}`;
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(collapsedStorageKey);
@@ -274,9 +294,12 @@ export function GanttView({
     return map;
   }, [membersQuery.data]);
 
+  // Incrustado, el equipo NO es un filtro que el usuario pueda soltar: es el
+  // recorte que define la vista. Por eso gana al estado local.
+  const effectiveTeamId = embed ? embed.teamId : teamId;
   const filters: GanttFilters = useMemo(
-    () => ({ statuses, assigneeId, teamId, position, onlyAtRisk }),
-    [statuses, assigneeId, teamId, position, onlyAtRisk],
+    () => ({ statuses, assigneeId, teamId: effectiveTeamId, position, onlyAtRisk }),
+    [statuses, assigneeId, effectiveTeamId, position, onlyAtRisk],
   );
   const tasks = useMemo(
     () => filterGanttTasks(datedTasks, filters, TODAY, positionByUser),
@@ -307,9 +330,11 @@ export function GanttView({
         tasksByItem,
         isCollapsed: (id) => collapsedNodes.has(id),
         showTasks,
+        // Incrustado: solo las ramas donde el equipo tiene trabajo.
+        onlyWithTasks: embed !== undefined,
         activeTypeIds,
       }),
-    [tree, tasksByItem, collapsedNodes, showTasks, activeTypeIds],
+    [tree, tasksByItem, collapsedNodes, showTasks, activeTypeIds, embed],
   );
 
   const nodeCount = useMemo(() => rows.filter((r) => r.kind === "node").length, [rows]);
@@ -699,7 +724,7 @@ export function GanttView({
   const hasActiveFilters =
     statuses.size !== LEGEND_STATUSES.length ||
     assigneeId != null ||
-    teamId != null ||
+    (teamId != null && !embed) ||
     position != null ||
     onlyAtRisk ||
     activeTypeIds.size > 0;
@@ -724,48 +749,55 @@ export function GanttView({
     "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => void navigate(`/projects/${project.id}`)}
-            className="mb-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← {project.name}
-          </button>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
-          </h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Atajo a la Estructura: es el viaje de ida y vuelta natural
+    <div
+      className={cn(
+        "flex flex-col gap-4",
+        embed ? "h-full overflow-y-auto p-3 sm:p-4" : "p-4 sm:p-5 lg:h-full lg:overflow-y-auto",
+      )}
+    >
+      {!embed && (
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={() => void navigate(`/projects/${project.id}`)}
+              className="mb-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              ← {project.name}
+            </button>
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
+            </h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Atajo a la Estructura: es el viaje de ida y vuelta natural
               (allí ya existe el botón "Cronograma"), y las fechas se editan
               desde ese lado. */}
-          <button
-            type="button"
-            onClick={() => void navigate(`/projects/${project.id}/estructura`)}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent"
-          >
-            <FolderTree className="size-4 text-brand-teal" /> Estructura
-          </button>
-          <button
-            type="button"
-            onClick={() => void navigate(`/projects/${project.id}/tareas`)}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
-          >
-            <Plus className="size-4" /> Tarea
-          </button>
-          <button
-            type="button"
-            onClick={onToggleDark}
-            aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              onClick={() => void navigate(`/projects/${project.id}/estructura`)}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+            >
+              <FolderTree className="size-4 text-brand-teal" /> Estructura
+            </button>
+            <button
+              type="button"
+              onClick={() => void navigate(`/projects/${project.id}/tareas`)}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
+            >
+              <Plus className="size-4" /> Tarea
+            </button>
+            <button
+              type="button"
+              onClick={onToggleDark}
+              aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
+          </div>
+        </header>
+      )}
 
       {moveError && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
@@ -912,8 +944,9 @@ export function GanttView({
             ))}
           </select>
 
-          {/* Equipo delegado */}
-          {(teamsQuery.data?.items ?? []).length > 0 && (
+          {/* Equipo delegado. Incrustado no se ofrece: el equipo ya es el
+              recorte de la pantalla y poder cambiarlo confundiría. */}
+          {!embed && (teamsQuery.data?.items ?? []).length > 0 && (
             <select
               className={inputCls}
               value={teamId ?? ""}

@@ -70,6 +70,62 @@ class TestTeamTasks:
         assert item["work_item_name"] == "Módulo 1"
         assert item["project_name"] == valid_project_payload["name"]
         assert item["assignee_id"] is None  # aún sin responsable
+        # NULL, no " ": concat() de Postgres devolvería un espacio con el LEFT
+        # JOIN vacío, y la UI lo pintaría como un nombre en blanco.
+        assert item["assignee_name"] is None
+        assert item["blocked_by"] == []  # sin dependencias todavía
+
+    async def test_team_tasks_carry_their_blocking_dependencies(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """El workspace pinta "Bloqueada por: X" sin pedir las dependencias por fila."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        async def _task(title: str) -> str:
+            res = await client.post(
+                "/api/v1/tasks",
+                headers=admin_headers,
+                json={
+                    "title": title,
+                    "work_item_id": modulo["id"],
+                    "team_id": team_id,
+                    "start_date": _day(0),
+                    "duration_days": 5,
+                },
+            )
+            assert res.status_code == 201, res.text
+            return res.json()["id"]
+
+        guion_id = await _task("Guion del Módulo 1")
+        banner_id = await _task("Banner del Módulo 1")
+
+        # El banner no puede empezar hasta que el guion esté listo (fin-inicio).
+        dep = await client.post(
+            f"/api/v1/tasks/{banner_id}/dependencies",
+            headers=admin_headers,
+            json={"depends_on_id": guion_id},
+        )
+        assert dep.status_code in (200, 201), dep.text
+
+        items = (
+            await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        ).json()
+        by_id = {i["id"]: i for i in items}
+
+        assert by_id[banner_id]["blocked_by"] == [
+            {
+                "id": guion_id,
+                "title": "Guion del Módulo 1",
+                "status": "pendiente_por_iniciar",
+            }
+        ]
+        # La bloqueante no se ve bloqueada a sí misma.
+        assert by_id[guion_id]["blocked_by"] == []
 
     async def test_task_without_team_is_not_listed(
         self, client, admin_headers, valid_project_payload

@@ -12,6 +12,10 @@ export interface ApiMyTeam {
   id: string;
   name: string;
   description: string | null;
+  // El equipo vive dentro de un proyecto: la Configuración del Grupo reutiliza
+  // los endpoints /projects/{project_id}/teams/... para renombrar, cambiar
+  // roles y archivar, en vez de duplicar esas rutas en el workspace.
+  project_id: string;
 }
 
 export interface ApiTeamMember {
@@ -86,8 +90,9 @@ export interface ApiTeamTask {
   title: string;
   status: ProjectTaskStatus;
   priority: string;
-  work_item_id: string;
-  work_item_name: string;
+  // Nullable: una tarea puede crearse suelta y colgarse del arbol mas tarde.
+  work_item_id: string | null;
+  work_item_name: string | null;
   project_id: string;
   project_name: string;
   assignee_id: string | null;
@@ -96,6 +101,24 @@ export interface ApiTeamTask {
   // Fechas opcionales: una tarea delegada puede estar aún sin planificar.
   start_date: string | null;
   due_date: string | null;
+  // Dependencias finish-to-start ya resueltas a título por el backend: la vista
+  // pinta "Bloqueada por: …" sin una llamada por fila.
+  blocked_by: ApiBlockingTask[];
+}
+
+/** Tarea bloqueante (dependencia FtS), resumida para el indicador de bloqueo. */
+export interface ApiBlockingTask {
+  id: string;
+  title: string;
+  status: ProjectTaskStatus;
+}
+
+/** Interruptores de aviso del usuario actual DENTRO de un equipo concreto. */
+export interface ApiTeamNotificationSettings {
+  nueva_tarea_asignada: boolean;
+  entregable_rechazado: boolean;
+  comentario_nuevo: boolean;
+  entregable_aprobado: boolean;
 }
 
 export interface NewVersionBody {
@@ -137,5 +160,17 @@ export const workspaceApi = {
   addComment: (teamId: string, deliverableId: string, body: NewCommentBody) =>
     http
       .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/comments`, body)
+      .then((r) => r.data),
+
+  notifications: (teamId: string) =>
+    http
+      .get<ApiTeamNotificationSettings>(`${base(teamId)}/workspace/notifications`)
+      .then((r) => r.data),
+
+  // PUT y no PATCH: el formulario manda siempre los cuatro interruptores, así
+  // que el recurso se reemplaza completo (idempotente).
+  updateNotifications: (teamId: string, body: ApiTeamNotificationSettings) =>
+    http
+      .put<ApiTeamNotificationSettings>(`${base(teamId)}/workspace/notifications`, body)
       .then((r) => r.data),
 };

@@ -214,3 +214,46 @@ describe("collectPlanSpans", () => {
     ]);
   });
 });
+
+describe("buildGanttRows · onlyWithTasks (cronograma recortado a un equipo)", () => {
+  // Estructura: raíz → [conTareas (1 tarea), sinTareas (0 tareas, con fechas)]
+  const conTareas = node({
+    id: "conTareas",
+    fecha_inicio_plan: "2026-01-01",
+    fecha_fin_plan: "2026-01-31",
+  });
+  const sinTareas = node({
+    id: "sinTareas",
+    fecha_inicio_plan: "2026-02-01",
+    fecha_fin_plan: "2026-02-28",
+  });
+  const raiz = node({
+    id: "raiz",
+    fecha_inicio_plan: "2026-01-01",
+    fecha_fin_plan: "2026-02-28",
+    children: [conTareas, sinTareas],
+  });
+  const tasksByItem = groupTasks([task({ id: "t1", work_item_id: "conTareas" })]);
+
+  const ids = (rows: GanttRow[]) => rows.map((r) => r.id);
+
+  it("sin la bandera muestra toda la estructura (cronograma del proyecto)", () => {
+    const rows = build({ tree: [raiz], tasksByItem });
+    expect(ids(rows)).toContain("sinTareas");
+  });
+
+  it("con la bandera poda las ramas sin ninguna tarea del equipo", () => {
+    const rows = build({ tree: [raiz], tasksByItem, onlyWithTasks: true });
+    expect(ids(rows)).not.toContain("sinTareas");
+  });
+
+  it("conserva los ancestros de un nodo con tareas, para no perder el contexto", () => {
+    const rows = build({ tree: [raiz], tasksByItem, onlyWithTasks: true });
+    expect(ids(rows)).toEqual(["raiz", "conTareas", "t1"]);
+  });
+
+  it("si el equipo no tiene ninguna tarea, no queda estructura que mostrar", () => {
+    const rows = build({ tree: [raiz], tasksByItem: new Map(), onlyWithTasks: true });
+    expect(rows).toEqual([]);
+  });
+});

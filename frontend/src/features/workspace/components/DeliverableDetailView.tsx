@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { Clock, ExternalLink, Plus } from "lucide-react";
+import { Clock, ExternalLink, Link2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Deliverable, DeliverableVersion, ResourceType, WorkspaceMember } from "../types";
+import type {
+  CommentType,
+  Deliverable,
+  DeliverableVersion,
+  ResourceType,
+  WorkspaceMember,
+} from "../types";
+import { ReviewActions } from "./ReviewActions";
 import { DELIVERABLE_STATUS_LABELS, DELIVERABLE_STATUS_BADGE } from "../types";
 import {
   RESOURCE_META,
@@ -276,7 +283,12 @@ interface DeliverableDetailViewProps {
   currentUserId: string;
   /** Solo el asignado (o quien entrega) registra entregas; el revisor no. */
   canDeliver?: boolean;
+  /** Líder o supervisor del equipo: solo ellos aprueban/devuelven/rechazan. */
+  canReview?: boolean;
+  /** Hay una decisión de revisión en vuelo (deshabilita el botón). */
+  reviewPending?: boolean;
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  onReview: (type: CommentType, reason: string) => void;
 }
 
 export function DeliverableDetailView({
@@ -284,7 +296,10 @@ export function DeliverableDetailView({
   members,
   currentUserId,
   canDeliver = true,
+  canReview = false,
+  reviewPending = false,
   onAddVersion,
+  onReview,
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
 
@@ -299,6 +314,14 @@ export function DeliverableDetailView({
           <h2 className="mt-0.5 text-base font-bold text-slate-800 dark:text-slate-100">
             {deliverable.taskTitle}
           </h2>
+          {deliverable.taskId && (
+            <span
+              title="Este entregable mueve el estado de una tarea real del proyecto"
+              className="mt-1 inline-flex items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[10px] font-medium text-brand-teal-dark dark:text-brand-teal"
+            >
+              <Link2 className="size-2.5" /> Tarea vinculada
+            </span>
+          )}
           {assignee && (
             <div className="mt-1.5 flex items-center gap-1.5">
               <span
@@ -325,17 +348,32 @@ export function DeliverableDetailView({
         </span>
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+      {/* Cuerpo con scroll: la historia del entregable (qué se entregó y qué
+          decidió el revisor). Crece hacia abajo con cada versión. */}
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
         <DeliveryTimeline versions={deliverable.versions} members={members} />
-        {canDeliver && (
+
+        <ReviewActions
+          deliverable={deliverable}
+          canReview={canReview}
+          pending={reviewPending}
+          onDecide={onReview}
+        />
+      </div>
+
+      {/* Registrar entrega anclado abajo, como el compositor del hilo de
+          comentarios: es la acción del panel, no un paso más de la historia.
+          Antes vivía dentro del scroll y, con pocas versiones, dejaba un hueco
+          en blanco debajo. */}
+      {canDeliver && (
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
           <RegisterDelivery
             onAddVersion={onAddVersion}
             currentVersion={deliverable.versions.length}
             uploadedBy={currentUserId}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

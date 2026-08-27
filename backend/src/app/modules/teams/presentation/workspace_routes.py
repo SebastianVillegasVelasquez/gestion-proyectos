@@ -12,6 +12,8 @@ from app.modules.teams.presentation.workspace_schemas import (
     CreateDeliverableRequest,
     DeliverableResponse,
     MyTeamResponse,
+    TeamNotificationSettingsResponse,
+    UpdateTeamNotificationSettingsRequest,
     WorkspaceAccessResponse,
 )
 
@@ -114,4 +116,34 @@ async def add_comment(
 ):
     return await WorkspaceService(repo).add_comment(
         team_id, deliverable_id, data, current_user
+    )
+
+
+# ── Preferencias de aviso del usuario actual en este equipo ──────────────────
+
+
+@router.get(
+    "/{team_id}/workspace/notifications",
+    response_model=TeamNotificationSettingsResponse,
+)
+async def get_notification_settings(
+    team_id: UUID,
+    repo=Depends(workspace_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await WorkspaceService(repo).get_notifications(team_id, current_user)
+
+
+@router.put(
+    "/{team_id}/workspace/notifications",
+    response_model=TeamNotificationSettingsResponse,
+)
+async def update_notification_settings(
+    team_id: UUID,
+    data: UpdateTeamNotificationSettingsRequest,
+    repo=Depends(workspace_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await WorkspaceService(repo).update_notifications(
+        team_id, data, current_user
     )

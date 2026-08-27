@@ -51,6 +51,7 @@ exclude = '(^|/)(alembic|tests)/'
 [tool.ruff.lint.per-file-ignores]
 # pytest re-exports fixtures via import; test method parameters shadow them (expected)
 "tests/integration/teams/test_workspace_task_link.py" = ["F811"]
+"tests/integration/teams/test_workspace_review_and_notifications.py" = ["F811"]
 
 [build-system]
 requires = ["poetry-core"]
