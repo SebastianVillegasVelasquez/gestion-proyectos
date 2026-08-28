@@ -1,5 +1,4 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
 import type { LoginRequest } from "@/features/auth/types";
 import { type FieldName, validateField } from "@/features/auth/utils/security.utils.ts";
 import { useLogin } from "@/features/auth/hooks/use-auth";
@@ -24,11 +23,8 @@ export default function LoginPage() {
 
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
-  const location = useLocation();
-  const fromState = location.state as { from?: { pathname?: string } } | null;
-  const redirectTo = fromState?.from?.pathname ?? "/dashboard";
-
-  const loginMutation = useLogin(redirectTo);
+  // Al entrar siempre se aterriza en el dashboard, no en la última ruta pedida.
+  const loginMutation = useLogin("/dashboard");
 
   const formError = loginMutation.error
     ? getErrorMessage(loginMutation.error, "Ocurrió un error, intenta de nuevo.")

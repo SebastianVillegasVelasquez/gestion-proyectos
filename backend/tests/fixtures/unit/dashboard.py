@@ -7,6 +7,7 @@ from app.modules.dashboard.infrastructure.repository import (
     DashboardPanels,
     DashboardRepository,
     DashboardSummary,
+    ProjectOverviewItem,
     ProjectProgressDetail,
     ProjectSchedule,
 )
@@ -20,12 +21,14 @@ class FakeDashboardRepository(DashboardRepository):
         project_progress: ProjectProgressDetail | None = None,
         project_schedule: ProjectSchedule | None = None,
         activity: list[ActivityRow] | None = None,
+        my_projects: list[ProjectOverviewItem] | None = None,
     ) -> None:
         self._summary = summary
         self._panels = panels or DashboardPanels()
         self._project_progress = project_progress
         self._project_schedule = project_schedule
         self._activity = activity or []
+        self._my_projects = my_projects or []
 
     async def get_summary(self) -> DashboardSummary:
         return self._summary
@@ -57,6 +60,11 @@ class FakeDashboardRepository(DashboardRepository):
         self, user_id: uuid.UUID, project_id: uuid.UUID
     ) -> ProjectProgressDetail | None:
         return self._project_progress
+
+    async def list_projects_for_user(
+        self, user_id: uuid.UUID
+    ) -> list[ProjectOverviewItem]:
+        return self._my_projects
 
     async def get_project_progress_by_token(
         self, token: str

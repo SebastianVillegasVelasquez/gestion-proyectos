@@ -19,7 +19,7 @@ from app.modules.project.infrastructure.models import (
 from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
-from app.modules.teams.infrastructure.models import TeamMember
+from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.shared.base_repository import BaseRepository
 
 
@@ -113,6 +113,31 @@ class ProjectRepository(BaseRepository[Project]):
 
         weights = compute_task_weights(nodes, tasks)
         return aggregate_progress_by_user(tasks, weights, team_member_ids)
+
+    async def get_member_teams(
+        self, project_id: UUID
+    ) -> dict[UUID, list[tuple[UUID, str]]]:
+        """{user_id: [(team_id, nombre) de equipos de ESTE proyecto]}.
+
+        Una sola query (team_members ⋈ teams). Un integrante puede estar en
+        varios equipos; se devuelven ordenados alfabéticamente por nombre para
+        que la UI los pinte de forma estable.
+        """
+        rows = (
+            await self._session.execute(
+                select(TeamMember.user_id, Team.id, Team.name)
+                .join(Team, Team.id == TeamMember.team_id)
+                .where(
+                    Team.project_id == project_id,
+                    Team.deleted_at.is_(None),
+                )
+                .order_by(Team.name)
+            )
+        ).all()
+        result: dict[UUID, list[tuple[UUID, str]]] = {}
+        for user_id, team_id, name in rows:
+            result.setdefault(user_id, []).append((team_id, name))
+        return result
 
     # ── Notas del proyecto ───────────────────────────────────────────────────
     async def add_note(self, note: ProjectNote) -> ProjectNote:

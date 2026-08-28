@@ -21,6 +21,16 @@ export function useTeams(projectId: string, params: TeamSearchParams = {}) {
   });
 }
 
+/** Equipos del proyecto a los que pertenece el usuario autenticado (rol User). */
+export function useMyTeams(projectId: string | undefined) {
+  return useQuery({
+    queryKey: teamKeys.mine(projectId ?? ""),
+    queryFn: () => teamsApi.mine(projectId!),
+    enabled: Boolean(projectId),
+    staleTime: 30_000,
+  });
+}
+
 /** Detalle de un equipo concreto. */
 export function useTeam(projectId: string, teamId: string | undefined) {
   return useQuery({

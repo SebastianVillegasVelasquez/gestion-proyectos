@@ -47,12 +47,40 @@ export function rangeOfTasks(tasks: Task[]): DateRange {
   return { start, due };
 }
 
+/** `YYYY-MM-DD` → día entero (UTC). Restar dos da la diferencia en días. */
+const dayNum = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / 86_400_000);
+
+/** Días que faltan para la entrega (negativo si ya venció); `null` si no hay fecha. */
+export function daysUntilDue(
+  dueDate: string | null,
+  today = new Date().toISOString().slice(0, 10),
+): number | null {
+  return dueDate ? dayNum(dueDate) - dayNum(today) : null;
+}
+
+export type TaskRisk = "vencida" | "por_vencer" | null;
+
+/**
+ * Riesgo de calendario de una tarea: `vencida` si su fecha de fin ya pasó,
+ * `por_vencer` si entrega dentro de `soonDays` días, `null` si va con holgura,
+ * ya está cerrada o aún no tiene fecha. Fuente única del criterio "en riesgo"
+ * que comparten el tablero del equipo, la vista de estructura y el cronograma.
+ */
+export function taskRisk(
+  task: Pick<Task, "status" | "due_date">,
+  today = new Date().toISOString().slice(0, 10),
+  soonDays = 3,
+): TaskRisk {
+  if (!task.due_date || task.status === "completada" || task.status === "cancelada") {
+    return null;
+  }
+  if (task.due_date < today) {
+    return "vencida";
+  }
+  return dayNum(task.due_date) - dayNum(today) <= soonDays ? "por_vencer" : null;
+}
+
 /** ¿Sigue abierta pasada su fecha de fin? (mismo criterio en toda la app). */
 export function isOverdue(task: Task, today = new Date().toISOString().slice(0, 10)): boolean {
-  return (
-    task.due_date != null &&
-    task.due_date < today &&
-    task.status !== "completada" &&
-    task.status !== "cancelada"
-  );
+  return taskRisk(task, today) === "vencida";
 }

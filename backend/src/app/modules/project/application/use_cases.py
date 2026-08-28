@@ -239,10 +239,12 @@ class GetProjectMemberProgressUseCase:
 
         members = await self.member_repo.get_all_members_by_project_id(project_id)
         progress_by_user = await self.project_repo.get_member_progress(project_id)
+        teams_by_user = await self.project_repo.get_member_teams(project_id)
 
         result: List[ProjectMemberProgressResponse] = []
         for member in members:
             progress = progress_by_user.get(member.user_id)
+            member_teams = teams_by_user.get(member.user_id, [])
             result.append(
                 ProjectMemberProgressResponse(
                     id=member.id,
@@ -255,6 +257,8 @@ class GetProjectMemberProgressUseCase:
                     tasks_total=progress.tasks_total if progress else 0,
                     tasks_completed=progress.tasks_completed if progress else 0,
                     progress_pct=progress.progress_pct if progress else 0,
+                    team_names=[name for _, name in member_teams],
+                    team_ids=[team_id for team_id, _ in member_teams],
                 )
             )
         return result

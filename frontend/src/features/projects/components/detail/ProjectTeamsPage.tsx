@@ -1,15 +1,24 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, Pencil, Plus, Search, Trash2, Users, UsersRound } from "lucide-react";
+import {
+  ChevronLeft,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  Users,
+  UsersRound,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useDeleteTeam, useTeams } from "../../hooks/use-teams";
+import { useDeleteTeam, useTeamMembers, useTeams } from "../../hooks/use-teams";
 import { filterTeams } from "../../utils/filter-teams";
 import { colorForName } from "../../utils/entity-color";
 import type { Team } from "../../types/api.types";
+import { AddTeamMemberModal } from "../teams/AddTeamMemberModal";
 import { TeamFormModal } from "../teams/TeamFormModal";
-import { TeamMembersManager } from "../teams/TeamMembersManager";
 import { TeamWorkPanel } from "../teams/TeamWorkPanel";
 
 // El avance de un equipo se calcula igual que el avance individual: tareas
@@ -76,6 +85,7 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
   const [editing, setEditing] = useState<Team | null>(null);
   const [deleting, setDeleting] = useState<Team | null>(null);
 
@@ -83,6 +93,11 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
   const filtered = useMemo(() => filterTeams(teams, search), [teams, search]);
 
   const open = useMemo(() => teams.find((t) => t.id === openId) ?? null, [teams, openId]);
+  const openMembersQuery = useTeamMembers(projectId, open?.id);
+  const existingMemberIds = useMemo(
+    () => (openMembersQuery.data ?? []).map((m) => m.user_id),
+    [openMembersQuery.data],
+  );
 
   const handleDelete = () => {
     if (!deleting) {
@@ -147,6 +162,15 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  setShowAddMember(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
+              >
+                <UserPlus className="size-3.5" /> Agregar integrante
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setEditing(open);
                 }}
                 className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
@@ -171,11 +195,18 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
           <div className="mt-5 border-t border-border pt-5">
             <TeamWorkPanel projectId={projectId} team={open} />
           </div>
-
-          <div className="mt-5 border-t border-border pt-5">
-            <TeamMembersManager projectId={projectId} teamId={open.id} />
-          </div>
         </div>
+
+        {showAddMember && (
+          <AddTeamMemberModal
+            projectId={projectId}
+            teamId={open.id}
+            existingIds={existingMemberIds}
+            onClose={() => {
+              setShowAddMember(false);
+            }}
+          />
+        )}
 
         {editing && (
           <TeamFormModal

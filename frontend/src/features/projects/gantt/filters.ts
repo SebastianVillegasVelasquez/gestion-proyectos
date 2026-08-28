@@ -1,5 +1,5 @@
 import type { Task, TaskStatus, UserPosition } from "../types/api.types";
-import { isOverdue } from "./metrics";
+import { taskRisk } from "../utils/task-dates";
 
 export interface GanttFilters {
   /** Estados activos: una tarea se muestra si su estado está en el conjunto. */
@@ -10,7 +10,7 @@ export interface GanttFilters {
   teamId: string | null;
   /** Cargo/responsabilidad a filtrar (null = todos). Requiere `positionByUser`. */
   position: UserPosition | null;
-  /** Mostrar solo tareas en riesgo (vencidas y abiertas). */
+  /** Mostrar solo tareas en riesgo (abiertas, vencidas o por vencer). */
   onlyAtRisk: boolean;
 }
 
@@ -45,7 +45,7 @@ export function filterGanttTasks<
         return false;
       }
     }
-    if (filters.onlyAtRisk && !isOverdue(task, today)) {
+    if (filters.onlyAtRisk && taskRisk(task, today) === null) {
       return false;
     }
     return true;

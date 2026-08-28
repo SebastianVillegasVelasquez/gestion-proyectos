@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useOutletContext } from "react-router";
+import { useOutletContext, useSearchParams } from "react-router";
 import { ListTodo, Package, Settings, Users2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
@@ -194,11 +194,13 @@ function MemberWorkspace() {
   useOutletContext<AppOutletContext>();
   const { user } = useAuth();
   const currentUserId = user?.id ?? "";
+  // Al llegar desde "mis proyectos → equipos" el equipo viene en `?team=`.
+  const [searchParams] = useSearchParams();
 
   const teamsQuery = useMyTeams();
   const teams = teamsQuery.data ?? [];
 
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(searchParams.get("team"));
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tareas");
   const [showNew, setShowNew] = useState(false);
@@ -391,6 +393,7 @@ function MemberWorkspace() {
                 teamId={activeTeam.id}
                 projectId={activeTeam.project_id}
                 members={members}
+                teamMembers={membersQuery.data ?? []}
               />
             </div>
           )}

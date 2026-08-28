@@ -209,6 +209,33 @@ class GetMyProjectProgressUseCase:
         )
 
 
+class GetMyProjectsUseCase:
+    """Lista completa de proyectos donde el usuario autenticado es miembro.
+
+    Alimenta la pantalla "Mis proyectos" del rol User. Misma forma de item que
+    el panel de proyectos del dashboard, pero sin recorte por cantidad.
+    """
+
+    def __init__(self, repo: DashboardRepository) -> None:
+        self._repo = repo
+
+    async def execute(self, user_id: UUID) -> list[ProjectOverviewItemResponse]:
+        items = await self._repo.list_projects_for_user(user_id)
+        return [
+            ProjectOverviewItemResponse(
+                id=item.id,
+                name=item.name,
+                client_name=item.client_name,
+                coordinator=item.coordinator,
+                tasks_total=item.tasks_total,
+                tasks_completed=item.tasks_completed,
+                progress_pct=item.progress_pct,
+                status=item.status,
+            )
+            for item in items
+        ]
+
+
 class GetPublicProjectProgressUseCase:
     """Progreso público de un proyecto por token de cliente (sin autenticación)."""
 

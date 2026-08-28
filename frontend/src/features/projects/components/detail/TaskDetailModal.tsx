@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarRange,
   ClipboardList,
   Clock,
   FolderTree,
+  Pencil,
   Timer,
   User,
   UsersRound,
@@ -12,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TaskEditForm } from "../../gantt/components/TaskEditForm";
 import { useTeamMembers } from "../../hooks/use-teams";
 import {
   TASK_PRIORITY_COLORS,
@@ -25,7 +27,8 @@ import {
 import { colorForName } from "../../utils/entity-color";
 import { fullName, initialsOf, resolveAssignment } from "../../utils/task-assignment";
 import { formatDateRange, isOverdue } from "../../utils/task-dates";
-import type { ProjectMember, Task, Team } from "../../types/api.types";
+import { TaskAssigneeSelect } from "../teams/TaskAssigneeSelect";
+import type { ProjectMember, Task, Team, TeamMember } from "../../types/api.types";
 
 function Field({
   icon: Icon,
@@ -126,8 +129,10 @@ function TeamBlock({
  * Ficha de una tarea vista desde la estructura del proyecto: de qué elemento
  * cuelga, en qué fechas va y quién responde (la persona, el equipo, o ambos).
  *
- * Es de solo lectura a propósito: la edición vive en la vista de Tareas, y
- * duplicarla aquí obligaría a mantener dos formularios en sincronía.
+ * El botón «Editar» abre el mismo formulario que la vista de Tareas
+ * (`TaskEditForm`): reutilizarlo evita mantener dos formularios en sincronía y,
+ * como su mutación invalida las vistas de tareas, el cambio se refleja al
+ * instante en la lista de Tareas y en el Cronograma.
  */
 export function TaskDetailModal({
   projectId,
@@ -135,6 +140,7 @@ export function TaskDetailModal({
   containerName,
   memberById,
   teamById,
+  assignableMembers,
   onClose,
 }: {
   projectId: string;
@@ -143,12 +149,19 @@ export function TaskDetailModal({
   containerName: string | null;
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
+  /** Integrantes a los que el líder puede reasignar esta tarea. Si llega, se
+   * muestra el selector rápido de responsable (sin abrir el formulario de
+   * edición completo, que es de administración). */
+  assignableMembers?: TeamMember[];
   onClose: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const assignment = useMemo(
     () => resolveAssignment(task, memberById, teamById),
     [task, memberById, teamById],
   );
+  const members = useMemo(() => [...memberById.values()], [memberById]);
+  const teams = useMemo(() => [...teamById.values()], [teamById]);
   const { person, team } = assignment;
   const late = isOverdue(task);
   const logged = Number(task.logged_hours);
@@ -170,102 +183,146 @@ export function TaskDetailModal({
             </span>
             <h3 className="mt-1.5 text-base font-semibold text-foreground">{task.title}</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(true);
+                }}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
+              >
+                <Pencil className="size-3.5" /> Editar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-semibold",
-                TASK_STATUS_COLORS[task.status],
-              )}
-            >
-              {TASK_STATUS_LABELS[task.status]}
-            </span>
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-semibold",
-                TASK_PRIORITY_COLORS[task.priority],
-              )}
-            >
-              Prioridad {TASK_PRIORITY_LABELS[task.priority].toLowerCase()}
-            </span>
-            {late && (
-              <span className="flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
-                <AlertTriangle className="size-3" /> Fuera de plazo
-              </span>
-            )}
-          </div>
-
-          {task.description && (
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{task.description}</p>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field icon={CalendarRange} label="Lapso">
-              {formatDateRange(task.start_date, task.due_date)}
-            </Field>
-            <Field icon={FolderTree} label="Dentro de">
-              {containerName ?? (
-                <span className="italic text-muted-foreground">
-                  Sin elemento (tarea suelta del proyecto)
+          {editing ? (
+            <TaskEditForm
+              projectId={projectId}
+              task={task}
+              members={members}
+              teams={teams}
+              onDone={() => {
+                setEditing(false);
+              }}
+            />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-semibold",
+                    TASK_STATUS_COLORS[task.status],
+                  )}
+                >
+                  {TASK_STATUS_LABELS[task.status]}
                 </span>
-              )}
-            </Field>
-            <Field icon={Timer} label="Estimado">
-              {estimated != null ? (
-                `${estimated} h`
-              ) : (
-                <span className="text-muted-foreground">Sin estimar</span>
-              )}
-            </Field>
-            <Field icon={Clock} label="Dedicado">
-              {logged > 0 ? (
-                `${logged} h`
-              ) : (
-                <span className="text-muted-foreground">Sin apuntes</span>
-              )}
-            </Field>
-          </div>
-
-          <Field icon={User} label="Responsable">
-            {person ? (
-              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-teal/15 text-xs font-bold text-brand-teal-dark dark:text-brand-teal">
-                  {initialsOf(person)}
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-semibold",
+                    TASK_PRIORITY_COLORS[task.priority],
+                  )}
+                >
+                  Prioridad {TASK_PRIORITY_LABELS[task.priority].toLowerCase()}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-foreground">{fullName(person)}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {positionLabel(person.position)} · {person.email}
-                  </p>
-                </div>
+                {late && (
+                  <span className="flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                    <AlertTriangle className="size-3" /> Fuera de plazo
+                  </span>
+                )}
               </div>
-            ) : (
-              <p className="italic text-muted-foreground">
-                {team
-                  ? "Delegada al equipo, todavía sin responsable individual."
-                  : assignment.label}
-              </p>
-            )}
-          </Field>
 
-          {team && (
-            <Field icon={UsersRound} label="Equipo asignado">
-              <TeamBlock
-                projectId={projectId}
-                team={team}
-                highlightUserId={person?.user_id ?? null}
-              />
-            </Field>
+              {task.description && (
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                  {task.description}
+                </p>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field icon={CalendarRange} label="Lapso">
+                  {formatDateRange(task.start_date, task.due_date)}
+                </Field>
+                <Field icon={FolderTree} label="Dentro de">
+                  {containerName ?? (
+                    <span className="italic text-muted-foreground">
+                      Sin elemento (tarea suelta del proyecto)
+                    </span>
+                  )}
+                </Field>
+                <Field icon={Timer} label="Estimado">
+                  {estimated != null ? (
+                    `${estimated} h`
+                  ) : (
+                    <span className="text-muted-foreground">Sin estimar</span>
+                  )}
+                </Field>
+                <Field icon={Clock} label="Dedicado">
+                  {logged > 0 ? (
+                    `${logged} h`
+                  ) : (
+                    <span className="text-muted-foreground">Sin apuntes</span>
+                  )}
+                </Field>
+              </div>
+
+              <Field icon={User} label="Responsable">
+                {person ? (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-teal/15 text-xs font-bold text-brand-teal-dark dark:text-brand-teal">
+                      {initialsOf(person)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-foreground">
+                        {fullName(person)}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {positionLabel(person.position)} · {person.email}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="italic text-muted-foreground">
+                    {team
+                      ? "Delegada al equipo, todavía sin responsable individual."
+                      : assignment.label}
+                  </p>
+                )}
+                {assignableMembers && assignableMembers.length > 0 && (
+                  <div className="mt-2">
+                    <p className="mb-1 text-[11px] text-muted-foreground">
+                      Reasignar a un integrante del equipo:
+                    </p>
+                    <TaskAssigneeSelect
+                      projectId={projectId}
+                      taskId={task.id}
+                      currentAssigneeId={task.assignee_id}
+                      members={assignableMembers}
+                    />
+                  </div>
+                )}
+              </Field>
+
+              {team && (
+                <Field icon={UsersRound} label="Equipo asignado">
+                  <TeamBlock
+                    projectId={projectId}
+                    team={team}
+                    highlightUserId={person?.user_id ?? null}
+                  />
+                </Field>
+              )}
+            </>
           )}
         </div>
       </div>

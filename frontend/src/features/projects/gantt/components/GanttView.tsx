@@ -19,6 +19,7 @@ import {
   Spline,
   Tag,
   ListChecks,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,10 +82,12 @@ const ROW_H = 36;
 const INDENT = 14;
 
 // Configuración por nivel de zoom: px por día y unidad natural de las marcas.
+// px por día por nivel de zoom. Más ajustados que antes para que las marcas de
+// día/semana queden legibles y no separadas por huecos enormes.
 const ZOOM_CFG: Record<"mes" | "semana" | "dia", { px: number; unit: TickUnit; label: string }> = {
-  mes: { px: 6, unit: "month", label: "Mes" },
-  semana: { px: 16, unit: "week", label: "Semana" },
-  dia: { px: 36, unit: "day", label: "Día" },
+  mes: { px: 5, unit: "month", label: "Mes" },
+  semana: { px: 11, unit: "week", label: "Semana" },
+  dia: { px: 26, unit: "day", label: "Día" },
 };
 type Zoom = keyof typeof ZOOM_CFG;
 
@@ -178,18 +181,20 @@ function KpiCard({
  */
 export interface GanttEmbed {
   /** Equipo al que se recorta el cronograma. El filtro queda bloqueado. */
-  teamId: string;
+  teamId?: string;
+  /** Responsable al que se recorta (p. ej. el propio usuario en su espacio). */
+  assigneeId?: string;
 }
 
 export function GanttView({
   project,
-  dark,
-  onToggleDark,
+  dark = false,
+  onToggleDark = () => undefined,
   embed,
 }: {
   project: Project;
-  dark: boolean;
-  onToggleDark: () => void;
+  dark?: boolean;
+  onToggleDark?: () => void;
   embed?: GanttEmbed;
 }) {
   const navigate = useNavigate();
@@ -229,6 +234,10 @@ export function GanttView({
   const [activeTypeIds, setActiveTypeIds] = useState<Set<string>>(() => new Set());
   // Mostrar/ocultar las tareas como filas hijas bajo cada elemento.
   const [showTasks, setShowTasks] = useState(true);
+  // Mostrar/ocultar las subtareas (las que cuelgan de otra tarea, típicamente
+  // las que reparte un líder). Los cronogramas incrustados de equipo/persona
+  // las muestran siempre; solo la vista principal las puede plegar.
+  const [showSubtasks, setShowSubtasks] = useState(true);
   // Mostrar/ocultar las flechas de dependencia (pueden saturar en proyectos densos).
   const [showDeps, setShowDeps] = useState(true);
 
@@ -240,7 +249,7 @@ export function GanttView({
   // enseñaría vacío. Son dos lecturas distintas del mismo dato, cada una con
   // su preferencia.
   const collapsedStorageKey = embed
-    ? `gantt-collapsed:${project.id}:team:${embed.teamId}`
+    ? `gantt-collapsed:${project.id}:embed:${embed.teamId ?? ""}:${embed.assigneeId ?? ""}`
     : `gantt-collapsed:${project.id}`;
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(() => {
     try {
@@ -296,14 +305,24 @@ export function GanttView({
 
   // Incrustado, el equipo NO es un filtro que el usuario pueda soltar: es el
   // recorte que define la vista. Por eso gana al estado local.
-  const effectiveTeamId = embed ? embed.teamId : teamId;
+  const effectiveTeamId = embed ? (embed.teamId ?? null) : teamId;
+  const effectiveAssigneeId = embed?.assigneeId ?? assigneeId;
   const filters: GanttFilters = useMemo(
-    () => ({ statuses, assigneeId, teamId: effectiveTeamId, position, onlyAtRisk }),
-    [statuses, assigneeId, effectiveTeamId, position, onlyAtRisk],
+    () => ({
+      statuses,
+      assigneeId: effectiveAssigneeId,
+      teamId: effectiveTeamId,
+      position,
+      onlyAtRisk,
+    }),
+    [statuses, effectiveAssigneeId, effectiveTeamId, position, onlyAtRisk],
   );
   const tasks = useMemo(
-    () => filterGanttTasks(datedTasks, filters, TODAY, positionByUser),
-    [datedTasks, filters, positionByUser],
+    () =>
+      filterGanttTasks(datedTasks, filters, TODAY, positionByUser).filter(
+        (t) => showSubtasks || t.parent_task_id == null,
+      ),
+    [datedTasks, filters, positionByUser, showSubtasks],
   );
 
   // Tareas filtradas agrupadas por elemento, para colgarlas del árbol.
@@ -330,11 +349,22 @@ export function GanttView({
         tasksByItem,
         isCollapsed: (id) => collapsedNodes.has(id),
         showTasks,
-        // Incrustado: solo las ramas donde el equipo tiene trabajo.
-        onlyWithTasks: embed !== undefined,
+        // Recortado a un equipo o a una persona (incrustado o por filtro): solo
+        // las ramas con trabajo suyo, conservando sus ancestros para el contexto.
+        onlyWithTasks:
+          embed !== undefined || effectiveTeamId != null || effectiveAssigneeId != null,
         activeTypeIds,
       }),
-    [tree, tasksByItem, collapsedNodes, showTasks, activeTypeIds, embed],
+    [
+      tree,
+      tasksByItem,
+      collapsedNodes,
+      showTasks,
+      activeTypeIds,
+      embed,
+      effectiveTeamId,
+      effectiveAssigneeId,
+    ],
   );
 
   const nodeCount = useMemo(() => rows.filter((r) => r.kind === "node").length, [rows]);
@@ -353,6 +383,9 @@ export function GanttView({
   }, [datedTasks, tree]);
 
   const todayPct = range ? dayOffsetPct(TODAY, range) : null;
+  // Solo se pinta la marca de "hoy" si cae DENTRO del rango: fuera de él,
+  // `left` sería negativo y la línea se dibujaría bajo la columna de nombres.
+  const showToday = todayPct != null && todayPct >= 0 && todayPct <= 100;
   const ticks = useMemo(
     () => (range ? ticksForZoom(range, ZOOM_CFG[zoom].unit) : []),
     [range, zoom],
@@ -554,25 +587,40 @@ export function GanttView({
   }, [rows, range, trackWidth]);
 
   // Flechas finish-to-start entre tareas visibles (ambas con geometría conocida).
+  // Cada dependencia sale y entra por su propio carril, desplazado según cuántas
+  // comparten tarea de origen o de destino, para que los tramos verticales
+  // paralelos no se pisen. Si el destino queda a la izquierda del origen, la
+  // ruta rodea por el borde de su fila en vez de doblarse sobre la barra.
   const arrows = useMemo(() => {
     if (!showDeps) {
       return [];
     }
     const out: { id: string; d: string }[] = [];
+    const outLane = new Map<string, number>();
+    const inLane = new Map<string, number>();
     for (const dep of dependencies) {
       const from = layout.positions.get(dep.depends_on_id);
       const to = layout.positions.get(dep.task_id);
       if (!from || !to) {
         continue;
       }
+      const k = outLane.get(dep.depends_on_id) ?? 0;
+      outLane.set(dep.depends_on_id, k + 1);
+      const j = inLane.get(dep.task_id) ?? 0;
+      inLane.set(dep.task_id, j + 1);
       const x1 = from.left + from.width;
       const y1 = from.yTop + ROW_H / 2;
       const x2 = to.left;
       const y2 = to.yTop + ROW_H / 2;
-      const stub = 10;
+      const exit = x1 + 12 + k * 7;
+      const enter = x2 - (12 + j * 7);
+      const end = x2 - 3;
       out.push({
         id: dep.id,
-        d: `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${y2} L ${x2 - 2} ${y2}`,
+        d:
+          exit < enter
+            ? `M ${x1} ${y1} H ${exit} V ${y2} H ${end}`
+            : `M ${x1} ${y1} H ${exit} V ${y2 + (y2 >= y1 ? -ROW_H / 2 : ROW_H / 2)} H ${enter} V ${y2} H ${end}`,
       });
     }
     return out;
@@ -870,7 +918,7 @@ export function GanttView({
             <Tag className="size-3" /> Tipos
           </span>
           {types.map((t) => {
-            const style = tipoStyle(t.id);
+            const style = tipoStyle(t.id, t.nombre);
             const active = activeTypeIds.has(t.id);
             return (
               <button
@@ -1016,6 +1064,27 @@ export function GanttView({
             <ListChecks className="size-3.5" /> Tareas
           </button>
 
+          {/* Mostrar / ocultar subtareas (las que reparte un líder). Solo en la
+              vista principal: los cronogramas de equipo/persona las muestran. */}
+          {!embed && showTasks && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowSubtasks((v) => !v);
+              }}
+              aria-pressed={showSubtasks}
+              title="Mostrar u ocultar las subtareas"
+              className={cn(
+                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                showSubtasks
+                  ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <GitBranch className="size-3.5" /> Subtareas
+            </button>
+          )}
+
           {/* Ir a hoy */}
           <button
             type="button"
@@ -1126,10 +1195,10 @@ export function GanttView({
           >
             <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
               {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
-              <div className="sticky top-0 z-30 flex border-b border-border bg-card">
+              <div className="sticky top-0 z-50 flex border-b border-border bg-card">
                 <div
                   style={{ width: labelW }}
-                  className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
+                  className="sticky left-0 z-40 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
                 >
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Estructura · {nodeCount} · {taskRowCount} tareas
@@ -1155,7 +1224,7 @@ export function GanttView({
                         className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
                         style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                       >
-                        {pctToPx(b.widthPct) >= 48 && (
+                        {pctToPx(b.widthPct) >= 32 && (
                           <span className="truncate text-[10px] font-semibold text-muted-foreground">
                             {b.label}
                           </span>
@@ -1184,7 +1253,7 @@ export function GanttView({
                         </span>
                       );
                     })}
-                    {todayPct != null && (
+                    {showToday && (
                       <span
                         className="absolute bottom-0.5 z-10 -translate-x-1/2 rounded-full bg-rose-500 px-1.5 py-px text-[9px] font-semibold leading-tight text-white shadow-sm"
                         style={{ left: pctToPx(todayPct) }}
@@ -1227,9 +1296,9 @@ export function GanttView({
                 </div>
 
                 {/* Línea de hoy (sobre las barras, bajo la columna fija) */}
-                {todayPct != null && (
+                {showToday && (
                   <div
-                    className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
+                    className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-rose-500/80"
                     style={{ left: labelW + pctToPx(todayPct) }}
                   />
                 )}
@@ -1255,14 +1324,25 @@ export function GanttView({
                       </marker>
                     </defs>
                     {arrows.map((a) => (
-                      <path
-                        key={a.id}
-                        d={a.d}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        markerEnd={`url(#gantt-arrow-${project.id})`}
-                      />
+                      <g key={a.id}>
+                        {/* Halo del color del panel: la flecha sigue legible
+                            aunque cruce una barra. */}
+                        <path
+                          d={a.d}
+                          fill="none"
+                          className="stroke-card"
+                          strokeWidth={4}
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d={a.d}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                          strokeLinejoin="round"
+                          markerEnd={`url(#gantt-arrow-${project.id})`}
+                        />
+                      </g>
                     ))}
                   </svg>
                 )}
@@ -1310,7 +1390,11 @@ export function GanttView({
                           if (draggingNodeIdRef.current == null || invalidNodeDropIds.has(row.id)) {
                             return;
                           }
-                          setNodeDropTarget({ id: row.id, pos });
+                          // `dragover` llega decenas de veces por segundo: sin
+                          // este guardado cada uno re-renderiza todo el gantt.
+                          setNodeDropTarget((prev) =>
+                            prev?.id === row.id && prev.pos === pos ? prev : { id: row.id, pos },
+                          );
                           scheduleNodeSpringOpen(row.id, pos);
                         }}
                         onDropNode={(pos) => {
@@ -1461,7 +1545,7 @@ function NodeRow({
   onDropNode: (pos: DropPos) => void;
   onResolveConflict: () => void;
 }) {
-  const style = tipoStyle(row.tipoId);
+  const style = tipoStyle(row.tipoId, typeName);
   const isDragging = drag?.id === row.id;
   // Al arrastrar, la barra resumen sigue al puntero con las fechas de preview.
   const view = isDragging ? previewDates(drag, dragDelta) : { start: row.start, due: row.due };
@@ -1470,7 +1554,7 @@ function NodeRow({
   const target: DragTarget = { kind: "node", id: row.id, start: row.start, due: row.due };
   return (
     <div className="flex items-stretch border-b border-border/70" style={{ height: ROW_H }}>
-      <div className="sticky left-0 z-20 shrink-0 relative" style={{ width: labelW }}>
+      <div className="sticky left-0 z-40 shrink-0 relative bg-muted" style={{ width: labelW }}>
         <button
           type="button"
           draggable
@@ -1649,7 +1733,7 @@ function TaskRow({
       className="group/row flex items-stretch border-b border-border/50 last:border-b-0"
       style={{ height: ROW_H, contentVisibility: "auto", containIntrinsicSize: `auto ${ROW_H}px` }}
     >
-      <div className="relative sticky left-0 z-20 shrink-0" style={{ width: labelW }}>
+      <div className="relative sticky left-0 z-40 shrink-0 bg-card" style={{ width: labelW }}>
         <button
           type="button"
           onClick={onOpen}

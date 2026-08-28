@@ -67,6 +67,20 @@ class ListTeamsUseCase:
         )
 
 
+class ListMyTeamsUseCase:
+    """Equipos de un proyecto a los que pertenece el usuario autenticado.
+
+    Alimenta la vista del rol User: si es uno solo, el frontend redirige directo;
+    si son varios, muestra el selector.
+    """
+
+    def __init__(self, team_repo: TeamRepository):
+        self.service = TeamService(team_repo)
+
+    async def execute(self, project_id: UUID, user_id: UUID) -> list[TeamResponse]:
+        return await self.service.list_teams_for_user(project_id, user_id)
+
+
 class AddTeamMemberUseCase:
     """Agrega un usuario al equipo. Valida que el usuario exista (otro contexto)."""
 

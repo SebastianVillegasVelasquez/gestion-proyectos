@@ -30,6 +30,11 @@ class TeamRepository(ABC):
     ) -> tuple[list[Team], int]: ...
 
     @abstractmethod
+    async def list_teams_for_user(
+        self, project_id: UUID, user_id: UUID
+    ) -> list[Team]: ...
+
+    @abstractmethod
     async def count_members(self, team_id: UUID) -> int: ...
 
     @abstractmethod

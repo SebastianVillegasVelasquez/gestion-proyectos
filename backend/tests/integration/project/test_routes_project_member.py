@@ -291,6 +291,32 @@ class TestRoutesProjectMember:
         assert row["tasks_total"] == 2
         assert row["tasks_completed"] == 1
         assert row["progress_pct"] == 50
+        # Aún no está en ningún equipo de este proyecto.
+        assert row["team_names"] == []
+
+        # Al meterlo en dos equipos, la vista de Integrantes los lista ordenados.
+        for team_name in ("Zeta", "Alfa"):
+            team = (
+                await client.post(
+                    f"/api/v1/projects/{project['id']}/teams",
+                    json={"name": team_name},
+                    headers=admin_headers,
+                )
+            ).json()
+            add = await client.post(
+                f"/api/v1/projects/{project['id']}/teams/{team['id']}/members",
+                json={"user_id": user["id"]},
+                headers=admin_headers,
+            )
+            assert add.status_code == 201, add.text
+
+        with_teams = (
+            await client.get(
+                f"/api/v1/projects/{project['id']}/members/progress",
+                headers=admin_headers,
+            )
+        ).json()
+        assert with_teams[0]["team_names"] == ["Alfa", "Zeta"]
 
         # En el otro proyecto (sin tareas para este usuario) el avance es 0,
         # sin arrastrar nada de lo que hizo en el primero.

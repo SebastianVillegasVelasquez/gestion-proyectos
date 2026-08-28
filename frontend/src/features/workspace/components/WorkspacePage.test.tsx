@@ -11,6 +11,7 @@ const authState = vi.hoisted(() => ({ admin: false }));
 
 vi.mock("react-router", () => ({
   useOutletContext: () => ({ dark: false, toggleDark: vi.fn() }),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({

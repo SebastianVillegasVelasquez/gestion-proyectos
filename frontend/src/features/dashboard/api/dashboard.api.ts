@@ -1,6 +1,7 @@
 import http from "@/lib/http";
 import type {
   DashboardPanels,
+  DashboardProjectItem,
   DashboardSummary,
   MyProjectProgress,
   RecentActivity,
@@ -27,4 +28,8 @@ export const dashboardApi = {
 
   getMyProjectProgress: (projectId: string) =>
     http.get<MyProjectProgress>(`/dashboard/me/projects/${projectId}`).then((r) => r.data),
+
+  // Lista completa de proyectos donde el usuario es miembro ("Mis proyectos").
+  getMyProjects: () =>
+    http.get<DashboardProjectItem[]>("/dashboard/me/projects").then((r) => r.data),
 };

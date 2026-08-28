@@ -49,6 +49,20 @@ function hash(value: string): number {
   return Math.abs(h);
 }
 
-export function tipoStyle(tipoId: string): TipoStyle {
+/** Nombre del tipo reservado para trabajo de terceros (lo crea un botón en la
+ * Estructura). Siempre se pinta naranja para que salte a la vista de que ese
+ * tramo no lo maneja el equipo. */
+export const THIRD_PARTY_TIPO_NOMBRE = "Actividad de terceros";
+
+const THIRD_PARTY_STYLE: TipoStyle = {
+  dot: "bg-orange-500",
+  chip: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  bar: "bg-orange-500",
+};
+
+export function tipoStyle(tipoId: string, nombre?: string | null): TipoStyle {
+  if (nombre?.trim().toLowerCase() === THIRD_PARTY_TIPO_NOMBRE.toLowerCase()) {
+    return THIRD_PARTY_STYLE;
+  }
   return PALETTE[hash(tipoId) % PALETTE.length];
 }

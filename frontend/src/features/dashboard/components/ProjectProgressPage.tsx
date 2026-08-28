@@ -1,5 +1,5 @@
-import { useParams } from "react-router-dom";
-import { ClipboardList } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { ChevronRight, ClipboardList, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -102,6 +102,21 @@ export function ProjectProgressPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Acceso a los equipos de trabajo del usuario en este proyecto */}
+          <Link
+            to={`/proyectos/${projectId}/equipos`}
+            className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-brand-gold/50 hover:bg-accent/40"
+          >
+            <UsersRound className="size-5 shrink-0 text-brand-gold" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">Equipos de trabajo</p>
+              <p className="text-xs text-muted-foreground">
+                Ver el cronograma y tus tareas por equipo.
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </Link>
 
           {/* Mis tareas en este proyecto */}
           <div>

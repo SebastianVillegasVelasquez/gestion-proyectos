@@ -38,6 +38,8 @@ from app.modules.tasks.presentation.schemas import (
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
+from app.modules.teams.domain.repository import TeamRepository
+from app.modules.teams.infrastructure.enums import TeamRole
 from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
@@ -525,9 +527,17 @@ class GetTaskByIdUseCase:
 
 
 class UpdateTaskUseCase:
-    def __init__(self, task_repo: TaskRepository, user_repo: Repository):
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        user_repo: Repository,
+        team_repo: TeamRepository | None = None,
+    ):
         self.task_repo = task_repo
         self.user_repo = user_repo
+        # Solo se necesita para autorizar la reasignación de un líder de equipo;
+        # los llamadores administrativos pueden omitirlo.
+        self.team_repo = team_repo
         self.service = TaskService(task_repo)
 
     async def execute(
@@ -535,20 +545,58 @@ class UpdateTaskUseCase:
         task_id: UUID,
         data: UpdateTaskRequest,
         actor_id: UUID | None = None,
+        actor_role: str | None = None,
     ) -> TaskResponse:
+        # Foto de los campos auditables ANTES de mutar: un PATCH puede tocar
+        # varios a la vez y cada uno se registra como un hecho aparte.
+        task = await _get_active_task(self.task_repo, task_id)
+
+        # Sin rol (llamador interno/administrativo) se mantiene el permiso amplio
+        # de siempre. Con rol no-admin, el único cambio permitido es que el
+        # líder/supervisor del equipo reasigne la tarea entre los suyos.
+        is_admin = actor_role is None or role_satisfies(
+            actor_role, ("admin", "super_admin", "developer")
+        )
+        if not is_admin:
+            await self._authorize_team_lead_reassignment(task, data, actor_id)
+
         if data.assignee_id:
             user = await self.user_repo.get_by_id(data.assignee_id)
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
-        # Foto de los campos auditables ANTES de mutar: un PATCH puede tocar
-        # varios a la vez y cada uno se registra como un hecho aparte.
-        task = await _get_active_task(self.task_repo, task_id)
         before = snapshot(task)
-
         updated = await self.service.update_task(task_id, data)
         await TaskAuditor(self.task_repo, actor_id).diff(before, task)
         return updated
+
+    async def _authorize_team_lead_reassignment(
+        self, task, data: UpdateTaskRequest, actor_id: UUID | None
+    ) -> None:
+        """El líder de un equipo solo puede REASIGNAR sus tareas: cambiar el
+        responsable de una tarea del equipo por otro integrante del mismo
+        equipo. Cualquier otra edición sigue siendo de administración."""
+        if self.team_repo is None or actor_id is None:
+            raise ForbiddenError("No tienes permiso para editar esta tarea")
+
+        touched = set(data.model_dump(exclude_unset=True))
+        if not touched or not touched <= {"assignee_id"}:
+            raise ForbiddenError("Solo puedes reasignar la tarea, no editar sus datos")
+
+        if task.team_id is None:
+            raise ForbiddenError("Esta tarea no está delegada a un equipo")
+
+        actor = await self.team_repo.get_member(task.team_id, actor_id)
+        if actor is None or actor.team_role not in (
+            TeamRole.LIDER,
+            TeamRole.SUPERVISOR,
+        ):
+            raise ForbiddenError("No lideras el equipo de esta tarea")
+
+        if data.assignee_id is not None:
+            new_owner = await self.team_repo.get_member(task.team_id, data.assignee_id)
+            if new_owner is None:
+                raise ForbiddenError("Solo puedes asignar a integrantes de tu equipo")
 
 
 class DeleteTaskUseCase:

@@ -77,7 +77,8 @@ const SECTIONS: NavSection[] = [
   },
 ];
 
-// El rol User solo ve su dashboard y los espacios de trabajo (sin gestión global).
+// El rol User solo ve su dashboard, sus proyectos y los espacios de trabajo
+// (sin gestión global).
 const USER_SECTIONS: NavSection[] = [
   {
     id: "main",
@@ -87,7 +88,10 @@ const USER_SECTIONS: NavSection[] = [
   {
     id: "workspace",
     title: "Trabajo",
-    items: [{ id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" }],
+    items: [
+      { id: "my-projects", label: "Mis proyectos", icon: FolderKanban, href: "/mis-proyectos" },
+      { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
+    ],
   },
   {
     id: "general",
@@ -113,6 +117,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/": "overview",
   "/projects": "all-projects",
   "/projects/builder": "project-builder",
+  "/mis-proyectos": "my-projects",
   "/workspace": "workspace",
   "/settings": "settings",
   "/feedback": "feedback",

@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   CalendarRange,
   CornerDownRight,
   FolderKanban,
+  FolderTree,
+  History,
   LayoutGrid,
   Link2Off,
   List,
@@ -12,9 +16,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import { collectItemPaths } from "@/features/projects/utils/work-item-path";
+import { buildTeamBoard } from "@/features/projects/utils/team-board";
+import { TeamStructureView } from "@/features/projects/components/teams/TeamStructureView";
+import { TaskAssigneeSelect } from "@/features/projects/components/teams/TaskAssigneeSelect";
+import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
 import { NewSubtaskModal } from "./NewSubtaskModal";
-import type { ApiTeamTask } from "../api/workspace.api";
+import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
 import type { WorkspaceMember } from "../types";
 import {
   STATUS_META,
@@ -31,7 +41,24 @@ import {
 } from "../utils/team-tasks";
 import { TeamGanttPanel } from "./TeamGanttPanel";
 
-type ViewMode = "lista" | "kanban" | "cronograma";
+type ViewMode = "lista" | "kanban" | "estructura" | "cronograma" | "trazabilidad";
+
+/** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea. */
+function Crumb({ path }: { path: string[] }) {
+  if (path.length === 0) {
+    return <>Sin elemento</>;
+  }
+  return (
+    <span title={path.join(" › ")}>
+      {path.slice(0, -1).map((name) => (
+        <span key={name}>{name} › </span>
+      ))}
+      <span className="font-semibold text-slate-500 dark:text-slate-400">
+        {path[path.length - 1]}
+      </span>
+    </span>
+  );
+}
 
 // El "hoy" se calcula una vez por render del componente raíz y baja como prop:
 // así todas las filas comparan contra la misma fecha (si cada fila llamara a
@@ -167,11 +194,13 @@ function TaskRow({
   row,
   today,
   canReview,
+  pathOf,
   onAddSubtask,
 }: {
   row: TaskTreeRow;
   today: string;
   canReview: boolean;
+  pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
 }) {
   const { task, depth, detachedParentTitle } = row;
@@ -208,7 +237,7 @@ function TaskRow({
               Subtarea de «{detachedParentTitle}» ·{" "}
             </span>
           )}
-          {task.work_item_name ?? "Sin elemento"} · {task.project_name}
+          <Crumb path={pathOf(task)} /> · {task.project_name}
         </p>
         <BlockedBy task={task} />
       </div>
@@ -252,6 +281,7 @@ function ListView({
   grouping,
   today,
   canReview,
+  pathOf,
   onAddSubtask,
 }: {
   groups: ReturnType<typeof groupTeamTasks>;
@@ -261,13 +291,13 @@ function ListView({
   grouping: TaskGrouping;
   today: string;
   canReview: boolean;
+  pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
 }) {
   return (
-    // `h-full` es lo que hace que este contenedor scrollee: sin altura propia
-    // crecía con el contenido y el padre `overflow-hidden` recortaba el final
-    // de la lista sin mostrar barra de desplazamiento.
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+    // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
+    // depender de que `h-full` resuelva contra un alto definido en cadena.
+    <div className="absolute inset-0 flex flex-col gap-4 overflow-y-auto p-4 sm:p-6">
       {groups
         // Agrupando por estado hay columnas vacías a propósito (ver utils), pero
         // en Lista una sección vacía solo es ruido vertical.
@@ -309,6 +339,7 @@ function ListView({
                     row={row}
                     today={today}
                     canReview={canReview}
+                    pathOf={pathOf}
                     onAddSubtask={onAddSubtask}
                   />
                 ))}
@@ -327,12 +358,22 @@ function TaskCard({
   parentTitle,
   members,
   today,
+  path,
+  canReview,
+  projectId,
+  teamMembers,
+  onReassigned,
 }: {
   task: ApiTeamTask;
   /** Título del padre cuando la tarjeta es una subtarea. */
   parentTitle: string | null;
   members: WorkspaceMember[];
   today: string;
+  path: string[];
+  canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
+  onReassigned: () => void;
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
@@ -357,7 +398,7 @@ function TaskCard({
         </p>
       )}
       <p className="mt-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
-        {task.work_item_name ?? "Sin elemento"}
+        <Crumb path={path} />
       </p>
 
       <BlockedBy task={task} />
@@ -372,42 +413,87 @@ function TaskCard({
         </div>
         <DueDate task={task} today={today} />
       </div>
+
+      {canReview && teamMembers.length > 0 && (
+        <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+          <TaskAssigneeSelect
+            projectId={projectId}
+            taskId={task.id}
+            currentAssigneeId={task.assignee_id}
+            members={teamMembers}
+            onDone={onReassigned}
+          />
+        </div>
+      )}
     </article>
   );
 }
 
 function KanbanView({
-  groups,
   allTasks,
   members,
   today,
+  pathOf,
+  canReview,
+  projectId,
+  teamMembers,
+  onReassigned,
 }: {
-  groups: ReturnType<typeof groupTeamTasks>;
   allTasks: ApiTeamTask[];
   members: WorkspaceMember[];
   today: string;
+  pathOf: (task: ApiTeamTask) => string[];
+  canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
+  onReassigned: () => void;
 }) {
   const titleById = new Map(allTasks.map((t) => [t.id, t.title]));
+  // Columnas de estado + una lane «En riesgo» (roja) al frente con las abiertas
+  // vencidas o por vencer, sacadas de su estado (misma lógica que el proyecto).
+  const columns = useMemo(() => buildTeamBoard(allTasks, today), [allTasks, today]);
   return (
-    // Scroll horizontal propio del tablero: la página nunca se desplaza en X.
-    <div className="flex h-full gap-3 overflow-x-auto p-4 sm:p-6">
-      {groups.map((group) => (
-        <section key={group.key} className="flex w-[280px] shrink-0 flex-col">
-          <header className="flex items-center justify-between gap-2 rounded-t-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
-            <p className="truncate text-[12px] font-semibold text-slate-600 dark:text-slate-300">
-              {group.label}
+    // Scroll horizontal propio del tablero; `absolute inset-0` para tener alto.
+    <div className="absolute inset-0 flex gap-3 overflow-x-auto p-4 sm:p-6">
+      {columns.map((col) => (
+        <section key={col.key} className="flex w-[280px] shrink-0 flex-col">
+          <header
+            className={cn(
+              "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
+              col.atRisk
+                ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
+                : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
+            )}
+          >
+            <p
+              className={cn(
+                "flex items-center gap-1 truncate text-[12px] font-semibold",
+                col.atRisk
+                  ? "text-rose-700 dark:text-rose-300"
+                  : "text-slate-600 dark:text-slate-300",
+              )}
+            >
+              {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
+              {col.label}
             </p>
             <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              {group.tasks.length}
+              {col.tasks.length}
             </span>
           </header>
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 border-slate-200 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-900/30">
-            {group.tasks.length === 0 ? (
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
+              col.atRisk
+                ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
+                : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
+            )}
+          >
+            {col.tasks.length === 0 ? (
               <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
                 Sin tareas
               </p>
             ) : (
-              group.tasks.map((task) => (
+              col.tasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -418,6 +504,11 @@ function KanbanView({
                   }
                   members={members}
                   today={today}
+                  path={pathOf(task)}
+                  canReview={canReview}
+                  projectId={projectId}
+                  teamMembers={teamMembers}
+                  onReassigned={onReassigned}
                 />
               ))
             )}
@@ -480,9 +571,11 @@ function Segmented<T extends string>({ value, options, onChange, label }: Segmen
 
 interface TeamTasksViewProps {
   teamId: string;
-  /** Proyecto del equipo: el cronograma cuelga de su estructura. */
+  /** Proyecto del equipo: el cronograma y la estructura cuelgan de él. */
   projectId: string;
   members: WorkspaceMember[];
+  /** Integrantes en crudo (con `user_id`): los usa el líder para reasignar. */
+  teamMembers: ApiTeamMember[];
 }
 
 /**
@@ -491,10 +584,12 @@ interface TeamTasksViewProps {
  * bloqueos— sale del modelo de tareas del proyecto: es la MISMA tarea que ven
  * el cronograma y la trazabilidad, no una copia del equipo.
  */
-export function TeamTasksView({ teamId, projectId, members }: TeamTasksViewProps) {
+export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamTasksViewProps) {
   const query = useTeamTasks(teamId);
   const accessQuery = useWorkspaceAccess(teamId);
   const canReview = accessQuery.data?.can_review ?? false;
+  const treeQuery = useWorkTree(projectId);
+  const qc = useQueryClient();
 
   const [view, setView] = useState<ViewMode>("lista");
   const [grouping, setGrouping] = useState<TaskGrouping>("integrante");
@@ -502,6 +597,11 @@ export function TeamTasksView({ teamId, projectId, members }: TeamTasksViewProps
 
   const today = useMemo(() => todayIso(), []);
   const tasks = useMemo(() => query.data ?? [], [query.data]);
+  const pathById = useMemo(() => collectItemPaths(treeQuery.data ?? []), [treeQuery.data]);
+  const pathOf = (task: ApiTeamTask): string[] =>
+    task.work_item_id ? (pathById.get(task.work_item_id) ?? []) : [];
+  const onReassigned = () =>
+    void qc.invalidateQueries({ queryKey: ["workspace", "tasks", teamId] });
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
   // dentro de columnas de estado no tendría dónde ir.
   const effectiveGrouping: TaskGrouping = view === "lista" ? grouping : "estado";
@@ -554,7 +654,12 @@ export function TeamTasksView({ teamId, projectId, members }: TeamTasksViewProps
           options={[
             { value: "lista", label: "Lista", Icon: List },
             { value: "kanban", label: "Kanban", Icon: LayoutGrid },
+            { value: "estructura", label: "Estructura", Icon: FolderTree },
             { value: "cronograma", label: "Cronograma", Icon: CalendarRange },
+            // La trazabilidad del equipo solo para quien lo lidera / supervisa.
+            ...(canReview
+              ? [{ value: "trazabilidad" as const, label: "Trazabilidad", Icon: History }]
+              : []),
           ]}
         />
 
@@ -586,7 +691,9 @@ export function TeamTasksView({ teamId, projectId, members }: TeamTasksViewProps
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      {/* `relative` + hijos `absolute inset-0`: el scroll interno funciona sin
+          depender de que `h-full` en cadena resuelva contra un alto definido. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
         {view === "lista" && (
           <ListView
             groups={groups}
@@ -595,13 +702,42 @@ export function TeamTasksView({ teamId, projectId, members }: TeamTasksViewProps
             grouping={effectiveGrouping}
             today={today}
             canReview={canReview}
+            pathOf={pathOf}
             onAddSubtask={setSubtaskParent}
           />
         )}
         {view === "kanban" && (
-          <KanbanView groups={groups} allTasks={tasks} members={members} today={today} />
+          <KanbanView
+            allTasks={tasks}
+            members={members}
+            today={today}
+            pathOf={pathOf}
+            canReview={canReview}
+            projectId={projectId}
+            teamMembers={teamMembers}
+            onReassigned={onReassigned}
+          />
         )}
-        {view === "cronograma" && <TeamGanttPanel projectId={projectId} teamId={teamId} />}
+        {view === "estructura" && (
+          <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
+            <TeamStructureView
+              tree={treeQuery.data ?? []}
+              tasks={tasks}
+              resolveWho={(t) => t.assignee_name ?? "Sin responsable"}
+              today={today}
+            />
+          </div>
+        )}
+        {view === "cronograma" && (
+          <div className="absolute inset-0 overflow-hidden">
+            <TeamGanttPanel projectId={projectId} teamId={teamId} />
+          </div>
+        )}
+        {view === "trazabilidad" && (
+          <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
+            <TraceabilityPanel projectId={projectId} lockedTeamId={teamId} />
+          </div>
+        )}
       </div>
 
       {subtaskParent && (
