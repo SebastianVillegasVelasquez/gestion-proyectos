@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { MembersPanel } from "./MembersPanel";
@@ -20,6 +21,10 @@ vi.mock("../../api/members.api", () => ({
   directoryApi: { list: vi.fn(), search: vi.fn() },
 }));
 
+vi.mock("../../hooks/use-tasks", () => ({
+  useProjectTasks: () => ({ data: [], isLoading: false, isError: false }),
+}));
+
 vi.mock("@/features/auth/hooks/use-auth", () => ({
   useAuth: () => ({
     user: { id: "u1", name: "Ana", email: "ana@obj.com", role: "user" },
@@ -30,7 +35,9 @@ vi.mock("@/features/auth/hooks/use-auth", () => ({
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
   return render(<MembersPanel projectId="p1" />, { wrapper: Wrapper });
 }
@@ -47,6 +54,8 @@ const members: ProjectMemberProgress[] = [
     tasks_total: 4,
     tasks_completed: 2,
     progress_pct: 50,
+    team_names: ["Diseño"],
+    team_ids: ["team-1"],
   },
   {
     id: "m2",
@@ -59,6 +68,8 @@ const members: ProjectMemberProgress[] = [
     tasks_total: 3,
     tasks_completed: 3,
     progress_pct: 100,
+    team_names: [],
+    team_ids: [],
   },
 ];
 

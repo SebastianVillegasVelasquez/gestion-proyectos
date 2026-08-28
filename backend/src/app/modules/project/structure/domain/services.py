@@ -30,6 +30,11 @@ from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
 # elimina. Sigue siendo un tipo real (editable/filtrable), no un hueco.
 DEFAULT_TIPO_NOMBRE = "Elemento"
 
+# Tipo reservado para trabajo que hace un tercero. Al colocar un nodo de este
+# tipo bajo un padre, los hijos PREVIOS de ese padre pasan a colgar de él y a
+# depender de él (el trabajo del proyecto queda a la espera del tercero).
+THIRD_PARTY_TIPO_NOMBRE = "Actividad de terceros"
+
 
 class WorkTreeService:
     """Reglas del árbol de trabajo recursivo. Depende de la abstracción del repo.
@@ -146,6 +151,8 @@ class WorkTreeService:
                 es_transversal=data.es_transversal,
             )
         )
+        if data.parent_id is not None and self._is_third_party(tipo):
+            await self._apply_third_party_gate(item, data.parent_id)
         return await self._respond_item(item)
 
     async def update_item(
@@ -294,6 +301,14 @@ class WorkTreeService:
                 key=lambda i: i.orden,
             )
             await self._resequence(old_siblings)
+
+        # Misma regla que al crear: si lo que se acaba de colocar es una
+        # «Actividad de terceros», los hijos previos del destino cuelgan de ella.
+        # `item.tipo` es lazy='raise', así que el tipo se pide por su id.
+        if new_parent_id is not None and self._is_third_party(
+            await self.repo.get_tipo(item.tipo_id)
+        ):
+            await self._apply_third_party_gate(item, new_parent_id, items=all_items)
 
         return await self._respond_item(item)
 
@@ -667,6 +682,45 @@ class WorkTreeService:
         if tipo.proyecto_id is not None and tipo.proyecto_id != proyecto_id:
             raise ValidationError("El tipo de nodo pertenece a otro proyecto")
         return tipo
+
+    @staticmethod
+    def _is_third_party(tipo: TipoNodo | None) -> bool:
+        return (
+            tipo is not None
+            and tipo.nombre.strip().lower() == THIRD_PARTY_TIPO_NOMBRE.lower()
+        )
+
+    async def _apply_third_party_gate(
+        self,
+        node: WorkItem,
+        parent_id: UUID,
+        items: list[WorkItem] | None = None,
+    ) -> None:
+        """`node` (tipo «Actividad de terceros») acaba de colocarse bajo
+        `parent_id`. Sus hermanos PREVIOS pasan a colgar de `node` y a depender
+        de él (FtS): el trabajo del proyecto queda a la espera del tercero.
+
+        Solo alcanza a los que ya eran hijos directos del padre en este momento;
+        lo que se añada después bajo el padre no se toca.
+        """
+        if items is None:
+            items = await self.repo.list_items(node.proyecto_id)
+        prev_siblings = sorted(
+            (
+                i
+                for i in items
+                if i.parent_id == parent_id and i.id != node.id and not i.is_deleted
+            ),
+            key=lambda i: i.orden,
+        )
+        for index, sib in enumerate(prev_siblings):
+            sib.parent_id = node.id
+            sib.orden = index
+            await self.repo.save_item(sib)
+            if await self.repo.get_dependency(sib.id, node.id) is None:
+                await self.repo.add_dependency(
+                    WorkItemDependency(work_item_id=sib.id, depends_on_id=node.id)
+                )
 
     @staticmethod
     def _compute_date_conflicts(

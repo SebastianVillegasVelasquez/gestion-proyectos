@@ -13,6 +13,7 @@ from app.modules.dashboard.application.use_cases import (
     GetMyDashboardPanelsUseCase,
     GetMyDashboardSummaryUseCase,
     GetMyProjectProgressUseCase,
+    GetMyProjectsUseCase,
     GetRecentActivityUseCase,
 )
 from app.modules.dashboard.infrastructure.repository import DashboardRepository
@@ -20,6 +21,7 @@ from app.modules.dashboard.presentation.schemas import (
     DashboardPanelsResponse,
     DashboardSummaryResponse,
     MyProjectProgressResponse,
+    ProjectOverviewItemResponse,
     RecentActivityResponse,
 )
 from app.modules.identity.infrastructure.enums import SystemRole
@@ -101,6 +103,15 @@ async def get_my_dashboard_panels(
         projects_limit=projects_limit,
         deadlines_limit=deadlines_limit,
     )
+
+
+@router.get("/me/projects", response_model=list[ProjectOverviewItemResponse])
+async def list_my_projects(
+    current_user: UserResponse = Depends(get_current_user),
+    repo: DashboardRepository = Depends(dashboard_repo_dependency),
+) -> list[ProjectOverviewItemResponse]:
+    """Todos los proyectos donde el usuario es miembro (pantalla "Mis proyectos")."""
+    return await GetMyProjectsUseCase(repo).execute(current_user.id)
 
 
 @router.get("/me/projects/{project_id}", response_model=MyProjectProgressResponse)

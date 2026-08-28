@@ -337,7 +337,7 @@ function TreeNode({
   onDropNode,
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
-  const style = tipoStyle(node.tipo_id);
+  const style = tipoStyle(node.tipo_id, typeNameById.get(node.tipo_id));
   // Las tareas del elemento son hijas suyas en el árbol, igual que los
   // elementos: se pliegan con la misma flecha y cuentan para saber si hay algo
   // dentro. Un módulo sin sub-elementos pero con tareas ya no se ve vacío.
@@ -658,7 +658,7 @@ function TypeChip({
   onRename: (nombre: string) => Promise<void>;
   onRequestDelete: () => void;
 }) {
-  const style = tipoStyle(tipo.id);
+  const style = tipoStyle(tipo.id, tipo.nombre);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(tipo.nombre);
   const [saving, setSaving] = useState(false);
@@ -783,6 +783,10 @@ function TypeChip({
   );
 }
 
+/** Tipo reservado para el trabajo que hace un tercero y del que dependen los
+ * elementos que se le cuelguen. Se crea a demanda con un botón dedicado. */
+const THIRD_PARTY_TIPO = "Actividad de terceros";
+
 function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo[] }) {
   const createType = useCreateNodeType(projectId);
   const updateType = useUpdateNodeType(projectId);
@@ -791,13 +795,24 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
   const [name, setName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<TipoNodo | null>(null);
 
+  const hasThirdParty = types.some(
+    (t) => t.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase(),
+  );
+
+  // Cierra el input y descarta lo tecleado: vuelve al estado "sin añadir".
+  function cancel() {
+    setName("");
+    setAdding(false);
+  }
+
   async function add() {
+    // "nuevo" + ok sin escribir nada no es un error: es cancelar la operación.
     if (name.trim().length < 1) {
+      cancel();
       return;
     }
     await createType.mutateAsync({ nombre: name.trim() });
-    setName("");
-    setAdding(false);
+    cancel();
   }
 
   return (
@@ -849,15 +864,25 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
             onChange={(e) => {
               setName(e.target.value);
             }}
-            onKeyDown={(e) => e.key === "Enter" && add()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                void add();
+              }
+              if (e.key === "Escape") {
+                cancel();
+              }
+            }}
             placeholder="Ej. Fase"
             className="w-24 rounded-full border border-border bg-background px-3 py-1 text-[12.5px] outline-none focus:border-brand-blue"
           />
           <button
-            onClick={add}
+            onClick={() => void add()}
             className="text-[12.5px] font-bold text-brand-teal hover:text-brand-teal-dark hover:underline"
           >
             ok
+          </button>
+          <button onClick={cancel} className="text-[12.5px] text-muted-foreground hover:underline">
+            cancelar
           </button>
         </span>
       ) : (
@@ -868,6 +893,22 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-border bg-transparent px-3 py-1 text-[12.5px] font-bold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         >
           <Plus className="size-3" /> nuevo
+        </button>
+      )}
+
+      {/* Atajo: crea el tipo «Actividad de terceros» (una vez por proyecto).
+          Después se añaden elementos de ese tipo y se enlazan como dependencia
+          con el editor de dependencias normal. */}
+      {!hasThirdParty && (
+        <button
+          onClick={() => {
+            createType.mutate({ nombre: THIRD_PARTY_TIPO });
+          }}
+          disabled={createType.isPending}
+          title="Crea un tipo para el trabajo que depende de un tercero"
+          className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-brand-blue/40 bg-transparent px-3 py-1 text-[12.5px] font-bold text-brand-blue transition-colors hover:border-brand-blue hover:bg-brand-blue/5 disabled:opacity-50"
+        >
+          <Plus className="size-3" /> añadir actividad de terceros
         </button>
       )}
     </div>
@@ -1291,7 +1332,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onDragStartNode={startDrag}
                   onDragEndNode={resetDrag}
                   onDragOverNode={(id, pos) => {
-                    setDropTarget({ id, pos });
+                    // `dragover` se dispara decenas de veces por segundo sobre la
+                    // misma fila; sin este guardado cada uno re-renderiza el
+                    // árbol entero y el arrastre se siente con lag.
+                    setDropTarget((prev) =>
+                      prev?.id === id && prev.pos === pos ? prev : { id, pos },
+                    );
                     scheduleSpringOpen(id, pos);
                   }}
                   onDropNode={handleDropOn}

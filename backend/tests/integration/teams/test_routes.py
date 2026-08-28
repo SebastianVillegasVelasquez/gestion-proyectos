@@ -74,6 +74,35 @@ class TestTeamCrudRoutes:
 
         assert second.status_code == 201, second.text
 
+    async def test_list_my_teams_returns_only_membership(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """GET /teams/mine: el rol User solo ve los equipos a los que pertenece."""
+        from app.core.security import create_access_token
+
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_a = await _create_team(client, admin_headers, project_id, name="Alfa")
+        await _create_team(client, admin_headers, project_id, name="Beta")
+
+        user = await _create_user(client, admin_headers, email="mine@test.com")
+        add = await client.post(
+            f"/api/v1/projects/{project_id}/teams/{team_a['id']}/members",
+            json={"user_id": user["id"]},
+            headers=admin_headers,
+        )
+        assert add.status_code == 201, add.text
+
+        headers = {
+            "Authorization": (
+                f"Bearer {create_access_token(user_id=user['id'], role='user')}"
+            )
+        }
+        resp = await client.get(
+            f"/api/v1/projects/{project_id}/teams/mine", headers=headers
+        )
+        assert resp.status_code == 200, resp.text
+        assert [t["name"] for t in resp.json()] == ["Alfa"]
+
     async def test_should_forbid_non_admin_creating_team(
         self, client, member_headers, admin_headers, valid_project_payload
     ):

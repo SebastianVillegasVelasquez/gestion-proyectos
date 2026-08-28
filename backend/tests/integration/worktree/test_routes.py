@@ -297,3 +297,76 @@ class TestDependencyRoutes:
             await client.get(f"/api/v1/work-items/{succ['id']}", headers=admin_headers)
         ).json()
         assert item["fecha_inicio_plan"] is None
+
+
+class TestThirdPartyGate:
+    """Al colocar un nodo tipo «Actividad de terceros» bajo un padre, los hijos
+    PREVIOS de ese padre pasan a colgar de él y a depender de él."""
+
+    async def _deps(self, client, admin_headers, item_id):
+        r = await client.get(
+            f"/api/v1/work-items/{item_id}/dependencies", headers=admin_headers
+        )
+        assert r.status_code == 200, r.text
+        return {d["depends_on_id"] for d in r.json()}
+
+    async def _tree(self, client, admin_headers, project_id):
+        r = await client.get(
+            f"/api/v1/projects/{project_id}/work-items", headers=admin_headers
+        )
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    async def test_create_third_party_reparents_previous_siblings(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        modulo = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        tercero = await _create_tipo(
+            client, admin_headers, project_id, "Actividad de terceros"
+        )
+        p = await _create_item(client, admin_headers, project_id, modulo, "P")
+        a = await _create_item(client, admin_headers, project_id, modulo, "A", p["id"])
+        b = await _create_item(client, admin_headers, project_id, modulo, "B", p["id"])
+
+        n = await _create_item(
+            client, admin_headers, project_id, tercero, "Tercero", p["id"]
+        )
+
+        tree = await self._tree(client, admin_headers, project_id)
+        p_node = next(x for x in tree if x["id"] == p["id"])
+        assert [c["id"] for c in p_node["children"]] == [n["id"]]
+        n_node = p_node["children"][0]
+        assert {c["id"] for c in n_node["children"]} == {a["id"], b["id"]}
+
+        assert await self._deps(client, admin_headers, a["id"]) == {n["id"]}
+        assert await self._deps(client, admin_headers, b["id"]) == {n["id"]}
+
+    async def test_move_third_party_reparents_and_ignores_later_children(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        modulo = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        tercero = await _create_tipo(
+            client, admin_headers, project_id, "Actividad de terceros"
+        )
+        p = await _create_item(client, admin_headers, project_id, modulo, "P")
+        a = await _create_item(client, admin_headers, project_id, modulo, "A", p["id"])
+        n = await _create_item(client, admin_headers, project_id, tercero, "Tercero")
+
+        moved = await client.post(
+            f"/api/v1/work-items/{n['id']}/move",
+            json={"new_parent_id": p["id"]},
+            headers=admin_headers,
+        )
+        assert moved.status_code == 200, moved.text
+
+        assert await self._deps(client, admin_headers, a["id"]) == {n["id"]}
+
+        # Un hijo añadido a P DESPUÉS no se toca.
+        c = await _create_item(client, admin_headers, project_id, modulo, "C", p["id"])
+        tree = await self._tree(client, admin_headers, project_id)
+        p_node = next(x for x in tree if x["id"] == p["id"])
+        child_ids = {x["id"] for x in p_node["children"]}
+        assert c["id"] in child_ids and n["id"] in child_ids
+        assert await self._deps(client, admin_headers, c["id"]) == set()

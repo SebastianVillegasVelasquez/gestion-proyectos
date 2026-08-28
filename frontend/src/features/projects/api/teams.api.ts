@@ -27,6 +27,10 @@ export const teamsApi = {
   get: (projectId: string, teamId: string) =>
     http.get<Team>(`/projects/${projectId}/teams/${teamId}`).then((r) => r.data),
 
+  // Equipos del proyecto a los que pertenece el usuario autenticado (rol User).
+  mine: (projectId: string) =>
+    http.get<Team[]>(`/projects/${projectId}/teams/mine`).then((r) => r.data),
+
   create: (projectId: string, payload: CreateTeamPayload) =>
     http.post<Team>(`/projects/${projectId}/teams`, payload).then((r) => r.data),
 

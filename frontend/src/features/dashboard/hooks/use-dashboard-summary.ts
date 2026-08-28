@@ -10,6 +10,7 @@ export const dashboardKeys = {
     [...dashboardKeys.all, "activity", "project", projectId] as const,
   mySummary: () => [...dashboardKeys.all, "me", "summary"] as const,
   myPanels: () => [...dashboardKeys.all, "me", "panels"] as const,
+  myProjects: () => [...dashboardKeys.all, "me", "projects"] as const,
   myProject: (projectId: string) => [...dashboardKeys.all, "me", "project", projectId] as const,
 };
 
@@ -60,6 +61,15 @@ export function useMyDashboardPanels() {
   return useQuery({
     queryKey: dashboardKeys.myPanels(),
     queryFn: dashboardApi.getMyPanels,
+    staleTime: 60_000,
+  });
+}
+
+/** Todos los proyectos del usuario (pantalla "Mis proyectos" del rol User). */
+export function useMyProjects() {
+  return useQuery({
+    queryKey: dashboardKeys.myProjects(),
+    queryFn: dashboardApi.getMyProjects,
     staleTime: 60_000,
   });
 }

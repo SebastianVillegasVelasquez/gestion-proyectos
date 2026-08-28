@@ -243,3 +243,113 @@ class TestTeamTasks:
             f"/api/v1/teams/{team_id}/tasks", headers=admin_headers
         )
         assert len(listed.json()) == 1
+
+
+class TestTeamLeadReassignment:
+    """El líder/supervisor de un equipo puede reasignar SUS tareas entre los
+    suyos vía PATCH /tasks/{id}, sin ser admin; nada más."""
+
+    async def _setup(self, client, admin_headers, member_user, valid_project_payload):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        mate = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "mate@example.com",
+                    "password": "password123",
+                    "name": "Mati",
+                    "last_name": "Roe",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        for user_id, role in (
+            (str(member_user.id), "lider"),
+            (mate["id"], "integrante"),
+        ):
+            resp = await client.post(
+                f"/api/v1/projects/{project_id}/teams/{team_id}/members",
+                headers=admin_headers,
+                json={"user_id": user_id, "team_role": role},
+            )
+            assert resp.status_code == 201, resp.text
+
+        task_id = (
+            await client.post(
+                "/api/v1/tasks",
+                headers=admin_headers,
+                json={
+                    "title": "Banner",
+                    "work_item_id": modulo["id"],
+                    "team_id": team_id,
+                    "start_date": _day(0),
+                    "duration_days": 3,
+                },
+            )
+        ).json()["id"]
+        return task_id, team_id, mate["id"]
+
+    async def test_lead_can_reassign_within_team_keeping_team_id(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, team_id, mate_id = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+
+        patched = await client.patch(
+            f"/api/v1/tasks/{task_id}",
+            headers=member_headers,
+            json={"assignee_id": mate_id},
+        )
+        assert patched.status_code == 200, patched.text
+        assert patched.json()["assignee_id"] == mate_id
+        # La tarea sigue siendo del equipo: el líder podrá volver a reasignarla.
+        assert patched.json()["team_id"] == team_id
+
+    async def test_lead_cannot_edit_other_fields(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, _, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        resp = await client.patch(
+            f"/api/v1/tasks/{task_id}",
+            headers=member_headers,
+            json={"title": "Otro título"},
+        )
+        assert resp.status_code == 403, resp.text
+
+    async def test_lead_cannot_assign_someone_outside_the_team(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, _, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        outsider = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "outsider@example.com",
+                    "password": "password123",
+                    "name": "Out",
+                    "last_name": "Sider",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        resp = await client.patch(
+            f"/api/v1/tasks/{task_id}",
+            headers=member_headers,
+            json={"assignee_id": outsider["id"]},
+        )
+        assert resp.status_code == 403, resp.text

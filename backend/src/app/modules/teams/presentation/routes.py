@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.core.dependencies import (
+    get_current_user,
     require_role,
     team_repo_dependency,
     user_repo_dependency,
@@ -14,6 +15,7 @@ from app.modules.teams.application.use_cases import (
     CreateTeamUseCase,
     DeleteTeamUseCase,
     GetTeamUseCase,
+    ListMyTeamsUseCase,
     ListTeamMembersUseCase,
     ListTeamsUseCase,
     RemoveTeamMemberUseCase,
@@ -61,6 +63,16 @@ async def list_teams(
     current_user=Depends(_reader),
 ):
     return await ListTeamsUseCase(repo).execute(project_id, search, pagination)
+
+
+@router.get("/{project_id}/teams/mine", response_model=list[TeamResponse])
+async def list_my_teams(
+    project_id: UUID,
+    repo=Depends(team_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Equipos de este proyecto a los que pertenece el usuario autenticado."""
+    return await ListMyTeamsUseCase(repo).execute(project_id, current_user.id)
 
 
 @router.get("/{project_id}/teams/{team_id}", response_model=TeamResponse)

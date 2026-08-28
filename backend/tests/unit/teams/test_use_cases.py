@@ -80,6 +80,17 @@ class FakeTeamRepository(TeamRepository):
         total = len(teams)
         return teams[offset : offset + limit], total
 
+    async def list_teams_for_user(self, project_id, user_id):
+        member_team_ids = {tid for (tid, uid) in self._members if uid == user_id}
+        teams = [
+            t
+            for t in self._teams.values()
+            if t.project_id == project_id
+            and not t.is_deleted
+            and t.id in member_team_ids
+        ]
+        return sorted(teams, key=lambda t: t.name)
+
     async def count_members(self, team_id):
         return sum(1 for (tid, _) in self._members if tid == team_id)
 

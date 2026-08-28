@@ -7,6 +7,10 @@ import type { DuracionUnidad, TipoNodo, WorkItemTree } from "../../types/api.typ
 
 type DateMode = "fechas" | "inicio_dur" | "fin_dur" | "solo_dur";
 
+/** Tipo cuyo trabajo lo hace un tercero: no lo planificamos nosotros, así que
+ * su tiempo es una única fecha exacta (la entrega) o directamente ninguna. */
+const THIRD_PARTY_TIPO = "Actividad de terceros";
+
 interface DatePayload {
   fecha_inicio_plan: string | null;
   fecha_fin_plan: string | null;
@@ -69,6 +73,16 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
     editItem?.duracion_valor != null ? String(editItem.duracion_valor) : "",
   );
   const [durUnidad, setDurUnidad] = useState<DuracionUnidad>(editItem?.duracion_unidad ?? "dias");
+  // Actividad de terceros: una sola fecha opcional (entrega del tercero).
+  const [terceroFecha, setTerceroFecha] = useState(
+    editItem?.fecha_fin_plan ?? editItem?.fecha_inicio_plan ?? "",
+  );
+
+  const isThirdParty =
+    nodeTypes
+      .find((t) => t.id === tipoId)
+      ?.nombre.trim()
+      .toLowerCase() === THIRD_PARTY_TIPO.toLowerCase();
   const [esTransversal, setEsTransversal] = useState(editItem?.es_transversal ?? false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,17 +92,23 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
   /** Devuelve las 4 columnas de fecha completas (las no usadas en null) para que
    *  el backend re-derive y, al editar, se limpie lo del modo anterior. */
   function buildDates(): DatePayload | null {
-    const dur = durValor ? Number(durValor) : null;
-    if (needsDur && (!dur || dur <= 0)) {
-      setError("Indica una duración válida.");
-      return null;
-    }
     const empty: DatePayload = {
       fecha_inicio_plan: null,
       fecha_fin_plan: null,
       duracion_valor: null,
       duracion_unidad: null,
     };
+    // Actividad de terceros: fecha exacta (hito, inicio = fin) o ninguna.
+    if (isThirdParty) {
+      return terceroFecha
+        ? { ...empty, fecha_inicio_plan: terceroFecha, fecha_fin_plan: terceroFecha }
+        : empty;
+    }
+    const dur = durValor ? Number(durValor) : null;
+    if (needsDur && (!dur || dur <= 0)) {
+      setError("Indica una duración válida.");
+      return null;
+    }
     switch (mode) {
       case "fechas":
         if (!inicio || !fin) {
@@ -230,114 +250,137 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
             </label>
           </div>
 
-          {/* Motor de fechas — 3 modos */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              ¿Cómo defines su tiempo?
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {MODES.map((m) => {
-                const Icon = m.icon;
-                const active = mode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setMode(m.id);
-                    }}
-                    className={cn(
-                      "flex items-start gap-2 rounded-xl border px-3 py-2 text-left transition-all",
-                      active
-                        ? "border-brand-blue bg-brand-blue/10 ring-2 ring-brand-blue/30"
-                        : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800",
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        "mt-0.5 size-4",
-                        active ? "text-brand-blue-dark dark:text-brand-blue" : "text-slate-400",
-                      )}
-                    />
-                    <span className="flex flex-col">
-                      <span
+          {isThirdParty ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Fecha del tercero (opcional)
+              </span>
+              <input
+                type="date"
+                value={terceroFecha}
+                onChange={(e) => {
+                  setTerceroFecha(e.target.value);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                Lo entrega un tercero: una fecha exacta o ninguna. No se planifica con duración.
+              </span>
+            </label>
+          ) : (
+            <>
+              {/* Motor de fechas — 3 modos */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  ¿Cómo defines su tiempo?
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODES.map((m) => {
+                    const Icon = m.icon;
+                    const active = mode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setMode(m.id);
+                        }}
                         className={cn(
-                          "text-xs font-semibold",
+                          "flex items-start gap-2 rounded-xl border px-3 py-2 text-left transition-all",
                           active
-                            ? "text-brand-blue-dark dark:text-brand-blue"
-                            : "text-slate-700 dark:text-slate-200",
+                            ? "border-brand-blue bg-brand-blue/10 ring-2 ring-brand-blue/30"
+                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800",
                         )}
                       >
-                        {m.label}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                        {m.hint}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {(mode === "fechas" || mode === "inicio_dur") && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Inicio
-                </span>
-                <input
-                  type="date"
-                  value={inicio}
-                  onChange={(e) => {
-                    setInicio(e.target.value);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </label>
-            )}
-            {(mode === "fechas" || mode === "fin_dur") && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Fin</span>
-                <input
-                  type="date"
-                  value={fin}
-                  onChange={(e) => {
-                    setFin(e.target.value);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </label>
-            )}
-            {needsDur && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Duración
-                </span>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    value={durValor}
-                    onChange={(e) => {
-                      setDurValor(e.target.value);
-                    }}
-                    placeholder="0"
-                    className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  />
-                  <select
-                    value={durUnidad}
-                    onChange={(e) => {
-                      setDurUnidad(e.target.value as DuracionUnidad);
-                    }}
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="dias">días</option>
-                    <option value="semanas">semanas</option>
-                  </select>
+                        <Icon
+                          className={cn(
+                            "mt-0.5 size-4",
+                            active ? "text-brand-blue-dark dark:text-brand-blue" : "text-slate-400",
+                          )}
+                        />
+                        <span className="flex flex-col">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold",
+                              active
+                                ? "text-brand-blue-dark dark:text-brand-blue"
+                                : "text-slate-700 dark:text-slate-200",
+                            )}
+                          >
+                            {m.label}
+                          </span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            {m.hint}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </label>
-            )}
-          </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {(mode === "fechas" || mode === "inicio_dur") && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Inicio
+                    </span>
+                    <input
+                      type="date"
+                      value={inicio}
+                      onChange={(e) => {
+                        setInicio(e.target.value);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    />
+                  </label>
+                )}
+                {(mode === "fechas" || mode === "fin_dur") && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Fin
+                    </span>
+                    <input
+                      type="date"
+                      value={fin}
+                      onChange={(e) => {
+                        setFin(e.target.value);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    />
+                  </label>
+                )}
+                {needsDur && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Duración
+                    </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={durValor}
+                        onChange={(e) => {
+                          setDurValor(e.target.value);
+                        }}
+                        placeholder="0"
+                        className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                      <select
+                        value={durUnidad}
+                        onChange={(e) => {
+                          setDurUnidad(e.target.value as DuracionUnidad);
+                        }}
+                        className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        <option value="dias">días</option>
+                        <option value="semanas">semanas</option>
+                      </select>
+                    </div>
+                  </label>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Nota: las tareas del elemento pueden tener fechas fuera de este rango */}
           <div className="flex items-start gap-2 rounded-lg border border-brand-blue/25 bg-brand-blue/5 px-3 py-2 text-[12px] text-foreground/80">

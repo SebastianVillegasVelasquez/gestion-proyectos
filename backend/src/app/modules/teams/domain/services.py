@@ -85,6 +85,23 @@ class TeamService:
         ]
         return responses, total
 
+    async def list_teams_for_user(
+        self, project_id: UUID, user_id: UUID
+    ) -> list[TeamResponse]:
+        teams = await self.repo.list_teams_for_user(project_id, user_id)
+        team_ids = [team.id for team in teams]
+        counts = await self.repo.member_counts(team_ids)
+        progress = await self.repo.progress_counts(team_ids)
+        return [
+            self._to_team_response(
+                team,
+                member_count=counts.get(team.id, 0),
+                assigned=progress.get(team.id, (0, 0))[0],
+                completed=progress.get(team.id, (0, 0))[1],
+            )
+            for team in teams
+        ]
+
     # ── Integrantes ──────────────────────────────────────────────────────────
     async def add_member(
         self, project_id: UUID, team_id: UUID, user_id: UUID, team_role: TeamRole

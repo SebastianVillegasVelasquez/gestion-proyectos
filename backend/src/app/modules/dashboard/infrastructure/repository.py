@@ -210,6 +210,11 @@ class DashboardRepository(ABC):
         self, user_id: uuid.UUID, project_id: uuid.UUID
     ) -> ProjectProgressDetail | None: ...
 
+    @abstractmethod
+    async def list_projects_for_user(
+        self, user_id: uuid.UUID
+    ) -> list[ProjectOverviewItem]: ...
+
     # ── Portal público del cliente (sin autenticación, por token) ──
     @abstractmethod
     async def get_project_progress_by_token(
@@ -598,6 +603,19 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             upcoming_deadlines=await self._get_upcoming_deadlines(
                 deadlines_limit, assignee_id=user_id
             ),
+        )
+
+    async def list_projects_for_user(
+        self, user_id: uuid.UUID
+    ) -> list[ProjectOverviewItem]:
+        """Todos los proyectos donde el usuario es miembro (sin recorte).
+
+        Reusa `_get_projects_overview` acotándolo por membresía. A diferencia del
+        panel del dashboard (que muestra unos pocos), esta es la lista completa
+        que alimenta la pantalla "Mis proyectos" del rol User.
+        """
+        return await self._get_projects_overview(
+            limit=1000, project_ids=self._member_project_ids(user_id)
         )
 
     async def _project_counts(self, project_id: uuid.UUID):

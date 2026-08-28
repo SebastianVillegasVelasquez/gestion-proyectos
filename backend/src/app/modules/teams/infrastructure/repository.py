@@ -73,6 +73,26 @@ class SqlAlchemyTeamRepository(TeamRepository):
         )
         return list(rows), int(total or 0)
 
+    async def list_teams_for_user(self, project_id: UUID, user_id: UUID) -> list[Team]:
+        """Equipos vivos de un proyecto a los que pertenece un usuario concreto."""
+        rows = (
+            (
+                await self._session.execute(
+                    select(Team)
+                    .join(TeamMember, TeamMember.team_id == Team.id)
+                    .where(
+                        Team.project_id == project_id,
+                        Team.deleted_at.is_(None),
+                        TeamMember.user_id == user_id,
+                    )
+                    .order_by(Team.name)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return list(rows)
+
     async def count_members(self, team_id: UUID) -> int:
         total = await self._session.scalar(
             select(func.count())

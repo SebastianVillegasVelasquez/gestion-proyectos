@@ -259,21 +259,45 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
   );
 }
 
-export function TraceabilityPanel({ projectId }: { projectId: string }) {
+export function TraceabilityPanel({
+  projectId,
+  lockedTeamId,
+}: {
+  projectId: string;
+  /** Cuando llega, la línea de tiempo queda fijada a ese equipo y se oculta el
+   * selector de equipo: es la trazabilidad "de este equipo" embebida en su
+   * panel, no la del proyecto entero. */
+  lockedTeamId?: string;
+}) {
   const query = useProjectTraceability(projectId);
   // Un solo objeto de filtros en vez de un useState por control: así añadir un
   // filtro nuevo no obliga a tocar cada sitio que los combina.
   const [filters, setFilters] = useState<TraceabilityFilters>(EMPTY_TRACE_FILTERS);
 
+  // Con equipo fijo el filtro de equipo se impone en cada render (sin efecto ni
+  // estado espejo): así seguir al mismo panel entre equipos "simplemente
+  // funciona".
+  const activeFilters = useMemo(
+    () => (lockedTeamId ? { ...filters, teamId: lockedTeamId } : filters),
+    [filters, lockedTeamId],
+  );
+
   const events = useMemo(() => query.data?.events ?? [], [query.data]);
-  const visible = useMemo(() => filterTraceabilityEvents(events, filters), [events, filters]);
+  const visible = useMemo(
+    () => filterTraceabilityEvents(events, activeFilters),
+    [events, activeFilters],
+  );
   const teams = useMemo(() => teamsInTimeline(events), [events]);
   const summary = query.data?.summary;
 
   const patch = (change: Partial<TraceabilityFilters>) => {
     setFilters((current) => ({ ...current, ...change }));
   };
-  const isFiltered = filters.group !== "todos" || filters.teamId !== null || filters.search !== "";
+  // Con equipo fijo, ese filtro es intrínseco: no cuenta como "filtrado por el usuario".
+  const isFiltered =
+    filters.group !== "todos" ||
+    (!lockedTeamId && filters.teamId !== null) ||
+    filters.search !== "";
 
   if (query.isLoading) {
     return <LoadingSkeleton rows={5} />;
@@ -354,7 +378,7 @@ export function TraceabilityPanel({ projectId }: { projectId: string }) {
             />
           </div>
 
-          {teams.length > 0 && (
+          {!lockedTeamId && teams.length > 0 && (
             <select
               value={filters.teamId ?? ""}
               onChange={(e) => {

@@ -325,6 +325,10 @@ export interface ProjectMemberProgress extends ProjectMember {
   tasks_total: number;
   tasks_completed: number;
   progress_pct: number;
+  // Equipos de trabajo de este proyecto a los que pertenece (vacío si ninguno).
+  // `team_ids` va en el mismo orden que `team_names`.
+  team_names: string[];
+  team_ids: string[];
 }
 
 export interface AddMemberPayload {

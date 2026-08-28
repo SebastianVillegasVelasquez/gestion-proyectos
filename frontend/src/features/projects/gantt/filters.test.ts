@@ -60,15 +60,15 @@ describe("filterGanttTasks", () => {
     expect(result.map((t) => t.team_id)).toEqual(["t2"]);
   });
 
-  it("keeps only at-risk tasks when requested", () => {
+  it("keeps only at-risk tasks when requested (vencidas o por vencer)", () => {
     const tasks = [
       task({ status: "en_progreso", due_date: "2026-06-10" }), // vencida
+      task({ status: "pendiente_por_iniciar", due_date: "2026-06-20" }), // por vencer (≤3 días)
       task({ status: "en_progreso", due_date: "2026-06-30" }), // a tiempo
       task({ status: "completada", due_date: "2026-06-01" }), // cerrada
     ];
     const result = filterGanttTasks(tasks, filters({ onlyAtRisk: true }), today);
-    expect(result).toHaveLength(1);
-    expect(result[0].due_date).toBe("2026-06-10");
+    expect(result.map((t) => t.due_date)).toEqual(["2026-06-10", "2026-06-20"]);
   });
 
   it("filters by cargo/position of the assignee", () => {

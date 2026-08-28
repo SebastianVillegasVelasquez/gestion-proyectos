@@ -47,6 +47,7 @@ export const teamKeys = {
       params.page ?? 1,
       params.pageSize ?? 50,
     ] as const,
+  mine: (projectId: string) => [...teamKeys.byProject(projectId), "mine"] as const,
   detail: (projectId: string, id: string) =>
     [...teamKeys.byProject(projectId), "detail", id] as const,
   members: (projectId: string, id: string) =>

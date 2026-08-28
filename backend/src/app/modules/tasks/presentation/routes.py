@@ -10,6 +10,7 @@ from app.core.dependencies import (
     project_repo_dependency,
     require_role,
     task_repo_dependency,
+    team_repo_dependency,
     user_repo_dependency,
     worktree_repo_dependency,
 )
@@ -198,12 +199,16 @@ async def get_task(
 async def update_task(
     task_id: UUID,
     payload: UpdateTaskRequest,
-    current_user=Depends(_admin),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
     user_repo=Depends(user_repo_dependency),
+    team_repo=Depends(team_repo_dependency),
 ):
-    return await UpdateTaskUseCase(task_repo, user_repo).execute(
-        task_id, payload, actor_id=current_user.id
+    """Editar una tarea es de administración; la excepción es que el
+    líder/supervisor de un equipo reasigne una tarea delegada a él entre sus
+    integrantes (ver `UpdateTaskUseCase`)."""
+    return await UpdateTaskUseCase(task_repo, user_repo, team_repo).execute(
+        task_id, payload, actor_id=current_user.id, actor_role=current_user.role
     )
 
 

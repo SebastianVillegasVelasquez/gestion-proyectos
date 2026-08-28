@@ -92,6 +92,11 @@ class ProjectMemberProgressResponse(BaseModelConfig):
     tasks_total: int
     tasks_completed: int
     progress_pct: int
+    # Equipos de trabajo de ESTE proyecto a los que pertenece el integrante.
+    # Vacío si aún no está en ninguno. Un integrante puede estar en varios.
+    # `team_ids` va en el mismo orden que `team_names` (para enlazar cada chip).
+    team_names: list[str] = []
+    team_ids: list[UUID] = []
 
 
 class ResponseProjectMember(BaseModelConfig):

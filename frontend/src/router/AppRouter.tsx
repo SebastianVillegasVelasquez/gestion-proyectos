@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useParams } from "react-router";
 import LoginPage from "@/features/auth/components/Login.tsx";
 import { AppLayout } from "@/components/layout/AppLayout.tsx";
 import { ProtectedRoute } from "@/router/ProtectedRoute.tsx";
@@ -29,6 +29,17 @@ const ProjectProgressPage = lazy(() =>
     default: m.ProjectProgressPage,
   })),
 );
+const MyProjectsPage = lazy(() =>
+  import("@/features/dashboard/components/MyProjectsPage.tsx").then((m) => ({
+    default: m.MyProjectsPage,
+  })),
+);
+// "Equipos de trabajo" de un proyecto y "Espacios de trabajo" son la misma cosa:
+// las rutas por proyecto redirigen al espacio de trabajo con el equipo elegido.
+function RedirectTeamToWorkspace() {
+  const { teamId } = useParams<{ teamId?: string }>();
+  return <Navigate to={teamId ? `/workspace?team=${teamId}` : "/workspace"} replace />;
+}
 const AllProjectsPage = lazy(() =>
   import("@/features/projects/components/AllProjectsPage.tsx").then((m) => ({
     default: m.AllProjectsPage,
@@ -106,8 +117,12 @@ export const AppRouter = () => (
         <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
           <Route path="/feedback" element={<FeedbackInbox />} />
         </Route>
-        {/* Progreso de proyecto (solo lectura) — el backend valida membresía */}
+        {/* Vistas del rol User acotadas por membresía (el backend valida el
+            acceso; no van dentro del RoleGuard de administración). */}
+        <Route path="/mis-proyectos" element={<MyProjectsPage />} />
         <Route path="/proyectos/:projectId/progreso" element={<ProjectProgressPage />} />
+        <Route path="/proyectos/:projectId/equipos" element={<RedirectTeamToWorkspace />} />
+        <Route path="/proyectos/:projectId/equipos/:teamId" element={<RedirectTeamToWorkspace />} />
 
         {/* Solo administración: gestión global de proyectos y colaboradores */}
         <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
