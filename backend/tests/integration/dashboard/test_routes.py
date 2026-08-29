@@ -7,6 +7,8 @@ from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.models import Team, TeamMember
 
 
 async def _make_work_item(db_session, project_id, nombre="Programa"):
@@ -349,3 +351,139 @@ class TestMyDashboardRoutes:
             f"/api/v1/dashboard/me/projects/{project_b.id}", headers=member_headers
         )
         assert response.status_code == 404
+
+    async def test_me_project_progress_includes_tasks_without_due_date(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        """Regresión: una tarea propia sin fecha límite rompía la serialización
+        (`due_date` era obligatorio) y devolvía 500 en producción. Ahora la tarea
+        aparece con `due_date` nulo en vez de ocultarse o tumbar la vista."""
+        project_a, _ = await _seed_user_scope(db_session, member_user, admin_user)
+        item = await _make_work_item(db_session, project_a.id, nombre="Sin fechas")
+        await _insert_task(
+            db_session,
+            project_a.id,
+            item.id,
+            "Mía sin fecha",
+            TaskStatus.EN_PROGRESO,
+            None,
+            member_user.id,
+        )
+        await db_session.commit()
+
+        response = await client.get(
+            f"/api/v1/dashboard/me/projects/{project_a.id}", headers=member_headers
+        )
+        assert response.status_code == 200
+        body = response.json()
+        sin_fecha = next(t for t in body["my_tasks"] if t["title"] == "Mía sin fecha")
+        assert sin_fecha["due_date"] is None
+
+    async def test_me_panels_task_board_allows_tasks_without_due_date(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        """El tablero del dashboard tampoco debe caerse por una tarea sin fecha."""
+        project_a, _ = await _seed_user_scope(db_session, member_user, admin_user)
+        item = await _make_work_item(db_session, project_a.id, nombre="Sin fechas")
+        await _insert_task(
+            db_session,
+            project_a.id,
+            item.id,
+            "Tablero sin fecha",
+            TaskStatus.PENDIENTE_POR_INICIAR,
+            None,
+            member_user.id,
+        )
+        await db_session.commit()
+
+        response = await client.get(
+            "/api/v1/dashboard/me/panels", headers=member_headers
+        )
+        assert response.status_code == 200
+        body = response.json()
+        board = {t["title"]: t for t in body["task_board"]}
+        assert board["Tablero sin fecha"]["due_date"] is None
+        # Un vencimiento necesita fecha: la tarea sin fecha no entra ahí.
+        assert "Tablero sin fecha" not in {
+            d["title"] for d in body["upcoming_deadlines"]
+        }
+
+    async def test_me_panels_upcoming_deadlines_window(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        """ "Próximos vencimientos" del rol User = lo atrasado + lo que vence en
+        los próximos 7 días. Fuera de esa ventana, cerrado o sin fecha: no entra."""
+        project_a, _ = await _seed_user_scope(db_session, member_user, admin_user)
+        item = await _make_work_item(db_session, project_a.id, nombre="Ventana")
+        today = datetime.date.today()
+        casos = [
+            ("Atrasada", TaskStatus.EN_PROGRESO, today - datetime.timedelta(days=3)),
+            (
+                "En 3 días",
+                TaskStatus.PENDIENTE_POR_INICIAR,
+                today + datetime.timedelta(days=3),
+            ),
+            ("En 6 días", TaskStatus.EN_PROGRESO, today + datetime.timedelta(days=6)),
+            (
+                "En 20 días",
+                TaskStatus.PENDIENTE_POR_INICIAR,
+                today + datetime.timedelta(days=20),
+            ),
+            (
+                "Cerrada pronto",
+                TaskStatus.COMPLETADA,
+                today + datetime.timedelta(days=2),
+            ),
+            ("Sin fecha", TaskStatus.EN_PROGRESO, None),
+        ]
+        for titulo, estado, due in casos:
+            await _insert_task(
+                db_session, project_a.id, item.id, titulo, estado, due, member_user.id
+            )
+        await db_session.commit()
+
+        response = await client.get(
+            "/api/v1/dashboard/me/panels", headers=member_headers
+        )
+        assert response.status_code == 200
+        titulos = [d["title"] for d in response.json()["upcoming_deadlines"]]
+        # Solo lo abierto, con fecha y dentro de la ventana; ordenado por fecha asc
+        # ("Mía vencida" viene del seed base: today-2, también dentro de la ventana).
+        assert titulos == ["Atrasada", "Mía vencida", "En 3 días", "En 6 días"]
+
+    async def test_indirect_team_member_sees_project(
+        self, client, member_headers, member_user, admin_user, db_session
+    ):
+        """Acceso vía equipo: el usuario está en un equipo del Proyecto B pero NO
+        en `project_members`. Aun así el proyecto aparece en su dashboard y la
+        vista de progreso abre (antes daba 404). Simula una fila heredada: el
+        `TeamMember` se crea por ORM porque el endpoint ya no lo permitiría."""
+        _, project_b = await _seed_user_scope(db_session, member_user, admin_user)
+        team = Team(id=uuid.uuid4(), project_id=project_b.id, name="Equipo B")
+        db_session.add(team)
+        await db_session.flush()
+        db_session.add(
+            TeamMember(
+                team_id=team.id,
+                user_id=member_user.id,
+                team_role=TeamRole.INTEGRANTE,
+            )
+        )
+        await db_session.commit()
+
+        listado = await client.get(
+            "/api/v1/dashboard/me/projects", headers=member_headers
+        )
+        assert listado.status_code == 200
+        assert "Proyecto B" in {p["name"] for p in listado.json()}
+
+        progreso = await client.get(
+            f"/api/v1/dashboard/me/projects/{project_b.id}", headers=member_headers
+        )
+        assert progreso.status_code == 200
+
+        resumen = await client.get(
+            "/api/v1/dashboard/me/summary", headers=member_headers
+        )
+        # Proyecto A (miembro directo) + Proyecto B (vía equipo).
+        assert resumen.json()["active_projects"] == 2

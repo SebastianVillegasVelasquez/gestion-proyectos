@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Sequence
 from uuid import UUID
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, delete, func, select
 from sqlalchemy.orm import selectinload
 
 from app.modules.identity.infrastructure.models import User
@@ -250,3 +250,17 @@ class TaskRepository(BaseRepository[Task]):
             TaskDependency.depends_on_id == depends_on_id,
         )
         return (await self._session.execute(query)).first() is not None
+
+    async def delete_dependency(self, task_id: UUID, depends_on_id: UUID) -> bool:
+        """Borra la arista FtS (borrado físico: la tabla no tiene soft-delete).
+
+        Devuelve True si se borró alguna fila, False si no existía.
+        """
+        result = await self._session.execute(
+            delete(TaskDependency).where(
+                TaskDependency.task_id == task_id,
+                TaskDependency.depends_on_id == depends_on_id,
+            )
+        )
+        await self._session.flush()
+        return bool(getattr(result, "rowcount", 0))

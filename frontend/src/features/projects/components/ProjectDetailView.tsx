@@ -84,9 +84,9 @@ const SECTIONS: {
     accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
   },
   {
-    to: "informe",
-    label: "Informe",
-    meta: "Estado del proyecto y exportación",
+    to: "analiticas",
+    label: "Analíticas",
+    meta: "Rendimiento del proyecto en el tiempo y exportación",
     icon: FileSpreadsheet,
     accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
   },

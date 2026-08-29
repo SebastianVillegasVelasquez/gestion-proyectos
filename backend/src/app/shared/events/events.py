@@ -25,6 +25,9 @@ class TaskSubmitted(DomainEvent):
     work_item_id: uuid.UUID
     task_id: uuid.UUID
     assigned_id: uuid.UUID
+    # Proyecto de la tarea: permite construir el enlace "ver tarea" de la
+    # notificación sin otra consulta. Opcional por compatibilidad hacia atrás.
+    project_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,27 @@ class TaskCreated(DomainEvent):
     work_item_id: uuid.UUID | None
     task_id: uuid.UUID
     assigned_id: uuid.UUID
+    project_id: uuid.UUID | None = None
+    # Equipo de la tarea, si está delegada a uno: deja que el manejador de
+    # notificaciones respete las preferencias por-equipo del destinatario.
+    team_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class TaskAssigned(DomainEvent):
+    """Se (re)asignó una tarea a una persona concreta después de crearla.
+
+    Cubre el hueco de `TaskCreated`: cambiar el responsable de una tarea ya
+    existente (reasignación del líder, o alta de tarea de equipo que fija el
+    responsable en un segundo paso) no disparaba ningún aviso.
+    """
+
+    task_id: uuid.UUID
+    assignee_id: uuid.UUID
+    assigned_by: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
+    work_item_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +66,9 @@ class TaskCompleted(DomainEvent):
     project_id: uuid.UUID
     task_id: uuid.UUID
     assigned_id: uuid.UUID
+    team_id: uuid.UUID | None = None
+    # Quién aprobó: para no notificarle su propia acción.
+    actor_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +78,7 @@ class TaskReturned(DomainEvent):
     project_id: uuid.UUID
     task_id: uuid.UUID
     assigned_id: uuid.UUID
+    team_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +95,8 @@ class TaskCommented(DomainEvent):
     # Responsable de la tarea, si lo hay: se entera de que le comentaron.
     assignee_id: uuid.UUID | None
     mentioned_user_ids: tuple[uuid.UUID, ...] = ()
+    project_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)

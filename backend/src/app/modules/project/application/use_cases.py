@@ -2,17 +2,13 @@ from datetime import date, datetime, timezone
 from typing import List
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.modules.project.domain.services import ProjectMemberService, ProjectService
-from app.modules.project.infrastructure.enums import ProjectRole
-from app.modules.project.infrastructure.models import ProjectMember, ProjectNote
+from app.modules.project.infrastructure.models import ProjectNote
 from app.modules.project.infrastructure.repository import (
     ProjectMemberRepository,
     ProjectRepository,
 )
 from app.modules.project.presentation.schemas import (
-    AssignTeamResponse,
     ClientAccessResponse,
     CreateProjectNoteRequest,
     CreateProjectRequest,
@@ -23,7 +19,6 @@ from app.modules.project.presentation.schemas import (
     ProjectResponse,
     UpdateProjectRequest,
 )
-from app.modules.teams.domain.repository import TeamRepository
 from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
@@ -282,51 +277,3 @@ class RemoveProjectMemberUseCase:
 
     async def execute(self, member_id: UUID) -> None:
         await self.service.remove_member(member_id)
-
-
-class AssignTeamToProjectUseCase:
-    """Opción A (snapshot): copia los integrantes de un equipo al proyecto.
-
-    Cada integrante entra como `integrante` del proyecto (ajustable luego) y se
-    marca `source_team_id` para auditar el origen. No duplica si ya es miembro.
-    """
-
-    def __init__(
-        self,
-        project_repo: Repository,
-        member_repo: ProjectMemberRepository,
-        team_repo: TeamRepository,
-    ):
-        self.project_repo = project_repo
-        self.member_repo = member_repo
-        self.team_repo = team_repo
-
-    async def execute(self, project_id: UUID, team_id: UUID) -> AssignTeamResponse:
-        project = await self.project_repo.get_by_id(project_id)
-        if not project or project.is_deleted:
-            raise HTTPException(status_code=404, detail="El proyecto no existe")
-
-        team = await self.team_repo.get_team(project_id, team_id)
-        if not team or team.is_deleted:
-            raise HTTPException(status_code=404, detail="El equipo no existe")
-
-        assigned = 0
-        skipped = 0
-        for team_member in await self.team_repo.list_members(team_id):
-            existing = await self.member_repo.get_member_by_project_id_and_user_id(
-                project_id=project_id, user_id=team_member.user_id
-            )
-            if existing is not None:
-                skipped += 1
-                continue
-            await self.member_repo.add(
-                ProjectMember(
-                    project_id=project_id,
-                    user_id=team_member.user_id,
-                    project_role=ProjectRole.INTEGRANTE,
-                    source_team_id=team_id,
-                )
-            )
-            assigned += 1
-
-        return AssignTeamResponse(assigned=assigned, skipped=skipped)

@@ -13,7 +13,13 @@ from app.modules.tasks.presentation.schemas import (
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
-from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
+from app.shared.exceptions import (
+    ConflictError,
+    CyclicDependencyError,
+    NotFoundError,
+    ValidationError,
+)
+from app.shared.graph import would_create_cycle
 
 
 class TaskService:
@@ -104,13 +110,30 @@ class TaskDependencyService:
         if rules.is_self_dependency(task_id, depends_on_id):
             raise ConflictError("Una tarea no puede depender de sí misma")
 
+        tasks: dict[str, "Task"] = {}
         for tid, name in ((task_id, "tarea"), (depends_on_id, "tarea origen")):
             t = await self.repo.get_by_id(tid)
             if not t or t.is_deleted:
                 raise NotFoundError(f"La {name} no existe")
+            tasks[name] = t
+
+        if tasks["tarea"].project_id != tasks["tarea origen"].project_id:
+            raise ValidationError("Las dependencias deben ser del mismo proyecto")
 
         if await self.repo.dependency_exists(task_id, depends_on_id):
             raise ConflictError("La dependencia ya existe")
+
+        # Anti-ciclos: la nueva arista no puede cerrar un ciclo con las que ya
+        # existen en el proyecto (misma regla que las dependencias de la
+        # estructura, en app.shared.graph).
+        edges = [
+            (d.task_id, d.depends_on_id)
+            for d in await self.repo.get_dependencies_by_project(
+                tasks["tarea"].project_id
+            )
+        ]
+        if would_create_cycle(edges, task_id, depends_on_id):
+            raise CyclicDependencyError("La dependencia crearía un ciclo")
 
         dep = await self.repo.add_dependency(
             TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
@@ -118,6 +141,11 @@ class TaskDependencyService:
         return TaskDependencyResponse(
             id=dep.id, task_id=dep.task_id, depends_on_id=dep.depends_on_id
         )
+
+    async def remove_dependency(self, task_id: UUID, depends_on_id: UUID) -> None:
+        """Quita una dependencia FtS. Idempotente-ish: 404 si no existía."""
+        if not await self.repo.delete_dependency(task_id, depends_on_id):
+            raise NotFoundError("La dependencia no existe")
 
     async def list_dependencies(self, task_id: UUID) -> list["TaskDependencyResponse"]:
         return [
@@ -156,11 +184,13 @@ class TaskStatusService:
         if not task or task.is_deleted:
             raise NotFoundError("La tarea no existe")
 
-        if data.status == TaskStatus.EN_PROGRESO:
+        # Regla FtS: mientras la tarea de la que se depende no esté COMPLETADA,
+        # esta no puede avanzar de estado. Devolver o cancelar sí se permiten.
+        if data.status in rules.FORWARD_STATUSES and data.status != task.status:
             deps = await self.task_repo.get_dependencies(task.id)
             if rules.incomplete_dependency_ids(deps):
                 raise ValidationError(
-                    "No puedes iniciar: hay dependencias sin completar"
+                    "No puedes avanzar: la tarea de la que depende aún no está completada"
                 )
 
         patch: dict = {"status": data.status}

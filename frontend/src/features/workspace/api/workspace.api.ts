@@ -1,4 +1,5 @@
 import http from "@/lib/http";
+import type { Task } from "@/features/projects/types/api.types";
 import type {
   CommentType,
   DeliverableStatus,
@@ -39,6 +40,8 @@ export interface ApiVersion {
   type: ResourceType;
   url: string;
   note: string | null;
+  /** Instrucciones para el siguiente rol. Interno del equipo (no va al cliente). */
+  observations: string | null;
   uploaded_by: string;
   uploaded_at: string;
 }
@@ -125,12 +128,37 @@ export interface NewVersionBody {
   type: ResourceType;
   url: string;
   note?: string;
+  observations?: string;
+}
+
+/** Corrección de una versión ya subida. Parcial: solo viaja lo que cambia. */
+export interface EditVersionBody {
+  type?: ResourceType;
+  url?: string;
+  note?: string;
+  observations?: string;
 }
 
 export interface NewCommentBody {
   content: string;
   type: CommentType;
   mentions: string[];
+}
+
+/**
+ * Alta de una tarea desde el espacio del equipo (la crea el líder/supervisor).
+ * El equipo y el proyecto salen del contexto; aquí solo el qué, de qué elemento
+ * cuelga, de qué tarea es subtarea y —opcional— quién la hace.
+ */
+export interface NewTeamTaskBody {
+  title: string;
+  assignee_id?: string | null;
+  work_item_id?: string | null;
+  parent_task_id?: string | null;
+  start_date?: string | null;
+  due_date?: string | null;
+  duration_days?: number | null;
+  priority?: string;
 }
 
 const base = (teamId: string) => `/teams/${teamId}`;
@@ -149,12 +177,23 @@ export const workspaceApi = {
 
   tasks: (teamId: string) => http.get<ApiTeamTask[]>(`${base(teamId)}/tasks`).then((r) => r.data),
 
+  createTask: (teamId: string, body: NewTeamTaskBody) =>
+    http.post<Task>(`${base(teamId)}/tasks`, body).then((r) => r.data),
+
   createDeliverable: (teamId: string, body: CreateDeliverableBody) =>
     http.post<ApiDeliverable>(`${base(teamId)}/deliverables`, body).then((r) => r.data),
 
   addVersion: (teamId: string, deliverableId: string, body: NewVersionBody) =>
     http
       .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions`, body)
+      .then((r) => r.data),
+
+  editVersion: (teamId: string, deliverableId: string, versionId: string, body: EditVersionBody) =>
+    http
+      .patch<ApiDeliverable>(
+        `${base(teamId)}/deliverables/${deliverableId}/versions/${versionId}`,
+        body,
+      )
       .then((r) => r.data),
 
   addComment: (teamId: string, deliverableId: string, body: NewCommentBody) =>

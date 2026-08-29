@@ -40,7 +40,7 @@ export function ProjectProgressPage() {
   const { data, isLoading, isError, refetch } = useMyProjectProgress(projectId);
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-5">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4 sm:p-5">
       <PageHeader
         title={data?.name ?? "Progreso del proyecto"}
         description={data?.coordinator ? `Coordinación: ${data.coordinator}` : undefined}

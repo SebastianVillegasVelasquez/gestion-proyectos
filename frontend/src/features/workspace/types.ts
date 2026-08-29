@@ -87,6 +87,9 @@ export interface DeliverableVersion {
   uploadedBy: string; // WorkspaceMember.id
   uploadedAt: string; // ISO
   note: string;
+  /** Instrucciones de quien entrega para el siguiente rol de la cadena.
+   * Trazabilidad interna del equipo: nunca se muestra al cliente. */
+  observations: string;
 }
 
 export interface FeedbackComment {

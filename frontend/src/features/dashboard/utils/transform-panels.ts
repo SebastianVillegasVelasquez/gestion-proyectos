@@ -40,8 +40,14 @@ function parseISO(iso: string): { year: number; month: number; day: number } {
   return { year, month, day };
 }
 
-/** "2026-06-14" -> "14 Jun" (etiqueta corta para los tags de tarea). */
-export function formatShortDate(iso: string): string {
+/**
+ * "2026-06-14" -> "14 Jun" (etiqueta corta para los tags de tarea).
+ * Sin fecha (tarea aún sin fecha límite) -> "Sin fecha".
+ */
+export function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) {
+    return "Sin fecha";
+  }
   const { month, day } = parseISO(iso);
   const abbr = MONTHS_ABBR[month - 1] ?? "";
   return `${String(day)} ${abbr}`;

@@ -33,7 +33,8 @@ export interface DashboardTaskItem {
   project_name: string | null;
   /** Proyecto al que pertenece: permite agrupar y enlazar desde "Mis tareas". */
   project_id: string | null;
-  due_date: string; // YYYY-MM-DD
+  /** YYYY-MM-DD, o null si la tarea aún no tiene fecha límite fijada. */
+  due_date: string | null;
 }
 
 export interface DashboardProjectItem {

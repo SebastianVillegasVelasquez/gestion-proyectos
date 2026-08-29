@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, FolderTree } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  UploadCloud,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateRange, taskRisk } from "../../utils/task-dates";
 import type { Task, WorkItemTree } from "../../types/api.types";
@@ -37,11 +44,17 @@ function TaskLine({
   who,
   today,
   onOpen,
+  onDeliver,
+  onMarkDelivered,
 }: {
   task: StructureTask;
   who: string;
   today: string;
   onOpen?: () => void;
+  /** "Entregar con adjunto": abre el modal de nuevo entregable. */
+  onDeliver?: () => void;
+  /** "Entregar sin adjunto": pasa la tarea a revisión sin crear entregable. */
+  onMarkDelivered?: () => void;
 }) {
   const inner = (
     <>
@@ -53,8 +66,8 @@ function TaskLine({
     </>
   );
   const cls =
-    "flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-left";
-  return onOpen ? (
+    "flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-left";
+  const clickable = onOpen ? (
     <button
       type="button"
       onClick={onOpen}
@@ -64,6 +77,37 @@ function TaskLine({
     </button>
   ) : (
     <div className={cls}>{inner}</div>
+  );
+
+  if (!onDeliver && !onMarkDelivered) {
+    return clickable;
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      {clickable}
+      {onDeliver && (
+        <button
+          type="button"
+          onClick={onDeliver}
+          title="Entregar con un adjunto (crea un entregable revisable)"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1.5 text-xs font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
+        >
+          <UploadCloud className="size-3.5" />
+          Entregar
+        </button>
+      )}
+      {onMarkDelivered && (
+        <button
+          type="button"
+          onClick={onMarkDelivered}
+          title="Marcar como entregada sin adjunto (pasa a revisión)"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent"
+        >
+          <Check className="size-3.5" />
+          Sin adjunto
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -77,6 +121,9 @@ function Node<T extends StructureTask>({
   resolveWho,
   today,
   onOpenTask,
+  onDeliverTask,
+  onMarkDeliveredTask,
+  canDeliverTask,
 }: {
   node: WorkItemTree;
   depth: number;
@@ -85,6 +132,9 @@ function Node<T extends StructureTask>({
   resolveWho: (task: T) => string;
   today: string;
   onOpenTask?: (task: T) => void;
+  onDeliverTask?: (task: T) => void;
+  onMarkDeliveredTask?: (task: T) => void;
+  canDeliverTask?: (task: T) => boolean;
 }) {
   const [open, setOpen] = useState(true);
   const total = countInSubtree.get(node.id) ?? 0;
@@ -133,6 +183,20 @@ function Node<T extends StructureTask>({
                     }
                   : undefined
               }
+              onDeliver={
+                onDeliverTask && (canDeliverTask?.(task) ?? true)
+                  ? () => {
+                      onDeliverTask(task);
+                    }
+                  : undefined
+              }
+              onMarkDelivered={
+                onMarkDeliveredTask && (canDeliverTask?.(task) ?? true)
+                  ? () => {
+                      onMarkDeliveredTask(task);
+                    }
+                  : undefined
+              }
             />
           ))}
           {node.children.map((child) => (
@@ -145,6 +209,9 @@ function Node<T extends StructureTask>({
               resolveWho={resolveWho}
               today={today}
               onOpenTask={onOpenTask}
+              onDeliverTask={onDeliverTask}
+              onMarkDeliveredTask={onMarkDeliveredTask}
+              canDeliverTask={canDeliverTask}
             />
           ))}
         </div>
@@ -163,12 +230,20 @@ export function TeamStructureView<T extends StructureTask>({
   tasks,
   resolveWho,
   onOpenTask,
+  onDeliverTask,
+  onMarkDeliveredTask,
+  canDeliverTask,
   today,
 }: {
   tree: WorkItemTree[];
   tasks: T[];
   resolveWho: (task: T) => string;
   onOpenTask?: (task: T) => void;
+  /** Si se pasa, cada tarea muestra un botón "Entregar" (atajo al modal de
+   * nuevo entregable). `canDeliverTask` acota a qué tareas se les ofrece. */
+  onDeliverTask?: (task: T) => void;
+  onMarkDeliveredTask?: (task: T) => void;
+  canDeliverTask?: (task: T) => boolean;
   today: string;
 }) {
   const tasksByItem = useMemo(() => {
@@ -232,6 +307,9 @@ export function TeamStructureView<T extends StructureTask>({
             resolveWho={resolveWho}
             today={today}
             onOpenTask={onOpenTask}
+            onDeliverTask={onDeliverTask}
+            onMarkDeliveredTask={onMarkDeliveredTask}
+            canDeliverTask={canDeliverTask}
           />
         ))
       )}
@@ -251,6 +329,20 @@ export function TeamStructureView<T extends StructureTask>({
                 onOpenTask
                   ? () => {
                       onOpenTask(task);
+                    }
+                  : undefined
+              }
+              onDeliver={
+                onDeliverTask && (canDeliverTask?.(task) ?? true)
+                  ? () => {
+                      onDeliverTask(task);
+                    }
+                  : undefined
+              }
+              onMarkDelivered={
+                onMarkDeliveredTask && (canDeliverTask?.(task) ?? true)
+                  ? () => {
+                      onMarkDeliveredTask(task);
                     }
                   : undefined
               }

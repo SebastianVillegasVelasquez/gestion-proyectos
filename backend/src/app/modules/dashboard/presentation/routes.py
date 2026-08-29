@@ -93,7 +93,9 @@ async def get_my_dashboard_summary(
 async def get_my_dashboard_panels(
     board_limit: int = Query(6, ge=1, le=20),
     projects_limit: int = Query(8, ge=1, le=20),
-    deadlines_limit: int = Query(8, ge=1, le=20),
+    # "Próximos vencimientos" del User se acota a los próximos 7 días (+ atrasadas);
+    # ese rango ya lo limita, pero damos margen por si la semana viene cargada.
+    deadlines_limit: int = Query(30, ge=1, le=50),
     current_user: UserResponse = Depends(get_current_user),
     repo: DashboardRepository = Depends(dashboard_repo_dependency),
 ) -> DashboardPanelsResponse:

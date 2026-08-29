@@ -25,6 +25,7 @@ from app.modules.notifications.presentation.routes import (
     router as notifications_router,
 )
 from app.modules.notifications.presentation.websocket import router as ws_router
+from app.modules.reminders.presentation.routes import router as reminders_router
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.project.structure.presentation.routes import router as worktree_router
 from app.modules.tasks.presentation.routes import router as tasks_router
@@ -41,6 +42,7 @@ from app.shared.broadcasting.redis import RedisBroadcaster
 from app.shared.connection_manager import ConnectionManager
 from app.shared.exceptions import (
     ConflictError,
+    CyclicDependencyError,
     DomainException,
     ForbiddenError,
     NotFoundError,
@@ -86,9 +88,16 @@ async def lifespan(app: FastAPI):
     app.state.broadcaster = broadcaster
     app.state.manager = ConnectionManager(broadcaster=broadcaster)
 
+    # ── Bucles de avisos por tiempo (tareas atrasadas + recordatorios) ──
+    from app.core.overdue_worker import start_overdue_worker
+
+    background_tasks = start_overdue_worker(settings)
+
     yield
 
     # ── Shutdown en orden inverso ──
+    for task in background_tasks:
+        task.cancel()
     await app.state.manager.shutdown()
     await app.state.broadcaster.disconnect()
 
@@ -142,6 +151,11 @@ async def conflict_handler(request: Request, exc: ConflictError):
     return JSONResponse(status_code=409, content={"detail": exc.message})
 
 
+@app.exception_handler(CyclicDependencyError)
+async def cyclic_dependency_handler(request: Request, exc: CyclicDependencyError):
+    return JSONResponse(status_code=409, content={"detail": exc.message})
+
+
 @app.exception_handler(ValidationError)
 async def validation_handler(request: Request, exc: ValidationError):
     return JSONResponse(status_code=422, content={"detail": exc.message})
@@ -186,5 +200,6 @@ app.include_router(teams_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(reminders_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")

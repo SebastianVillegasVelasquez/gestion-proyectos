@@ -16,9 +16,11 @@ from app.core.dependencies import (
 )
 from app.modules.tasks.application.use_cases import (
     AddTaskDependencyUseCase,
+    RemoveTaskDependencyUseCase,
     AttachTaskToWorkItemUseCase,
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
+    CreateTeamTaskUseCase,
     AddCommentUseCase,
     CreateTasksFromBranchUseCase,
     DeleteCommentUseCase,
@@ -44,6 +46,7 @@ from app.modules.tasks.presentation.schemas import (
     CommentResponse,
     CreateCommentRequest,
     CreateTaskRequest,
+    CreateTeamTaskRequest,
     CreateTimeEntryRequest,
     TaskEffortResponse,
     TimeEntryResponse,
@@ -203,11 +206,12 @@ async def update_task(
     task_repo=Depends(task_repo_dependency),
     user_repo=Depends(user_repo_dependency),
     team_repo=Depends(team_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
 ):
     """Editar una tarea es de administración; la excepción es que el
     líder/supervisor de un equipo reasigne una tarea delegada a él entre sus
     integrantes (ver `UpdateTaskUseCase`)."""
-    return await UpdateTaskUseCase(task_repo, user_repo, team_repo).execute(
+    return await UpdateTaskUseCase(task_repo, user_repo, team_repo, bus).execute(
         task_id, payload, actor_id=current_user.id, actor_role=current_user.role
     )
 
@@ -254,6 +258,30 @@ async def get_team_tasks(
     return await GetTasksByTeamUseCase(task_repo).execute(team_id)
 
 
+@router.post(
+    "/teams/{team_id}/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_team_task(
+    team_id: UUID,
+    payload: CreateTeamTaskRequest,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+    team_repo=Depends(team_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """El líder o supervisor de un equipo crea una tarea de SU equipo: bolsa
+    (sin responsable) o ya asignada a un integrante, colgada de un elemento y/o
+    subtarea de otra. El proyecto sale del equipo, no del cuerpo."""
+    return await CreateTeamTaskUseCase(
+        task_repo, work_tree_repo, user_repo, project_repo, team_repo, bus
+    ).execute(team_id, payload, actor_id=current_user.id)
+
+
 # ── Dependencias y estado ────────────────────────────────────────────────────
 @router.post(
     "/tasks/{task_id}/dependencies",
@@ -269,6 +297,20 @@ async def add_task_dependency(
     return await AddTaskDependencyUseCase(task_repo).execute(
         task_id, payload.depends_on_id
     )
+
+
+@router.delete(
+    "/tasks/{task_id}/dependencies/{depends_on_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_task_dependency(
+    task_id: UUID,
+    depends_on_id: UUID,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Quita una dependencia FtS de la tarea (edición posterior a la creación)."""
+    await RemoveTaskDependencyUseCase(task_repo).execute(task_id, depends_on_id)
 
 
 @router.get(

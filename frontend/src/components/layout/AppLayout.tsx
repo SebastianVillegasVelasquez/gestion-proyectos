@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
+import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
@@ -104,6 +105,7 @@ export const AppLayout = () => {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <RemindersBell placement="down" />
               <NotificationBell placement="down" />
               <button
                 type="button"

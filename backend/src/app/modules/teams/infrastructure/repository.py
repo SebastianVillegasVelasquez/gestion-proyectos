@@ -39,6 +39,9 @@ class SqlAlchemyTeamRepository(TeamRepository):
         )
         return result.scalars().first()
 
+    async def get_team_by_id(self, team_id: UUID) -> Team | None:
+        return await self._session.get(Team, team_id)
+
     async def get_team_by_name(self, project_id: UUID, name: str) -> Team | None:
         result = await self._session.execute(
             select(Team).where(Team.project_id == project_id, Team.name == name)

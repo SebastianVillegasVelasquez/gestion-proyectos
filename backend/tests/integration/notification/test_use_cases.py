@@ -69,4 +69,5 @@ class TestNotificationUseCases:
         assert notif.payload == {
             "work_item_id": str(work_item["id"]),
             "task_id": str(task.json()["id"]),
+            "project_id": project_id,
         }

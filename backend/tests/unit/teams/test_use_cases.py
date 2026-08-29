@@ -59,6 +59,9 @@ class FakeTeamRepository(TeamRepository):
             return None
         return team
 
+    async def get_team_by_id(self, team_id):
+        return self._teams.get(team_id)
+
     async def get_team_by_name(self, project_id, name):
         for team in self._teams.values():
             if (
@@ -140,6 +143,23 @@ class FakeTeamRepository(TeamRepository):
             member.user = user
 
 
+class FakeProjectMemberRepository:
+    """Stub del repositorio de miembros de proyecto (otro bounded context).
+
+    Solo implementa lo que `AddTeamMemberUseCase` consulta: si un usuario ya
+    pertenece a un proyecto. `join` es un helper de test para sembrar filas.
+    """
+
+    def __init__(self) -> None:
+        self._members: dict[tuple[uuid.UUID, uuid.UUID], SimpleNamespace] = {}
+
+    def join(self, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        self._members[(project_id, user_id)] = SimpleNamespace(is_deleted=False)
+
+    async def get_member_by_project_id_and_user_id(self, project_id, user_id):
+        return self._members.get((project_id, user_id))
+
+
 class FakeUserRepository:
     """Stub mínimo del repositorio de usuarios (otro bounded context)."""
 
@@ -175,15 +195,23 @@ def user_repo() -> FakeUserRepository:
 
 
 @pytest.fixture
+def member_repo() -> FakeProjectMemberRepository:
+    return FakeProjectMemberRepository()
+
+
+@pytest.fixture
 def project_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
-def _register(team_repo, user_repo, **kwargs):
-    """Crea un usuario y lo hace visible tanto al stub de usuarios como al
-    directorio interno del fake de equipos (para reconstruir respuestas)."""
+def _register(team_repo, user_repo, member_repo=None, project_id=None, **kwargs):
+    """Crea un usuario y lo hace visible al stub de usuarios y al directorio del
+    fake de equipos. Si se pasan `member_repo` y `project_id`, además lo apunta
+    como integrante del proyecto (precondición para entrar a un equipo)."""
     user = user_repo.register(**kwargs)
     team_repo.users[user.id] = user
+    if member_repo is not None and project_id is not None:
+        member_repo.join(project_id, user.id)
     return user
 
 
@@ -272,14 +300,14 @@ class TestTeamUseCases:
 
 class TestTeamMemberUseCases:
     async def test_add_member_defaults_to_integrante(
-        self, team_repo, user_repo, project_id
+        self, team_repo, user_repo, member_repo, project_id
     ):
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
-        user = _register(team_repo, user_repo)
+        user = _register(team_repo, user_repo, member_repo, project_id)
 
-        member = await AddTeamMemberUseCase(team_repo, user_repo).execute(
+        member = await AddTeamMemberUseCase(team_repo, user_repo, member_repo).execute(
             project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
@@ -287,34 +315,54 @@ class TestTeamMemberUseCases:
         assert member.team_role == TeamRole.INTEGRANTE
         assert member.name == "Ana"
 
-    async def test_add_member_unknown_user(self, team_repo, user_repo, project_id):
+    async def test_add_member_unknown_user(
+        self, team_repo, user_repo, member_repo, project_id
+    ):
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
 
         with pytest.raises(NotFoundError):
-            await AddTeamMemberUseCase(team_repo, user_repo).execute(
+            await AddTeamMemberUseCase(team_repo, user_repo, member_repo).execute(
                 project_id, team.id, uuid.uuid4(), TeamRole.INTEGRANTE
             )
 
-    async def test_add_member_rejects_duplicate(self, team_repo, user_repo, project_id):
+    async def test_add_member_requires_project_membership(
+        self, team_repo, user_repo, member_repo, project_id
+    ):
+        """No se puede entrar a un equipo sin ser antes integrante del proyecto."""
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
-        user = _register(team_repo, user_repo)
-        add = AddTeamMemberUseCase(team_repo, user_repo)
+        user = _register(team_repo, user_repo)  # existe, pero no está en el proyecto
+
+        with pytest.raises(ConflictError):
+            await AddTeamMemberUseCase(team_repo, user_repo, member_repo).execute(
+                project_id, team.id, user.id, TeamRole.INTEGRANTE
+            )
+
+    async def test_add_member_rejects_duplicate(
+        self, team_repo, user_repo, member_repo, project_id
+    ):
+        team = await CreateTeamUseCase(team_repo).execute(
+            project_id, CreateTeamRequest(name="Equipo A")
+        )
+        user = _register(team_repo, user_repo, member_repo, project_id)
+        add = AddTeamMemberUseCase(team_repo, user_repo, member_repo)
 
         await add.execute(project_id, team.id, user.id, TeamRole.INTEGRANTE)
 
         with pytest.raises(ConflictError):
             await add.execute(project_id, team.id, user.id, TeamRole.INTEGRANTE)
 
-    async def test_change_member_role(self, team_repo, user_repo, project_id):
+    async def test_change_member_role(
+        self, team_repo, user_repo, member_repo, project_id
+    ):
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
-        user = _register(team_repo, user_repo)
-        await AddTeamMemberUseCase(team_repo, user_repo).execute(
+        user = _register(team_repo, user_repo, member_repo, project_id)
+        await AddTeamMemberUseCase(team_repo, user_repo, member_repo).execute(
             project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
@@ -334,12 +382,12 @@ class TestTeamMemberUseCases:
                 project_id, team.id, uuid.uuid4(), TeamRole.LIDER
             )
 
-    async def test_remove_member(self, team_repo, user_repo, project_id):
+    async def test_remove_member(self, team_repo, user_repo, member_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
-        user = _register(team_repo, user_repo)
-        await AddTeamMemberUseCase(team_repo, user_repo).execute(
+        user = _register(team_repo, user_repo, member_repo, project_id)
+        await AddTeamMemberUseCase(team_repo, user_repo, member_repo).execute(
             project_id, team.id, user.id, TeamRole.INTEGRANTE
         )
 
@@ -348,13 +396,13 @@ class TestTeamMemberUseCases:
         members = await ListTeamMembersUseCase(team_repo).execute(project_id, team.id)
         assert members == []
 
-    async def test_list_members(self, team_repo, user_repo, project_id):
+    async def test_list_members(self, team_repo, user_repo, member_repo, project_id):
         team = await CreateTeamUseCase(team_repo).execute(
             project_id, CreateTeamRequest(name="Equipo A")
         )
-        ana = _register(team_repo, user_repo, name="Ana")
-        luis = _register(team_repo, user_repo, name="Luis")
-        add = AddTeamMemberUseCase(team_repo, user_repo)
+        ana = _register(team_repo, user_repo, member_repo, project_id, name="Ana")
+        luis = _register(team_repo, user_repo, member_repo, project_id, name="Luis")
+        add = AddTeamMemberUseCase(team_repo, user_repo, member_repo)
         await add.execute(project_id, team.id, ana.id, TeamRole.INTEGRANTE)
         await add.execute(project_id, team.id, luis.id, TeamRole.LIDER)
 

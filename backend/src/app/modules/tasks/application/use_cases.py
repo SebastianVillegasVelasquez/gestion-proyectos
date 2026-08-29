@@ -25,6 +25,7 @@ from app.modules.tasks.presentation.schemas import (
     CommentResponse,
     CreateCommentRequest,
     CreateTaskRequest,
+    CreateTeamTaskRequest,
     CreateTimeEntryRequest,
     SkippedElementResponse,
     TaskEffortResponse,
@@ -44,6 +45,7 @@ from app.shared.authz import role_satisfies
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import (
+    TaskAssigned,
     TaskCommented,
     TaskCompleted,
     TaskCreated,
@@ -106,14 +108,19 @@ class CreateTaskUseCase:
                 raise NotFoundError("El usuario asignado no existe")
 
         # Fase 3: si la nueva tarea cuelga de otra (líder repartiendo subtareas
-        # de una tarea general del equipo) y no se envía team_id explícito,
-        # hereda el del padre. Así aparece en `GET /teams/{id}/tasks` sin pedir
-        # al frontend que replique la relación.
-        if data.parent_task_id is not None and data.team_id is None:
+        # de una tarea general del equipo), hereda lo que no se envíe explícito:
+        #   - `team_id`  → aparece en `GET /teams/{id}/tasks`.
+        #   - `work_item_id` → la subtarea cuelga del MISMO elemento del padre,
+        #     así modifica la estructura y el cronograma principales (no queda
+        #     invisible fuera del árbol).
+        if data.parent_task_id is not None:
             parent = await self.task_repo.get_by_id(data.parent_task_id)
             if parent is None or parent.is_deleted:
                 raise NotFoundError("La tarea padre no existe")
-            data.team_id = parent.team_id
+            if data.team_id is None:
+                data.team_id = parent.team_id
+            if data.work_item_id is None and parent.work_item_id is not None:
+                data.work_item_id = parent.work_item_id
 
         created = await self.service.add_task(data)
         if data.depends_on_id is not None:
@@ -134,11 +141,113 @@ class CreateTaskUseCase:
                     task_id=created.id,
                     work_item_id=data.work_item_id,
                     assigned_id=data.assignee_id,  # type: ignore
+                    project_id=created.project_id,
+                    team_id=data.team_id,
                     occurred_at=datetime.now(timezone.utc),
                 )
             )
 
         return created
+
+
+class CreateTeamTaskUseCase:
+    """Alta de una tarea desde el espacio de un equipo, hecha por su líder o
+    supervisor (rol de EQUIPO, no de sistema): el flujo administrativo de
+    `POST /tasks` sigue siendo solo-admin.
+
+    El equipo y el proyecto salen del contexto, no del cuerpo. Se valida que:
+      - el actor lidera o supervisa el equipo;
+      - el elemento (si viene) es del proyecto del equipo;
+      - el responsable (si viene) es integrante del equipo;
+      - la tarea padre (si viene) es de este mismo equipo.
+
+    La tarea nace como "tarea del equipo" (con `team_id`, sin responsable) y, si
+    llega `assignee_id`, se asigna acto seguido por el MISMO camino que usa el
+    líder para reasignar (`UpdateTaskUseCase`), que deja `team_id` intacto. Así
+    el XOR persona/equipo de la creación se respeta y el estado final
+    «tarea del equipo con responsable» se alcanza por la vía sancionada.
+    """
+
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        user_repo: Repository,
+        project_repo: Repository,
+        team_repo: TeamRepository,
+        bus: EventBus | None = None,
+    ):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+        self.user_repo = user_repo
+        self.project_repo = project_repo
+        self.team_repo = team_repo
+        self._bus = bus
+
+    async def execute(
+        self, team_id: UUID, data: CreateTeamTaskRequest, actor_id: UUID
+    ) -> TaskResponse:
+        actor = await self.team_repo.get_member(team_id, actor_id)
+        if actor is None or actor.team_role not in (
+            TeamRole.LIDER,
+            TeamRole.SUPERVISOR,
+        ):
+            raise ForbiddenError(
+                "Solo el líder o el supervisor del equipo crean tareas"
+            )
+
+        team = await self.team_repo.get_team_by_id(team_id)
+        if team is None:
+            raise NotFoundError("El equipo no existe")
+
+        if data.work_item_id is not None:
+            work_item = await _get_work_item(self.work_tree_repo, data.work_item_id)
+            if work_item.proyecto_id != team.project_id:
+                raise ValidationError("El elemento pertenece a otro proyecto")
+
+        if data.assignee_id is not None:
+            member = await self.team_repo.get_member(team_id, data.assignee_id)
+            if member is None:
+                raise ValidationError("El responsable no es integrante del equipo")
+
+        if data.parent_task_id is not None:
+            parent = await self.task_repo.get_by_id(data.parent_task_id)
+            if parent is None or parent.is_deleted:
+                raise NotFoundError("La tarea padre no existe")
+            if parent.team_id != team_id:
+                raise ValidationError("La tarea padre no es de este equipo")
+
+        created = await CreateTaskUseCase(
+            self.task_repo,
+            self.work_tree_repo,
+            self.user_repo,
+            self.project_repo,
+            self._bus,
+        ).execute(
+            CreateTaskRequest(
+                title=data.title,
+                priority=data.priority,
+                description=data.description,
+                project_id=team.project_id,
+                team_id=team_id,
+                work_item_id=data.work_item_id,
+                parent_task_id=data.parent_task_id,
+                depends_on_id=data.depends_on_id,
+                start_date=data.start_date,
+                due_date=data.due_date,
+            ),
+            actor_id=actor_id,
+        )
+
+        if data.assignee_id is None:
+            return created
+
+        # Ya autorizamos al actor como líder/supervisor: la asignación es un
+        # paso interno de confianza (actor_role=None), no una reasignación
+        # sujeta a nueva comprobación.
+        return await UpdateTaskUseCase(
+            self.task_repo, self.user_repo, self.team_repo, self._bus
+        ).execute(created.id, UpdateTaskRequest(assignee_id=data.assignee_id), actor_id)
 
 
 class CreateTasksFromBranchUseCase:
@@ -307,6 +416,8 @@ class AddCommentUseCase:
                     author_id=author_id,
                     assignee_id=task.assignee_id,
                     mentioned_user_ids=tuple(mentioned),
+                    project_id=getattr(task, "project_id", None),
+                    team_id=getattr(task, "team_id", None),
                     occurred_at=datetime.now(timezone.utc),
                 )
             )
@@ -532,12 +643,17 @@ class UpdateTaskUseCase:
         task_repo: TaskRepository,
         user_repo: Repository,
         team_repo: TeamRepository | None = None,
+        bus: EventBus | None = None,
     ):
         self.task_repo = task_repo
         self.user_repo = user_repo
         # Solo se necesita para autorizar la reasignación de un líder de equipo;
         # los llamadores administrativos pueden omitirlo.
         self.team_repo = team_repo
+        # Opcional: al reasignar (cambia el responsable) publica `TaskAssigned`
+        # para que se avise a la persona. Los llamadores que no lo pasen no
+        # notifican, como hasta ahora.
+        self._bus = bus
         self.service = TaskService(task_repo)
 
     async def execute(
@@ -565,9 +681,34 @@ class UpdateTaskUseCase:
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
+        previous_assignee_id = task.assignee_id
+        team_id = task.team_id
+        project_id = getattr(task, "project_id", None)
+        work_item_id = getattr(task, "work_item_id", None)
+
         before = snapshot(task)
         updated = await self.service.update_task(task_id, data)
         await TaskAuditor(self.task_repo, actor_id).diff(before, task)
+
+        # Reasignación efectiva → avisar a la persona (salvo que se asigne a sí
+        # misma). Cubre el hueco de `TaskCreated`, que solo dispara al crear.
+        if (
+            self._bus is not None
+            and updated.assignee_id is not None
+            and updated.assignee_id != previous_assignee_id
+        ):
+            await self._bus.publish(
+                TaskAssigned(
+                    task_id=updated.id,
+                    assignee_id=updated.assignee_id,
+                    assigned_by=actor_id,
+                    project_id=project_id,
+                    team_id=team_id,
+                    work_item_id=work_item_id,
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
+
         return updated
 
     async def _authorize_team_lead_reassignment(
@@ -666,6 +807,14 @@ class AddTaskDependencyUseCase:
         return await self.service.add_dependency(task_id, depends_on_id)
 
 
+class RemoveTaskDependencyUseCase:
+    def __init__(self, task_repo: TaskRepository):
+        self.service = TaskDependencyService(task_repo)
+
+    async def execute(self, task_id: UUID, depends_on_id: UUID) -> None:
+        await self.service.remove_dependency(task_id, depends_on_id)
+
+
 class GetTaskDependenciesUseCase:
     def __init__(self, task_repo: TaskRepository):
         self.service = TaskDependencyService(task_repo)
@@ -750,7 +899,9 @@ class ChangeTaskStatusUseCase:
         # Los eventos de flujo sí asumen una tarea con responsable
         # (entrega/aprobación): sin él no hay a quién notificar.
         if self._bus and new_status.assignee_id:
-            await self._emit_status_event(new_status, data.status, project_id)
+            await self._emit_status_event(
+                new_status, data.status, project_id, current_user_id
+            )
         return new_status
 
     async def _authorize(
@@ -795,6 +946,7 @@ class ChangeTaskStatusUseCase:
         task: TaskResponse,
         new_status: TaskStatus,
         project_id: UUID,
+        actor_id: UUID | None = None,
     ) -> None:
         assert task.assignee_id is not None
         now = datetime.now(timezone.utc)
@@ -804,6 +956,7 @@ class ChangeTaskStatusUseCase:
                     task_id=task.id,
                     work_item_id=project_id,
                     assigned_id=task.assignee_id,
+                    project_id=project_id,
                     occurred_at=now,
                 )
             )
@@ -813,6 +966,8 @@ class ChangeTaskStatusUseCase:
                     task_id=task.id,
                     project_id=project_id,
                     assigned_id=task.assignee_id,
+                    team_id=task.team_id,
+                    actor_id=actor_id,
                     occurred_at=now,
                 )
             )
@@ -822,6 +977,7 @@ class ChangeTaskStatusUseCase:
                     task_id=task.id,
                     project_id=project_id,
                     assigned_id=task.assignee_id,
+                    team_id=task.team_id,
                     occurred_at=now,
                 )
             )

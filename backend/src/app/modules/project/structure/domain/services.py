@@ -25,6 +25,7 @@ from app.modules.project.structure.presentation.schemas import (
     WorkItemTreeResponse,
 )
 from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
+from app.shared.graph import would_create_cycle
 
 # Nombre del tipo por defecto al que se reasignan los elementos cuyo tipo se
 # elimina. Sigue siendo un tipo real (editable/filtrable), no un hueco.
@@ -776,22 +777,9 @@ class WorkTreeService:
     def _creates_cycle(
         edges: list[tuple[UUID, UUID]], work_item_id: UUID, depends_on_id: UUID
     ) -> bool:
-        # edges = (sucesor, predecesor). Agregar (work_item → depends_on) cierra
-        # un ciclo si depends_on ya depende (transitivamente) de work_item.
-        adjacency: dict[UUID, list[UUID]] = {}
-        for successor, predecessor in edges:
-            adjacency.setdefault(successor, []).append(predecessor)
-        stack = [depends_on_id]
-        seen: set[UUID] = set()
-        while stack:
-            current = stack.pop()
-            if current == work_item_id:
-                return True
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(adjacency.get(current, []))
-        return False
+        # edges = (sucesor, predecesor). Misma comprobación que en dependencias
+        # de tareas: vive en app.shared.graph (DRY entre bounded contexts).
+        return would_create_cycle(edges, work_item_id, depends_on_id)
 
     def _build_tree(
         self, items: list[WorkItem], derivation: dict[UUID, DerivedDates]

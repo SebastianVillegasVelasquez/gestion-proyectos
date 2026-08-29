@@ -352,6 +352,72 @@ export function workloadByMember(
   return result;
 }
 
+// ── Rendimiento por integrante ──────────────────────────────────────────────
+
+export interface MemberPerformance {
+  userId: string;
+  /** Tareas asignadas a la persona, sin contar las canceladas. */
+  total: number;
+  completed: number;
+  /** Abiertas y ya vencidas: la señal de "va atrasado". */
+  overdue: number;
+  /** Abiertas (ni completadas ni canceladas). */
+  open: number;
+  inReview: number;
+  /** completed / total (0-100). "Quién va mejor" se lee de aquí. */
+  completionPct: number;
+}
+
+/**
+ * Métricas por persona para el gráfico de rendimiento del equipo. A diferencia
+ * de `workloadByMember` (solo carga abierta), aquí importa lo YA hecho y lo
+ * atrasado, para comparar integrantes entre sí.
+ */
+export function performanceByMember(
+  tasks: ApiTeamTask[],
+  memberIds: string[],
+  today: string,
+): Record<string, MemberPerformance> {
+  const acc: Record<string, MemberPerformance> = {};
+  for (const id of memberIds) {
+    acc[id] = {
+      userId: id,
+      total: 0,
+      completed: 0,
+      overdue: 0,
+      open: 0,
+      inReview: 0,
+      completionPct: 0,
+    };
+  }
+
+  for (const t of tasks) {
+    const id = t.assignee_id;
+    if (id === null || !(id in acc) || t.status === "cancelada") {
+      continue;
+    }
+    const m = acc[id];
+    m.total += 1;
+    if (t.status === "completada") {
+      m.completed += 1;
+      continue;
+    }
+    m.open += 1;
+    if (t.status === "en_revision") {
+      m.inReview += 1;
+    }
+    if (isOverdue(t, today)) {
+      m.overdue += 1;
+    }
+  }
+
+  for (const id of memberIds) {
+    const m = acc[id];
+    m.completionPct = m.total === 0 ? 0 : Math.round((m.completed / m.total) * 100);
+  }
+  return acc;
+}
+
 /** Verde <60, ámbar 60-84, rojo ≥85 — los umbrales del diseño de referencia. */
 export function workloadBarClass(pct: number): string {
   if (pct >= 85) {

@@ -12,6 +12,7 @@ from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
+from app.modules.teams.infrastructure.models import Team, TeamMember
 
 
 @dataclass
@@ -32,7 +33,9 @@ class TaskBoardItem:
     # Id del proyecto: la vista del usuario agrupa SUS tareas por proyecto y
     # enlaza a cada uno; con el nombre solo no se puede navegar.
     project_id: uuid.UUID | None
-    due_date: datetime.date
+    # Puede faltar: una tarea recién creada aún no tiene fecha límite fijada. Se
+    # muestra como "sin fecha", no se oculta (el negocio quiere ver la actividad).
+    due_date: datetime.date | None
 
 
 @dataclass
@@ -388,17 +391,34 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         return items
 
     async def _get_upcoming_deadlines(
-        self, limit: int, assignee_id: uuid.UUID | None = None
+        self,
+        limit: int,
+        assignee_id: uuid.UUID | None = None,
+        horizon_days: int | None = None,
     ) -> list[DeadlineItem]:
+        """Tareas abiertas ordenadas por fecha límite más próxima.
+
+        Un "vencimiento" necesita fecha: las tareas sin `due_date` no entran aquí
+        (sí se ven en el tablero y en "mis tareas por proyecto", como "sin fecha").
+
+        Con `horizon_days` se acota a lo que vence de aquí a N días. Lo ya vencido
+        queda incluido: su fecha también está por debajo de ese tope, y a la
+        persona le urge tanto o más que lo que vence pronto.
+        """
         status_col = Task.status
         base = self._task_with_project()
         if assignee_id is not None:
             base = base.where(Task.assignee_id == assignee_id)
+        conditions: list[ColumnElement[bool]] = [
+            status_col.notin_(_OPEN_EXCLUDED),
+            Task.due_date.is_not(None),
+        ]
+        if horizon_days is not None:
+            horizon = datetime.date.today() + datetime.timedelta(days=horizon_days)
+            conditions.append(Task.due_date <= horizon)
         rows = (
             await self._session.execute(
-                base.where(status_col.notin_(_OPEN_EXCLUDED))
-                .order_by(Task.due_date.asc())
-                .limit(limit)
+                base.where(*conditions).order_by(Task.due_date.asc()).limit(limit)
             )
         ).all()
         return [
@@ -521,12 +541,31 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         return items
 
     # ── Variantes por usuario (rol User) ──────────────────────────────────────
-    def _member_project_ids(self, user_id: uuid.UUID):
-        """Subconsulta con los IDs de proyectos donde el usuario es miembro."""
-        return select(ProjectMember.project_id).where(
+    def _accessible_project_ids(self, user_id: uuid.UUID):
+        """IDs de proyectos que el usuario puede ver en su dashboard.
+
+        Dos vías: miembro directo (`project_members`) o integrante de alguno de
+        sus equipos, ya que un equipo vive dentro de un proyecto
+        (`team_members` -> `teams.project_id`). El acceso vía equipo es de solo
+        lectura: aparece en el dashboard y abre la vista de progreso, pero no
+        otorga permisos de gestión (esos siguen mirando `project_members`).
+
+        `UNION` deduplica, así que un proyecto al que se llega por ambas vías
+        cuenta una sola vez.
+        """
+        direct = select(ProjectMember.project_id).where(
             ProjectMember.user_id == user_id,
             ProjectMember.deleted_at.is_(None),
         )
+        via_team = (
+            select(Team.project_id)
+            .join(TeamMember, TeamMember.team_id == Team.id)
+            .where(
+                TeamMember.user_id == user_id,
+                Team.deleted_at.is_(None),
+            )
+        )
+        return direct.union(via_team)
 
     @staticmethod
     def _derive_status(overdue: int, in_review: int) -> str:
@@ -565,16 +604,14 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             ).label("overdue"),
         ).where(Task.deleted_at.is_(None), Task.assignee_id == user_id)
 
-        # Proyectos activos = proyectos (no borrados) donde el usuario es miembro.
+        # Proyectos activos = proyectos (no borrados) a los que el usuario tiene
+        # acceso, sea como miembro directo o vía equipo.
+        accessible = self._accessible_project_ids(user_id).subquery()
         projects_query = (
-            select(func.count(func.distinct(ProjectMember.project_id)))
-            .select_from(ProjectMember)
-            .join(Project, Project.id == ProjectMember.project_id)
-            .where(
-                ProjectMember.user_id == user_id,
-                ProjectMember.deleted_at.is_(None),
-                Project.deleted_at.is_(None),
-            )
+            select(func.count())
+            .select_from(accessible)
+            .join(Project, Project.id == accessible.c.project_id)
+            .where(Project.deleted_at.is_(None))
         )
 
         task_row = (await self._session.execute(tasks_query)).one()
@@ -588,6 +625,10 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             overdue_tasks=int(task_row.overdue or 0),
         )
 
+    # Ventana de "Próximos vencimientos" del rol User: lo que vence en la próxima
+    # semana (más lo ya atrasado). Cae 1 o varios proyectos según qué entre.
+    _USER_DEADLINE_HORIZON_DAYS = 7
+
     async def get_panels_for_user(
         self,
         user_id: uuid.UUID,
@@ -598,10 +639,12 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         return DashboardPanels(
             task_board=await self._get_task_board(board_limit, assignee_id=user_id),
             projects=await self._get_projects_overview(
-                projects_limit, project_ids=self._member_project_ids(user_id)
+                projects_limit, project_ids=self._accessible_project_ids(user_id)
             ),
             upcoming_deadlines=await self._get_upcoming_deadlines(
-                deadlines_limit, assignee_id=user_id
+                deadlines_limit,
+                assignee_id=user_id,
+                horizon_days=self._USER_DEADLINE_HORIZON_DAYS,
             ),
         )
 
@@ -615,7 +658,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         que alimenta la pantalla "Mis proyectos" del rol User.
         """
         return await self._get_projects_overview(
-            limit=1000, project_ids=self._member_project_ids(user_id)
+            limit=1000, project_ids=self._accessible_project_ids(user_id)
         )
 
     async def _project_counts(self, project_id: uuid.UUID):
@@ -702,19 +745,18 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
     async def get_project_progress_for_user(
         self, user_id: uuid.UUID, project_id: uuid.UUID
     ) -> ProjectProgressDetail | None:
-        # Guard de membresía: si el usuario no pertenece al proyecto -> None (404).
-        is_member = (
+        # Guard de acceso: miembro directo del proyecto o integrante de uno de sus
+        # equipos. Si no tiene ninguna vía -> None (el endpoint responde 404
+        # indistinto, sin revelar si el proyecto existe).
+        accessible = self._accessible_project_ids(user_id).subquery()
+        has_access = (
             await self._session.execute(
-                select(ProjectMember.id)
-                .where(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id == user_id,
-                    ProjectMember.deleted_at.is_(None),
-                )
+                select(accessible.c.project_id)
+                .where(accessible.c.project_id == project_id)
                 .limit(1)
             )
         ).first()
-        if is_member is None:
+        if has_access is None:
             return None
 
         project = (

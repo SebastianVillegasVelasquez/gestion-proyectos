@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_TLS: bool = True
     EMAIL_FROM: str = "OBJ Digital <no-reply@objdigital.com>"
+    # URL pública del frontend: se usa para construir los enlaces "abrir tarea",
+    # "revisar entrega", etc. dentro de los correos. Sin barra final.
+    APP_PUBLIC_URL: str = "http://localhost:5173"
+
+    # Barrido periódico de tareas atrasadas (notificación + correo de aviso).
+    OVERDUE_SCAN_ENABLED: bool = True
+    OVERDUE_SCAN_INTERVAL_HOURS: int = 6
+
+    # Despacho de recordatorios personales (notificación y/o correo).
+    REMINDERS_SCAN_ENABLED: bool = True
+    REMINDERS_SCAN_INTERVAL_MINUTES: int = 5
 
     # ── OpenAI ──────────────────────────────────
     OPENAI_API_KEY: str = ""

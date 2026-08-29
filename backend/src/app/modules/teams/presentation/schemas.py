@@ -1,9 +1,10 @@
+import datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
 from pydantic import StringConstraints
 
-from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.enums import InvitationStatus, TeamRole
 from app.shared.base_model import BaseModelConfig
 
 
@@ -51,3 +52,40 @@ class TeamMemberResponse(BaseModelConfig):
     last_name: str
     position: str
     team_role: TeamRole
+
+
+class CreateInvitationRequest(BaseModelConfig):
+    user_id: UUID
+
+
+class InvitationResponse(BaseModelConfig):
+    id: UUID
+    team_id: UUID
+    team_name: str
+    project_id: UUID
+    user_id: UUID
+    user_name: str
+    invited_by_id: UUID
+    invited_by_name: str
+    status: InvitationStatus
+    created_at: datetime.datetime
+    responded_at: Optional[datetime.datetime] = None
+
+    @classmethod
+    def of(cls, inv) -> "InvitationResponse":
+        def _full_name(u) -> str:
+            return f"{u.name} {u.last_name}".strip() if u else ""
+
+        return cls(
+            id=inv.id,
+            team_id=inv.team_id,
+            team_name=inv.team.name if inv.team else "",
+            project_id=inv.team.project_id if inv.team else inv.team_id,
+            user_id=inv.user_id,
+            user_name=_full_name(inv.user),
+            invited_by_id=inv.invited_by_id,
+            invited_by_name=_full_name(inv.invited_by),
+            status=inv.status,
+            created_at=inv.created_at,
+            responded_at=inv.responded_at,
+        )

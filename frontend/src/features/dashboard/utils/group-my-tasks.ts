@@ -40,7 +40,8 @@ export function groupMyTasksByProject(tasks: DashboardTaskItem[], today: string)
       overdue: 0,
     };
     group.tasks.push(task);
-    if (task.due_date < today) {
+    // Sin fecha límite no es "vencida": no cuenta como atrasada.
+    if (task.due_date !== null && task.due_date < today) {
       group.overdue += 1;
     }
     groups.set(key, group);
@@ -48,7 +49,10 @@ export function groupMyTasksByProject(tasks: DashboardTaskItem[], today: string)
 
   const result = [...groups.values()];
   for (const group of result) {
-    group.tasks.sort((a, b) => a.due_date.localeCompare(b.due_date));
+    // Por fecha de fin ascendente; las tareas sin fecha van al final.
+    group.tasks.sort((a, b) =>
+      (a.due_date ?? "9999-12-31").localeCompare(b.due_date ?? "9999-12-31"),
+    );
   }
   return result.sort((a, b) => b.overdue - a.overdue || b.tasks.length - a.tasks.length);
 }

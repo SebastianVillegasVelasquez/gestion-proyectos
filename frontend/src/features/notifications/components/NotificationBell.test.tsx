@@ -2,14 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
+import type * as ReactRouter from "react-router";
 import type { ReactNode } from "react";
 
 import { NotificationBell } from "./NotificationBell";
 import { notificationsApi } from "../api/notifications.api";
 import type { AppNotification, PaginatedNotifications } from "../types";
 
+const navigateSpy = vi.fn();
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactRouter>();
+  return { ...actual, useNavigate: () => navigateSpy };
+});
+
 vi.mock("@/features/auth/hooks/use-auth", () => ({
-  useAuth: () => ({ isAuthenticated: true }),
+  useAuth: () => ({ isAuthenticated: true, user: { role: "user" } }),
 }));
 
 vi.mock("../api/notifications.api", () => ({
@@ -24,7 +32,9 @@ vi.mock("../api/notifications.api", () => ({
 function renderBell() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
   return render(<NotificationBell />, { wrapper: Wrapper });
 }
@@ -51,6 +61,7 @@ function listPage(items: AppNotification[]): PaginatedNotifications {
 describe("NotificationBell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigateSpy.mockReset();
     vi.mocked(notificationsApi.list).mockResolvedValue(listPage([notif()]));
     vi.mocked(notificationsApi.markAllAsRead).mockResolvedValue({ updated: 1 });
     vi.mocked(notificationsApi.markAsRead).mockResolvedValue(notif({ is_read: true }));
@@ -90,6 +101,22 @@ describe("NotificationBell", () => {
     await waitFor(() => {
       expect(notificationsApi.markAllAsRead).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("navigates to the workspace with the task focused when a user clicks a task notification", async () => {
+    vi.mocked(notificationsApi.unreadCount).mockResolvedValue({ unread_count: 1 });
+    vi.mocked(notificationsApi.list).mockResolvedValue(
+      listPage([notif({ payload: { task_id: "t-123", project_id: "p-9" } })]),
+    );
+    renderBell();
+    await userEvent.click(screen.getByLabelText("Notificaciones"));
+
+    await userEvent.click(await screen.findByText("Se te asignó la tarea Guion Unidad 1"));
+
+    await waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith("/workspace?focus=t-123");
+    });
+    expect(notificationsApi.markAsRead).toHaveBeenCalledWith("n1");
   });
 
   it("degrades gracefully when the list endpoint fails", async () => {

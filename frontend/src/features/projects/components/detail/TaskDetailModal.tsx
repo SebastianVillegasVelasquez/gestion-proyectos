@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Clock,
   FolderTree,
+  Link2,
   Pencil,
   Timer,
   User,
@@ -14,7 +15,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskEditForm } from "../../gantt/components/TaskEditForm";
+import { useProjectTasks } from "../../hooks/use-tasks";
 import { useTeamMembers } from "../../hooks/use-teams";
+import { TaskDependencyEditor } from "../TaskDependencyEditor";
 import {
   TASK_PRIORITY_COLORS,
   TASK_PRIORITY_LABELS,
@@ -156,6 +159,7 @@ export function TaskDetailModal({
   onClose: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const projectTasks = useProjectTasks(projectId);
   const assignment = useMemo(
     () => resolveAssignment(task, memberById, teamById),
     [task, memberById, teamById],
@@ -275,6 +279,19 @@ export function TaskDetailModal({
                   )}
                 </Field>
               </div>
+
+              <Field icon={Link2} label="Dependencia">
+                <TaskDependencyEditor
+                  taskId={task.id}
+                  projectId={projectId}
+                  canEdit
+                  allTasks={projectTasks.data ?? []}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Mientras la tarea de la que depende no esté completada, esta no puede avanzar de
+                  estado.
+                </p>
+              </Field>
 
               <Field icon={User} label="Responsable">
                 {person ? (

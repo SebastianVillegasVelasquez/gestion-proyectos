@@ -2,13 +2,10 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  CalendarRange,
   CornerDownRight,
   FolderKanban,
-  FolderTree,
   History,
   LayoutGrid,
-  Link2Off,
   List,
   ListTodo,
   Plus,
@@ -19,11 +16,11 @@ import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/Asy
 import { useWorkTree } from "@/features/projects/hooks/use-structure";
 import { collectItemPaths } from "@/features/projects/utils/work-item-path";
 import { buildTeamBoard } from "@/features/projects/utils/team-board";
-import { TeamStructureView } from "@/features/projects/components/teams/TeamStructureView";
-import { TaskAssigneeSelect } from "@/features/projects/components/teams/TaskAssigneeSelect";
+import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
 import { NewSubtaskModal } from "./NewSubtaskModal";
+import { NewTeamTaskModal } from "./NewTeamTaskModal";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
 import type { WorkspaceMember } from "../types";
 import {
@@ -39,9 +36,16 @@ import {
   type TaskGrouping,
   type TaskTreeRow,
 } from "../utils/team-tasks";
-import { TeamGanttPanel } from "./TeamGanttPanel";
+import { TeamTaskFilterBar } from "./TeamTaskFilterBar";
+import {
+  EMPTY_TEAM_TASK_FILTERS,
+  filterTeamTasks,
+  type TeamTaskFilters,
+} from "../utils/team-task-filters";
 
-type ViewMode = "lista" | "kanban" | "estructura" | "cronograma" | "trazabilidad";
+// Estructura y Cronograma viven ahora como secciones propias del menú lateral
+// del espacio (WorkspaceNav), no dentro de esta vista.
+type ViewMode = "lista" | "kanban" | "trazabilidad";
 
 /** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea. */
 function Crumb({ path }: { path: string[] }) {
@@ -194,14 +198,20 @@ function TaskRow({
   row,
   today,
   canReview,
+  projectId,
+  teamMembers,
   pathOf,
   onAddSubtask,
+  onReassigned,
 }: {
   row: TaskTreeRow;
   today: string;
   canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
+  onReassigned: () => void;
 }) {
   const { task, depth, detachedParentTitle } = row;
   return (
@@ -242,6 +252,24 @@ function TaskRow({
         <BlockedBy task={task} />
       </div>
 
+      {/* Responsable: para el líder/supervisor es un selector (asignar o
+          reasignar la tarea del equipo aquí mismo); para el resto, el nombre. */}
+      <span className="w-[150px] shrink-0">
+        {canReview && teamMembers.length > 0 ? (
+          <ReassignTaskButton
+            projectId={projectId}
+            taskId={task.id}
+            currentAssigneeId={task.assignee_id}
+            members={teamMembers}
+            onDone={onReassigned}
+          />
+        ) : (
+          <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
+            {task.assignee_name ?? "Sin responsable"}
+          </span>
+        )}
+      </span>
+
       {/* Anchos fijos: las columnas quedan alineadas entre filas y grupos. */}
       <ProgressBar task={task} className="w-[120px] shrink-0" />
       <span className="w-[88px] shrink-0 text-right">
@@ -281,8 +309,11 @@ function ListView({
   grouping,
   today,
   canReview,
+  projectId,
+  teamMembers,
   pathOf,
   onAddSubtask,
+  onReassigned,
 }: {
   groups: ReturnType<typeof groupTeamTasks>;
   /** Todas las del equipo: resuelven el título de un padre fuera del grupo. */
@@ -291,8 +322,11 @@ function ListView({
   grouping: TaskGrouping;
   today: string;
   canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
+  onReassigned: () => void;
 }) {
   return (
     // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
@@ -339,8 +373,11 @@ function ListView({
                     row={row}
                     today={today}
                     canReview={canReview}
+                    projectId={projectId}
+                    teamMembers={teamMembers}
                     pathOf={pathOf}
                     onAddSubtask={onAddSubtask}
+                    onReassigned={onReassigned}
                   />
                 ))}
               </div>
@@ -416,7 +453,7 @@ function TaskCard({
 
       {canReview && teamMembers.length > 0 && (
         <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-          <TaskAssigneeSelect
+          <ReassignTaskButton
             projectId={projectId}
             taskId={task.id}
             currentAssigneeId={task.assignee_id}
@@ -594,9 +631,18 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
   const [view, setView] = useState<ViewMode>("lista");
   const [grouping, setGrouping] = useState<TaskGrouping>("integrante");
   const [subtaskParent, setSubtaskParent] = useState<ApiTeamTask | null>(null);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [filters, setFilters] = useState<TeamTaskFilters>(EMPTY_TEAM_TASK_FILTERS);
 
   const today = useMemo(() => todayIso(), []);
-  const tasks = useMemo(() => query.data ?? [], [query.data]);
+  const allTasks = useMemo(() => query.data ?? [], [query.data]);
+  // Filtramos ANTES de agrupar: Lista, Kanban y Estructura ven el mismo
+  // subconjunto. El cronograma y la trazabilidad tienen sus propios filtros.
+  const tasks = useMemo(() => filterTeamTasks(allTasks, filters), [allTasks, filters]);
+  const patchFilters = (patch: Partial<TeamTaskFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+  };
+  const showFilterBar = view === "lista" || view === "kanban";
   const pathById = useMemo(() => collectItemPaths(treeQuery.data ?? []), [treeQuery.data]);
   const pathOf = (task: ApiTeamTask): string[] =>
     task.work_item_id ? (pathById.get(task.work_item_id) ?? []) : [];
@@ -609,11 +655,6 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
   );
-  const blockedCount = useMemo(
-    () => tasks.filter((t) => activeBlockers(t).length > 0).length,
-    [tasks],
-  );
-
   if (query.isLoading) {
     return (
       <div className="p-6">
@@ -631,7 +672,7 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
       </div>
     );
   }
-  if (tasks.length === 0) {
+  if (allTasks.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
         <EmptyState
@@ -654,8 +695,6 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
           options={[
             { value: "lista", label: "Lista", Icon: List },
             { value: "kanban", label: "Kanban", Icon: LayoutGrid },
-            { value: "estructura", label: "Estructura", Icon: FolderTree },
-            { value: "cronograma", label: "Cronograma", Icon: CalendarRange },
             // La trazabilidad del equipo solo para quien lo lidera / supervisa.
             ...(canReview
               ? [{ value: "trazabilidad" as const, label: "Trazabilidad", Icon: History }]
@@ -677,19 +716,38 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
 
         <div className="flex-1" />
 
-        <span className="text-[11px] text-slate-400 dark:text-slate-500">
-          {tasks.length} tarea{tasks.length === 1 ? "" : "s"}
-        </span>
-        {blockedCount > 0 && (
-          <span
-            title="Tareas que esperan a que otra termine (dependencia fin-inicio)"
-            className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-          >
-            <Link2Off className="size-3" />
-            {blockedCount} bloqueada{blockedCount === 1 ? "" : "s"}
+        {!showFilterBar && (
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            {allTasks.length} tarea{allTasks.length === 1 ? "" : "s"}
           </span>
         )}
+
+        {canReview && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowNewTask(true);
+            }}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+          >
+            <Plus className="size-3.5" />
+            Nueva tarea
+          </button>
+        )}
       </div>
+
+      {showFilterBar && (
+        <TeamTaskFilterBar
+          filters={filters}
+          onChange={patchFilters}
+          onReset={() => {
+            setFilters(EMPTY_TEAM_TASK_FILTERS);
+          }}
+          teamMembers={teamMembers}
+          shown={tasks.length}
+          totalTasks={allTasks.length}
+        />
+      )}
 
       {/* `relative` + hijos `absolute inset-0`: el scroll interno funciona sin
           depender de que `h-full` en cadena resuelva contra un alto definido. */}
@@ -702,8 +760,11 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             grouping={effectiveGrouping}
             today={today}
             canReview={canReview}
+            projectId={projectId}
+            teamMembers={teamMembers}
             pathOf={pathOf}
             onAddSubtask={setSubtaskParent}
+            onReassigned={onReassigned}
           />
         )}
         {view === "kanban" && (
@@ -718,21 +779,6 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             onReassigned={onReassigned}
           />
         )}
-        {view === "estructura" && (
-          <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
-            <TeamStructureView
-              tree={treeQuery.data ?? []}
-              tasks={tasks}
-              resolveWho={(t) => t.assignee_name ?? "Sin responsable"}
-              today={today}
-            />
-          </div>
-        )}
-        {view === "cronograma" && (
-          <div className="absolute inset-0 overflow-hidden">
-            <TeamGanttPanel projectId={projectId} teamId={teamId} />
-          </div>
-        )}
         {view === "trazabilidad" && (
           <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
             <TraceabilityPanel projectId={projectId} lockedTeamId={teamId} />
@@ -746,6 +792,16 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
           parent={subtaskParent}
           onClose={() => {
             setSubtaskParent(null);
+          }}
+        />
+      )}
+
+      {showNewTask && (
+        <NewTeamTaskModal
+          teamId={teamId}
+          projectId={projectId}
+          onClose={() => {
+            setShowNewTask(false);
           }}
         />
       )}

@@ -46,6 +46,9 @@ from app.modules.project.structure.infrastructure.repository import (
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.modules.teams.domain.repository import TeamRepository
 from app.modules.teams.domain.workspace import WorkspaceRepository
+from app.modules.teams.infrastructure.invitation_repository import (
+    TeamInvitationRepository,
+)
 from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
 from app.modules.teams.infrastructure.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
@@ -85,6 +88,12 @@ def project_members_repo_dependency(
 def team_repo_dependency(db: AsyncSession = Depends(get_db)) -> TeamRepository:
     # Devuelve la abstracción; la implementación concreta es intercambiable (DIP).
     return SqlAlchemyTeamRepository(db)
+
+
+def team_invitation_repo_dependency(
+    db: AsyncSession = Depends(get_db),
+) -> TeamInvitationRepository:
+    return TeamInvitationRepository(db)
 
 
 def workspace_repo_dependency(
@@ -133,8 +142,38 @@ def feedback_repo_dependency(
     return SqlAlchemyFeedbackRepository(db)
 
 
+def reminder_repo_dependency(db: AsyncSession = Depends(get_db)):
+    from app.modules.reminders.infrastructure.repository import (
+        SqlAlchemyReminderRepository,
+    )
+
+    return SqlAlchemyReminderRepository(db)
+
+
 def get_broadcaster_from_request(request: Request) -> Broadcaster:
     return request.app.state.broadcaster
+
+
+def deliverable_notifier_dependency(
+    db: AsyncSession = Depends(get_db),
+    broadcaster: Broadcaster = Depends(get_broadcaster_from_request),
+):
+    """Avisa a líder/supervisor cuando un integrante sube una entrega.
+
+    Comparte la sesión del request (FastAPI cachea `get_db`), así el aviso y
+    el cambio de estado del entregable viajan en el mismo commit.
+    """
+    from app.modules.teams.application.workspace_notifications import (
+        DeliverableNotifier,
+    )
+
+    settings = get_settings()
+    return DeliverableNotifier(
+        session=db,
+        broadcaster=broadcaster,
+        email_sender=SmtpEmailSender(settings),
+        public_url=settings.APP_PUBLIC_URL,
+    )
 
 
 def event_bus_dependency(
@@ -151,9 +190,13 @@ def event_bus_dependency(
     """
     bus = EventBus()
     notification_repo = SqlAlchemyNotificationRepository(db)
-    register_notification_handlers(bus, notification_repo, broadcaster)
+    register_notification_handlers(bus, notification_repo, broadcaster, session=db)
+    settings = get_settings()
     bus.subscribe(
-        UserCreated, NotifyUserCreatedByEmail(SmtpEmailSender(get_settings()))
+        UserCreated,
+        NotifyUserCreatedByEmail(
+            SmtpEmailSender(settings), public_url=settings.APP_PUBLIC_URL
+        ),
     )
     return bus
 

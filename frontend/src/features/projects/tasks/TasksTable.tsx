@@ -137,7 +137,7 @@ export function TasksTable({
   members,
   teams,
   tree,
-  locationById,
+  locationPathById,
   currentUserId,
   isElevated,
   onOpenDetail,
@@ -147,7 +147,8 @@ export function TasksTable({
   members: ProjectMember[];
   teams: Team[];
   tree: WorkItemTree[];
-  locationById: Map<string, { name: string; tipoId: string }>;
+  /** id de elemento → cadena de ancestros (raíz→él), para el breadcrumb. */
+  locationPathById: Map<string, string[]>;
   // Quién mira la tabla: decide qué transiciones de estado puede fijar cada fila.
   currentUserId: string | undefined;
   isElevated: boolean;
@@ -504,7 +505,9 @@ export function TasksTable({
           </thead>
           <tbody>
             {sortedTasks.map((task) => {
-              const location = task.work_item_id ? locationById.get(task.work_item_id) : undefined;
+              const locationPath = task.work_item_id
+                ? (locationPathById.get(task.work_item_id) ?? [])
+                : [];
               const isSel = selected.has(task.id);
               return (
                 <tr
@@ -652,10 +655,19 @@ export function TasksTable({
                       );
                     })()}
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    <span className="block truncate" title={location?.name ?? undefined}>
-                      {location?.name ?? "—"}
-                    </span>
+                  <td className="max-w-[16rem] px-3 py-2 text-xs text-muted-foreground">
+                    {locationPath.length > 0 ? (
+                      <span className="block truncate" title={locationPath.join(" › ")}>
+                        {locationPath.slice(0, -1).map((name, i) => (
+                          <span key={i}>{name} › </span>
+                        ))}
+                        <span className="font-medium text-foreground">
+                          {locationPath[locationPath.length - 1]}
+                        </span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                     {formatDate(task.due_date)}

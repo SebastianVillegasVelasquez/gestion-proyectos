@@ -35,7 +35,9 @@ export function NewSubtaskModal({
   const createSubtask = useCreateTeamSubtask(teamId);
 
   const [title, setTitle] = useState("");
-  const [assigneeId, setAssigneeId] = useState<string>("");
+  // Por defecto la subtarea la hace quien tiene la tarea padre: es lo más común
+  // y evita volver a elegir. El líder puede cambiarlo aquí mismo antes de crear.
+  const [assigneeId, setAssigneeId] = useState<string>(parent.assignee_id ?? "");
   // El padre puede estar sin planificar: precargamos sus fechas si existen,
   // pero dejamos que el líder las complete cuando falten.
   const [startDate, setStartDate] = useState(parent.start_date ?? "");

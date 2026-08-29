@@ -147,6 +147,7 @@ export function NodeTasksModal({
           projectId={projectId}
           tasks={allTasks}
           initialWorkItemId={node.id}
+          initialTitle={node.nombre}
           onClose={() => {
             setShowCreate(false);
           }}

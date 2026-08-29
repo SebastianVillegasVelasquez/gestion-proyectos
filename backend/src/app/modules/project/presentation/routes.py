@@ -1,3 +1,4 @@
+import datetime
 import re
 from dataclasses import asdict
 from typing import List
@@ -6,18 +7,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response
 from starlette import status
 
+from app.modules.tasks.infrastructure.enums import TaskPriority, TaskStatus
+
 from app.core.database import get_db
 from app.core.dependencies import (
     event_bus_dependency,
     project_members_repo_dependency,
     project_repo_dependency,
     require_role,
-    team_repo_dependency,
     user_repo_dependency,
 )
 from app.modules.project.application.use_cases import (
     AddMemberToProjectUseCase,
-    AssignTeamToProjectUseCase,
     CreateProjectNoteUseCase,
     CreateProjectUseCase,
     DeleteProjectNoteUseCase,
@@ -33,12 +34,15 @@ from app.modules.project.application.use_cases import (
     UpdateProjectMemberRoleUseCase,
     UpdateProjectUseCase,
 )
-from app.modules.project.application.reports import (
-    ProjectReportBuilder,
-    report_to_csv,
+from app.modules.project.application.analytics import (
+    AnalyticsFilters,
+    ProjectAnalyticsBuilder,
+)
+from app.modules.project.application.analytics_html import render_analytics_html
+from app.modules.project.presentation.analytics_schemas import (
+    ProjectAnalyticsResponse,
 )
 from app.modules.project.presentation.schemas import (
-    AssignTeamResponse,
     ClientAccessResponse,
     CreateProjectNoteRequest,
     CreateProjectRequest,
@@ -46,7 +50,6 @@ from app.modules.project.presentation.schemas import (
     ProjectMemberRequest,
     ProjectMemberResponse,
     ProjectNoteResponse,
-    ProjectReportResponse,
     ProjectResponse,
     UpdateProjectMemberRoleRequest,
     UpdateProjectRequest,
@@ -245,51 +248,92 @@ async def remove_project_member(
     await RemoveProjectMemberUseCase(project_member_repo).execute(member_id)
 
 
-@router.post(
-    "/{project_id}/teams/{team_id}",
-    response_model=AssignTeamResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def assign_team_to_project(
-    project_id: UUID,
-    team_id: UUID,
-    project_repo=Depends(project_repo_dependency),
-    member_repo=Depends(project_members_repo_dependency),
-    team_repo=Depends(team_repo_dependency),
-    _=Depends(require_role("admin", "super_admin")),
-):
-    return await AssignTeamToProjectUseCase(
-        project_repo=project_repo, member_repo=member_repo, team_repo=team_repo
-    ).execute(project_id, team_id)
+# ── Informe / analítica ──────────────────────────────────────────────────────
 
 
-# ── Informes y exportación ────────────────────────────────────────────────────
-@router.get("/{project_id}/report", response_model=ProjectReportResponse)
-async def get_project_report(
+def _analytics_filters(
+    date_from: datetime.date | None,
+    date_to: datetime.date | None,
+    team_id: UUID | None,
+    assignee_id: UUID | None,
+    status_filter: TaskStatus | None,
+    priority: TaskPriority | None,
+    work_item_id: UUID | None,
+) -> AnalyticsFilters:
+    return AnalyticsFilters(
+        date_from=date_from,
+        date_to=date_to,
+        team_id=team_id,
+        assignee_id=assignee_id,
+        status=status_filter,
+        priority=priority.value if priority else None,
+        work_item_id=work_item_id,
+    )
+
+
+@router.get("/{project_id}/analytics", response_model=ProjectAnalyticsResponse)
+async def get_project_analytics(
     project_id: UUID,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    team_id: UUID | None = None,
+    assignee_id: UUID | None = None,
+    status_filter: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    work_item_id: UUID | None = None,
     db=Depends(get_db),
     _=Depends(require_role("admin", "super_admin")),
 ):
-    """Estado del proyecto: tareas por estado, horas y detalle por tarea."""
-    report = await ProjectReportBuilder(db).build(project_id)
-    return ProjectReportResponse(**asdict(report))
+    """Analítica del informe interactivo: rendimiento en el tiempo, por equipo,
+    individual y por lapsos de entrega. Duraciones en días laborables."""
+    analytics = await ProjectAnalyticsBuilder(db).build(
+        project_id,
+        _analytics_filters(
+            date_from,
+            date_to,
+            team_id,
+            assignee_id,
+            status_filter,
+            priority,
+            work_item_id,
+        ),
+    )
+    return ProjectAnalyticsResponse(**asdict(analytics))
 
 
-@router.get("/{project_id}/report.csv")
-async def export_project_report(
+@router.get("/{project_id}/analytics.html")
+async def export_project_analytics_html(
     project_id: UUID,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    team_id: UUID | None = None,
+    assignee_id: UUID | None = None,
+    status_filter: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    work_item_id: UUID | None = None,
     db=Depends(get_db),
     _=Depends(require_role("admin", "super_admin")),
 ):
-    """El mismo informe en CSV, para abrirlo en Excel o Google Sheets."""
-    report = await ProjectReportBuilder(db).build(project_id)
-    # Nombre de archivo con el del proyecto: quien descarga varios informes
-    # necesita distinguirlos sin abrirlos.
-    safe_name = re.sub(r"[^\w\-]+", "_", report.project_name).strip("_") or "proyecto"
+    """El informe como un HTML autocontenido y descargable (sustituye al CSV)."""
+    analytics = await ProjectAnalyticsBuilder(db).build(
+        project_id,
+        _analytics_filters(
+            date_from,
+            date_to,
+            team_id,
+            assignee_id,
+            status_filter,
+            priority,
+            work_item_id,
+        ),
+    )
+    safe_name = (
+        re.sub(r"[^\w\-]+", "_", analytics.project_name).strip("_") or "proyecto"
+    )
     return Response(
-        content=report_to_csv(report),
-        media_type="text/csv; charset=utf-8",
+        content=render_analytics_html(analytics),
+        media_type="text/html; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="informe_{safe_name}.csv"'
+            "Content-Disposition": f'attachment; filename="informe_{safe_name}.html"'
         },
     )

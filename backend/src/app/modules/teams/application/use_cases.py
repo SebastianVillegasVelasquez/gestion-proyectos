@@ -10,8 +10,9 @@ from app.modules.teams.presentation.schemas import (
     TeamResponse,
     UpdateTeamRequest,
 )
+from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.shared.base_repository import Repository
-from app.shared.exceptions import NotFoundError
+from app.shared.exceptions import ConflictError, NotFoundError
 from app.shared.pagination import Pagination
 
 
@@ -82,11 +83,24 @@ class ListMyTeamsUseCase:
 
 
 class AddTeamMemberUseCase:
-    """Agrega un usuario al equipo. Valida que el usuario exista (otro contexto)."""
+    """Agrega un usuario al equipo.
 
-    def __init__(self, team_repo: TeamRepository, user_repo: Repository):
+    Valida dos precondiciones antes de tocar el equipo:
+    - el usuario existe (vive en otro bounded context);
+    - el usuario ya es integrante del proyecto. Un equipo vive dentro de un
+      proyecto, así que no se puede pertenecer a un equipo sin pertenecer antes
+      al proyecto (evita "miembros indirectos" que luego chocan con los permisos).
+    """
+
+    def __init__(
+        self,
+        team_repo: TeamRepository,
+        user_repo: Repository,
+        project_member_repo: ProjectMemberRepository,
+    ):
         self.service = TeamService(team_repo)
         self.user_repo = user_repo
+        self.project_member_repo = project_member_repo
 
     async def execute(
         self, project_id: UUID, team_id: UUID, user_id: UUID, team_role: TeamRole
@@ -94,6 +108,15 @@ class AddTeamMemberUseCase:
         user = await self.user_repo.get_by_id(user_id)
         if user is None or getattr(user, "is_deleted", False):
             raise NotFoundError("El usuario no existe")
+        membership = (
+            await self.project_member_repo.get_member_by_project_id_and_user_id(
+                project_id=project_id, user_id=user_id
+            )
+        )
+        if membership is None or membership.is_deleted:
+            raise ConflictError(
+                "El usuario debe ser integrante del proyecto antes de añadirlo a un equipo"
+            )
         return await self.service.add_member(project_id, team_id, user_id, team_role)
 
 

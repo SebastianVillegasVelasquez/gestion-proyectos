@@ -1,17 +1,33 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOutletContext, useSearchParams } from "react-router";
-import { ListTodo, Package, Settings, Users2, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  BarChart3,
+  CalendarRange,
+  FolderTree,
+  ListTodo,
+  Package,
+  Settings,
+  Users2,
+  X,
+} from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion, WorkspaceMember } from "../types";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
-import { DeliverableDetailView } from "./DeliverableDetailView";
+import { DeliverableDetailView, type EditVersionPatch } from "./DeliverableDetailView";
 import { FeedbackThread } from "./FeedbackThread";
 import { GroupSettingsView } from "./GroupSettingsView";
+import { MyInvitationsBanner } from "./MyInvitationsBanner";
+import { TeamGanttPanel } from "./TeamGanttPanel";
+import { TeamProgressView } from "./TeamProgressView";
+import { WorkspaceNav } from "./WorkspaceNav";
+import { WorkspaceStructureView } from "./WorkspaceStructureView";
+import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
 import {
@@ -19,19 +35,20 @@ import {
   useAddVersion,
   useCreateDeliverable,
   useDeliverables,
+  useEditVersion,
   useMyTeams,
   useTeamMembers,
   useTeamTasks,
   useWorkspaceAccess,
 } from "../hooks/use-workspace";
 
-type WorkspaceTab = "tareas" | "entregables" | "configuracion";
-
-const TABS: { id: WorkspaceTab; label: string; Icon: React.ElementType }[] = [
-  { id: "tareas", label: "Tareas del equipo", Icon: ListTodo },
-  { id: "entregables", label: "Entregables y Revisiones", Icon: Package },
-  { id: "configuracion", label: "Configuración del Grupo", Icon: Settings },
-];
+type WorkspaceTab =
+  | "tareas"
+  | "entregables"
+  | "estructura"
+  | "cronograma"
+  | "progreso"
+  | "configuracion";
 
 // ── New deliverable modal ──────────────────────────────────────────────────
 
@@ -39,6 +56,7 @@ function NewDeliverableModal({
   members,
   tasks,
   pending,
+  initialTaskId,
   onCreate,
   onClose,
 }: {
@@ -47,12 +65,15 @@ function NewDeliverableModal({
   // así el entregable queda enganchado y aprobar/rechazar mueve la tarea real.
   tasks: ApiTeamTask[];
   pending: boolean;
+  /** Preselecciona una tarea (atajo "Entregar" desde la vista de estructura). */
+  initialTaskId?: string;
   onCreate: (taskTitle: string, assigneeId: string, taskId: string | null) => void;
   onClose: () => void;
 }) {
-  const [taskId, setTaskId] = useState<string>("");
-  const [title, setTitle] = useState("");
-  const [assigneeId, setAssigneeId] = useState(members[0]?.id ?? "");
+  const preselected = initialTaskId ? tasks.find((t) => t.id === initialTaskId) : undefined;
+  const [taskId, setTaskId] = useState<string>(preselected?.id ?? "");
+  const [title, setTitle] = useState(preselected?.title ?? "");
+  const [assigneeId, setAssigneeId] = useState(preselected?.assignee_id ?? members.at(0)?.id ?? "");
 
   // Al elegir una tarea real, autorrellenamos título y responsable. Si el usuario
   // los edita después, respetamos su valor (no sobreescribimos en cada render).
@@ -204,6 +225,9 @@ function MemberWorkspace() {
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tareas");
   const [showNew, setShowNew] = useState(false);
+  // Tarea preseleccionada al abrir el modal desde el atajo "Entregar" de la
+  // vista de estructura (fase 3.4). null = alta normal desde "Nuevo entregable".
+  const [deliverTaskId, setDeliverTaskId] = useState<string | null>(null);
 
   // El equipo activo: el seleccionado o el primero disponible.
   const activeTeamId = selectedTeamId ?? teams[0]?.id ?? null;
@@ -213,6 +237,16 @@ function MemberWorkspace() {
   const accessQuery = useWorkspaceAccess(activeTeamId);
   const deliverablesQuery = useDeliverables(activeTeamId);
   const tasksQuery = useTeamTasks(activeTeamId);
+  // Estructura y cronograma del proyecto del equipo (secciones del menú lateral).
+  const projectId = activeTeam?.project_id ?? "";
+  const treeQuery = useWorkTree(projectId);
+  const nodeTypesQuery = useNodeTypes(projectId);
+  const typeNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    (nodeTypesQuery.data ?? []).forEach((t) => m.set(t.id, t.nombre));
+    return m;
+  }, [nodeTypesQuery.data]);
+  const today = new Date().toISOString().slice(0, 10);
 
   const members = (membersQuery.data ?? []).map(mapMember);
   const deliverables = (deliverablesQuery.data ?? []).map(mapDeliverable);
@@ -225,6 +259,7 @@ function MemberWorkspace() {
       (t) => t.status !== "completada" && t.status !== "cancelada" && !linked.has(t.id),
     );
   }, [deliverablesQuery.data, tasksQuery.data]);
+  const linkableTaskIds = useMemo(() => new Set(linkableTasks.map((t) => t.id)), [linkableTasks]);
   const access = accessQuery.data;
   const canDeliver = access?.can_deliver ?? false;
   const canReview = access?.can_review ?? false;
@@ -234,7 +269,17 @@ function MemberWorkspace() {
 
   const createDeliverable = useCreateDeliverable(activeTeamId);
   const addVersion = useAddVersion(activeTeamId);
+  const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
+  const changeTaskStatus = useChangeTaskStatus(activeTeam?.project_id ?? "");
+  const qc = useQueryClient();
+  // Reasignar una tarea desde la estructura toca la caché de tareas del
+  // proyecto (lo hace el propio hook), pero no la del workspace: la refrescamos.
+  const refreshTeamTasks = () => {
+    if (activeTeamId) {
+      void qc.invalidateQueries({ queryKey: ["workspace", "tasks", activeTeamId] });
+    }
+  };
 
   const handleSwitchTeam = (id: string) => {
     setSelectedTeamId(id);
@@ -248,7 +293,28 @@ function MemberWorkspace() {
     }
     addVersion.mutate({
       deliverableId: selectedDeliverable.id,
-      body: { type: version.type, url: version.url, note: version.note },
+      body: {
+        type: version.type,
+        url: version.url,
+        note: version.note,
+        observations: version.observations || undefined,
+      },
+    });
+  };
+
+  const handleEditVersion = (versionId: string, patch: EditVersionPatch) => {
+    if (!selectedDeliverable) {
+      return;
+    }
+    editVersion.mutate({
+      deliverableId: selectedDeliverable.id,
+      versionId,
+      body: {
+        type: patch.type,
+        url: patch.url,
+        note: patch.note,
+        observations: patch.observations,
+      },
     });
   };
 
@@ -294,9 +360,24 @@ function MemberWorkspace() {
         onSuccess: (d) => {
           setSelectedDeliverableId(d.id);
           setShowNew(false);
+          setDeliverTaskId(null);
+          // El entregable recién creado pasa a la vista de entregables, donde se
+          // registra la entrega real (versión).
+          setActiveTab("entregables");
         },
       },
     );
+  };
+
+  const openDeliverForTask = (taskId: string) => {
+    setDeliverTaskId(taskId);
+    setShowNew(true);
+  };
+
+  // "Entregar sin adjunto": la tarea pasa a revisión sin crear un entregable.
+  // El líder/supervisor la aprueba o devuelve igual que una entrega con adjunto.
+  const markTaskDelivered = (taskId: string) => {
+    changeTaskStatus.mutate({ taskId, status: "en_revision" });
   };
 
   // ── Estados de carga / vacío ──────────────────────────────────────────────
@@ -319,147 +400,183 @@ function MemberWorkspace() {
   }
   if (teams.length === 0 || !activeTeam) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <EmptyState
-          icon={Users2}
-          title="No perteneces a ningún equipo de trabajo"
-          hint="Cuando un administrador te agregue a un equipo, su espacio aparecerá aquí."
-        />
+      <div className="flex h-full flex-col">
+        <MyInvitationsBanner />
+        <div className="flex flex-1 items-center justify-center p-6">
+          <EmptyState
+            icon={Users2}
+            title="No perteneces a ningún equipo de trabajo"
+            hint="Cuando te inviten o te agreguen a un equipo, su espacio aparecerá aquí."
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-      {/* Selector de equipos */}
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
-        {teams.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              handleSwitchTeam(t.id);
+      <MyInvitationsBanner />
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Columna principal: cabecera + sección activa, a todo el ancho. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900">
+          <WorkspaceHeader
+            name={activeTeam.name}
+            description={activeTeam.description ?? ""}
+            members={members}
+            canDeliver={canDeliver}
+            onNewDeliverable={() => {
+              setShowNew(true);
             }}
-            className={cn(
-              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-md px-4 py-3 text-[13px] font-medium transition-colors",
-              t.id === activeTeam.id
-                ? "border-b-2 border-brand-gold text-brand-gold"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
-            )}
-          >
-            <Users2 className="size-3.5" />
-            {t.name}
-          </button>
-        ))}
-      </div>
+            teams={teams}
+            activeTeamId={activeTeam.id}
+            onSwitchTeam={handleSwitchTeam}
+          />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900">
-        <WorkspaceHeader
-          name={activeTeam.name}
-          description={activeTeam.description ?? ""}
-          members={members}
-          canDeliver={canDeliver}
-          onNewDeliverable={() => {
-            setShowNew(true);
-          }}
-        />
-
-        {/* Tabs */}
-        <div className="flex shrink-0 items-end gap-1 border-b border-slate-200 bg-white px-5 dark:border-slate-800 dark:bg-slate-900">
-          {TABS.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => {
-                setActiveTab(id);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 rounded-t-md px-3 py-2.5 text-[13px] font-medium transition-colors",
-                activeTab === id
-                  ? "border-b-2 border-brand-gold text-brand-gold"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
-              )}
-            >
-              <Icon className="size-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {activeTab === "tareas" && (
-            <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
-              <TeamTasksView
-                teamId={activeTeam.id}
-                projectId={activeTeam.project_id}
-                members={members}
-                teamMembers={membersQuery.data ?? []}
-              />
-            </div>
-          )}
-
-          {activeTab === "entregables" && (
-            <>
-              <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
-                {deliverablesQuery.isLoading ? (
-                  <div className="p-4">
-                    <LoadingSkeleton rows={3} />
-                  </div>
-                ) : (
-                  <DeliverableList
-                    deliverables={deliverables}
-                    members={members}
-                    selectedId={selectedDeliverable?.id ?? null}
-                    onSelect={setSelectedDeliverableId}
-                  />
-                )}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {activeTab === "tareas" && (
+              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+                <TeamTasksView
+                  teamId={activeTeam.id}
+                  projectId={activeTeam.project_id}
+                  members={members}
+                  teamMembers={membersQuery.data ?? []}
+                />
               </div>
+            )}
 
-              {selectedDeliverable ? (
-                <>
-                  <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800">
-                    <DeliverableDetailView
-                      deliverable={selectedDeliverable}
-                      members={members}
-                      currentUserId={currentUserId}
-                      canDeliver={canDeliver}
-                      canReview={canReview}
-                      reviewPending={addComment.isPending}
-                      onAddVersion={handleAddVersion}
-                      onReview={handleReview}
-                    />
-                  </div>
-                  <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
-                    <FeedbackThread
-                      comments={selectedDeliverable.comments}
-                      members={members}
-                      currentUserId={currentUserId}
-                      onAddComment={handleAddComment}
-                    />
-                  </div>
-                </>
-              ) : (
-                <NoDeliverableSelected />
-              )}
-            </>
-          )}
+            {activeTab === "estructura" && (
+              <div className="flex-1 overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+                <WorkspaceStructureView
+                  tree={treeQuery.data ?? []}
+                  tasks={tasksQuery.data ?? []}
+                  typeNameById={typeNameById}
+                  today={today}
+                  projectId={activeTeam.project_id}
+                  teamMembers={membersQuery.data ?? []}
+                  canReview={canReview}
+                  onDeliverTask={
+                    canDeliver
+                      ? (t) => {
+                          openDeliverForTask(t.id);
+                        }
+                      : undefined
+                  }
+                  onMarkDeliveredTask={
+                    canDeliver
+                      ? (t) => {
+                          markTaskDelivered(t.id);
+                        }
+                      : undefined
+                  }
+                  canDeliverTask={(t) => linkableTaskIds.has(t.id)}
+                  onReassigned={refreshTeamTasks}
+                />
+              </div>
+            )}
 
-          {activeTab === "configuracion" && (
-            <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
-              <GroupSettingsView
-                projectId={activeTeam.project_id}
-                teamId={activeTeam.id}
-                name={activeTeam.name}
-                description={activeTeam.description ?? ""}
-                members={members}
-                tasks={tasksQuery.data ?? []}
-                deliverables={deliverables}
-                isMember={access?.team_role != null}
-                onArchived={handleArchived}
-              />
-            </div>
-          )}
+            {activeTab === "cronograma" && (
+              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+                <TeamGanttPanel projectId={activeTeam.project_id} teamId={activeTeam.id} />
+              </div>
+            )}
+
+            {activeTab === "entregables" && (
+              <>
+                <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
+                  {deliverablesQuery.isLoading ? (
+                    <div className="p-4">
+                      <LoadingSkeleton rows={3} />
+                    </div>
+                  ) : (
+                    <DeliverableList
+                      deliverables={deliverables}
+                      members={members}
+                      selectedId={selectedDeliverable?.id ?? null}
+                      onSelect={setSelectedDeliverableId}
+                    />
+                  )}
+                </div>
+
+                {selectedDeliverable ? (
+                  <>
+                    <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800">
+                      <DeliverableDetailView
+                        deliverable={selectedDeliverable}
+                        members={members}
+                        currentUserId={currentUserId}
+                        canDeliver={canDeliver}
+                        canReview={canReview}
+                        reviewPending={addComment.isPending}
+                        editPending={editVersion.isPending}
+                        onAddVersion={handleAddVersion}
+                        onEditVersion={handleEditVersion}
+                        onReview={handleReview}
+                      />
+                    </div>
+                    <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
+                      <FeedbackThread
+                        comments={selectedDeliverable.comments}
+                        members={members}
+                        currentUserId={currentUserId}
+                        onAddComment={handleAddComment}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <NoDeliverableSelected />
+                )}
+              </>
+            )}
+
+            {activeTab === "progreso" && (
+              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+                <TeamProgressView
+                  tasks={tasksQuery.data ?? []}
+                  deliverables={deliverables}
+                  teamMembers={membersQuery.data ?? []}
+                  today={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
+            )}
+
+            {activeTab === "configuracion" && (
+              <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+                <GroupSettingsView
+                  projectId={activeTeam.project_id}
+                  teamId={activeTeam.id}
+                  name={activeTeam.name}
+                  description={activeTeam.description ?? ""}
+                  members={members}
+                  tasks={tasksQuery.data ?? []}
+                  deliverables={deliverables}
+                  isMember={access?.team_role != null}
+                  isLeader={access?.team_role === "lider"}
+                  onArchived={handleArchived}
+                />
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Menú lateral derecho: navegación entre secciones (estilo Linear). */}
+        <WorkspaceNav
+          active={activeTab}
+          onSelect={setActiveTab}
+          items={[
+            { id: "tareas", label: "Tareas", Icon: ListTodo },
+            {
+              id: "entregables",
+              label: "Entregables",
+              Icon: Package,
+              count: deliverables.length,
+            },
+            { id: "estructura", label: "Estructura", Icon: FolderTree },
+            { id: "cronograma", label: "Cronograma", Icon: CalendarRange },
+            { id: "progreso", label: "Progreso", Icon: BarChart3 },
+            { id: "configuracion", label: "Configuración", Icon: Settings },
+          ]}
+        />
       </div>
 
       {showNew && (
@@ -467,9 +584,11 @@ function MemberWorkspace() {
           members={members}
           tasks={linkableTasks}
           pending={createDeliverable.isPending}
+          initialTaskId={deliverTaskId ?? undefined}
           onCreate={handleCreate}
           onClose={() => {
             setShowNew(false);
+            setDeliverTaskId(null);
           }}
         />
       )}

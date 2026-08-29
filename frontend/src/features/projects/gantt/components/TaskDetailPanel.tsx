@@ -11,13 +11,13 @@ import {
   useChangeTaskStatus,
   useDetachTask,
   useProjectTasks,
-  useTaskDependencies,
 } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import { useWorkTree, useNodeTypes } from "../../hooks/use-structure";
 import { workItemPath } from "../../utils/flatten-work-tree";
 import { WorkItemPickerModal } from "../../tasks/WorkItemPickerModal";
+import { TaskDependencyEditor } from "../../components/TaskDependencyEditor";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
 
@@ -64,7 +64,6 @@ export function TaskDetailPanel({
   onClose: () => void;
 }) {
   const changeStatus = useChangeTaskStatus(projectId);
-  const depsQuery = useTaskDependencies(task.id);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId);
   const teamsQuery = useTeams(projectId);
@@ -95,12 +94,6 @@ export function TaskDetailPanel({
     }
     return (teamsQuery.data?.items ?? []).find((t) => t.id === task.team_id)?.name ?? null;
   }, [task.team_id, teamsQuery.data]);
-
-  const titleById = useMemo(() => {
-    const map = new Map<string, string>();
-    (tasksQuery.data ?? []).forEach((t) => map.set(t.id, t.title));
-    return map;
-  }, [tasksQuery.data]);
 
   // Rol del usuario dentro del proyecto: líder (coordinador/supervisor),
   // responsable de esta tarea, o ninguno.
@@ -354,25 +347,12 @@ export function TaskDetailPanel({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Dependencias
               </p>
-              {depsQuery.isLoading ? (
-                <div className="h-6 w-32 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
-              ) : (depsQuery.data?.length ?? 0) === 0 ? (
-                <p className="text-sm italic text-slate-400">Sin dependencias.</p>
-              ) : (
-                <ul className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                  {depsQuery.data?.map((dep) => (
-                    <li
-                      key={dep.id}
-                      className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 dark:border-slate-700"
-                    >
-                      <span className="text-slate-400">Depende de</span>
-                      <span className="truncate font-medium text-slate-700 dark:text-slate-200">
-                        {titleById.get(dep.depends_on_id) ?? "otra tarea"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <TaskDependencyEditor
+                taskId={task.id}
+                projectId={projectId}
+                canEdit={isManagement}
+                allTasks={tasksQuery.data ?? []}
+              />
             </div>
           </>
         )}

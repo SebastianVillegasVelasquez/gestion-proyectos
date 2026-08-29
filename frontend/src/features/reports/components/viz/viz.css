@@ -1,0 +1,25 @@
+/* Paleta de datos del informe. Los MARCAS (líneas, barras) usan estos tokens,
+ * validados para daltonismo y contraste (skill dataviz). El resto de la UI
+ * —botones, bordes, cabeceras— sigue usando la marca Bitácora OBJ. Modo claro
+ * y oscuro con pasos propios, no un volcado automático. */
+.viz-root {
+  --viz-surface: #fcfcfb;
+  --viz-ink: #0b0b0b;
+  --viz-ink-soft: #52514e;
+  --viz-grid: #e7e5e4;
+  --viz-s1: #2a78d6; /* serie 1 — azul */
+  --viz-s2: #eb6834; /* serie 2 — naranja */
+  --viz-good: #1baf7a;
+  --viz-bad: #e34948;
+}
+
+.dark .viz-root {
+  --viz-surface: #1a1a19;
+  --viz-ink: #ffffff;
+  --viz-ink-soft: #c3c2b7;
+  --viz-grid: #33322e;
+  --viz-s1: #3987e5;
+  --viz-s2: #d95926;
+  --viz-good: #199e70;
+  --viz-bad: #e66767;
+}

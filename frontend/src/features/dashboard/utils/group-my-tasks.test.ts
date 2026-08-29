@@ -97,4 +97,19 @@ describe("groupMyTasksByProject", () => {
   it("no devuelve grupos cuando no hay nada pendiente", () => {
     expect(groupMyTasksByProject([], TODAY)).toEqual([]);
   });
+
+  it("incluye las tareas sin fecha límite: no son vencidas y van al final", () => {
+    const groups = groupMyTasksByProject(
+      [
+        task({ id: "sin-fecha", due_date: null }),
+        task({ id: "con-fecha", due_date: "2026-08-28" }),
+        task({ id: "vencida", due_date: "2026-08-01" }),
+      ],
+      TODAY,
+    );
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].overdue).toBe(1); // solo "vencida", no la de fecha nula
+    expect(groups[0].tasks.map((t) => t.id)).toEqual(["vencida", "con-fecha", "sin-fecha"]);
+  });
 });

@@ -73,7 +73,7 @@ export function MyTasksByProject({
 
               <ul className="flex flex-col gap-1">
                 {group.tasks.map((task) => {
-                  const overdue = task.due_date < today;
+                  const overdue = task.due_date !== null && task.due_date < today;
                   return (
                     <li
                       key={task.id}

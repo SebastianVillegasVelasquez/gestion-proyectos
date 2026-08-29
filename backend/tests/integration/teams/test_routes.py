@@ -3,7 +3,13 @@ from tests.integration.worktree.test_routes import _create_project
 
 
 async def _create_user(
-    client, admin_headers, *, email: str, name: str = "Ana", last_name: str = "Gomez"
+    client,
+    admin_headers,
+    *,
+    email: str,
+    name: str = "Ana",
+    last_name: str = "Gomez",
+    project_id: str | None = None,
 ):
     response = await client.post(
         "/api/v1/identity/users",
@@ -18,7 +24,20 @@ async def _create_user(
         headers=admin_headers,
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    user = response.json()
+    # Un integrante de equipo debe ser antes integrante del proyecto.
+    if project_id is not None:
+        member = await client.post(
+            "/api/v1/projects/members/",
+            json={
+                "user_id": user["id"],
+                "project_id": project_id,
+                "project_role": "integrante",
+            },
+            headers=admin_headers,
+        )
+        assert member.status_code == 201, member.text
+    return user
 
 
 async def _create_team(
@@ -84,7 +103,9 @@ class TestTeamCrudRoutes:
         team_a = await _create_team(client, admin_headers, project_id, name="Alfa")
         await _create_team(client, admin_headers, project_id, name="Beta")
 
-        user = await _create_user(client, admin_headers, email="mine@test.com")
+        user = await _create_user(
+            client, admin_headers, email="mine@test.com", project_id=project_id
+        )
         add = await client.post(
             f"/api/v1/projects/{project_id}/teams/{team_a['id']}/members",
             json={"user_id": user["id"]},
@@ -210,7 +231,9 @@ class TestTeamMemberRoutes:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
-        user = await _create_user(client, admin_headers, email="ana@example.com")
+        user = await _create_user(
+            client, admin_headers, email="ana@example.com", project_id=project_id
+        )
 
         response = await client.post(
             f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
@@ -230,7 +253,11 @@ class TestTeamMemberRoutes:
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
         user = await _create_user(
-            client, admin_headers, email="lider@example.com", name="Luis"
+            client,
+            admin_headers,
+            email="lider@example.com",
+            name="Luis",
+            project_id=project_id,
         )
 
         response = await client.post(
@@ -247,7 +274,9 @@ class TestTeamMemberRoutes:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
-        user = await _create_user(client, admin_headers, email="dup@example.com")
+        user = await _create_user(
+            client, admin_headers, email="dup@example.com", project_id=project_id
+        )
 
         await client.post(
             f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
@@ -276,12 +305,32 @@ class TestTeamMemberRoutes:
 
         assert response.status_code == 404
 
+    async def test_should_reject_member_not_in_project(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """Un equipo vive dentro de un proyecto: no se puede entrar a un equipo
+        sin ser antes integrante del proyecto (evita miembros indirectos)."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        # Usuario que existe pero NO se ha dado de alta en el proyecto.
+        user = await _create_user(client, admin_headers, email="outsider@example.com")
+
+        response = await client.post(
+            f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
+            json={"user_id": user["id"]},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 409, response.text
+
     async def test_should_change_member_role(
         self, client, admin_headers, valid_project_payload
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
-        user = await _create_user(client, admin_headers, email="role@example.com")
+        user = await _create_user(
+            client, admin_headers, email="role@example.com", project_id=project_id
+        )
 
         await client.post(
             f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
@@ -303,7 +352,9 @@ class TestTeamMemberRoutes:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
-        user = await _create_user(client, admin_headers, email="remove@example.com")
+        user = await _create_user(
+            client, admin_headers, email="remove@example.com", project_id=project_id
+        )
 
         await client.post(
             f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
@@ -330,10 +381,18 @@ class TestTeamMemberRoutes:
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
         user1 = await _create_user(
-            client, admin_headers, email="m1@example.com", name="Ana"
+            client,
+            admin_headers,
+            email="m1@example.com",
+            name="Ana",
+            project_id=project_id,
         )
         user2 = await _create_user(
-            client, admin_headers, email="m2@example.com", name="Carlos"
+            client,
+            admin_headers,
+            email="m2@example.com",
+            name="Carlos",
+            project_id=project_id,
         )
 
         for user in (user1, user2):
@@ -357,7 +416,9 @@ class TestTeamMemberRoutes:
     ):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
         team = await _create_team(client, admin_headers, project_id)
-        user = await _create_user(client, admin_headers, email="count@example.com")
+        user = await _create_user(
+            client, admin_headers, email="count@example.com", project_id=project_id
+        )
 
         await client.post(
             f"/api/v1/projects/{project_id}/teams/{team['id']}/members",

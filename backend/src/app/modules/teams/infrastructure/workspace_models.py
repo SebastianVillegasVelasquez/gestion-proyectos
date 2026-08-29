@@ -92,6 +92,11 @@ class DeliverableVersion(Base, UUIDMixin, TimestampMixin):
     )
     url: Mapped[str] = mapped_column(String(1000), nullable=False)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Instrucciones de quien entrega para el siguiente rol de la cadena ("dejé el
+    # guion en la carpeta X, falta revisar el minuto 3"). Dato INTERNO del equipo:
+    # nunca sale en informes ni paneles al cliente (esas vistas no leen estas
+    # tablas; si algún día hay reporting de entregables, este campo no entra).
+    observations: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
