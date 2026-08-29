@@ -4,7 +4,36 @@
  * El navegador usa 16px por defecto; subirlo a 17px agranda ~1px toda la letra
  * de una sola vez, porque las utilidades de Tailwind se miden en `rem`
  * (relativas a la raíz). Un único punto de control para el tamaño global.
+ *
+ * Responsive: el mismo punto de control sirve para achicar TODA la interfaz en
+ * pantallas pequeñas de una vez. Como paddings, gaps, tamaños de texto e iconos
+ * salen de utilidades en `rem`, bajar la raíz encoge el layout entero de forma
+ * proporcional — sin re-maquetar cada componente. Los breakpoints coinciden con
+ * los de Tailwind (`md` = 768px, y ~480px para móviles angostos).
  */
 html {
   font-size: 17px;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+/*
+ * Guarda contra el scroll horizontal de página en móvil: cualquier contenido
+ * ancho (tablas, cronograma, filas de chips) debe desbordar DENTRO de su propio
+ * contenedor con `overflow-x-auto`, nunca empujando el ancho del documento.
+ * `clip` en vez de `hidden` para no romper `position: sticky` de los hijos.
+ */
+html,
+body {
+  overflow-x: clip;
 }

@@ -26,7 +26,8 @@ function Card({ className, accent, interactive, ...props }: CardProps) {
 }
 
 function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col space-y-1 p-5", className)} {...props} />;
+  // Padding más ajustado en móvil; a partir de `sm` recupera el del diseño.
+  return <div className={cn("flex flex-col space-y-1 p-4 sm:p-5", className)} {...props} />;
 }
 
 // `ref` incluido en las props: React 19 lo trata como una prop normal en
@@ -37,7 +38,7 @@ function CardContent({
   ref,
   ...props
 }: HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
-  return <div ref={ref} className={cn("p-5 pt-0", className)} {...props} />;
+  return <div ref={ref} className={cn("p-4 pt-0 sm:p-5 sm:pt-0", className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {

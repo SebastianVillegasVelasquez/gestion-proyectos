@@ -24,6 +24,7 @@ from app.modules.identity.presentation.schemas import (
     BulkCreatedUser,
     BulkCreateUsersResponse,
     BulkUserRowError,
+    CreatedUserResponse,
     CreatePositionRequest,
     CreateUserRequest,
     DirectoryUserResponse,
@@ -91,6 +92,7 @@ def _token_response(user) -> TokenResponse:
             document_type=user.document_type,
             document_number=user.document_number,
             created_at=user.created_at,
+            must_change_password=getattr(user, "must_change_password", False),
         ),
     )
 
@@ -107,7 +109,7 @@ class CreateUserUseCase:
         self.user_service = UserService(user_repo)
         self.event_bus = event_bus
 
-    async def execute(self, data: CreateUserRequest) -> UserResponse:
+    async def execute(self, data: CreateUserRequest) -> CreatedUserResponse:
         if not await self.user_repo.is_email_available(data.email):
             raise ConflictError("El correo ya se encuentra registrado")
 
@@ -119,7 +121,16 @@ class CreateUserUseCase:
         if not await self.position_repo.key_exists(data.position):
             raise NotFoundError(f"El cargo '{data.position}' no existe")
 
+        # Sin contraseña definida por el admin: el sistema genera una temporal y
+        # la devuelve una sola vez para entregarla. La persona la cambia en su
+        # primer ingreso (must_change_password lo pone `create_user`).
+        generated = not data.password
+        if generated:
+            data = data.model_copy(update={"password": _generate_temp_password()})
+
         result = await self.user_service.create_user(data)
+
+        temp = data.password if generated else None
 
         if self.event_bus is not None:
             await self.event_bus.publish(
@@ -128,10 +139,11 @@ class CreateUserUseCase:
                     user_id=result.id,
                     email=result.email,
                     name=result.name,
+                    temporary_password=temp,
                 )
             )
 
-        return result
+        return CreatedUserResponse(**result.model_dump(), temporary_password=temp)
 
 
 class LoginUseCase:
@@ -274,6 +286,8 @@ class ChangeMyPasswordUseCase:
         if not verify_password(current, user.password):
             raise UnauthorizedError("La contraseña actual no es correcta")
         user.password = hash_password(new)
+        # Ya eligió una clave propia: se levanta la obligación del primer ingreso.
+        user.must_change_password = False
         await self.user_repo.save(user)
 
 
@@ -289,6 +303,8 @@ class ResetUserPasswordUseCase:
             raise NotFoundError("Usuario no encontrado")
         temp = _generate_temp_password()
         user.password = hash_password(temp)
+        # Clave temporal: la persona deberá cambiarla en su próximo ingreso.
+        user.must_change_password = True
         await self.user_repo.save(user)
         return ResetPasswordResponse(user_id=user_id, temporary_password=temp)
 
@@ -411,6 +427,9 @@ class BulkCreateUsersUseCase:
                             user_id=user.id,
                             email=user.email,
                             name=user.name,
+                            temporary_password=(
+                                password if generated_password else None
+                            ),
                         )
                     )
 

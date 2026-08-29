@@ -118,9 +118,11 @@ class TestCreateUserAdminRoute:
         )
         assert second.status_code == 409
 
-    async def test_should_return_422_when_password_is_missing(
+    async def test_missing_password_generates_a_temporary_one(
         self, client, admin_headers
     ):
+        # El admin ya no define la contraseña: el sistema genera una temporal y
+        # la devuelve una sola vez para entregarla.
         response = await client.post(
             "/api/v1/identity/users",
             json={
@@ -133,7 +135,10 @@ class TestCreateUserAdminRoute:
             headers=admin_headers,
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["temporary_password"]
+        assert body["must_change_password"] is True
 
     async def test_should_return_422_when_role_is_invalid(self, client, admin_headers):
         response = await client.post(

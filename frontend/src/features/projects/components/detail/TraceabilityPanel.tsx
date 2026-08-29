@@ -269,7 +269,10 @@ export function TraceabilityPanel({
    * panel, no la del proyecto entero. */
   lockedTeamId?: string;
 }) {
-  const query = useProjectTraceability(projectId);
+  // Con equipo fijo (espacio de trabajo) la consulta se acota a ese equipo: el
+  // backend la exige así para autorizar a líderes/supervisores de equipo que no
+  // organizan el proyecto entero.
+  const query = useProjectTraceability(projectId, lockedTeamId);
   // Un solo objeto de filtros en vez de un useState por control: así añadir un
   // filtro nuevo no obliga a tocar cada sitio que los combina.
   const [filters, setFilters] = useState<TraceabilityFilters>(EMPTY_TRACE_FILTERS);

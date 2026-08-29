@@ -106,6 +106,10 @@ class UserCreated(DomainEvent):
     user_id: uuid.UUID
     email: str
     name: str
+    # Contraseña temporal generada por el sistema, solo cuando el alta no trajo
+    # una definida. Viaja en el evento porque el correo de bienvenida la incluye
+    # para que la persona pueda entrar. None si el admin definió la contraseña.
+    temporary_password: str | None = None
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,8 @@ from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
+from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.models import Team, TeamMember
 
 UTC = datetime.timezone.utc
 
@@ -156,3 +158,37 @@ class TestProjectTraceabilityRoute:
             headers=member_headers,
         )
         assert response.status_code == 200
+
+    async def test_should_allow_team_lead_scoped_to_their_team(
+        self, client, member_headers, member_user, project_with_history, db_session
+    ):
+        # Líder de un equipo del proyecto, SIN rol de organizador del proyecto:
+        # puede ver la trazabilidad si la pide acotada a su equipo.
+        team = Team(
+            id=uuid.uuid4(), project_id=project_with_history.id, name="Guionistas"
+        )
+        db_session.add(team)
+        await db_session.flush()
+        db_session.add(
+            TeamMember(
+                id=uuid.uuid4(),
+                team_id=team.id,
+                user_id=member_user.id,
+                team_role=TeamRole.LIDER,
+            )
+        )
+        await db_session.commit()
+
+        ok = await client.get(
+            f"/api/v1/projects/{project_with_history.id}/traceability",
+            params={"team_id": str(team.id)},
+            headers=member_headers,
+        )
+        assert ok.status_code == 200
+
+        # Sin acotar a su equipo no está autorizado (vería el proyecto entero).
+        forbidden = await client.get(
+            f"/api/v1/projects/{project_with_history.id}/traceability",
+            headers=member_headers,
+        )
+        assert forbidden.status_code == 403

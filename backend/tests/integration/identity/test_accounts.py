@@ -32,6 +32,20 @@ class TestChangeOwnPassword:
         )
         assert resp.status_code == 401
 
+    async def test_change_clears_must_change_password_flag(
+        self, client, member_user, member_headers
+    ):
+        changed = await client.patch(
+            "/api/v1/identity/me/password",
+            json={"current_password": "Member123*", "new_password": "NuevaClave9"},
+            headers=member_headers,
+        )
+        assert changed.status_code == 204, changed.text
+
+        me = await client.get("/api/v1/identity/me", headers=member_headers)
+        assert me.status_code == 200
+        assert me.json()["must_change_password"] is False
+
 
 class TestAdminResetPassword:
     async def test_admin_resets_and_user_logs_in_with_temp(
@@ -47,6 +61,8 @@ class TestAdminResetPassword:
 
         login = await _login(client, "member@test.com", temp)
         assert login.status_code == 200, login.text
+        # Clave temporal: el usuario debe cambiarla en el primer ingreso.
+        assert login.json()["user"]["must_change_password"] is True
 
     async def test_reset_requires_admin(self, client, member_user, member_headers):
         denied = await client.post(
@@ -54,6 +70,28 @@ class TestAdminResetPassword:
             headers=member_headers,
         )
         assert denied.status_code == 403
+
+    async def test_admin_can_clear_must_change_password(
+        self, client, member_user, super_admin_headers
+    ):
+        # Fuerza el flag con un reset...
+        await client.post(
+            f"/api/v1/identity/users/{member_user.id}/reset-password",
+            headers=super_admin_headers,
+        )
+        # ...y un admin lo levanta desde la edición del usuario.
+        patched = await client.patch(
+            f"/api/v1/identity/users/{member_user.id}",
+            json={
+                "email": member_user.email,
+                "name": member_user.name,
+                "last_name": member_user.last_name,
+                "must_change_password": False,
+            },
+            headers=super_admin_headers,
+        )
+        assert patched.status_code == 200, patched.text
+        assert patched.json()["must_change_password"] is False
 
 
 class TestAdminCreateUser:
@@ -71,6 +109,47 @@ class TestAdminCreateUser:
         )
         assert resp.status_code == 201, resp.text
         assert resp.json()["role"] == "admin"
+        # Cuenta nueva: entra con clave provisional y debe cambiarla al ingresar.
+        assert resp.json()["must_change_password"] is True
+
+    async def test_create_without_password_generates_temporary(
+        self, client, super_admin_headers
+    ):
+        resp = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "sin.clave@test.com",
+                "name": "Sin",
+                "last_name": "Clave",
+                "role": "user",
+            },
+            headers=super_admin_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        temp = body["temporary_password"]
+        assert temp and len(temp) >= 8
+        assert body["must_change_password"] is True
+        # La temporal sirve para iniciar sesión.
+        login = await _login(client, "sin.clave@test.com", temp)
+        assert login.status_code == 200, login.text
+
+    async def test_create_with_password_omits_temporary(
+        self, client, super_admin_headers
+    ):
+        resp = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "con.clave@test.com",
+                "password": "Passw0rd1",
+                "name": "Con",
+                "last_name": "Clave",
+                "role": "user",
+            },
+            headers=super_admin_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["temporary_password"] is None
 
     async def test_non_admin_cannot_create_user(self, client, member_headers):
         resp = await client.post(

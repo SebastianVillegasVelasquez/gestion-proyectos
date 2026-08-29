@@ -10,7 +10,8 @@ export const projectKeys = {
   nodeTypes: (id: string) => [...projectKeys.detail(id), "node-types"] as const,
   trash: (id: string) => [...projectKeys.detail(id), "trash"] as const,
   members: (id: string) => [...projectKeys.detail(id), "members"] as const,
-  traceability: (id: string) => [...projectKeys.detail(id), "traceability"] as const,
+  traceability: (id: string, teamId?: string) =>
+    [...projectKeys.detail(id), "traceability", ...(teamId ? [teamId] : [])] as const,
   areas: (id: string) => [...projectKeys.detail(id), "areas"] as const,
   clientAccess: (id: string) => [...projectKeys.detail(id), "client-access"] as const,
   notes: (id: string) => [...projectKeys.detail(id), "notes"] as const,

@@ -39,6 +39,7 @@ from app.modules.identity.presentation.schemas import (
     AdminUserSortField,
     BulkCreateUsersResponse,
     ChangePasswordRequest,
+    CreatedUserResponse,
     CreatePositionRequest,
     CreateUserRequest,
     DirectoryUserResponse,
@@ -71,7 +72,7 @@ def _assert_can_assign_role(actor_role: str, target_role) -> None:
         raise ForbiddenError("Solo un super_admin puede asignar el rol super_admin")
 
 
-@router.post("/users", response_model=UserResponse, status_code=201)
+@router.post("/users", response_model=CreatedUserResponse, status_code=201)
 async def create_user_admin(
     data: CreateUserRequest,
     repo: UserRepository = Depends(user_repo_dependency),

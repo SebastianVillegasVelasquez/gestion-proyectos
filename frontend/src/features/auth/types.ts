@@ -9,6 +9,10 @@ export interface AuthUser {
   email: string;
   role: Role;
   position?: string;
+  // Primer ingreso: el backend lo marca en cuentas nuevas y tras un reset de
+  // admin. Mientras sea true la app bloquea todo con el modal de bienvenida
+  // hasta que la persona crea su propia contraseña.
+  must_change_password?: boolean;
 }
 
 export interface LoginResponse {

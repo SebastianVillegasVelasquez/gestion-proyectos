@@ -67,6 +67,16 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Primer ingreso: SOLO se pone en True donde el sistema entrega una clave que
+    # la persona no eligió — alta de usuario por un admin (`UserService.create_user`,
+    # que además dispara el correo de bienvenida) y reset de contraseña. El
+    # default es False: cualquier otra cuenta (seeds, usuarios ya existentes en
+    # producción) entra normal. El frontend bloquea la app con un modal mientras
+    # esto sea True.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     # Relaciones
 
     tasks: Mapped[list[Task]] = relationship("Task", back_populates="assignee")

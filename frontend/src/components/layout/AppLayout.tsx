@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
+import { FirstLoginPasswordGate } from "@/features/auth/components/FirstLoginPasswordGate";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
 // Fallback mientras se descarga el chunk de la ruta (solo el área de contenido;
@@ -57,6 +58,9 @@ export const AppLayout = () => {
 
   return (
     <WhatsNewProvider>
+      {/* Primer ingreso: si la cuenta entró con contraseña provisional, este
+          modal cubre toda la app hasta que la persona cree la suya. */}
+      <FirstLoginPasswordGate />
       <div className="flex h-screen overflow-hidden bg-background text-foreground">
         {/* Mobile backdrop */}
         {sidebarOpen && (
