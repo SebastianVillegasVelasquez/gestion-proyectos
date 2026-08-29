@@ -1,0 +1,180 @@
+import { useState } from "react";
+import { Check, UserCog, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUpdateTask } from "../../hooks/use-tasks";
+import { colorForName } from "../../utils/entity-color";
+import { fullName, initialsOf } from "../../utils/task-assignment";
+
+/**
+ * Reasigna una tarea del equipo a otro integrante DEL MISMO equipo. Sustituye
+ * al viejo `<select>`: un botón que muestra al responsable actual con SU color
+ * (paleta determinista por nombre, la misma que usan los chips de equipo) y
+ * abre un modal para elegir. Es la única potestad del líder/supervisor sobre
+ * tareas que no son suyas; solo toca `assignee_id`.
+ */
+
+interface Person {
+  user_id: string;
+  name: string;
+  last_name: string;
+}
+
+export function ReassignTaskButton({
+  projectId,
+  taskId,
+  currentAssigneeId,
+  members,
+  onDone,
+}: {
+  projectId: string;
+  taskId: string;
+  currentAssigneeId: string | null;
+  members: Person[];
+  onDone?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const update = useUpdateTask(projectId);
+  const current = members.find((m) => m.user_id === currentAssigneeId) ?? null;
+
+  function choose(nextId: string | null) {
+    setOpen(false);
+    if (nextId === currentAssigneeId) {
+      return;
+    }
+    update.mutate({ taskId, payload: { assignee_id: nextId } }, { onSuccess: onDone });
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        disabled={update.isPending}
+        onClick={() => {
+          setOpen(true);
+        }}
+        aria-label="Reasignar responsable"
+        className={cn(
+          "flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold transition hover:opacity-90 disabled:opacity-50",
+          current
+            ? colorForName(fullName(current))
+            : "border border-dashed border-border text-muted-foreground hover:border-brand-gold hover:text-brand-gold-dark",
+        )}
+      >
+        <UserCog className="size-3 shrink-0 opacity-70" />
+        <span className="max-w-[130px] truncate">
+          {update.isPending ? "Guardando…" : current ? fullName(current) : "Asignar"}
+        </span>
+      </button>
+
+      {update.isError && (
+        <span className="text-[11px] text-rose-600 dark:text-rose-400">
+          No se pudo reasignar. Revisa que la persona siga en el equipo.
+        </span>
+      )}
+
+      {open && (
+        <ReassignModal
+          members={members}
+          currentAssigneeId={currentAssigneeId}
+          onPick={choose}
+          onClose={() => {
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReassignModal({
+  members,
+  currentAssigneeId,
+  onPick,
+  onClose,
+}: {
+  members: Person[];
+  currentAssigneeId: string | null;
+  onPick: (id: string | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <UserCog className="size-4 text-brand-gold" /> Reasignar responsable
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          <button
+            type="button"
+            onClick={() => {
+              onPick(null);
+            }}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-accent",
+              currentAssigneeId === null && "bg-accent",
+            )}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-[10px] text-muted-foreground">
+              —
+            </span>
+            <span className="flex-1 text-muted-foreground">Sin responsable</span>
+            {currentAssigneeId === null && <Check className="size-4 text-brand-gold" />}
+          </button>
+
+          {members.map((m) => {
+            const name = fullName(m);
+            const isCurrent = m.user_id === currentAssigneeId;
+            return (
+              <button
+                key={m.user_id}
+                type="button"
+                onClick={() => {
+                  onPick(m.user_id);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-accent",
+                  isCurrent && "bg-accent",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                    colorForName(name),
+                  )}
+                >
+                  {initialsOf(m)}
+                </span>
+                <span
+                  className={cn(
+                    "flex-1 truncate font-medium",
+                    isCurrent ? "text-foreground" : "text-foreground/80",
+                  )}
+                >
+                  {name}
+                </span>
+                {isCurrent && <Check className="size-4 shrink-0 text-brand-gold" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

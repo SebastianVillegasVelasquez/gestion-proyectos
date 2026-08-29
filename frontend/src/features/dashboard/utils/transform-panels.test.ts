@@ -15,6 +15,11 @@ describe("formatShortDate", () => {
     expect(formatShortDate("2026-06-14")).toBe("14 Jun");
     expect(formatShortDate("2026-01-03")).toBe("3 Ene");
   });
+
+  it("shows 'Sin fecha' when the task has no due date", () => {
+    expect(formatShortDate(null)).toBe("Sin fecha");
+    expect(formatShortDate(undefined)).toBe("Sin fecha");
+  });
 });
 
 describe("deadlinePriority", () => {
@@ -62,6 +67,14 @@ describe("toTask", () => {
   it("omits the project tag when there is no project", () => {
     const task = toTask({ ...base, project_name: null });
     expect(task.tags).toEqual([{ label: "14 Jun", variant: "date" }]);
+  });
+
+  it("labels the date tag 'Sin fecha' when the task has no due date", () => {
+    const task = toTask({ ...base, due_date: null });
+    expect(task.tags).toEqual([
+      { label: "Diplomado", variant: "project" },
+      { label: "Sin fecha", variant: "date" },
+    ]);
   });
 });
 

@@ -160,6 +160,14 @@ describe("filterTasks", () => {
     expect(filterTasks(tasks, filters({ search: "GUION" }), tree).map((t) => t.id)).toEqual(["a"]);
   });
 
+  it("also searches the ancestor chain, so a branch name narrows the list", () => {
+    // "Módulo 1" no está en el título de ninguna, pero sí en la ruta de a y d.
+    expect(filterTasks(tasks, filters({ search: "módulo 1" }), tree).map((t) => t.id)).toEqual([
+      "a",
+      "d",
+    ]);
+  });
+
   it("includes the whole subtree when filtering by a parent element", () => {
     // Módulo 1 contiene Unidad 1 y Unidad 2: sus dos tareas, aunque ninguna
     // cuelgue literalmente del módulo.

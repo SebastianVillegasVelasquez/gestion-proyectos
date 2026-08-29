@@ -45,6 +45,7 @@ function mapVersion(v: ApiVersion): DeliverableVersion {
     uploadedBy: v.uploaded_by,
     uploadedAt: v.uploaded_at,
     note: v.note ?? "",
+    observations: v.observations ?? "",
   };
 }
 

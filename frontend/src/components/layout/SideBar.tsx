@@ -20,6 +20,7 @@ import { useAuth, useLogout } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
+import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.DEVELOPER]: "Developer",
@@ -308,6 +309,7 @@ export function Sidebar({
           </div>
           {/* Notificaciones + tema — solo escritorio (en móvil están en la barra superior) */}
           <div className={cn("hidden items-center gap-0.5 md:flex", collapsed && "md:flex-col")}>
+            <RemindersBell placement="up" />
             <NotificationBell placement="up" />
             <button
               type="button"

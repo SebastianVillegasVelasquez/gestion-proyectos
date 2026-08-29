@@ -7,6 +7,7 @@ y responsable resueltos, para agrupar por módulo en el workspace.
 
 from datetime import date, timedelta
 
+from app.core.security import create_access_token
 from tests.integration.worktree.test_routes import (
     _create_item,
     _create_project,
@@ -30,6 +31,22 @@ async def _create_team(
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
+
+
+async def _add_project_member(
+    client, admin_headers, project_id, user_id, role="integrante"
+) -> None:
+    """Alta en el proyecto: precondición para poder entrar a un equipo."""
+    resp = await client.post(
+        "/api/v1/projects/members/",
+        json={
+            "user_id": str(user_id),
+            "project_id": str(project_id),
+            "project_role": role,
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201, resp.text
 
 
 class TestTeamTasks:
@@ -208,6 +225,52 @@ class TestTeamTasks:
             "Diseñar variante móvil",
         }
 
+    async def test_subtask_inherits_work_item_from_parent(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """La subtarea sin `work_item_id` cuelga del MISMO elemento del padre,
+        así se ve en la estructura y el cronograma (no queda fuera del árbol)."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        parent_id = (
+            await client.post(
+                "/api/v1/tasks",
+                headers=admin_headers,
+                json={
+                    "title": "Tarea general",
+                    "work_item_id": modulo["id"],
+                    "team_id": team_id,
+                    "start_date": _day(0),
+                    "duration_days": 5,
+                },
+            )
+        ).json()["id"]
+
+        sub = await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={
+                "title": "Subtarea sin ubicar",
+                "project_id": project_id,
+                "parent_task_id": parent_id,
+                "start_date": _day(0),
+                "duration_days": 2,
+            },
+        )
+        assert sub.status_code == 201, sub.text
+        assert sub.json()["work_item_id"] == modulo["id"]
+
+        # Y por tanto aparece entre las tareas del elemento.
+        node_tasks = await client.get(
+            f"/api/v1/work-items/{modulo['id']}/tasks", headers=admin_headers
+        )
+        assert "Subtarea sin ubicar" in {t["title"] for t in node_tasks.json()}
+
     async def test_reassign_team_via_patch(
         self, client, admin_headers, valid_project_payload
     ):
@@ -275,6 +338,7 @@ class TestTeamLeadReassignment:
             (str(member_user.id), "lider"),
             (mate["id"], "integrante"),
         ):
+            await _add_project_member(client, admin_headers, project_id, user_id)
             resp = await client.post(
                 f"/api/v1/projects/{project_id}/teams/{team_id}/members",
                 headers=admin_headers,
@@ -353,3 +417,182 @@ class TestTeamLeadReassignment:
             json={"assignee_id": outsider["id"]},
         )
         assert resp.status_code == 403, resp.text
+
+
+class TestCreateTeamTask:
+    """POST /teams/{team_id}/tasks: el líder/supervisor crea tareas de SU equipo
+    sin ser admin (POST /tasks sigue siendo solo-admin)."""
+
+    async def _setup(self, client, admin_headers, member_user, valid_project_payload):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        mate = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "teammate-ctt@example.com",
+                    "password": "password123",
+                    "name": "Tea",
+                    "last_name": "Mate",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        for user_id, role in (
+            (str(member_user.id), "lider"),
+            (mate["id"], "integrante"),
+        ):
+            await _add_project_member(client, admin_headers, project_id, user_id)
+            resp = await client.post(
+                f"/api/v1/projects/{project_id}/teams/{team_id}/members",
+                headers=admin_headers,
+                json={"user_id": user_id, "team_role": role},
+            )
+            assert resp.status_code == 201, resp.text
+        return project_id, team_id, modulo["id"], mate["id"]
+
+    async def test_lead_creates_pool_task(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        _, team_id, item_id, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        resp = await client.post(
+            f"/api/v1/teams/{team_id}/tasks",
+            headers=member_headers,
+            json={"title": "Guion del módulo", "work_item_id": item_id},
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["team_id"] == team_id
+        assert body["assignee_id"] is None
+
+        listed = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=member_headers
+        )
+        assert [t["title"] for t in listed.json()] == ["Guion del módulo"]
+
+    async def test_lead_creates_task_already_assigned_to_a_member(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        _, team_id, item_id, mate_id = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        resp = await client.post(
+            f"/api/v1/teams/{team_id}/tasks",
+            headers=member_headers,
+            json={
+                "title": "Montaje",
+                "work_item_id": item_id,
+                "assignee_id": mate_id,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        # Estado válido «tarea del equipo con responsable».
+        assert body["assignee_id"] == mate_id
+        assert body["team_id"] == team_id
+
+    async def test_lead_creates_subtask_inheriting_parent_context(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        _, team_id, item_id, mate_id = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        parent_id = (
+            await client.post(
+                f"/api/v1/teams/{team_id}/tasks",
+                headers=member_headers,
+                json={"title": "Tarea general", "work_item_id": item_id},
+            )
+        ).json()["id"]
+
+        resp = await client.post(
+            f"/api/v1/teams/{team_id}/tasks",
+            headers=member_headers,
+            json={
+                "title": "Subtarea concreta",
+                "parent_task_id": parent_id,
+                "assignee_id": mate_id,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["parent_task_id"] == parent_id
+        assert body["team_id"] == team_id
+        assert body["work_item_id"] == item_id  # heredado del padre
+        assert body["assignee_id"] == mate_id
+
+    async def test_integrante_cannot_create_team_tasks(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_id = await _create_team(client, admin_headers, project_id)
+        plain = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "plain-integrante@example.com",
+                    "password": "password123",
+                    "name": "Pla",
+                    "last_name": "In",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        await _add_project_member(client, admin_headers, project_id, plain["id"])
+        await client.post(
+            f"/api/v1/projects/{project_id}/teams/{team_id}/members",
+            headers=admin_headers,
+            json={"user_id": plain["id"], "team_role": "integrante"},
+        )
+        headers = {
+            "Authorization": f"Bearer {create_access_token(user_id=plain['id'], role='user')}"
+        }
+
+        resp = await client.post(
+            f"/api/v1/teams/{team_id}/tasks",
+            headers=headers,
+            json={"title": "No debería"},
+        )
+        assert resp.status_code == 403, resp.text
+
+    async def test_cannot_assign_outside_the_team(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        _, team_id, item_id, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        outsider = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "ctt-outsider@example.com",
+                    "password": "password123",
+                    "name": "Out",
+                    "last_name": "Sider",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        resp = await client.post(
+            f"/api/v1/teams/{team_id}/tasks",
+            headers=member_headers,
+            json={
+                "title": "X",
+                "work_item_id": item_id,
+                "assignee_id": outsider["id"],
+            },
+        )
+        assert resp.status_code == 422, resp.text

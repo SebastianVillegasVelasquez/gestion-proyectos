@@ -1,4 +1,5 @@
 import type { Task, TaskPriority, TaskStatus, WorkItemTree } from "../types/api.types";
+import { collectItemPaths } from "../utils/work-item-path";
 
 /**
  * Filtros de la pantalla de tareas.
@@ -168,10 +169,14 @@ export function withinRange(task: Task, from: string | null, to: string | null):
 export function filterTasks(tasks: Task[], filters: TaskFilters, tree: WorkItemTree[]): Task[] {
   const needle = filters.search.trim().toLowerCase();
   const locationIds = filters.locationId ? subtreeIds(tree, filters.locationId) : null;
+  // Con nombres de tarea repetidos (p. ej. "guion de video" ×480), lo que
+  // distingue una de otra es su rama: el buscador también mira los ancestros.
+  const pathById = needle ? collectItemPaths(tree) : new Map<string, string[]>();
 
   return tasks.filter((task) => {
     if (needle) {
-      const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();
+      const path = task.work_item_id ? (pathById.get(task.work_item_id) ?? []) : [];
+      const haystack = `${task.title} ${task.description ?? ""} ${path.join(" ")}`.toLowerCase();
       if (!haystack.includes(needle)) {
         return false;
       }

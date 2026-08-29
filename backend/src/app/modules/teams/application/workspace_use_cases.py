@@ -21,6 +21,7 @@ from app.modules.teams.presentation.workspace_schemas import (
     MyTeamResponse,
     TeamNotificationSettingsResponse,
     UpdateTeamNotificationSettingsRequest,
+    UpdateVersionRequest,
     WorkspaceAccessResponse,
 )
 from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
@@ -43,8 +44,12 @@ _TASK_STATUS_ON_DELIVER = TaskStatus.EN_REVISION
 class WorkspaceService:
     """Casos de uso del espacio de trabajo. Exige la política antes de actuar."""
 
-    def __init__(self, repo: WorkspaceRepository):
+    def __init__(self, repo: WorkspaceRepository, notifier=None):
         self._repo = repo
+        # Colaborador opcional: avisa a líder/supervisor cuando se entrega.
+        # Solo la ruta de "subir versión" lo inyecta; el resto crea el
+        # servicio sin él y nada cambia.
+        self._notifier = notifier
 
     # ── acceso ───────────────────────────────────────────────────────────────
     async def _access(self, team_id: UUID, current_user) -> WorkspaceAccess:
@@ -163,6 +168,7 @@ class WorkspaceService:
                 resource_type=data.type,
                 url=data.url,
                 note=data.note,
+                observations=data.observations,
                 uploaded_by=current_user.id,
             )
         )
@@ -173,6 +179,51 @@ class WorkspaceService:
         # tarea a "en revisión" y deja rastro en TaskHistory. Idempotente.
         await self._sync_task_status(deliverable, _TASK_STATUS_ON_DELIVER, current_user)
 
+        # T8: avisar a quien revisa (líder / supervisor) que hay entrega nueva.
+        if self._notifier is not None:
+            members = await self._repo.list_members(team_id)
+            team = await self._repo.get_team(team_id)
+            await self._notifier.deliverable_submitted(
+                team_id=team_id,
+                team_name=team.name if team else "",
+                project_name=team.name if team else "",
+                deliverable_id=deliverable.id,
+                task_id=deliverable.task_id,
+                task_title=deliverable.task_title,
+                submitter_id=current_user.id,
+                submitter_name=getattr(current_user, "name", "Un integrante"),
+                reviewers=members,
+            )
+
+        return DeliverableResponse.of(
+            await self._require_deliverable(team_id, deliverable_id)
+        )
+
+    async def update_version(
+        self,
+        team_id: UUID,
+        deliverable_id: UUID,
+        version_id: UUID,
+        data: UpdateVersionRequest,
+        current_user,
+    ) -> DeliverableResponse:
+        """Corrige una entrega ya subida (URL, nota u observaciones). Solo cambia
+        lo que se envía; no crea una versión nueva ni mueve el estado."""
+        if not (await self._access(team_id, current_user)).can_deliver:
+            raise ForbiddenError("Solo los integrantes del equipo pueden entregar")
+        deliverable = await self._require_deliverable(team_id, deliverable_id)
+        version = next((v for v in deliverable.versions if v.id == version_id), None)
+        if version is None:
+            raise NotFoundError("La versión no existe")
+        if data.type is not None:
+            version.resource_type = data.type
+        if data.url is not None:
+            version.url = data.url
+        if data.note is not None:
+            version.note = data.note or None
+        if data.observations is not None:
+            version.observations = data.observations or None
+        await self._repo.save_deliverable(deliverable)
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
         )

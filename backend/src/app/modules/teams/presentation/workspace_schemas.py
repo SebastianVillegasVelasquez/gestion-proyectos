@@ -27,6 +27,20 @@ class AddVersionRequest(BaseModelConfig):
     type: ResourceType
     url: Annotated[str, StringConstraints(min_length=1, max_length=1000)]
     note: Optional[str] = None
+    # Instrucciones para el siguiente rol de la cadena. Interno del equipo.
+    observations: Optional[str] = None
+
+
+class UpdateVersionRequest(BaseModelConfig):
+    """Corrige una entrega ya subida. Todos los campos opcionales: solo se
+    aplica lo que se envíe (PATCH parcial)."""
+
+    type: Optional[ResourceType] = None
+    url: Optional[Annotated[str, StringConstraints(min_length=1, max_length=1000)]] = (
+        None
+    )
+    note: Optional[str] = None
+    observations: Optional[str] = None
 
 
 class AddCommentRequest(BaseModelConfig):
@@ -44,6 +58,8 @@ class VersionResponse(BaseModelConfig):
     type: ResourceType
     url: str
     note: Optional[str] = None
+    # Solo para la trazabilidad interna del equipo (vista de entregables).
+    observations: Optional[str] = None
     uploaded_by: UUID
     uploaded_at: datetime.datetime
 
@@ -55,6 +71,7 @@ class VersionResponse(BaseModelConfig):
             type=v.resource_type,
             url=v.url,
             note=v.note,
+            observations=v.observations,
             uploaded_by=v.uploaded_by,
             uploaded_at=v.created_at,
         )

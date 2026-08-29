@@ -21,3 +21,6 @@ class NotificationType(str, enum.Enum):
     COMENTARIO_PUBLICADO = "comentario_publicado"
     COMENTARIO_RESPUESTA = "comentario_respuesta"
     MENCION = "mencion"
+
+    # Recordatorio personal que la propia persona se programó.
+    RECORDATORIO = "recordatorio"

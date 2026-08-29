@@ -8,6 +8,7 @@ import {
 } from "@/features/auth/utils/session.utils";
 import { decodeJwt } from "@/features/auth/utils/jwt.utils";
 import { SESSION_REFRESHED_EVENT, refreshAccessToken } from "@/features/auth/api/refresh";
+import { USER_REVALIDATED_EVENT, revalidateUser } from "@/features/auth/api/revalidate";
 
 // Margen para renovar el token ANTES de que expire y no dejar una ventana en la
 // que las peticiones fallen con 401.
@@ -35,17 +36,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
     // El interceptor renueva el token de forma silenciosa (misma pestaña);
-    // re-leemos la sesión para reiniciar el temporizador de expiración.
+    // re-leemos la sesión para reiniciar el temporizador de expiración. El mismo
+    // gesto sirve cuando la revalidación de usuario detecta un cambio (p. ej. de rol).
     const onRefreshed = () => {
       setSession(readSession());
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
+    window.addEventListener(USER_REVALIDATED_EVENT, onRefreshed);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
+      window.removeEventListener(USER_REVALIDATED_EVENT, onRefreshed);
     };
   }, []);
+
+  // Revalida el usuario contra el servidor al abrir la app y cada vez que la
+  // pestaña vuelve al primer plano. Así un cambio de rol hecho por un admin se
+  // refleja en la navegación y los RoleGuard en segundos, sin forzar re-login.
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    void revalidateUser(true);
+    const onFocus = () => void revalidateUser();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void revalidateUser();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // Solo depende de si hay sesión y de quién es; no del objeto completo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.accessToken == null, session?.user.id]);
 
   // Al montar: si no hay sesión válida (access token vencido) pero aún queda un
   // refresh token, renovamos en silencio en vez de exigir un nuevo login. Cubre

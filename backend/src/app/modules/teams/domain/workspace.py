@@ -75,6 +75,9 @@ class WorkspaceRepository(ABC):
     async def list_members(self, team_id: UUID) -> list[TeamMember]: ...
 
     @abstractmethod
+    async def get_team(self, team_id: UUID) -> Team | None: ...
+
+    @abstractmethod
     async def list_deliverables(self, team_id: UUID) -> list[Deliverable]: ...
 
     @abstractmethod

@@ -5,9 +5,21 @@ from app.modules.tasks.infrastructure.enums import TaskStatus
 # Estados que cuentan como "trabajo terminado" para desbloquear dependencias/fases.
 _TERMINAL = (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
 
+# Transiciones que "hacen avanzar" la tarea. Devolver o cancelar no cuentan:
+# se permiten aunque la dependencia siga pendiente.
+FORWARD_STATUSES = (
+    TaskStatus.EN_PROGRESO,
+    TaskStatus.EN_REVISION,
+    TaskStatus.COMPLETADA,
+)
+
 
 def incomplete_dependency_ids(dependencies) -> list[UUID]:
-    """Devuelve los ids de las tareas-prerrequisito que aún no están completadas."""
+    """Ids de las tareas-prerrequisito que aún no están completadas (aprobadas).
+
+    Regla de negocio: una tarea que depende de otra no puede avanzar de estado
+    mientras esa otra no esté COMPLETADA.
+    """
     blocking: list[UUID] = []
     for dep in dependencies:
         target = getattr(dep, "depends_on", None)

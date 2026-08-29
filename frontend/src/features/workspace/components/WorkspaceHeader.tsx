@@ -1,6 +1,11 @@
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMember } from "../types";
+
+interface HeaderTeam {
+  id: string;
+  name: string;
+}
 
 interface WorkspaceHeaderProps {
   name: string;
@@ -8,6 +13,10 @@ interface WorkspaceHeaderProps {
   members: WorkspaceMember[];
   canDeliver: boolean;
   onNewDeliverable: () => void;
+  /** Equipos del usuario: si hay más de uno, el título es un selector. */
+  teams: HeaderTeam[];
+  activeTeamId: string;
+  onSwitchTeam: (id: string) => void;
 }
 
 export function WorkspaceHeader({
@@ -16,6 +25,9 @@ export function WorkspaceHeader({
   members,
   canDeliver,
   onNewDeliverable,
+  teams,
+  activeTeamId,
+  onSwitchTeam,
 }: WorkspaceHeaderProps) {
   const leader = members.find((m) => m.role === "lider");
   const others = members.filter((m) => m.id !== leader?.id);
@@ -25,7 +37,27 @@ export function WorkspaceHeader({
   return (
     <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="min-w-0">
-        <h1 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50">{name}</h1>
+        {teams.length > 1 ? (
+          <div className="relative inline-flex items-center">
+            <select
+              aria-label="Cambiar de equipo"
+              value={activeTeamId}
+              onChange={(e) => {
+                onSwitchTeam(e.target.value);
+              }}
+              className="max-w-[60vw] cursor-pointer truncate rounded-md bg-transparent py-0.5 pr-7 text-lg font-bold text-slate-900 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800 dark:focus:bg-slate-800"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-1.5 size-4 text-slate-400" />
+          </div>
+        ) : (
+          <h1 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50">{name}</h1>
+        )}
         {description && (
           <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">
             {description}

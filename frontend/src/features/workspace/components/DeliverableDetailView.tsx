@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Clock, ExternalLink, Link2, Plus } from "lucide-react";
+import { Check, Clock, ExternalLink, Link2, Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   CommentType,
@@ -17,6 +17,14 @@ import {
   resourceDisplayName,
 } from "../utils/resource-types";
 
+/** Campos que se pueden corregir de una entrega ya subida (todos opcionales). */
+export interface EditVersionPatch {
+  type?: ResourceType;
+  url?: string;
+  note?: string;
+  observations?: string;
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
@@ -29,16 +37,133 @@ function formatDate(iso: string) {
   });
 }
 
+// ── Editar una entrega ya subida ─────────────────────────────────────────────
+
+function VersionEditor({
+  version,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  version: DeliverableVersion;
+  pending: boolean;
+  onSave: (patch: EditVersionPatch) => void;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<ResourceType>(version.type);
+  const [url, setUrl] = useState(version.url === "#" ? "" : version.url);
+  const [note, setNote] = useState(version.note);
+  const [observations, setObservations] = useState(version.observations);
+
+  const handleSave = () => {
+    if (!url.trim()) {
+      return;
+    }
+    onSave({
+      type,
+      url: url.trim(),
+      note: note.trim(),
+      observations: observations.trim(),
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        Corregir entrega V{version.versionNumber}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        {UPLOADABLE_RESOURCE_TYPES.map((rt) => {
+          const m = RESOURCE_META[rt];
+          const Icon = m.Icon;
+          const selected = type === rt;
+          return (
+            <button
+              key={rt}
+              type="button"
+              onClick={() => {
+                setType(rt);
+              }}
+              className={cn(
+                "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                selected
+                  ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark"
+                  : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400",
+              )}
+            >
+              <Icon className={cn("size-3", selected ? "text-brand-gold-dark" : m.color)} />
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => {
+          setUrl(e.target.value);
+        }}
+        placeholder={RESOURCE_META[type].placeholder}
+        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      />
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => {
+          setNote(e.target.value);
+        }}
+        placeholder="Detalles de la entrega"
+        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      />
+      <textarea
+        value={observations}
+        onChange={(e) => {
+          setObservations(e.target.value);
+        }}
+        rows={2}
+        placeholder="Observaciones para el siguiente rol (interno del equipo)"
+        className="w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      />
+
+      <div className="flex items-center justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          <X className="size-3" /> Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!url.trim() || pending}
+          className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-40"
+        >
+          <Check className="size-3" /> Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Delivery timeline ────────────────────────────────────────────────────────
 
 function DeliveryTimeline({
   versions,
   members,
+  onEditVersion,
+  editPending = false,
 }: {
   versions: DeliverableVersion[];
   members: WorkspaceMember[];
+  /** Si se pasa, cada versión ofrece un lápiz para corregirla en el sitio. */
+  onEditVersion?: (versionId: string, patch: EditVersionPatch) => void;
+  editPending?: boolean;
 }) {
   const sorted = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
     <div>
@@ -86,61 +211,101 @@ function DeliveryTimeline({
                         : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        {/* Resource type chip */}
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-                            meta.chip,
-                          )}
-                        >
-                          <Icon className="size-3 shrink-0" />
-                          {meta.label}
-                        </span>
-                        <span className="truncate text-[12px] font-medium text-slate-700 dark:text-slate-200">
-                          {resourceDisplayName(v.type, v.url, v.fileName)}
-                        </span>
-                        {isLatest && (
-                          <span className="shrink-0 rounded-full bg-brand-gold-light px-1.5 py-0.5 text-[9px] font-semibold text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold">
-                            Actual
-                          </span>
+                    {onEditVersion && editingId === v.id ? (
+                      <VersionEditor
+                        version={v}
+                        pending={editPending}
+                        onCancel={() => {
+                          setEditingId(null);
+                        }}
+                        onSave={(patch) => {
+                          onEditVersion(v.id, patch);
+                          setEditingId(null);
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {/* Resource type chip */}
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
+                                meta.chip,
+                              )}
+                            >
+                              <Icon className="size-3 shrink-0" />
+                              {meta.label}
+                            </span>
+                            <span className="truncate text-[12px] font-medium text-slate-700 dark:text-slate-200">
+                              {resourceDisplayName(v.type, v.url, v.fileName)}
+                            </span>
+                            {isLatest && (
+                              <span className="shrink-0 rounded-full bg-brand-gold-light px-1.5 py-0.5 text-[9px] font-semibold text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold">
+                                Actual
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-1">
+                            {onEditVersion && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(v.id);
+                                }}
+                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                              >
+                                <Pencil className="size-2.5" /> Editar
+                              </button>
+                            )}
+                            {v.url && v.url !== "#" && (
+                              <a
+                                href={v.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                              >
+                                Abrir <ExternalLink className="size-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {v.note && (
+                          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                            {v.note}
+                          </p>
                         )}
-                      </div>
 
-                      {v.url && v.url !== "#" && (
-                        <a
-                          href={v.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
-                        >
-                          Abrir <ExternalLink className="size-2.5" />
-                        </a>
-                      )}
-                    </div>
+                        {v.observations && (
+                          <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                              Interno · para el siguiente rol
+                            </span>
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+                              {v.observations}
+                            </p>
+                          </div>
+                        )}
 
-                    {v.note && (
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                        {v.note}
-                      </p>
-                    )}
-
-                    <div className="mt-2 flex items-center gap-1.5">
-                      {uploader && (
-                        <span
-                          className={cn(
-                            "flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white",
-                            uploader.avatarColor,
+                        <div className="mt-2 flex items-center gap-1.5">
+                          {uploader && (
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white",
+                                uploader.avatarColor,
+                              )}
+                            >
+                              {uploader.initials}
+                            </span>
                           )}
-                        >
-                          {uploader.initials}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                        {uploader?.name ?? "Desconocido"} · {formatDate(v.uploadedAt)}
-                      </span>
-                    </div>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            {uploader?.name ?? "Desconocido"} · {formatDate(v.uploadedAt)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -165,6 +330,7 @@ function RegisterDelivery({ onAddVersion, currentVersion, uploadedBy }: Register
   const [typeTouchedByUser, setTypeTouchedByUser] = useState(false);
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
+  const [observations, setObservations] = useState("");
 
   const handleUrlChange = (value: string) => {
     setUrl(value);
@@ -184,9 +350,11 @@ function RegisterDelivery({ onAddVersion, currentVersion, uploadedBy }: Register
       uploadedBy,
       uploadedAt: new Date().toISOString(),
       note: note.trim() || `${RESOURCE_META[type].label} — V${currentVersion + 1}`,
+      observations: observations.trim(),
     });
     setUrl("");
     setNote("");
+    setObservations("");
     setTypeTouchedByUser(false);
     setType("enlace");
   };
@@ -258,6 +426,15 @@ function RegisterDelivery({ onAddVersion, currentVersion, uploadedBy }: Register
           placeholder="Detalles de la entrega (ej: prototipo mobile actualizado, incluye estado vacío)"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
         />
+        <textarea
+          value={observations}
+          onChange={(e) => {
+            setObservations(e.target.value);
+          }}
+          rows={2}
+          placeholder="Observaciones para el siguiente rol (ej: falta revisar el minuto 3). Solo lo ve el equipo, nunca el cliente."
+          className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        />
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-slate-400 dark:text-slate-500">{meta.hint}</p>
           <button
@@ -287,7 +464,11 @@ interface DeliverableDetailViewProps {
   canReview?: boolean;
   /** Hay una decisión de revisión en vuelo (deshabilita el botón). */
   reviewPending?: boolean;
+  /** Hay una corrección de versión en vuelo. */
+  editPending?: boolean;
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  /** Corrige una entrega ya subida (no crea versión nueva). Solo si `canDeliver`. */
+  onEditVersion?: (versionId: string, patch: EditVersionPatch) => void;
   onReview: (type: CommentType, reason: string) => void;
 }
 
@@ -298,7 +479,9 @@ export function DeliverableDetailView({
   canDeliver = true,
   canReview = false,
   reviewPending = false,
+  editPending = false,
   onAddVersion,
+  onEditVersion,
   onReview,
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
@@ -351,7 +534,12 @@ export function DeliverableDetailView({
       {/* Cuerpo con scroll: la historia del entregable (qué se entregó y qué
           decidió el revisor). Crece hacia abajo con cada versión. */}
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
-        <DeliveryTimeline versions={deliverable.versions} members={members} />
+        <DeliveryTimeline
+          versions={deliverable.versions}
+          members={members}
+          onEditVersion={canDeliver ? onEditVersion : undefined}
+          editPending={editPending}
+        />
 
         <ReviewActions
           deliverable={deliverable}

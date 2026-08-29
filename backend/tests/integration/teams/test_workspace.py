@@ -212,15 +212,24 @@ class TestWorkspaceRolePermissions:
         assert created.status_code == 201
         del_id = created.json()["id"]
 
-        # Entrega (versión) -> pasa a en_revision.
+        # Entrega (versión) -> pasa a en_revision. Con observaciones para el
+        # siguiente rol (dato interno del equipo).
         v = await client.post(
             f"{BASE}/{s.team.id}/deliverables/{del_id}/versions",
-            json={"type": "repositorio", "url": "https://github.com/org/repo/pull/1"},
+            json={
+                "type": "repositorio",
+                "url": "https://github.com/org/repo/pull/1",
+                "observations": "Falta revisar el minuto 3 del video.",
+            },
             headers=_headers(s.integrante),
         )
         assert v.status_code == 201
         assert v.json()["status"] == "en_revision"
         assert v.json()["versions"][0]["type"] == "repositorio"
+        assert (
+            v.json()["versions"][0]["observations"]
+            == "Falta revisar el minuto 3 del video."
+        )
 
         # Comentario normal: permitido.
         c = await client.post(
@@ -238,6 +247,35 @@ class TestWorkspaceRolePermissions:
                 headers=_headers(s.integrante),
             )
             assert r.status_code == 403
+
+    async def test_integrante_can_edit_a_submitted_version(self, client, scenario):
+        s = scenario
+        del_id = (
+            await _create_deliverable(
+                client, s.team.id, _headers(s.integrante), s.integrante.id
+            )
+        ).json()["id"]
+        version_id = (
+            await client.post(
+                f"{BASE}/{s.team.id}/deliverables/{del_id}/versions",
+                json={"type": "enlace", "url": "https://old.example/v1"},
+                headers=_headers(s.integrante),
+            )
+        ).json()["versions"][0]["id"]
+
+        patched = await client.patch(
+            f"{BASE}/{s.team.id}/deliverables/{del_id}/versions/{version_id}",
+            json={
+                "url": "https://new.example/v1-fixed",
+                "observations": "Corregí el enlace roto.",
+            },
+            headers=_headers(s.integrante),
+        )
+        assert patched.status_code == 200, patched.text
+        v0 = patched.json()["versions"][0]
+        assert v0["url"] == "https://new.example/v1-fixed"
+        assert v0["observations"] == "Corregí el enlace roto."
+        assert v0["type"] == "enlace"  # lo no enviado no cambia
 
     async def test_lider_can_approve(self, client, scenario):
         s = scenario
@@ -259,3 +297,38 @@ class TestWorkspaceRolePermissions:
             client, s.team.id, _headers(s.outsider), s.outsider.id
         )
         assert r.status_code == 403
+
+
+class TestDeliverableSubmittedNotifiesReviewers:
+    """T8: subir una versión avisa a líder/supervisor (no al que entrega)."""
+
+    async def test_lider_gets_a_notification_when_a_version_is_uploaded(
+        self, client, scenario, db_session
+    ):
+        from sqlalchemy import select
+
+        from app.modules.notifications.infrastructure.models import Notification
+
+        s = scenario
+        created = await _create_deliverable(
+            client, s.team.id, _headers(s.integrante), s.integrante.id
+        )
+        del_id = created.json()["id"]
+
+        v = await client.post(
+            f"{BASE}/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "repositorio", "url": "https://github.com/org/repo/pull/1"},
+            headers=_headers(s.integrante),
+        )
+        assert v.status_code == 201
+
+        rows = (await db_session.execute(select(Notification))).scalars().all()
+        to_lider = [n for n in rows if n.user_to_id == s.lider.id]
+        to_integrante = [n for n in rows if n.user_to_id == s.integrante.id]
+
+        assert len(to_lider) == 1
+        assert to_lider[0].notification_type.value == "tarea_entregada"
+        assert to_lider[0].payload["deliverable_id"] == del_id
+        assert to_lider[0].actor_id == s.integrante.id
+        # Quien entrega no se autoavisa como revisor.
+        assert to_integrante == []

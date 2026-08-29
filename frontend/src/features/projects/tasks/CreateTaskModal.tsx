@@ -73,6 +73,14 @@ export function CreateTaskModal({
     [treeQuery.data, form.workItemId],
   );
 
+  // Nombre "hoja" del elemento elegido ("Guion", "Video 1"). Muchas veces la
+  // tarea ES ese elemento y no hace falta inventar un título: se ofrece como
+  // un atajo de un clic, sin forzarlo (el campo sigue siendo libre).
+  const selectedElementName = useMemo(() => {
+    const path = workItemPath(treeQuery.data ?? [], form.workItemId || null);
+    return path ? (path.split(" / ").pop() ?? null) : null;
+  }, [treeQuery.data, form.workItemId]);
+
   const handleSubmit = () => {
     const error = validateTaskForm(form);
     if (error) {
@@ -115,6 +123,17 @@ export function CreateTaskModal({
               }}
               placeholder="Diseñar unidad 1"
             />
+            {selectedElementName && selectedElementName !== form.title.trim() && (
+              <button
+                type="button"
+                onClick={() => {
+                  set("title", selectedElementName);
+                }}
+                className="mt-1 self-start rounded-md border border-brand-teal/30 bg-brand-teal/10 px-2 py-1 text-[11px] font-medium text-brand-teal-dark transition hover:bg-brand-teal/20 dark:text-brand-teal"
+              >
+                Usar «{selectedElementName}» como título
+              </button>
+            )}
           </Field>
           <Field label="Descripción">
             <textarea

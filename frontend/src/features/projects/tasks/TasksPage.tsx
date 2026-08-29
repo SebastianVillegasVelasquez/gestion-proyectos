@@ -22,7 +22,7 @@ import { useProjectTasks } from "../hooks/use-tasks";
 import { useProjectMembers } from "../hooks/use-members";
 import { useTeams } from "../hooks/use-teams";
 import { useWorkTree } from "../hooks/use-structure";
-import type { WorkItemTree } from "../types/api.types";
+import { collectItemPaths } from "../utils/work-item-path";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { TasksTable } from "./TasksTable";
 import { TaskFilterBar } from "./TaskFilterBar";
@@ -40,18 +40,6 @@ import {
 // proyecto de una vez (las necesitan otras vistas del detalle para sus métricas),
 // pero la tabla ya no las renderiza todas juntas: pagina en cliente.
 const PAGE_SIZE = 25;
-
-/** Aplana el árbol de estructura a un mapa id → {nombre, tipoId}, para el tag
- * de ubicación de cada tarea en la tabla. */
-function flattenLocations(nodes: WorkItemTree[]): Map<string, { name: string; tipoId: string }> {
-  const map = new Map<string, { name: string; tipoId: string }>();
-  const visit = (node: WorkItemTree) => {
-    map.set(node.id, { name: node.nombre, tipoId: node.tipo_id });
-    node.children.forEach(visit);
-  };
-  nodes.forEach(visit);
-  return map;
-}
 
 /**
  * Cifra de cabecera. Clickable cuando representa un filtro: el número señala un
@@ -151,7 +139,9 @@ export function TasksPage() {
     [filtered, safePage],
   );
 
-  const locationById = useMemo(() => flattenLocations(tree), [tree]);
+  // id → cadena de ancestros (["Curso X", "Componente Y", "Unidad Z"]): la tabla
+  // muestra la ruta completa para distinguir tareas con el mismo título.
+  const locationPathById = useMemo(() => collectItemPaths(tree), [tree]);
   const hasFilters = activeFilterCount(filters) > 0;
 
   return (
@@ -290,7 +280,7 @@ export function TasksPage() {
             members={membersQuery.data ?? []}
             teams={teamsQuery.data?.items ?? []}
             tree={tree}
-            locationById={locationById}
+            locationPathById={locationPathById}
             currentUserId={user?.id}
             isElevated={isElevated}
             onOpenDetail={(id) => {

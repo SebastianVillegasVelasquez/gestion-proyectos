@@ -207,12 +207,40 @@ export function useProjectTaskDependencies(projectId: string | undefined) {
   });
 }
 
+interface DependencyVars {
+  taskId: string;
+  dependsOnId: string;
+  /** Del proyecto: refresca también las flechas FtS del cronograma. */
+  projectId?: string;
+}
+
+function invalidateDeps(qc: ReturnType<typeof useQueryClient>, vars: DependencyVars) {
+  void qc.invalidateQueries({ queryKey: taskKeys.dependencies(vars.taskId) });
+  if (vars.projectId) {
+    void qc.invalidateQueries({
+      queryKey: taskKeys.projectDependencies(vars.projectId),
+    });
+  }
+}
+
 export function useAddTaskDependency() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, dependsOnId }: { taskId: string; dependsOnId: string }) =>
+    mutationFn: ({ taskId, dependsOnId }: DependencyVars) =>
       tasksApi.addDependency(taskId, dependsOnId),
-    onSuccess: (_data, { taskId }) =>
-      qc.invalidateQueries({ queryKey: taskKeys.dependencies(taskId) }),
+    onSuccess: (_data, vars) => {
+      invalidateDeps(qc, vars);
+    },
+  });
+}
+
+export function useRemoveTaskDependency() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, dependsOnId }: DependencyVars) =>
+      tasksApi.removeDependency(taskId, dependsOnId),
+    onSuccess: (_data, vars) => {
+      invalidateDeps(qc, vars);
+    },
   });
 }

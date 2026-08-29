@@ -138,7 +138,7 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
-          <Route path="/projects/:projectId/informe" element={<ProjectReportPage />} />
+          <Route path="/projects/:projectId/analiticas" element={<ProjectReportPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Route>

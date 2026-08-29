@@ -79,4 +79,7 @@ export const tasksApi = {
         depends_on_id: dependsOnId,
       })
       .then((r) => r.data),
+
+  removeDependency: (taskId: string, dependsOnId: string) =>
+    http.delete(`/tasks/${taskId}/dependencies/${dependsOnId}`).then(() => undefined),
 };

@@ -33,6 +33,12 @@ class TestIncompleteDependencies:
         dep = SimpleNamespace(depends_on_id=dep_id, depends_on=None)
         assert rules.incomplete_dependency_ids([dep]) == [dep_id]
 
+    def test_in_review_still_blocks(self):
+        # "Entregada" no basta: la dependencia tiene que estar COMPLETADA.
+        blocking = uuid.uuid4()
+        deps = [_dep(blocking, TaskStatus.EN_REVISION)]
+        assert rules.incomplete_dependency_ids(deps) == [blocking]
+
 
 class TestEarlierPhaseBlocks:
     def test_false_when_all_terminal(self):

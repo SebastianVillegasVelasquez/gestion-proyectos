@@ -1,12 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { tasksApi } from "@/features/projects/api/tasks.api";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { projectKeys, taskKeys } from "@/features/projects/hooks/query-keys";
-import type { CreateTaskPayload } from "@/features/projects/types/api.types";
+import type { Task } from "@/features/projects/types/api.types";
 import {
   workspaceApi,
   type ApiTeamNotificationSettings,
   type CreateDeliverableBody,
+  type EditVersionBody,
   type NewCommentBody,
+  type NewTeamTaskBody,
   type NewVersionBody,
 } from "../api/workspace.api";
 
@@ -89,6 +90,15 @@ export function useAddVersion(teamId: string | null) {
   );
 }
 
+/** Fase 3: corregir una entrega ya subida sin crear una versión nueva. */
+export function useEditVersion(teamId: string | null) {
+  return useDeliverableMutation(
+    teamId,
+    (vars: { deliverableId: string; versionId: string; body: EditVersionBody }) =>
+      workspaceApi.editVersion(teamId!, vars.deliverableId, vars.versionId, vars.body),
+  );
+}
+
 export function useAddComment(teamId: string | null) {
   return useDeliverableMutation(teamId, (vars: { deliverableId: string; body: NewCommentBody }) =>
     workspaceApi.addComment(teamId!, vars.deliverableId, vars.body),
@@ -96,33 +106,48 @@ export function useAddComment(teamId: string | null) {
 }
 
 /**
- * Fase 3: el líder crea una subtarea de una tarea general del equipo. El
- * backend hereda el `team_id` del padre, así que aparece en el listado del
- * workspace sin más.
- *
- * Invalida DOS mundos: el del equipo y el del proyecto. La subtarea no es una
- * entidad aparte —es una Task del proyecto— y debe verse igual en el
- * cronograma, la estructura y la trazabilidad.
+ * Una tarea creada desde el espacio del equipo NO es una entidad aparte: es una
+ * Task del proyecto con `team_id`. Al crearla hay que refrescar los dos mundos
+ * —el del equipo y el del proyecto (cronograma, estructura, trazabilidad)— o la
+ * tarea "no aparece" hasta recargar la página entera.
+ */
+function invalidateAfterTeamTask(qc: QueryClient, teamId: string | null, task: Task) {
+  if (teamId) {
+    void qc.invalidateQueries({ queryKey: keys.tasks(teamId) });
+  }
+  void qc.invalidateQueries({ queryKey: taskKeys.byProject(task.project_id) });
+  void qc.invalidateQueries({ queryKey: projectKeys.traceability(task.project_id) });
+  if (task.work_item_id) {
+    void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+  }
+}
+
+/**
+ * El líder/supervisor crea una tarea de SU equipo: bolsa o ya asignada,
+ * colgada de un elemento. Va por `POST /teams/{id}/tasks` (no `POST /tasks`,
+ * que es solo-admin).
+ */
+export function useCreateTeamTask(teamId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NewTeamTaskBody) => workspaceApi.createTask(teamId!, body),
+    onSuccess: (task) => {
+      invalidateAfterTeamTask(qc, teamId, task);
+    },
+  });
+}
+
+/**
+ * El líder parte una tarea general del equipo en subtareas. Mismo endpoint que
+ * `useCreateTeamTask` (el backend hereda elemento y `team_id` del padre); se
+ * mantiene aparte por claridad de intención en las vistas que lo usan.
  */
 export function useCreateTeamSubtask(teamId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateTaskPayload) => tasksApi.create(payload),
+    mutationFn: (body: NewTeamTaskBody) => workspaceApi.createTask(teamId!, body),
     onSuccess: (task) => {
-      if (teamId) {
-        void qc.invalidateQueries({ queryKey: keys.tasks(teamId) });
-      }
-
-      // Una subtarea del equipo es una Task normal del proyecto: hereda el
-      // `work_item_id` del padre, así que YA sale en el cronograma, en la
-      // estructura y en la trazabilidad. Lo que faltaba era avisar a esas
-      // vistas: sin invalidar sus claves, seguían mostrando la caché anterior
-      // y la subtarea "no aparecía" hasta recargar la página entera.
-      void qc.invalidateQueries({ queryKey: taskKeys.byProject(task.project_id) });
-      void qc.invalidateQueries({ queryKey: projectKeys.traceability(task.project_id) });
-      if (task.work_item_id) {
-        void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
-      }
+      invalidateAfterTeamTask(qc, teamId, task);
     },
   });
 }

@@ -137,6 +137,42 @@ class CreateTaskRequest(TaskBase):
         return self
 
 
+class CreateTeamTaskRequest(BaseModelConfig):
+    """Alta de una tarea DESDE el espacio de un equipo (la crea su líder o
+    supervisor). El equipo y el proyecto salen del contexto (la ruta), no del
+    cuerpo: aquí solo se decide el título, de qué elemento cuelga, de qué tarea
+    es subtarea y —si ya se sabe— quién la hace.
+
+    A diferencia de `CreateTaskRequest`, `assignee_id` y el equipo NO se
+    excluyen: en el equipo, "asignar a un integrante" es justo el estado
+    válido «tarea del equipo con responsable». El caso de uso crea primero la
+    tarea del equipo y, si viene responsable, la asigna por el mismo camino
+    sancionado que usa el líder para reasignar.
+    """
+
+    title: Annotated[str, StringConstraints(min_length=2, max_length=200)]
+    priority: TaskPriority = TaskPriority.MEDIA
+    description: Optional[str] = None
+    assignee_id: Optional[UUID] = None
+    work_item_id: Optional[UUID] = None
+    parent_task_id: Optional[UUID] = None
+    depends_on_id: Optional[UUID] = None
+
+    start_date: Optional[date] = None
+    due_date: Optional[date] = None
+    duration_days: Optional[int] = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def resolve_dates(self) -> "CreateTeamTaskRequest":
+        if self.due_date is None and self.duration_days is not None:
+            if self.start_date is None:
+                raise ValueError("Indica la fecha de inicio para usar la duración")
+            self.due_date = self.start_date + timedelta(days=self.duration_days)
+        if self.start_date and self.due_date and self.due_date < self.start_date:
+            raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
+        return self
+
+
 class TaskResponse(TaskBase):
     id: UUID
     project_id: UUID

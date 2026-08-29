@@ -22,6 +22,15 @@ class TeamRepository(ABC):
     async def get_team(self, project_id: UUID, team_id: UUID) -> Team | None: ...
 
     @abstractmethod
+    async def get_team_by_id(self, team_id: UUID) -> Team | None:
+        """El equipo por su id, sin exigir el proyecto (el equipo ya lo lleva).
+
+        Para llamadores que solo tienen el team_id (p. ej. el alta de tareas
+        desde el espacio de trabajo, que deriva el proyecto del equipo).
+        """
+        ...
+
+    @abstractmethod
     async def get_team_by_name(self, project_id: UUID, name: str) -> Team | None: ...
 
     @abstractmethod

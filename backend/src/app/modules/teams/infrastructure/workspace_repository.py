@@ -55,6 +55,9 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
         )
         return list(rows.scalars().all())
 
+    async def get_team(self, team_id: UUID) -> Team | None:
+        return await self._session.get(Team, team_id)
+
     def _with_children(self):
         return select(Deliverable).options(
             selectinload(Deliverable.versions),

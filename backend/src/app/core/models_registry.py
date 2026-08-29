@@ -14,7 +14,7 @@ from app.modules.tasks.infrastructure.models import (
 )
 
 # ── Teams models ──────────────────────────────────────────────────────────────
-from app.modules.teams.infrastructure.models import Team, TeamMember
+from app.modules.teams.infrastructure.models import Team, TeamInvitation, TeamMember
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
     DeliverableComment,
@@ -30,6 +30,9 @@ from app.modules.project.structure.infrastructure.models import (
 
 # ── Notifications models ──────────────────────────────────────────────────────
 from app.modules.notifications.infrastructure.models import Notification
+
+# ── Reminders models ─────────────────────────────────────────────────────────
+from app.modules.reminders.infrastructure.models import PersonalReminder
 
 # ── Feedback models ───────────────────────────────────────────────────────────
 from app.modules.feedback.infrastructure.models import Feedback
@@ -51,6 +54,7 @@ __all__ = [
     # Teams
     "Team",
     "TeamMember",
+    "TeamInvitation",
     "Deliverable",
     "DeliverableVersion",
     "DeliverableComment",
@@ -60,6 +64,8 @@ __all__ = [
     "WorkItemDependency",
     # Notifications
     "Notification",
+    # Reminders
+    "PersonalReminder",
     # Feedback
     "Feedback",
 ]

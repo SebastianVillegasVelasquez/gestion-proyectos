@@ -5,7 +5,6 @@ import { getErrorMessage } from "@/utils/get-error-message";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { roleRank } from "@/features/auth/types";
-import { AddTeamMemberModal } from "@/features/projects/components/teams/AddTeamMemberModal";
 import {
   useChangeTeamMemberRole,
   useDeleteTeam,
@@ -14,6 +13,8 @@ import {
 } from "@/features/projects/hooks/use-teams";
 import type { ApiTeamNotificationSettings, ApiTeamTask } from "../api/workspace.api";
 import { useTeamNotifications, useUpdateTeamNotifications } from "../hooks/use-workspace";
+import { useTeamInvitations } from "../hooks/use-invitations";
+import { InviteMemberModal } from "./InviteMemberModal";
 import type { Deliverable, TeamRole, WorkspaceMember } from "../types";
 import { TEAM_ROLE_LABELS } from "../types";
 import { buildTeamActivity, formatActivityDate } from "../utils/team-activity";
@@ -171,17 +172,21 @@ function MembersCard({
   members,
   tasks,
   canManage,
+  canInvite,
 }: {
   projectId: string;
   teamId: string;
   members: WorkspaceMember[];
   tasks: ApiTeamTask[];
   canManage: boolean;
+  canInvite: boolean;
 }) {
   const [inviting, setInviting] = useState(false);
   const [toRemove, setToRemove] = useState<WorkspaceMember | null>(null);
   const changeRole = useChangeTeamMemberRole(projectId, teamId);
   const removeMember = useRemoveTeamMember(projectId, teamId);
+  const invitationsQuery = useTeamInvitations(projectId, teamId, canInvite);
+  const pendingInvites = (invitationsQuery.data ?? []).filter((i) => i.status === "pendiente");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const workload = useMemo(
@@ -307,7 +312,23 @@ function MembersCard({
           </p>
         )}
 
-        {canManage && (
+        {canInvite && pendingInvites.length > 0 && (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/40">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Invitaciones pendientes ({pendingInvites.length})
+            </p>
+            <ul className="mt-1 flex flex-col gap-1">
+              {pendingInvites.map((inv) => (
+                <li key={inv.id} className="text-[12px] text-slate-600 dark:text-slate-300">
+                  {inv.user_name}
+                  <span className="text-slate-400"> · esperando respuesta</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {canInvite && (
           <button
             type="button"
             onClick={() => {
@@ -322,10 +343,10 @@ function MembersCard({
       </Card>
 
       {inviting && (
-        <AddTeamMemberModal
+        <InviteMemberModal
           projectId={projectId}
           teamId={teamId}
-          existingIds={members.map((m) => m.id)}
+          memberUserIds={members.map((m) => m.id)}
           onClose={() => {
             setInviting(false);
           }}
@@ -562,6 +583,8 @@ interface GroupSettingsViewProps {
   deliverables: Deliverable[];
   /** ¿El usuario actual pertenece al equipo? (el admin puede solo observar) */
   isMember: boolean;
+  /** ¿El usuario actual es líder de este equipo? (puede invitar). */
+  isLeader: boolean;
   onArchived: () => void;
 }
 
@@ -580,12 +603,16 @@ export function GroupSettingsView({
   tasks,
   deliverables,
   isMember,
+  isLeader,
   onArchived,
 }: GroupSettingsViewProps) {
   const { user } = useAuth();
   // Espejo del `require_role("admin", "super_admin")` del backend: developer
   // tiene rango superior, así que entra por la comparación de rango.
   const canManage = user ? roleRank(user.role) >= roleRank("admin") : false;
+  // Invitar es del líder del equipo o de administración (mismo criterio que el
+  // backend: líder del equipo O admin).
+  const canInvite = canManage || isLeader;
 
   return (
     <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -607,6 +634,7 @@ export function GroupSettingsView({
           members={members}
           tasks={tasks}
           canManage={canManage}
+          canInvite={canInvite}
         />
         {canManage && (
           <DangerZoneCard

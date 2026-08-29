@@ -57,6 +57,9 @@ export function AddTeamMemberModal({
         </div>
 
         <div className="flex flex-col gap-3 px-5 py-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Solo puedes agregar personas que ya sean integrantes del proyecto.
+          </p>
           <DirectoryUserPicker
             selected={selected}
             onSelect={setSelected}

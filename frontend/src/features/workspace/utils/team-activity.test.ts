@@ -36,6 +36,7 @@ describe("buildTeamActivity", () => {
               uploadedBy: "u1",
               uploadedAt: "2026-03-01T10:00:00Z",
               note: "",
+              observations: "",
             },
           ],
           comments: [

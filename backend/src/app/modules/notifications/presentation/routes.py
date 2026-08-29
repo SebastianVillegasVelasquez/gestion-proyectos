@@ -1,10 +1,19 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from app.core.dependencies import get_current_user, notification_repo_dependency
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.core.dependencies import (
+    get_current_user,
+    notification_repo_dependency,
+    require_role,
+)
+from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.presentation.schemas import UserResponse
+from app.modules.notifications.application.overdue_scan import scan_overdue_tasks
 from app.modules.notifications.application.use_cases import (
     DeleteNotificationUseCase,
     GetUnreadCountUseCase,
@@ -12,6 +21,7 @@ from app.modules.notifications.application.use_cases import (
     MarkAllAsReadUseCase,
     MarkNotificationAsReadUseCase,
 )
+from app.shared.email.sender import SmtpEmailSender
 from app.modules.notifications.presentation.schemas import (
     MarkAllReadResponse,
     NotificationResponse,
@@ -63,6 +73,29 @@ async def mark_all_as_read(
     current_user: UserResponse = Depends(get_current_user),
 ):
     return await MarkAllAsReadUseCase(repo).execute(current_user.id)
+
+
+@router.post("/overdue-scan")
+async def run_overdue_scan(
+    db: AsyncSession = Depends(get_db),
+    _admin: UserResponse = Depends(
+        require_role(SystemRole.ADMIN, SystemRole.SUPER_ADMIN, SystemRole.DEVELOPER)
+    ),
+):
+    """Dispara el barrido de tareas atrasadas de inmediato (además del bucle
+    periódico). Útil para pruebas y para forzar los avisos tras un import."""
+    settings = get_settings()
+    result = await scan_overdue_tasks(
+        db,
+        email_sender=SmtpEmailSender(settings),
+        public_url=settings.APP_PUBLIC_URL,
+    )
+    return {
+        "checked": result.checked,
+        "notified": result.notified,
+        "skipped_cooldown": result.skipped_cooldown,
+        "emails_sent": result.emails_sent,
+    }
 
 
 @router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)

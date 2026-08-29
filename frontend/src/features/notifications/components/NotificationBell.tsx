@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
   AlertTriangle,
   AtSign,
@@ -6,6 +7,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   FolderKanban,
   type LucideIcon,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { resolveNotificationTarget } from "../utils/notification-target";
 import {
   useMarkAllRead,
   useMarkRead,
@@ -72,9 +75,13 @@ const DEFAULT_TONE = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-sl
 function NotificationRow({
   notification,
   onRead,
+  onActivate,
+  hasTarget,
 }: {
   notification: AppNotification;
   onRead: (id: string) => void;
+  onActivate: (notification: AppNotification) => void;
+  hasTarget: boolean;
 }) {
   const Icon = TYPE_ICON[notification.notification_type] ?? Bell;
   const tone = TYPE_TONE[notification.notification_type] ?? DEFAULT_TONE;
@@ -84,9 +91,7 @@ function NotificationRow({
       <button
         type="button"
         onClick={() => {
-          if (unread) {
-            onRead(notification.id);
-          }
+          onActivate(notification);
         }}
         className={cn(
           "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 pr-10 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
@@ -110,9 +115,15 @@ function NotificationRow({
           >
             {notification.message}
           </span>
-          <span className="mt-1 block text-[11px] text-slate-400 dark:text-slate-500">
+          <span className="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
             {NOTIFICATION_TYPE_LABELS[notification.notification_type]} ·{" "}
             {formatRelativeTime(notification.created_at)}
+            {hasTarget && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-brand-teal opacity-0 transition-opacity group-hover/item:opacity-100">
+                <ChevronRight className="size-3" />
+                Ver
+              </span>
+            )}
           </span>
         </span>
       </button>
@@ -141,7 +152,8 @@ function NotificationRow({
 }
 
 export function NotificationBell({ placement = "down" }: { placement?: "down" | "up" }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"todas" | "no_leidas">("todas");
 
@@ -149,6 +161,19 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
   const listQuery = useNotifications(open && isAuthenticated);
   const markAll = useMarkAllRead();
   const markRead = useMarkRead();
+
+  // Clic en una notificación: la marca leída y, si su tipo + payload permiten
+  // deducir un destino, navega ahí y cierra el panel.
+  const activate = (notification: AppNotification) => {
+    if (!notification.is_read) {
+      markRead.mutate(notification.id);
+    }
+    const target = resolveNotificationTarget(notification, user?.role);
+    if (target) {
+      setOpen(false);
+      void navigate(target);
+    }
+  };
 
   const unread = unreadQuery.data?.unread_count ?? 0;
   const badge = formatBadgeCount(unread);
@@ -284,6 +309,8 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                       onRead={(id) => {
                         markRead.mutate(id);
                       }}
+                      onActivate={activate}
+                      hasTarget={resolveNotificationTarget(n, user?.role) !== null}
                     />
                   ))}
                 </ul>

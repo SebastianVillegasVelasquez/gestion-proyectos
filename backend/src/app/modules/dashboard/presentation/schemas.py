@@ -20,7 +20,9 @@ class TaskBoardItemResponse(BaseModelConfig):
     # Permite que la vista del usuario agrupe sus tareas por proyecto y enlace
     # a cada uno (con el nombre solo no se puede navegar).
     project_id: UUID | None = None
-    due_date: datetime.date
+    # Opcional: una tarea puede no tener fecha límite fijada todavía. El front la
+    # muestra como "sin fecha"; antes esto provocaba un 500 al serializar.
+    due_date: datetime.date | None = None
 
 
 class ProjectOverviewItemResponse(BaseModelConfig):
