@@ -25,10 +25,9 @@ class LoginRequest(BaseModelConfig):
 class CreateUserRequest(BaseModelConfig):
     email: EmailStr
 
-    password: Annotated[
-        str,
-        StringConstraints(min_length=8),
-    ]
+    # Opcional: si el admin no la define, el sistema genera una contraseña
+    # temporal y se la entrega para que el usuario la cambie en su primer ingreso.
+    password: Annotated[str, StringConstraints(min_length=8)] | None = None
 
     name: Annotated[
         str,
@@ -98,6 +97,9 @@ class UpdateUserRequest(BaseModelConfig):
     )
     document_type: Optional[DocumentType] = None
     document_number: Optional[DocumentNumber] = None
+    # Permite a un admin exigir o levantar el cambio de contraseña del próximo
+    # ingreso de una cuenta concreta (None = no se toca).
+    must_change_password: bool | None = None
 
     @field_validator("email", mode="before")
     @classmethod
@@ -158,6 +160,21 @@ class UserResponse(BaseModelConfig):
     # Fecha de alta de la cuenta. Opcional porque algunas respuestas (p. ej.
     # el login) se arman a mano; la administración de usuarios sí la envía.
     created_at: Optional[datetime] = None
+    # Primer ingreso: mientras sea True el frontend obliga a cambiar la clave
+    # con un modal antes de dejar usar la plataforma. Default False para no
+    # romper respuestas armadas a mano de flujos que no lo necesitan.
+    must_change_password: bool = False
+
+
+class CreatedUserResponse(UserResponse):
+    """Respuesta del alta de un usuario.
+
+    Incluye ``temporary_password`` SOLO cuando la generó el sistema (el admin no
+    definió ninguna): es la única vez que viaja en claro, para que quien da el
+    alta se la entregue a la persona.
+    """
+
+    temporary_password: Optional[str] = None
 
 
 class AdminUserSortField(str, Enum):

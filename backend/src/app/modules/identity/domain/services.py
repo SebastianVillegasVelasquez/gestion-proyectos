@@ -62,6 +62,11 @@ class UserService:
         return self._to_response(updated_user)
 
     def convert_to_orm(self, data: CreateUserRequest) -> User:
+        if data.password is None:
+            # El use case (CreateUserUseCase / carga masiva) siempre define una
+            # contraseña antes de llegar aquí —propia o generada—; esto solo
+            # protege de un uso indebido del servicio.
+            raise ValueError("Falta la contraseña para crear el usuario")
         return User(
             email=data.email,
             password=self.hash_password(data.password),
@@ -71,6 +76,9 @@ class UserService:
             position=data.position,
             document_type=data.document_type.value if data.document_type else None,
             document_number=data.document_number,
+            # Alta hecha por un admin: la persona recibe una clave que no eligió
+            # (y el correo de bienvenida), así que debe cambiarla al entrar.
+            must_change_password=True,
         )
 
     @staticmethod
@@ -94,4 +102,5 @@ class UserService:
             document_type=user.document_type,
             document_number=user.document_number,
             created_at=user.created_at,
+            must_change_password=getattr(user, "must_change_password", False),
         )

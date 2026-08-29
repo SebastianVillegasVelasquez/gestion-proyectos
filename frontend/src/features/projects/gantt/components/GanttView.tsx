@@ -1189,11 +1189,18 @@ export function GanttView({
             ref={scrollRef}
             onScroll={handleGridScroll}
             className={cn(
-              "scrollbar-none relative max-h-[65vh] overflow-auto overscroll-x-contain rounded-t-xl border border-b-0 border-border bg-card shadow-sm",
+              "scrollbar-none relative overflow-auto overscroll-x-contain rounded-t-xl border border-b-0 border-border bg-card shadow-sm",
+              // Incrustado (cronograma del equipo): ocupa una altura generosa
+              // aunque haya pocas tareas, en vez de encogerse a 3-4 filas y
+              // dejar el panel medio vacío. Suelto: se limita a 65vh.
+              embed ? "min-h-[60vh] max-h-[calc(100vh-15rem)]" : "max-h-[65vh]",
               (drag != null || resizing) && "select-none",
             )}
           >
-            <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
+            <div
+              className={cn("relative", embed && "flex min-h-full flex-col")}
+              style={{ width: labelW + trackWidth, minWidth: "100%" }}
+            >
               {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
               <div className="sticky top-0 z-50 flex border-b border-border bg-card">
                 <div
@@ -1266,7 +1273,7 @@ export function GanttView({
               </div>
 
               {/* ── Cuerpo ── */}
-              <div className="relative">
+              <div className={cn("relative", embed && "flex-1")}>
                 {/* Capa de fondo: fines de semana y rejilla, alineadas al eje */}
                 <div
                   className="pointer-events-none absolute inset-y-0 z-0"

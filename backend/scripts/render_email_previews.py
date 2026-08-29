@@ -5,7 +5,7 @@ navegador, sin levantar nada.
 
 Salida: ``src/app/shared/email/previews/*.html`` (versionados). El logo va
 embebido como ``data:`` URI SOLO para poder abrir el archivo suelto; en el
-envío real se usa ``{APP_PUBLIC_URL}/logo.webp`` porque los clientes de correo
+envío real se usa ``{APP_PUBLIC_URL}/logo-email.jpg`` porque los clientes de correo
 bloquean las imágenes ``data:``.
 """
 
@@ -39,7 +39,7 @@ def _note(subject: str) -> str:
         "  Vista previa autogenerada por scripts/render_email_previews.py\n"
         "  Plantilla real: src/app/shared/email/templates.py\n"
         "  El logo va embebido como data URI SOLO para abrir este archivo suelto;\n"
-        "  en el envio real se usa {APP_PUBLIC_URL}/logo.webp.\n"
+        "  en el envio real se usa {APP_PUBLIC_URL}/logo-email.jpg.\n"
         f"  Asunto: {subject}\n"
         "-->\n"
     )
@@ -56,6 +56,7 @@ def main() -> None:
             email="ana.martinez@objdigital.com",
             login_url=f"{base}/login",
             logo_url=logo,
+            temporary_password="Kp7mQ2xR9tLa",
         ),
         "tarea-atrasada.html": overdue_task_email(
             name="Ana Martínez",

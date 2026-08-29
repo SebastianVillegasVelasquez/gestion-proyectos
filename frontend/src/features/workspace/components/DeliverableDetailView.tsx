@@ -323,9 +323,16 @@ interface RegisterDeliveryProps {
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
   currentVersion: number;
   uploadedBy: string;
+  /** Se llama tras registrar la entrega (para cerrar el modal que lo contiene). */
+  onDone?: () => void;
 }
 
-function RegisterDelivery({ onAddVersion, currentVersion, uploadedBy }: RegisterDeliveryProps) {
+function RegisterDelivery({
+  onAddVersion,
+  currentVersion,
+  uploadedBy,
+  onDone,
+}: RegisterDeliveryProps) {
   const [type, setType] = useState<ResourceType>("enlace");
   const [typeTouchedByUser, setTypeTouchedByUser] = useState(false);
   const [url, setUrl] = useState("");
@@ -357,16 +364,13 @@ function RegisterDelivery({ onAddVersion, currentVersion, uploadedBy }: Register
     setObservations("");
     setTypeTouchedByUser(false);
     setType("enlace");
+    onDone?.();
   };
 
   const meta = RESOURCE_META[type];
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        Registrar nueva entrega (V{currentVersion + 1})
-      </p>
-
       {/* Resource type selector */}
       <div className="flex flex-wrap gap-2">
         {UPLOADABLE_RESOURCE_TYPES.map((rt) => {
@@ -485,6 +489,7 @@ export function DeliverableDetailView({
   onReview,
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
+  const [showRegister, setShowRegister] = useState(false);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -549,19 +554,87 @@ export function DeliverableDetailView({
         />
       </div>
 
-      {/* Registrar entrega anclado abajo, como el compositor del hilo de
-          comentarios: es la acción del panel, no un paso más de la historia.
-          Antes vivía dentro del scroll y, con pocas versiones, dejaba un hueco
-          en blanco debajo. */}
+      {/* Registrar entrega: solo un botón anclado abajo. El formulario vive en
+          un modal, así el panel no reserva espacio para él cuando no se usa
+          (antes dejaba un bloque alto y medio vacío bajo la última versión). */}
       {canDeliver && (
-        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
-          <RegisterDelivery
-            onAddVersion={onAddVersion}
-            currentVersion={deliverable.versions.length}
-            uploadedBy={currentUserId}
-          />
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <button
+            type="button"
+            onClick={() => {
+              setShowRegister(true);
+            }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+          >
+            <Plus className="size-4" />
+            Registrar nueva entrega (V{deliverable.versions.length + 1})
+          </button>
         </div>
       )}
+
+      {showRegister && (
+        <RegisterDeliveryModal
+          currentVersion={deliverable.versions.length}
+          uploadedBy={currentUserId}
+          onAddVersion={onAddVersion}
+          onClose={() => {
+            setShowRegister(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modal que envuelve el formulario de registro de entrega ──────────────────
+
+function RegisterDeliveryModal({
+  currentVersion,
+  uploadedBy,
+  onAddVersion,
+  onClose,
+}: {
+  currentVersion: number;
+  uploadedBy: string;
+  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Registrar nueva entrega"
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Registrar nueva entrega (V{currentVersion + 1})
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <RegisterDelivery
+            onAddVersion={onAddVersion}
+            currentVersion={currentVersion}
+            uploadedBy={uploadedBy}
+            onDone={onClose}
+          />
+        </div>
+      </div>
     </div>
   );
 }
