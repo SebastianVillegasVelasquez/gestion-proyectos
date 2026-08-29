@@ -131,44 +131,82 @@ def _facts(rows: list[tuple[str, str]]) -> str:
 
 
 def welcome_email(
-    *, name: str, email: str, login_url: str = "", logo_url: str = ""
+    *,
+    name: str,
+    email: str,
+    login_url: str = "",
+    logo_url: str = "",
+    temporary_password: str | None = None,
 ) -> RenderedEmail:
-    """Bienvenida al crear la cuenta. No lleva contraseña a propósito:
-    quien dio el alta la entrega por otro canal.
+    """Bienvenida al crear la cuenta.
+
+    Si ``temporary_password`` viene informada (el sistema la gener&oacute;: el admin
+    no defini&oacute; ninguna), el correo la incluye — es lo que la persona necesita
+    para entrar — y le avisa que caduca en 24 horas para empujarla a cambiarla.
+    Si va vac&iacute;a, se asume que la clave la entrega quien dio el alta por otro
+    canal.
 
     ``logo_url`` debe ser una URL http(s) accesible (p. ej.
-    ``{APP_PUBLIC_URL}/logo.webp``): los clientes de correo bloquean las
-    imágenes en ``data:`` URI. Si va vacío, la cabecera cae a la marca en texto.
+    ``{APP_PUBLIC_URL}/logo-email.jpg``): los clientes de correo bloquean las
+    im&aacute;genes en ``data:`` URI. Si va vac&iacute;a, la cabecera cae a la marca
+    en texto.
     """
     subject = "Te damos la bienvenida a Bitácora OBJ"
-    body = (
-        _h(f"Hola, {name}")
-        + _p(
-            "Se cre&oacute; una cuenta para ti en <strong>Bit&aacute;cora OBJ</strong>, "
-            "la plataforma con la que damos seguimiento a los proyectos, tareas y "
-            "entregables del equipo de OBJ Digital."
-        )
-        + _facts([("Usuario", email)])
-        + _p(
-            "Tu contrase&ntilde;a de acceso te la entregar&aacute; directamente la persona "
-            "que te dio de alta. Por seguridad, nunca la enviamos por correo."
-        )
-        + _button("Entrar a la plataforma", login_url)
-        + _p(
-            f'<span style="color:{MUTED};font-size:13px;">Cuando entres por primera vez, '
-            "te recomendamos revisar tus tareas asignadas y tu cronograma. Si el "
-            "bot&oacute;n no funciona, copia y pega esta direcci&oacute;n en tu navegador:"
-            f'<br /><span style="color:{TEAL};">{login_url or "—"}</span></span>'
-        )
+
+    body = _h(f"Hola, {name}") + _p(
+        "Se cre&oacute; una cuenta para ti en <strong>Bit&aacute;cora OBJ</strong>, "
+        "la plataforma con la que damos seguimiento a los proyectos, tareas y "
+        "entregables del equipo de OBJ Digital."
     )
+
+    if temporary_password:
+        body += _facts(
+            [
+                ("Usuario", email),
+                (
+                    "Contrase&ntilde;a temporal",
+                    f'<span style="font-family:Consolas,Menlo,monospace;font-size:15px;'
+                    f'letter-spacing:1px;">{temporary_password}</span>',
+                ),
+            ]
+        ) + _p(
+            f'<span style="color:{RED};font-weight:bold;">Esta contrase&ntilde;a '
+            "caduca en 24 horas.</span> Entra cuanto antes: al ingresar, la "
+            "plataforma te pedir&aacute; crear una contrase&ntilde;a propia que "
+            "solo t&uacute; conozcas."
+        )
+    else:
+        body += _facts([("Usuario", email)]) + _p(
+            "Tu contrase&ntilde;a de acceso te la entregar&aacute; directamente la "
+            "persona que te dio de alta. La primera vez que entres, la plataforma "
+            "te pedir&aacute; crear tu propia contrase&ntilde;a."
+        )
+
+    body += _button("Entrar a la plataforma", login_url) + _p(
+        f'<span style="color:{MUTED};font-size:13px;">Si el bot&oacute;n no funciona, '
+        "copia y pega esta direcci&oacute;n en tu navegador:"
+        f'<br /><span style="color:{TEAL};">{login_url or "—"}</span></span>'
+    )
+
     text = (
         f"Hola, {name}\n\n"
         f"Se creó una cuenta para ti en Bitácora OBJ con el usuario {email}.\n"
-        "Tu contraseña te la entregará la persona que te dio de alta; "
-        "por seguridad no la enviamos por correo.\n"
     )
+    if temporary_password:
+        text += (
+            f"\nContraseña temporal: {temporary_password}\n"
+            "Esta contraseña caduca en 24 horas. Entra cuanto antes: al ingresar, "
+            "la plataforma te pedirá crear una contraseña propia.\n"
+        )
+    else:
+        text += (
+            "Tu contraseña te la entregará la persona que te dio de alta. "
+            "La primera vez que entres, la plataforma te pedirá crear tu propia "
+            "contraseña.\n"
+        )
     if login_url:
         text += f"\nEntrar a la plataforma: {login_url}\n"
+
     return RenderedEmail(
         subject=subject,
         html=_shell(

@@ -63,8 +63,11 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
     EMAIL_FROM: str = "OBJ Digital <no-reply@objdigital.com>"
     # URL pública del frontend: se usa para construir los enlaces "abrir tarea",
-    # "revisar entrega", etc. dentro de los correos. Sin barra final.
-    APP_PUBLIC_URL: str = "http://localhost:5173"
+    # "revisar entrega", etc. y el logo dentro de los correos. Sin barra final.
+    # Por defecto apunta a producción: los clientes de correo bloquean/omiten
+    # imágenes servidas desde localhost, así que un default local rompía el logo
+    # de TODOS los correos en el servidor si no se sobreescribía el .env.
+    APP_PUBLIC_URL: str = "https://bitacora.objdigital.com.co"
 
     # Barrido periódico de tareas atrasadas (notificación + correo de aviso).
     OVERDUE_SCAN_ENABLED: bool = True

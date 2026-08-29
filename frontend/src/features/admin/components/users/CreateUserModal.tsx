@@ -23,7 +23,6 @@ export function CreateUserModal({
     name: "",
     last_name: "",
     email: "",
-    password: "",
     role: Role.USER as Role,
     position: "sin_cargo",
     document_type: "" as DocumentType | "",
@@ -34,11 +33,7 @@ export function CreateUserModal({
   const createUser = useCreateUser();
 
   const canSubmit =
-    form.name.trim() &&
-    form.last_name.trim() &&
-    form.email.trim() &&
-    form.password.length >= 8 &&
-    !createUser.isPending;
+    form.name.trim() && form.last_name.trim() && form.email.trim() && !createUser.isPending;
 
   const set =
     (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -54,7 +49,6 @@ export function CreateUserModal({
         name: form.name.trim(),
         last_name: form.last_name.trim(),
         email: form.email.trim(),
-        password: form.password,
         role: form.role,
         position: form.position,
         // El documento es opcional: enviamos null cuando queda vacío.
@@ -62,8 +56,9 @@ export function CreateUserModal({
         document_number: form.document_number.trim() || null,
       },
       {
-        onSuccess: () => {
-          onCreated(form.email.trim(), form.password);
+        onSuccess: (created) => {
+          // El backend genera la contraseña temporal y la devuelve una vez.
+          onCreated(form.email.trim(), created.temporary_password ?? "");
         },
       },
     );
@@ -126,14 +121,10 @@ export function CreateUserModal({
               setForm((f) => ({ ...f, email: e.target.value.trim().toLowerCase() }));
             }}
           />
-          <input
-            className={inputCls}
-            type="text"
-            placeholder="Contraseña inicial (mín. 8, con número)"
-            aria-label="Contraseña inicial"
-            value={form.password}
-            onChange={set("password")}
-          />
+          <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            El sistema genera una contraseña temporal al crear la cuenta. Se muestra una vez para
+            que se la entregues a la persona; deberá cambiarla en su primer ingreso.
+          </p>
           {/* Documento de identidad (opcional): tipo + número */}
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">

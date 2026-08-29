@@ -33,11 +33,19 @@ class GetProjectTraceabilityUseCase:
     def __init__(self, repo: TraceabilityRepository) -> None:
         self._repo = repo
 
-    async def execute(self, project_id: UUID) -> ProjectTraceabilityResponse:
+    async def execute(
+        self, project_id: UUID, team_id: UUID | None = None
+    ) -> ProjectTraceabilityResponse:
         if not await self._repo.project_exists(project_id):
             raise NotFoundError("Proyecto no encontrado")
 
         rows = await self._repo.list_events(project_id)
+        # Trazabilidad acotada a un equipo: la piden los líderes/supervisores de
+        # equipo, que solo pueden ver la actividad de SU equipo. El resumen se
+        # recalcula sobre lo filtrado para que los contadores cuadren con la
+        # línea de tiempo visible.
+        if team_id is not None:
+            rows = [row for row in rows if row.team_id == team_id]
 
         events: list[TraceabilityEvent] = []
         delays = deliveries = returns = reschedules = reassignments = 0

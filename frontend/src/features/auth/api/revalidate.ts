@@ -35,7 +35,10 @@ async function doRevalidate(): Promise<void> {
     user.role !== current.role ||
     user.name !== current.name ||
     user.email !== current.email ||
-    user.position !== current.position;
+    user.position !== current.position ||
+    // Al crear su contraseña propia, el flag pasa a false: hay que reflejarlo
+    // para que el modal de primer ingreso se cierre sin recargar la página.
+    Boolean(user.must_change_password) !== Boolean(current.must_change_password);
   if (!changed) {
     return;
   }

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, Path, Request
+from fastapi import Depends, Path, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +49,8 @@ from app.modules.teams.domain.workspace import WorkspaceRepository
 from app.modules.teams.infrastructure.invitation_repository import (
     TeamInvitationRepository,
 )
+from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.models import Team
 from app.modules.teams.infrastructure.repository import SqlAlchemyTeamRepository
 from app.modules.teams.infrastructure.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
@@ -235,6 +237,7 @@ async def get_current_user(
         document_type=user.document_type,
         document_number=user.document_number,
         created_at=user.created_at,
+        must_change_password=getattr(user, "must_change_password", False),
     )
 
 
@@ -282,5 +285,51 @@ def require_project_permission(*allowed_project_roles: ProjectRole):
             )
 
         return current_user
+
+    return _auth_check
+
+
+def require_traceability_access():
+    """Autorización de la trazabilidad de un proyecto.
+
+    La ven los organizadores del proyecto (ProjectRole COORDINADOR/SUPERVISOR)
+    y los administradores globales. Además, un líder o supervisor de un equipo
+    del proyecto puede consultarla **acotada a su equipo** pasando
+    ``?team_id=...``: así revisa la actividad de su equipo y de sus integrantes
+    sin necesidad de ser organizador del proyecto entero.
+    """
+
+    async def _auth_check(
+        project_id: UUID = Path(...),
+        team_id: UUID | None = Query(None),
+        current_user: UserResponse = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ):
+        if role_satisfies(
+            current_user.role, [SystemRole.SUPER_ADMIN, SystemRole.ADMIN]
+        ):
+            return current_user
+
+        member = await ProjectMemberRepository(db).get_member_by_project_id_and_user_id(
+            project_id=project_id, user_id=current_user.id
+        )
+        organizer_roles = (ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR)
+        if member and not member.is_deleted and member.project_role in organizer_roles:
+            return current_user
+
+        # No es organizador del proyecto: solo puede ver la trazabilidad si la
+        # pide acotada a un equipo concreto que lidera o supervisa.
+        if team_id is not None:
+            team = await db.get(Team, team_id)
+            if team and team.deleted_at is None and team.project_id == project_id:
+                team_role = await SqlAlchemyWorkspaceRepository(db).get_member_role(
+                    team_id, current_user.id
+                )
+                if team_role in (TeamRole.LIDER, TeamRole.SUPERVISOR):
+                    return current_user
+
+        raise ForbiddenError(
+            "No tienes permiso para ver la trazabilidad de este proyecto"
+        )
 
     return _auth_check

@@ -15,6 +15,7 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
     email: user.email,
     position: user.position,
   });
+  const [mustChangePassword, setMustChangePassword] = useState(user.must_change_password);
   const [addingPosition, setAddingPosition] = useState(false);
   const { data: positions, isLoading: positionsLoading } = usePositions();
   const updateUser = useUpdateUser();
@@ -42,6 +43,7 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
           last_name: form.last_name.trim(),
           email: form.email.trim(),
           position: form.position,
+          must_change_password: mustChangePassword,
         },
       },
       { onSuccess: onClose },
@@ -128,6 +130,25 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
                 ))
               )}
             </select>
+          </label>
+          <label className="mt-1 flex items-start gap-2.5 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={mustChangePassword}
+              onChange={(e) => {
+                setMustChangePassword(e.target.checked);
+              }}
+              className="mt-0.5 size-4 shrink-0 accent-brand-gold"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-foreground">
+                Pedir cambio de contraseña en el próximo ingreso
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Desmárcalo para que esta cuenta entre directo con su contraseña actual, sin el modal
+                de bienvenida.
+              </span>
+            </span>
           </label>
           {addingPosition ? (
             <NewPositionInlineForm

@@ -14,11 +14,12 @@ export interface AdminUser {
   document_number: string | null;
   /** Ingreso al sistema: alta de la cuenta (ISO 8601), tal como la sirve el backend. */
   created_at: string | null;
+  /** La cuenta debe crear su contraseña en el próximo ingreso (alta o reset). */
+  must_change_password: boolean;
 }
 
 export interface CreateUserPayload {
   email: string;
-  password: string;
   name: string;
   last_name: string;
   role: Role;
@@ -26,6 +27,12 @@ export interface CreateUserPayload {
   // Documento de identidad opcional (tipo + número).
   document_type?: DocumentType | null;
   document_number?: string | null;
+}
+
+/** Alta de usuario: el backend devuelve la contraseña temporal generada (una
+ * sola vez) para entregarla a la persona. */
+export interface CreatedUser extends AdminUser {
+  temporary_password: string | null;
 }
 
 export interface BulkUserRowError {
@@ -59,6 +66,7 @@ export type UpdateUserChanges = Partial<
     | "position"
     | "document_type"
     | "document_number"
+    | "must_change_password"
   >
 >;
 
@@ -111,7 +119,7 @@ export const adminUsersApi = {
   },
 
   create: (payload: CreateUserPayload) =>
-    http.post<AdminUser>("/identity/users", payload).then((r) => r.data),
+    http.post<CreatedUser>("/identity/users", payload).then((r) => r.data),
 
   // Carga masiva desde CSV (primera vez usando la plataforma: alta de muchos
   // usuarios de una sola vez).
@@ -137,6 +145,7 @@ export const adminUsersApi = {
         position: changes.position ?? user.position,
         document_type: changes.document_type ?? user.document_type,
         document_number: changes.document_number ?? user.document_number,
+        must_change_password: changes.must_change_password ?? user.must_change_password,
       })
       .then((r) => r.data),
 

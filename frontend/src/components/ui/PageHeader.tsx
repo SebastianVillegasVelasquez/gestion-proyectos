@@ -30,7 +30,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={cn("mb-6", className)}>
+    <header className={cn("mb-5 sm:mb-6", className)}>
       {breadcrumb && breadcrumb.length > 0 && (
         <nav aria-label="Ruta de navegación" className="mb-2">
           <ol className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -65,7 +65,7 @@ export function PageHeader({
           </h1>
           {description && <p className="mt-2 text-sm text-muted-foreground">{description}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </header>
   );

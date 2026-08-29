@@ -36,8 +36,28 @@ class TestNotifyUserCreatedByEmail:
         assert len(sender.sent) == 1
         assert sender.sent[0]["to"] == "nuevo@example.com"
         assert "Ana" in sender.sent[0]["body"]
-        # No debe filtrar contraseñas: el evento ni siquiera las lleva.
-        assert "password" not in sender.sent[0]["body"].lower()
+        # Alta con contraseña definida por el admin: el correo no trae ninguna.
+        assert "Contraseña temporal" not in sender.sent[0]["body"]
+
+    async def test_includes_generated_password_with_24h_notice(self):
+        sender = FakeEmailSender()
+        handler = NotifyUserCreatedByEmail(sender)
+
+        await handler(
+            UserCreated(
+                occurred_at=datetime.datetime.now(datetime.timezone.utc),
+                user_id=uuid.uuid4(),
+                email="nuevo@example.com",
+                name="Ana",
+                temporary_password="Kp7mQ2xR9tLa",
+            )
+        )
+
+        body = sender.sent[0]["body"]
+        html = sender.sent[0]["html"]
+        assert "Kp7mQ2xR9tLa" in body
+        assert "Kp7mQ2xR9tLa" in html
+        assert "24 horas" in body
 
 
 class TestSmtpEmailSenderWithoutCredentials:
