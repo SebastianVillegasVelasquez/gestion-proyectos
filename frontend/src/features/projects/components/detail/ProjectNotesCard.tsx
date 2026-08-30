@@ -85,7 +85,10 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
 
   return (
     <Card className="shrink-0 rounded-2xl">
-      <CardContent className="flex flex-col gap-4 py-5">
+      {/* `CardContent` trae `pt-0` (asume un `CardHeader` arriba que ya puso el
+          padding superior); esta card no usa header, así que sin `sm:pt-5`
+          explícito el título quedaba pegado al borde a partir de `sm`. */}
+      <CardContent className="flex flex-col gap-4 py-5 sm:pt-5">
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground">
             <span className="flex size-8 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
