@@ -266,6 +266,23 @@ export function CreateTaskModal({
             </Field>
           )}
 
+          {/* Aprobación: desactivada por defecto (entrega directo, sin
+              revisión). Activarla exige que el líder/supervisor del proyecto
+              apruebe o devuelva la entrega antes de darla por completada. */}
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+            <input
+              type="checkbox"
+              checked={form.requiresApproval}
+              onChange={(e) => {
+                set("requiresApproval", e.target.checked);
+              }}
+              className="size-4 accent-brand-gold"
+            />
+            <span className="text-slate-600 dark:text-slate-300">
+              Requiere aprobación del líder o supervisor para darse por completada
+            </span>
+          </label>
+
           {/* Dependencia */}
           <Field label="Depende de (opcional)">
             <select

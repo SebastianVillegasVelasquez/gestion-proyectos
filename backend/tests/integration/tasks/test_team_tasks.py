@@ -309,8 +309,8 @@ class TestTeamTasks:
 
 
 class TestTeamLeadReassignment:
-    """El líder/supervisor de un equipo puede reasignar SUS tareas entre los
-    suyos vía PATCH /tasks/{id}, sin ser admin; nada más."""
+    """El líder/supervisor de un equipo edita y elimina las tareas DE SU
+    EQUIPO vía PATCH/DELETE /tasks/{id}, sin ser admin — pero solo esas."""
 
     async def _setup(self, client, admin_headers, member_user, valid_project_payload):
         project_id = await _create_project(client, admin_headers, valid_project_payload)
@@ -378,7 +378,7 @@ class TestTeamLeadReassignment:
         # La tarea sigue siendo del equipo: el líder podrá volver a reasignarla.
         assert patched.json()["team_id"] == team_id
 
-    async def test_lead_cannot_edit_other_fields(
+    async def test_lead_can_edit_task_fields_within_its_team(
         self, client, admin_headers, member_headers, member_user, valid_project_payload
     ):
         task_id, _, _ = await self._setup(
@@ -387,9 +387,72 @@ class TestTeamLeadReassignment:
         resp = await client.patch(
             f"/api/v1/tasks/{task_id}",
             headers=member_headers,
-            json={"title": "Otro título"},
+            json={
+                "title": "Otro título",
+                "priority": "alta",
+                "requires_approval": True,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["title"] == "Otro título"
+        assert body["priority"] == "alta"
+        assert body["requires_approval"] is True
+
+    async def test_lead_cannot_move_task_to_another_team(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, _, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        task = (
+            await client.get(f"/api/v1/tasks/{task_id}", headers=admin_headers)
+        ).json()
+        other_team_id = await _create_team(
+            client, admin_headers, task["project_id"], name="Otro equipo"
+        )
+        resp = await client.patch(
+            f"/api/v1/tasks/{task_id}",
+            headers=member_headers,
+            json={"team_id": other_team_id},
         )
         assert resp.status_code == 403, resp.text
+
+    async def test_lead_can_delete_a_task_of_its_team(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, _, _ = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        resp = await client.delete(f"/api/v1/tasks/{task_id}", headers=member_headers)
+        assert resp.status_code == 204, resp.text
+
+        listed = await client.get(f"/api/v1/tasks/{task_id}", headers=admin_headers)
+        assert listed.status_code == 404
+
+    async def test_deleting_a_task_cascades_to_its_subtasks(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        task_id, team_id, mate_id = await self._setup(
+            client, admin_headers, member_user, valid_project_payload
+        )
+        subtask_id = (
+            await client.post(
+                f"/api/v1/teams/{team_id}/tasks",
+                headers=member_headers,
+                json={
+                    "title": "Subtarea",
+                    "parent_task_id": task_id,
+                    "assignee_id": mate_id,
+                },
+            )
+        ).json()["id"]
+
+        resp = await client.delete(f"/api/v1/tasks/{task_id}", headers=member_headers)
+        assert resp.status_code == 204, resp.text
+
+        listed = await client.get(f"/api/v1/tasks/{subtask_id}", headers=admin_headers)
+        assert listed.status_code == 404
 
     async def test_lead_cannot_assign_someone_outside_the_team(
         self, client, admin_headers, member_headers, member_user, valid_project_payload
