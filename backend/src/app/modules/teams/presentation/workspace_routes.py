@@ -160,6 +160,22 @@ async def add_version(
     )
 
 
+@router.delete(
+    "/{team_id}/deliverables/{deliverable_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_deliverable(
+    team_id: UUID,
+    deliverable_id: UUID,
+    repo=Depends(workspace_repo_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Borra un entregable propio (mientras no esté ya aprobado)."""
+    await WorkspaceService(repo).delete_deliverable(
+        team_id, deliverable_id, current_user
+    )
+
+
 @router.patch(
     "/{team_id}/deliverables/{deliverable_id}/versions/{version_id}",
     response_model=DeliverableResponse,

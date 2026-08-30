@@ -33,6 +33,7 @@ vi.mock("../hooks/use-workspace", () => ({
   useAddVersion: () => ({ mutate: vi.fn() }),
   useEditVersion: () => ({ mutate: vi.fn(), isPending: false }),
   useAddComment: () => ({ mutate: vi.fn() }),
+  useDeleteDeliverable: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }));
 
 function renderPage() {

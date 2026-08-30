@@ -83,6 +83,13 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
             )
         )
 
+    async def get_deliverable_by_task(self, task_id: UUID) -> Deliverable | None:
+        return await self._session.scalar(
+            self._with_children().where(
+                Deliverable.task_id == task_id, Deliverable.deleted_at.is_(None)
+            )
+        )
+
     async def add_deliverable(self, deliverable: Deliverable) -> Deliverable:
         return await self._persist(deliverable)
 

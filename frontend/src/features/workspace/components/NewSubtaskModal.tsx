@@ -47,6 +47,8 @@ export function NewSubtaskModal({
       : "1",
   );
   const [error, setError] = useState<string | null>(null);
+  // Desactivado por defecto, igual que al crear cualquier otra tarea.
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +73,7 @@ export function NewSubtaskModal({
         // Sin fecha de inicio, la subtarea queda sin planificar (como el padre).
         start_date: startDate || null,
         duration_days: startDate ? duration : undefined,
+        requires_approval: requiresApproval,
       });
       onClose();
     } catch (e) {
@@ -158,6 +161,20 @@ export function NewSubtaskModal({
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+            <input
+              type="checkbox"
+              checked={requiresApproval}
+              onChange={(e) => {
+                setRequiresApproval(e.target.checked);
+              }}
+              className="size-4 accent-brand-gold"
+            />
+            <span className="text-slate-600 dark:text-slate-300">
+              Requiere aprobación del líder o supervisor para darse por completada
+            </span>
+          </label>
 
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:bg-rose-900/20 dark:text-rose-300">

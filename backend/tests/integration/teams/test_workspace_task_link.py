@@ -16,8 +16,13 @@ from app.modules.project.structure.infrastructure.models import TipoNodo, WorkIt
 from tests.integration.teams.test_workspace import scenario  # noqa: F401
 
 
-async def _make_task(db, team_id, assignee_id) -> Task:
-    """Crea una Task delegada al equipo, con su árbol mínimo (proyecto + módulo)."""
+async def _make_task(db, team_id, assignee_id, requires_approval=True) -> Task:
+    """Crea una Task delegada al equipo, con su árbol mínimo (proyecto + módulo).
+
+    `requires_approval=True` por defecto: la mayoría de tests de este archivo
+    ejercitan el flujo CLÁSICO con revisión del líder. Los que ejercitan el
+    entregable "sin aprobación" lo piden explícito con `requires_approval=False`.
+    """
     project = Project(
         name=f"Proj {uuid4()}",
         description="Fase 2",
@@ -44,6 +49,7 @@ async def _make_task(db, team_id, assignee_id) -> Task:
         start_date=date.today(),
         due_date=date.today() + timedelta(days=5),
         status=TaskStatus.PENDIENTE_POR_INICIAR,
+        requires_approval=requires_approval,
     )
     db.add(task)
     await db.commit()
@@ -239,3 +245,234 @@ class TestDeliverableLinkedToTask:
         )
         assert created.status_code == 201, created.text
         assert created.json()["task_id"] is None
+
+
+class TestDeliverableWithoutApprovalAutoCompletes:
+    """`requires_approval=False` (el default): entregar completa la tarea
+    directo, sin pasar por el líder — ni notificación de revisión pendiente."""
+
+    async def test_delivering_completes_the_task_without_review(
+        self, client, scenario, db_session
+    ):
+        from sqlalchemy import select
+
+        from app.modules.notifications.infrastructure.models import Notification
+
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+
+        deliverable_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        version = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com/banner"},
+            headers=integrante_h,
+        )
+        assert version.status_code == 201, version.text
+        assert version.json()["status"] == "aprobado"
+
+        await db_session.refresh(task)
+        assert task.status == TaskStatus.COMPLETADA
+        assert task.completed_at is not None
+
+        history = await _history_for(db_session, task.id)
+        assert [h.new_status for h in history] == [TaskStatus.COMPLETADA]
+
+        # Nadie revisa: el líder no recibe el aviso de "hay una entrega pendiente".
+        rows = (await db_session.execute(select(Notification))).scalars().all()
+        to_lider = [n for n in rows if n.user_to_id == s.lider.id]
+        assert to_lider == []
+
+    async def test_leader_can_still_reopen_it_afterwards(
+        self, client, scenario, db_session
+    ):
+        """El líder puede cambiar el estado en cualquier momento, aprobación
+        obligatoria o no: pedir cambios devuelve la tarea igual que siempre."""
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+        lider_h = await _headers_for(s.lider)
+
+        deliverable_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+        await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+
+        reopened = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/comments",
+            json={"content": "En realidad falta algo", "type": "solicitud_cambio"},
+            headers=lider_h,
+        )
+        assert reopened.status_code == 201, reopened.text
+        assert reopened.json()["status"] == "cambios_solicitados"
+
+        await db_session.refresh(task)
+        assert task.status == TaskStatus.DEVUELTA
+
+
+class TestDeliverableOwnershipRules:
+    """Solo el responsable de la tarea entrega, corrige o borra su entregable;
+    y solo hay un entregable vivo por tarea."""
+
+    async def test_cannot_create_a_deliverable_assigned_to_someone_else(
+        self, client, scenario
+    ):
+        s = scenario
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables",
+            json={"task_title": "No es mío", "assignee_id": str(s.lider.id)},
+            headers=await _headers_for(s.integrante),
+        )
+        assert r.status_code == 403, r.text
+
+    async def test_cannot_create_a_deliverable_for_a_task_assigned_to_someone_else(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        task = await _make_task(db_session, s.team.id, s.lider.id)
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables",
+            json={
+                "task_title": task.title,
+                "assignee_id": str(s.integrante.id),
+                "task_id": str(task.id),
+            },
+            headers=await _headers_for(s.integrante),
+        )
+        assert r.status_code == 403, r.text
+
+    async def test_cannot_create_a_second_deliverable_for_the_same_task(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        task = await _make_task(db_session, s.team.id, s.integrante.id)
+        integrante_h = await _headers_for(s.integrante)
+        payload = {
+            "task_title": task.title,
+            "assignee_id": str(s.integrante.id),
+            "task_id": str(task.id),
+        }
+        first = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables",
+            json=payload,
+            headers=integrante_h,
+        )
+        assert first.status_code == 201, first.text
+
+        second = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables",
+            json=payload,
+            headers=integrante_h,
+        )
+        assert second.status_code == 422, second.text
+
+    async def test_only_the_owner_can_add_a_version(self, client, scenario):
+        s = scenario
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={"task_title": "Prototipo", "assignee_id": str(s.integrante.id)},
+                headers=await _headers_for(s.integrante),
+            )
+        ).json()["id"]
+
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=await _headers_for(s.lider),
+        )
+        assert r.status_code == 403, r.text
+
+    async def test_owner_can_delete_before_approval(self, client, scenario):
+        s = scenario
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={"task_title": "Prototipo", "assignee_id": str(s.integrante.id)},
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        deleted = await client.delete(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}", headers=integrante_h
+        )
+        assert deleted.status_code == 204, deleted.text
+
+        listed = await client.get(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}", headers=integrante_h
+        )
+        assert listed.status_code == 404
+
+    async def test_cannot_delete_someone_elses_deliverable(self, client, scenario):
+        s = scenario
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={"task_title": "Prototipo", "assignee_id": str(s.integrante.id)},
+                headers=await _headers_for(s.integrante),
+            )
+        ).json()["id"]
+
+        r = await client.delete(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}",
+            headers=await _headers_for(s.lider),
+        )
+        assert r.status_code == 403, r.text
+
+    async def test_cannot_delete_an_approved_deliverable(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+        await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )  # auto-aprobado (requires_approval=False)
+
+        r = await client.delete(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}", headers=integrante_h
+        )
+        assert r.status_code == 422, r.text

@@ -15,7 +15,7 @@ import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
-import type { CommentType, DeliverableVersion, WorkspaceMember } from "../types";
+import type { CommentType, DeliverableVersion } from "../types";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
@@ -28,12 +28,14 @@ import { TeamProgressView } from "./TeamProgressView";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { WorkspaceStructureView } from "./WorkspaceStructureView";
 import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
+import { getErrorMessage } from "@/utils/get-error-message";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
 import {
   useAddComment,
   useAddVersion,
   useCreateDeliverable,
+  useDeleteDeliverable,
   useDeliverables,
   useEditVersion,
   useMyTeams,
@@ -53,38 +55,33 @@ type WorkspaceTab =
 // ── New deliverable modal ──────────────────────────────────────────────────
 
 function NewDeliverableModal({
-  members,
   tasks,
   pending,
   initialTaskId,
   onCreate,
   onClose,
 }: {
-  members: WorkspaceMember[];
-  // Tareas del equipo abiertas (aún no completadas) para elegir opcionalmente:
-  // así el entregable queda enganchado y aprobar/rechazar mueve la tarea real.
+  // Tareas ABIERTAS y ASIGNADAS A QUIEN ABRE el modal (aún no completadas ni
+  // ya con un entregable): solo se entrega lo propio, así que ni la tarea ni
+  // el responsable se eligen aquí — el responsable es siempre quien entrega.
   tasks: ApiTeamTask[];
   pending: boolean;
   /** Preselecciona una tarea (atajo "Entregar" desde la vista de estructura). */
   initialTaskId?: string;
-  onCreate: (taskTitle: string, assigneeId: string, taskId: string | null) => void;
+  onCreate: (taskTitle: string, taskId: string | null) => void;
   onClose: () => void;
 }) {
   const preselected = initialTaskId ? tasks.find((t) => t.id === initialTaskId) : undefined;
   const [taskId, setTaskId] = useState<string>(preselected?.id ?? "");
   const [title, setTitle] = useState(preselected?.title ?? "");
-  const [assigneeId, setAssigneeId] = useState(preselected?.assignee_id ?? members.at(0)?.id ?? "");
 
-  // Al elegir una tarea real, autorrellenamos título y responsable. Si el usuario
-  // los edita después, respetamos su valor (no sobreescribimos en cada render).
+  // Al elegir una tarea real, autorrellenamos el título. Si el usuario lo
+  // edita después, respetamos su valor (no sobreescribimos en cada render).
   const selectTask = (id: string) => {
     setTaskId(id);
     const t = tasks.find((x) => x.id === id);
     if (t) {
       setTitle(t.title);
-      if (t.assignee_id) {
-        setAssigneeId(t.assignee_id);
-      }
     }
   };
 
@@ -108,7 +105,7 @@ function NewDeliverableModal({
           onSubmit={(e) => {
             e.preventDefault();
             if (title.trim()) {
-              onCreate(title.trim(), assigneeId, taskId || null);
+              onCreate(title.trim(), taskId || null);
             }
           }}
           className="mt-5 space-y-4"
@@ -133,8 +130,8 @@ function NewDeliverableModal({
                 ))}
               </select>
               <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-                Al aprobar o rechazar, se actualiza la tarea vinculada y queda en la trazabilidad
-                del proyecto.
+                Solo tus tareas asignadas y abiertas. Al aprobar o rechazar, se actualiza la tarea
+                vinculada y queda en la trazabilidad del proyecto.
               </p>
             </div>
           )}
@@ -152,24 +149,6 @@ function NewDeliverableModal({
               autoFocus
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Responsable
-            </label>
-            <select
-              value={assigneeId}
-              onChange={(e) => {
-                setAssigneeId(e.target.value);
-              }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
           </div>
           <div className="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button
@@ -250,15 +229,20 @@ function MemberWorkspace() {
 
   const members = (membersQuery.data ?? []).map(mapMember);
   const deliverables = (deliverablesQuery.data ?? []).map(mapDeliverable);
-  // Al abrir "Nuevo entregable" solo ofrecemos tareas abiertas y aún NO
-  // vinculadas — evita que dos entregables apunten a la misma Task (el
-  // backend además rechaza el duplicado con un índice único parcial).
+  // Al abrir "Nuevo entregable" solo ofrecemos MIS tareas (nadie entrega el
+  // trabajo de otra persona), abiertas y aún NO vinculadas — evita que dos
+  // entregables apunten a la misma Task (el backend además rechaza el
+  // duplicado con un índice único parcial).
   const linkableTasks = useMemo(() => {
     const linked = new Set((deliverablesQuery.data ?? []).map((d) => d.task_id).filter(Boolean));
     return (tasksQuery.data ?? []).filter(
-      (t) => t.status !== "completada" && t.status !== "cancelada" && !linked.has(t.id),
+      (t) =>
+        t.assignee_id === currentUserId &&
+        t.status !== "completada" &&
+        t.status !== "cancelada" &&
+        !linked.has(t.id),
     );
-  }, [deliverablesQuery.data, tasksQuery.data]);
+  }, [deliverablesQuery.data, tasksQuery.data, currentUserId]);
   const linkableTaskIds = useMemo(() => new Set(linkableTasks.map((t) => t.id)), [linkableTasks]);
   const access = accessQuery.data;
   const canDeliver = access?.can_deliver ?? false;
@@ -271,6 +255,7 @@ function MemberWorkspace() {
   const addVersion = useAddVersion(activeTeamId);
   const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
+  const deleteDeliverable = useDeleteDeliverable(activeTeamId);
   const changeTaskStatus = useChangeTaskStatus(activeTeam?.project_id ?? "");
   const qc = useQueryClient();
   // Reasignar una tarea desde la estructura toca la caché de tareas del
@@ -318,6 +303,17 @@ function MemberWorkspace() {
     });
   };
 
+  const handleDelete = () => {
+    if (!selectedDeliverable) {
+      return;
+    }
+    deleteDeliverable.mutate(selectedDeliverable.id, {
+      onSuccess: () => {
+        setSelectedDeliverableId(null);
+      },
+    });
+  };
+
   const handleAddComment = (content: string, type: CommentType, mentions: string[]) => {
     if (!selectedDeliverable) {
       return;
@@ -353,9 +349,9 @@ function MemberWorkspace() {
     setActiveTab("tareas");
   };
 
-  const handleCreate = (taskTitle: string, assigneeId: string, taskId: string | null) => {
+  const handleCreate = (taskTitle: string, taskId: string | null) => {
     createDeliverable.mutate(
-      { task_title: taskTitle, assignee_id: assigneeId, task_id: taskId },
+      { task_title: taskTitle, assignee_id: currentUserId, task_id: taskId },
       {
         onSuccess: (d) => {
           setSelectedDeliverableId(d.id);
@@ -509,9 +505,19 @@ function MemberWorkspace() {
                         canReview={canReview}
                         reviewPending={addComment.isPending}
                         editPending={editVersion.isPending}
+                        deletePending={deleteDeliverable.isPending}
+                        deleteError={
+                          deleteDeliverable.isError
+                            ? getErrorMessage(
+                                deleteDeliverable.error,
+                                "No se pudo eliminar el entregable",
+                              )
+                            : null
+                        }
                         onAddVersion={handleAddVersion}
                         onEditVersion={handleEditVersion}
                         onReview={handleReview}
+                        onDelete={handleDelete}
                       />
                     </div>
                     <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
@@ -581,7 +587,6 @@ function MemberWorkspace() {
 
       {showNew && (
         <NewDeliverableModal
-          members={members}
           tasks={linkableTasks}
           pending={createDeliverable.isPending}
           initialTaskId={deliverTaskId ?? undefined}
