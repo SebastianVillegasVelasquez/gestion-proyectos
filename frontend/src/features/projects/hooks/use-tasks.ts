@@ -155,6 +155,29 @@ export function useDetachTask(projectId: string) {
 }
 
 /**
+ * Elimina una tarea (borrado lógico en el backend: `deleted_at`). Al quedar
+ * marcada, desaparece de golpe de todas las vistas que ya filtran por tareas
+ * vivas — proyecto, equipo, espacio de trabajo del líder — sin tocar nada más
+ * en cada una de ellas. El responsable (si tenía) también deja de verla: la
+ * asignación vive en la propia fila de la tarea, no en una tabla aparte.
+ */
+export function useDeleteTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) => tasksApi.remove(taskId),
+    onSuccess: () => {
+      invalidateTaskViews(qc, projectId);
+      // Prefijo: cubre también las vistas "tareas por elemento" y por equipo.
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+      // La bolsa de tareas y el tablero del espacio de trabajo del líder viven
+      // en su propio namespace de queries, fuera de `taskKeys` — sin esto la
+      // tarea borrada seguía viéndose ahí hasta la siguiente recarga.
+      void qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+  });
+}
+
+/**
  * Edita los datos de una tarea (título, prioridad, fechas, responsable/equipo).
  * Es una acción de administración: PATCH /tasks/{id}. Para reasignar de persona a
  * equipo (o viceversa) el llamador envía el otro campo en null, ya que el backend

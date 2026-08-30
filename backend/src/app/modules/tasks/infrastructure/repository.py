@@ -55,6 +55,13 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_subtasks(self, parent_task_id: UUID) -> list[Task]:
+        """Subtareas vivas de una tarea, para el borrado en cascada."""
+        query = select(Task).where(
+            Task.parent_task_id == parent_task_id, Task.deleted_at.is_(None)
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
     # ── Comentarios ───────────────────────────────────────────────────────────
     async def add_comment(self, comment: TaskComment) -> TaskComment:
         self._session.add(comment)

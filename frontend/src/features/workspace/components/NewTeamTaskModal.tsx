@@ -49,6 +49,9 @@ export function NewTeamTaskModal({
   const [workItemId, setWorkItemId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [durationDays, setDurationDays] = useState("1");
+  // Desactivado por defecto: la persona integrante entrega y la tarea queda
+  // hecha directo, sin pasar por el líder de nuevo.
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -70,6 +73,7 @@ export function NewTeamTaskModal({
         work_item_id: workItemId || null,
         start_date: startDate || null,
         duration_days: startDate ? duration : undefined,
+        requires_approval: requiresApproval,
       });
       onClose();
     } catch (err) {
@@ -170,6 +174,20 @@ export function NewTeamTaskModal({
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+            <input
+              type="checkbox"
+              checked={requiresApproval}
+              onChange={(e) => {
+                setRequiresApproval(e.target.checked);
+              }}
+              className="size-4 accent-brand-gold"
+            />
+            <span className="text-slate-600 dark:text-slate-300">
+              Requiere aprobación del líder o supervisor para darse por completada
+            </span>
+          </label>
 
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:bg-rose-900/20 dark:text-rose-300">

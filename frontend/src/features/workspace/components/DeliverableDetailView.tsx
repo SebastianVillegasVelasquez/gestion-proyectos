@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, Clock, ExternalLink, Link2, Pencil, Plus, X } from "lucide-react";
+import { Check, Clock, ExternalLink, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type {
   CommentType,
   Deliverable,
@@ -470,10 +471,16 @@ interface DeliverableDetailViewProps {
   reviewPending?: boolean;
   /** Hay una corrección de versión en vuelo. */
   editPending?: boolean;
+  /** Hay un borrado en vuelo. */
+  deletePending?: boolean;
+  /** Error al borrar (se muestra en el diálogo de confirmación). */
+  deleteError?: string | null;
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
   /** Corrige una entrega ya subida (no crea versión nueva). Solo si `canDeliver`. */
   onEditVersion?: (versionId: string, patch: EditVersionPatch) => void;
   onReview: (type: CommentType, reason: string) => void;
+  /** Borra el entregable. Solo se ofrece a quien lo entregó. */
+  onDelete?: () => void;
 }
 
 export function DeliverableDetailView({
@@ -484,12 +491,26 @@ export function DeliverableDetailView({
   canReview = false,
   reviewPending = false,
   editPending = false,
+  deletePending = false,
+  deleteError = null,
   onAddVersion,
   onEditVersion,
   onReview,
+  onDelete,
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
   const [showRegister, setShowRegister] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // El entregable es de UNA persona: solo quien lo entregó registra o corrige
+  // entregas y puede borrarlo. Que el equipo entero pueda "entregar" — sin
+  // importar de quién es el trabajo — era justo el hueco que dejaba a
+  // cualquier integrante tocar el entregable de otro.
+  const isOwner = deliverable.assigneeId === currentUserId;
+  const canRegister = canDeliver && isOwner;
+  // Una vez aprobado ya movió el avance del proyecto: borrarlo pasa primero
+  // por que el líder reabra la revisión, no por un borrado silencioso.
+  const canDelete = canRegister && deliverable.status !== "aprobado" && onDelete;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -526,14 +547,29 @@ export function DeliverableDetailView({
             </div>
           )}
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-            DELIVERABLE_STATUS_BADGE[deliverable.status],
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+              DELIVERABLE_STATUS_BADGE[deliverable.status],
+            )}
+          >
+            {DELIVERABLE_STATUS_LABELS[deliverable.status]}
+          </span>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmDelete(true);
+              }}
+              aria-label="Eliminar entregable"
+              title="Eliminar entregable"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           )}
-        >
-          {DELIVERABLE_STATUS_LABELS[deliverable.status]}
-        </span>
+        </div>
       </div>
 
       {/* Cuerpo con scroll: la historia del entregable (qué se entregó y qué
@@ -542,7 +578,7 @@ export function DeliverableDetailView({
         <DeliveryTimeline
           versions={deliverable.versions}
           members={members}
-          onEditVersion={canDeliver ? onEditVersion : undefined}
+          onEditVersion={canRegister ? onEditVersion : undefined}
           editPending={editPending}
         />
 
@@ -557,7 +593,7 @@ export function DeliverableDetailView({
       {/* Registrar entrega: solo un botón anclado abajo. El formulario vive en
           un modal, así el panel no reserva espacio para él cuando no se usa
           (antes dejaba un bloque alto y medio vacío bajo la última versión). */}
-      {canDeliver && (
+      {canRegister && (
         <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
           <button
             type="button"
@@ -579,6 +615,23 @@ export function DeliverableDetailView({
           onAddVersion={onAddVersion}
           onClose={() => {
             setShowRegister(false);
+          }}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          destructive
+          title="Eliminar entregable"
+          message={`¿Eliminar "${deliverable.taskTitle}"? Se pierden sus entregas y comentarios.`}
+          confirmLabel="Eliminar"
+          loading={deletePending}
+          errorMessage={deleteError}
+          onConfirm={() => {
+            onDelete?.();
+          }}
+          onCancel={() => {
+            setConfirmDelete(false);
           }}
         />
       )}

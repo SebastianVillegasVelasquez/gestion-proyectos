@@ -235,6 +235,7 @@ class CreateTeamTaskUseCase:
                 depends_on_id=data.depends_on_id,
                 start_date=data.start_date,
                 due_date=data.due_date,
+                requires_approval=data.requires_approval,
             ),
             actor_id=actor_id,
         )
@@ -613,6 +614,7 @@ class GetTasksByTeamUseCase:
                 parent_task_id=task.parent_task_id,
                 start_date=task.start_date,
                 due_date=task.due_date,
+                requires_approval=task.requires_approval,
                 blocked_by=blocking.get(task.id, []),
             )
             for task, work_item_name, project_id, project_name, assignee_name in rows
@@ -674,7 +676,7 @@ class UpdateTaskUseCase:
             actor_role, ("admin", "super_admin", "developer")
         )
         if not is_admin:
-            await self._authorize_team_lead_reassignment(task, data, actor_id)
+            await self._authorize_team_lead_edit(task, data, actor_id)
 
         if data.assignee_id:
             user = await self.user_repo.get_by_id(data.assignee_id)
@@ -711,18 +713,22 @@ class UpdateTaskUseCase:
 
         return updated
 
-    async def _authorize_team_lead_reassignment(
+    async def _authorize_team_lead_edit(
         self, task, data: UpdateTaskRequest, actor_id: UUID | None
     ) -> None:
-        """El líder de un equipo solo puede REASIGNAR sus tareas: cambiar el
-        responsable de una tarea del equipo por otro integrante del mismo
-        equipo. Cualquier otra edición sigue siendo de administración."""
+        """El líder/supervisor de un equipo edita las tareas DE SU EQUIPO —
+        título, prioridad, fechas, responsable, aprobación, etc. — pero no
+        puede sacarlas del equipo (`team_id`) ni tocar campos de estructura
+        (`work_item_id` va por adjuntar/quitar, no por aquí). Cualquier tarea
+        fuera de su equipo sigue siendo de administración exclusivamente."""
         if self.team_repo is None or actor_id is None:
             raise ForbiddenError("No tienes permiso para editar esta tarea")
 
         touched = set(data.model_dump(exclude_unset=True))
-        if not touched or not touched <= {"assignee_id"}:
-            raise ForbiddenError("Solo puedes reasignar la tarea, no editar sus datos")
+        if not touched:
+            return
+        if not touched <= _TEAM_LEAD_EDITABLE_FIELDS:
+            raise ForbiddenError("No puedes editar esos campos de la tarea")
 
         if task.team_id is None:
             raise ForbiddenError("Esta tarea no está delegada a un equipo")
@@ -740,12 +746,55 @@ class UpdateTaskUseCase:
                 raise ForbiddenError("Solo puedes asignar a integrantes de tu equipo")
 
 
+# Campos que un líder/supervisor de equipo (rol de EQUIPO, no de sistema)
+# puede tocar en una tarea de SU equipo vía PATCH /tasks/{id}. `team_id` queda
+# fuera a propósito: mover la tarea a otro equipo sigue siendo de administración.
+_TEAM_LEAD_EDITABLE_FIELDS = {
+    "assignee_id",
+    "title",
+    "description",
+    "priority",
+    "start_date",
+    "due_date",
+    "estimated_hours",
+    "requires_approval",
+}
+
+
 class DeleteTaskUseCase:
-    def __init__(self, task_repo: TaskRepository):
+    """Borra una tarea (y en cascada sus subtareas). De administración, salvo
+    que el líder/supervisor de SU equipo borre una tarea delegada a él."""
+
+    def __init__(
+        self, task_repo: TaskRepository, team_repo: TeamRepository | None = None
+    ):
+        self.task_repo = task_repo
+        self.team_repo = team_repo
         self.service = TaskService(task_repo)
 
-    async def execute(self, task_id: UUID) -> None:
+    async def execute(
+        self,
+        task_id: UUID,
+        actor_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> None:
+        task = await _get_active_task(self.task_repo, task_id)
+        is_admin = actor_role is None or role_satisfies(
+            actor_role, ("admin", "super_admin", "developer")
+        )
+        if not is_admin:
+            await self._authorize_team_lead(task, actor_id)
         await self.service.delete_task(task_id)
+
+    async def _authorize_team_lead(self, task, actor_id: UUID | None) -> None:
+        if self.team_repo is None or actor_id is None or task.team_id is None:
+            raise ForbiddenError("No tienes permiso para eliminar esta tarea")
+        actor = await self.team_repo.get_member(task.team_id, actor_id)
+        if actor is None or actor.team_role not in (
+            TeamRole.LIDER,
+            TeamRole.SUPERVISOR,
+        ):
+            raise ForbiddenError("No lideras el equipo de esta tarea")
 
 
 async def _get_active_task(task_repo: TaskRepository, task_id: UUID):
@@ -881,6 +930,7 @@ class ChangeTaskStatusUseCase:
                 assignee_id=task.assignee_id,
                 project_id=project_id,
                 new_status=data.status,
+                requires_approval=task.requires_approval,
             )
 
         previous_status = task.status
@@ -911,6 +961,7 @@ class ChangeTaskStatusUseCase:
         project_id: UUID,
         new_status: TaskStatus,
         current_user_role: str | None = None,
+        requires_approval: bool = True,
     ) -> None:
         # Override de gestión: admin / super_admin / developer pueden fijar cualquier
         # estado (corrección administrativa). role_satisfies ya trata a developer
@@ -923,6 +974,17 @@ class ChangeTaskStatusUseCase:
         # El responsable puede entregar o retomar; nunca autoaprobarse.
         is_assignee = assignee_id is not None and assignee_id == current_user_id
         if new_status not in _REVIEW_TARGET_STATUSES and is_assignee:
+            return
+
+        # Tarea sin revisión obligatoria (`requires_approval=False`, el
+        # default): el responsable entrega y la marca COMPLETADA él mismo, sin
+        # pasar por el líder. DEVUELTA sigue siendo cosa del revisor: sin
+        # revisión no hay a quién "devolver".
+        if (
+            is_assignee
+            and not requires_approval
+            and new_status == TaskStatus.COMPLETADA
+        ):
             return
 
         # Sólo el líder/supervisor del proyecto puede aprobar o devolver.

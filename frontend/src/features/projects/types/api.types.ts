@@ -257,6 +257,12 @@ export interface Task {
   estimated_hours: string | null;
   /** Horas realmente dedicadas: suma de los apuntes, calculada en lectura. */
   logged_hours: string;
+  /**
+   * false (por defecto): el responsable entrega y la tarea queda COMPLETADA
+   * directo, sin pasar por nadie más. true: exige aprobación del líder o
+   * supervisor del proyecto (pasa primero por EN_REVISION).
+   */
+  requires_approval: boolean;
 }
 
 export interface CreateTaskPayload {
@@ -278,6 +284,8 @@ export interface CreateTaskPayload {
   // Dependencia opcional al crear (finish-to-start).
   depends_on_id?: string | null;
   parent_task_id?: string | null;
+  // Desactivado por defecto en el backend si se omite.
+  requires_approval?: boolean;
 }
 
 export interface UpdateTaskPayload {
@@ -289,6 +297,7 @@ export interface UpdateTaskPayload {
   start_date?: string;
   due_date?: string;
   estimated_hours?: string | null;
+  requires_approval?: boolean;
 }
 
 export interface AttachTaskPayload {

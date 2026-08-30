@@ -19,6 +19,9 @@ export interface TaskFormState {
   dateMode: "end" | "duration";
   dueDate: string;
   durationDays: string;
+  // false (por defecto): el responsable entrega y queda completada directo.
+  // true: la aprueba o devuelve el líder/supervisor del proyecto.
+  requiresApproval: boolean;
 }
 
 export function emptyTaskForm(workItemId = "", title = ""): TaskFormState {
@@ -35,6 +38,7 @@ export function emptyTaskForm(workItemId = "", title = ""): TaskFormState {
     dateMode: "duration",
     dueDate: "",
     durationDays: "",
+    requiresApproval: false,
   };
 }
 
@@ -60,6 +64,7 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     // Las fechas son opcionales: la tarea puede quedar como borrador y
     // planificarse después. Solo enviamos lo que el usuario haya completado.
     start_date: nullIfEmpty(form.startDate),
+    requires_approval: form.requiresApproval,
   };
 
   if (form.startDate) {

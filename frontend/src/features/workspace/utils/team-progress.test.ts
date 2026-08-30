@@ -18,6 +18,7 @@ function task(over: Partial<ApiTeamTask>): ApiTeamTask {
     parent_task_id: null,
     start_date: null,
     due_date: null,
+    requires_approval: false,
     blocked_by: [],
     ...over,
   };

@@ -57,6 +57,7 @@ export function TaskEditForm({
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
   const [teamId, setTeamId] = useState(task.team_id ?? "");
   const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours ?? "");
+  const [requiresApproval, setRequiresApproval] = useState(task.requires_approval);
 
   const save = () => {
     const payload: UpdateTaskPayload = {};
@@ -79,6 +80,9 @@ export function TaskEditForm({
     if ((estimatedHours || null) !== (task.estimated_hours ?? null)) {
       // Vacío = sin estimar (null), no cero: son cosas distintas.
       payload.estimated_hours = estimatedHours || null;
+    }
+    if (requiresApproval !== task.requires_approval) {
+      payload.requires_approval = requiresApproval;
     }
 
     // Reasignación: persona XOR equipo. Se envía el otro campo en null para
@@ -274,6 +278,20 @@ export function TaskEditForm({
           </select>
         )}
       </div>
+
+      <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+        <input
+          type="checkbox"
+          checked={requiresApproval}
+          onChange={(e) => {
+            setRequiresApproval(e.target.checked);
+          }}
+          className="size-4 accent-brand-gold"
+        />
+        <span className="text-slate-600 dark:text-slate-300">
+          Requiere aprobación del líder o supervisor para darse por completada
+        </span>
+      </label>
 
       {updateTask.isError && (
         <p className="text-xs text-red-600 dark:text-red-400">

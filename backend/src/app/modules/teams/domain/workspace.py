@@ -86,6 +86,16 @@ class WorkspaceRepository(ABC):
     ) -> Deliverable | None: ...
 
     @abstractmethod
+    async def get_deliverable_by_task(self, task_id: UUID) -> Deliverable | None:
+        """El entregable vivo (si existe) ya enganchado a esta Task.
+
+        Deja crear "solo un entregable por tarea asignada" con un mensaje
+        claro, en vez de que la persona se entere por un 500 del índice único
+        de la base de datos.
+        """
+        ...
+
+    @abstractmethod
     async def add_deliverable(self, deliverable: Deliverable) -> Deliverable: ...
 
     @abstractmethod

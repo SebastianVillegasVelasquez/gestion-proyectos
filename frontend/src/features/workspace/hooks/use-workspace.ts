@@ -105,6 +105,13 @@ export function useAddComment(teamId: string | null) {
   );
 }
 
+/** Borra un entregable propio (mientras no esté ya aprobado). */
+export function useDeleteDeliverable(teamId: string | null) {
+  return useDeliverableMutation(teamId, (deliverableId: string) =>
+    workspaceApi.deleteDeliverable(teamId!, deliverableId),
+  );
+}
+
 /**
  * Una tarea creada desde el espacio del equipo NO es una entidad aparte: es una
  * Task del proyecto con `team_id`. Al crearla hay que refrescar los dos mundos

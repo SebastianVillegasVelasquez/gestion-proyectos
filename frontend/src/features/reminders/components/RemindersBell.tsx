@@ -154,7 +154,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                   }
                 }}
                 placeholder="Recordarme…"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
               <div className="flex gap-2">
                 <input
@@ -163,7 +163,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                   onChange={(e) => {
                     setWhen(e.target.value);
                   }}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
                 <select
                   value={channel}
@@ -171,7 +171,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                     setChannel(e.target.value as ReminderChannel);
                   }}
                   aria-label="Canal del recordatorio"
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 >
                   <option value="notificacion">Notificación</option>
                   <option value="correo">Correo</option>
