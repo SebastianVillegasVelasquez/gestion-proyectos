@@ -8,17 +8,23 @@ import {
   LayoutGrid,
   List,
   ListTodo,
+  Pencil,
   Plus,
+  Trash2,
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { getErrorMessage } from "@/utils/get-error-message";
 import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useDeleteTask } from "@/features/projects/hooks/use-tasks";
 import { collectItemPaths } from "@/features/projects/utils/work-item-path";
 import { buildTeamBoard } from "@/features/projects/utils/team-board";
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
+import { EditTeamTaskModal } from "./EditTeamTaskModal";
 import { NewSubtaskModal } from "./NewSubtaskModal";
 import { NewTeamTaskModal } from "./NewTeamTaskModal";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
@@ -203,6 +209,8 @@ function TaskRow({
   pathOf,
   onAddSubtask,
   onReassigned,
+  onEdit,
+  onDelete,
 }: {
   row: TaskTreeRow;
   today: string;
@@ -212,6 +220,8 @@ function TaskRow({
   pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
   onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
 }) {
   const { task, depth, detachedParentTitle } = row;
   return (
@@ -282,19 +292,46 @@ function TaskRow({
         <UrgencyBadge task={task} />
       </span>
 
-      {/* Solo en tareas raíz y para el líder: partir una tarea general en subtareas. */}
-      {task.parent_task_id === null && canReview ? (
-        <button
-          type="button"
-          onClick={() => {
-            onAddSubtask(task);
-          }}
-          title="Agregar subtarea"
-          aria-label={`Agregar subtarea a ${task.title}`}
-          className="shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-all hover:bg-brand-teal/10 hover:text-brand-teal-dark focus-visible:opacity-100 group-hover:opacity-100 dark:hover:text-brand-teal"
-        >
-          <Plus className="size-4" />
-        </button>
+      {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
+          eliminar (cualquier nivel — la tarea sigue siendo de SU equipo). */}
+      {canReview ? (
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all focus-within:opacity-100 group-hover:opacity-100">
+          {task.parent_task_id === null && (
+            <button
+              type="button"
+              onClick={() => {
+                onAddSubtask(task);
+              }}
+              title="Agregar subtarea"
+              aria-label={`Agregar subtarea a ${task.title}`}
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-brand-teal/10 hover:text-brand-teal-dark dark:hover:text-brand-teal"
+            >
+              <Plus className="size-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              onEdit(task);
+            }}
+            title="Editar tarea"
+            aria-label={`Editar ${task.title}`}
+            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete(task);
+            }}
+            title="Eliminar tarea"
+            aria-label={`Eliminar ${task.title}`}
+            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </span>
       ) : (
         <span className="size-6 shrink-0" aria-hidden />
       )}
@@ -314,6 +351,8 @@ function ListView({
   pathOf,
   onAddSubtask,
   onReassigned,
+  onEdit,
+  onDelete,
 }: {
   groups: ReturnType<typeof groupTeamTasks>;
   /** Todas las del equipo: resuelven el título de un padre fuera del grupo. */
@@ -327,6 +366,8 @@ function ListView({
   pathOf: (task: ApiTeamTask) => string[];
   onAddSubtask: (task: ApiTeamTask) => void;
   onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
 }) {
   return (
     // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
@@ -378,6 +419,8 @@ function ListView({
                     pathOf={pathOf}
                     onAddSubtask={onAddSubtask}
                     onReassigned={onReassigned}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
                   />
                 ))}
               </div>
@@ -400,6 +443,8 @@ function TaskCard({
   projectId,
   teamMembers,
   onReassigned,
+  onEdit,
+  onDelete,
 }: {
   task: ApiTeamTask;
   /** Título del padre cuando la tarjeta es una subtarea. */
@@ -411,10 +456,12 @@ function TaskCard({
   projectId: string;
   teamMembers: ApiTeamMember[];
   onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <article className="group rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-2">
         <p
           className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-slate-700 dark:text-slate-200"
@@ -422,7 +469,35 @@ function TaskCard({
         >
           {task.title}
         </p>
-        <UrgencyBadge task={task} />
+        <div className="flex shrink-0 items-center gap-1">
+          <UrgencyBadge task={task} />
+          {canReview && (
+            <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit(task);
+                }}
+                title="Editar tarea"
+                aria-label={`Editar ${task.title}`}
+                className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              >
+                <Pencil className="size-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(task);
+                }}
+                title="Eliminar tarea"
+                aria-label={`Eliminar ${task.title}`}
+                className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            </span>
+          )}
+        </div>
       </div>
 
       {parentTitle !== null && (
@@ -475,6 +550,8 @@ function KanbanView({
   projectId,
   teamMembers,
   onReassigned,
+  onEdit,
+  onDelete,
 }: {
   allTasks: ApiTeamTask[];
   members: WorkspaceMember[];
@@ -484,6 +561,8 @@ function KanbanView({
   projectId: string;
   teamMembers: ApiTeamMember[];
   onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
 }) {
   const titleById = new Map(allTasks.map((t) => [t.id, t.title]));
   // Columnas de estado + una lane «En riesgo» (roja) al frente con las abiertas
@@ -546,6 +625,8 @@ function KanbanView({
                   projectId={projectId}
                   teamMembers={teamMembers}
                   onReassigned={onReassigned}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
                 />
               ))
             )}
@@ -627,12 +708,17 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
   const canReview = accessQuery.data?.can_review ?? false;
   const treeQuery = useWorkTree(projectId);
   const qc = useQueryClient();
+  const deleteTask = useDeleteTask(projectId);
 
   const [view, setView] = useState<ViewMode>("lista");
   const [grouping, setGrouping] = useState<TaskGrouping>("integrante");
   const [subtaskParent, setSubtaskParent] = useState<ApiTeamTask | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
   const [filters, setFilters] = useState<TeamTaskFilters>(EMPTY_TEAM_TASK_FILTERS);
+  // Edición/borrado de una tarea (o subtarea) del equipo, solo para el líder.
+  const [editingTask, setEditingTask] = useState<ApiTeamTask | null>(null);
+  const [deletingTask, setDeletingTask] = useState<ApiTeamTask | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const today = useMemo(() => todayIso(), []);
   const allTasks = useMemo(() => query.data ?? [], [query.data]);
@@ -765,6 +851,11 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             pathOf={pathOf}
             onAddSubtask={setSubtaskParent}
             onReassigned={onReassigned}
+            onEdit={setEditingTask}
+            onDelete={(task) => {
+              setDeleteError(null);
+              setDeletingTask(task);
+            }}
           />
         )}
         {view === "kanban" && (
@@ -777,6 +868,11 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             projectId={projectId}
             teamMembers={teamMembers}
             onReassigned={onReassigned}
+            onEdit={setEditingTask}
+            onDelete={(task) => {
+              setDeleteError(null);
+              setDeletingTask(task);
+            }}
           />
         )}
         {view === "trazabilidad" && (
@@ -802,6 +898,43 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
           projectId={projectId}
           onClose={() => {
             setShowNewTask(false);
+          }}
+        />
+      )}
+
+      {editingTask && (
+        <EditTeamTaskModal
+          projectId={projectId}
+          task={editingTask}
+          teamMembers={teamMembers}
+          onClose={() => {
+            setEditingTask(null);
+          }}
+        />
+      )}
+
+      {deletingTask && (
+        <ConfirmDialog
+          destructive
+          title="Eliminar tarea"
+          message={`¿Eliminar "${deletingTask.title}"? Si tiene subtareas, también se eliminan.`}
+          confirmLabel="Eliminar"
+          loading={deleteTask.isPending}
+          errorMessage={deleteError}
+          onConfirm={() => {
+            deleteTask.mutate(deletingTask.id, {
+              onSuccess: () => {
+                setDeletingTask(null);
+                setDeleteError(null);
+              },
+              onError: (error) => {
+                setDeleteError(getErrorMessage(error, "No se pudo eliminar la tarea"));
+              },
+            });
+          }}
+          onCancel={() => {
+            setDeletingTask(null);
+            setDeleteError(null);
           }}
         />
       )}

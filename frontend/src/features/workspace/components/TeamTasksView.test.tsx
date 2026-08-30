@@ -1,0 +1,135 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+
+import { TeamTasksView } from "./TeamTasksView";
+import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
+import type * as useWorkspaceModule from "../hooks/use-workspace";
+import { useUpdateTask, useDeleteTask } from "@/features/projects/hooks/use-tasks";
+import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import type { ApiTeamTask } from "../api/workspace.api";
+
+vi.mock("../hooks/use-workspace", async (importOriginal) => {
+  const actual = await importOriginal<typeof useWorkspaceModule>();
+  return {
+    ...actual,
+    useTeamTasks: vi.fn(),
+    useWorkspaceAccess: vi.fn(),
+  };
+});
+
+vi.mock("@/features/projects/hooks/use-tasks", () => ({
+  useUpdateTask: vi.fn(),
+  useDeleteTask: vi.fn(),
+}));
+
+vi.mock("@/features/projects/hooks/use-structure", () => ({
+  useWorkTree: vi.fn(),
+}));
+
+function task(over: Partial<ApiTeamTask> = {}): ApiTeamTask {
+  return {
+    id: "t1",
+    title: "Grabar video intro",
+    status: "pendiente_por_iniciar",
+    priority: "media",
+    work_item_id: null,
+    work_item_name: null,
+    project_id: "p1",
+    project_name: "Proyecto",
+    assignee_id: "u1",
+    assignee_name: "Ana",
+    parent_task_id: null,
+    start_date: null,
+    due_date: null,
+    requires_approval: false,
+    blocked_by: [],
+    ...over,
+  };
+}
+
+function renderView(canReview: boolean, tasks: ApiTeamTask[]) {
+  vi.mocked(useTeamTasks).mockReturnValue({
+    data: tasks,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as never);
+  vi.mocked(useWorkspaceAccess).mockReturnValue({
+    data: {
+      team_role: canReview ? "lider" : "integrante",
+      can_view: true,
+      can_deliver: true,
+      can_review: canReview,
+    },
+  } as never);
+  vi.mocked(useWorkTree).mockReturnValue({ data: [] } as never);
+
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return render(<TeamTasksView teamId="team1" projectId="p1" members={[]} teamMembers={[]} />, {
+    wrapper: Wrapper,
+  });
+}
+
+describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
+  const deleteMutate = vi.fn();
+  const updateMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDeleteTask).mockReturnValue({
+      mutate: deleteMutate,
+      isPending: false,
+    } as never);
+    vi.mocked(useUpdateTask).mockReturnValue({
+      mutate: updateMutate,
+      isPending: false,
+    } as never);
+  });
+
+  it("no ofrece editar ni eliminar a quien no lidera el equipo", () => {
+    renderView(false, [task()]);
+
+    expect(screen.queryByLabelText(/Editar Grabar video intro/i)).toBeNull();
+    expect(screen.queryByLabelText(/Eliminar Grabar video intro/i)).toBeNull();
+  });
+
+  it("cancelar el borrado no llama a la mutación", async () => {
+    const user = userEvent.setup();
+    renderView(true, [task()]);
+
+    await user.click(screen.getByLabelText(/Eliminar Grabar video intro/i));
+    const dialog = screen.getByRole("dialog", { name: /Eliminar tarea/i });
+    await user.click(within(dialog).getByRole("button", { name: /Cancelar/i }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(deleteMutate).not.toHaveBeenCalled();
+  });
+
+  it("confirmar el borrado llama a useDeleteTask con el id de la tarea", async () => {
+    const user = userEvent.setup();
+    renderView(true, [task({ id: "t9", title: "Editar audio" })]);
+
+    await user.click(screen.getByLabelText(/Eliminar Editar audio/i));
+    const dialog = screen.getByRole("dialog", { name: /Eliminar tarea/i });
+    await user.click(within(dialog).getByRole("button", { name: /^Eliminar$/ }));
+
+    await waitFor(() => {
+      expect(deleteMutate).toHaveBeenCalledWith("t9", expect.anything());
+    });
+  });
+
+  it("editar abre el formulario precargado con el título de la tarea", async () => {
+    const user = userEvent.setup();
+    renderView(true, [task({ title: "Montaje final" })]);
+
+    await user.click(screen.getByLabelText(/Editar Montaje final/i));
+    expect(await screen.findByText("Editar tarea")).toBeTruthy();
+    expect(screen.getByDisplayValue("Montaje final")).toBeTruthy();
+  });
+});
