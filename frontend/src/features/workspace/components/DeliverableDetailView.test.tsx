@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { DeliverableDetailView } from "./DeliverableDetailView";
@@ -76,5 +76,82 @@ describe("DeliverableDetailView — editar una entrega ya subida", () => {
       "v1",
       expect.objectContaining({ url: "https://new.example/fixed", type: "enlace" }),
     );
+  });
+});
+
+describe("DeliverableDetailView — solo quien entregó toca su entregable", () => {
+  it("no ofrece registrar ni editar el entregable de otra persona", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        currentUserId="u2"
+        deliverable={deliverableWithVersion()}
+        canDeliver
+        onEditVersion={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /registrar nueva entrega/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /editar/i })).toBeNull();
+  });
+
+  it("el dueño sí puede registrar una nueva entrega", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        currentUserId="u1"
+        deliverable={deliverableWithVersion()}
+        canDeliver
+      />,
+    );
+    expect(screen.getByRole("button", { name: /registrar nueva entrega/i })).toBeTruthy();
+  });
+});
+
+describe("DeliverableDetailView — eliminar", () => {
+  it("no ofrece eliminar el entregable de otra persona", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        currentUserId="u2"
+        deliverable={deliverableWithVersion()}
+        canDeliver
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText("Eliminar entregable")).toBeNull();
+  });
+
+  it("no ofrece eliminar un entregable ya aprobado, ni siquiera al dueño", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        currentUserId="u1"
+        deliverable={{ ...deliverableWithVersion(), status: "aprobado" }}
+        canDeliver
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText("Eliminar entregable")).toBeNull();
+  });
+
+  it("el dueño elimina su entregable tras confirmar", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    render(
+      <DeliverableDetailView
+        {...base}
+        currentUserId="u1"
+        deliverable={deliverableWithVersion()}
+        canDeliver
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.click(screen.getByLabelText("Eliminar entregable"));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog", { name: /Eliminar entregable/i });
+    await user.click(within(dialog).getByRole("button", { name: /^Eliminar$/ }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

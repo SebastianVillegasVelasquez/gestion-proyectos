@@ -104,6 +104,9 @@ export interface ApiTeamTask {
   // Fechas opcionales: una tarea delegada puede estar aún sin planificar.
   start_date: string | null;
   due_date: string | null;
+  // false (por defecto): quien la tiene asignada la entrega y queda hecha
+  // directo. true: pasa por aprobación del líder/supervisor.
+  requires_approval: boolean;
   // Dependencias finish-to-start ya resueltas a título por el backend: la vista
   // pinta "Bloqueada por: …" sin una llamada por fila.
   blocked_by: ApiBlockingTask[];
@@ -159,6 +162,9 @@ export interface NewTeamTaskBody {
   due_date?: string | null;
   duration_days?: number | null;
   priority?: string;
+  // Desactivado por defecto en el backend si se omite: la o el integrante
+  // entrega y la subtarea queda hecha directo, sin pasar por el líder.
+  requires_approval?: boolean;
 }
 
 const base = (teamId: string) => `/teams/${teamId}`;
@@ -200,6 +206,10 @@ export const workspaceApi = {
     http
       .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/comments`, body)
       .then((r) => r.data),
+
+  // Solo quien entregó, y solo mientras no esté ya aprobado (ver backend).
+  deleteDeliverable: (teamId: string, deliverableId: string) =>
+    http.delete(`${base(teamId)}/deliverables/${deliverableId}`).then(() => undefined),
 
   notifications: (teamId: string) =>
     http

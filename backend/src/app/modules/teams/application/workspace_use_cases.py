@@ -129,15 +129,28 @@ class WorkspaceService:
                 "Solo los integrantes del equipo pueden crear entregables"
             )
 
-        # Fase 2: si viene `task_id`, la Task debe existir y estar delegada a
-        # este equipo. Así el entregable no puede "colarse" en tareas de otro
-        # equipo o inexistentes.
+        # Cada quien entrega SU trabajo, nunca "a nombre de" otro integrante:
+        # sin esto, cualquiera del equipo podía crear un entregable con el
+        # `assignee_id` de otra persona.
+        if data.assignee_id != current_user.id:
+            raise ForbiddenError("Solo puedes crear entregables asignados a ti mismo")
+
+        # Fase 2: si viene `task_id`, la Task debe existir, estar delegada a
+        # este equipo y estar asignada A QUIEN entrega — no basta con que sea
+        # del equipo: solo el responsable de la tarea puede entregarla.
         if data.task_id is not None:
             task = await self._repo.get_task(data.task_id)
             if task is None:
                 raise NotFoundError("La tarea vinculada no existe")
             if task.team_id != team_id:
                 raise ValidationError("La tarea no está delegada a este equipo")
+            if task.assignee_id != current_user.id:
+                raise ForbiddenError("Solo puedes entregar tareas que tienes asignadas")
+            existing = await self._repo.get_deliverable_by_task(data.task_id)
+            if existing is not None:
+                raise ValidationError(
+                    "Esta tarea ya tiene un entregable — súbele una nueva versión en vez de crear otro"
+                )
 
         created = await self._repo.add_deliverable(
             Deliverable(
@@ -158,6 +171,10 @@ class WorkspaceService:
         if not (await self._access(team_id, current_user)).can_deliver:
             raise ForbiddenError("Solo los integrantes del equipo pueden entregar")
         deliverable = await self._require_deliverable(team_id, deliverable_id)
+        if deliverable.assignee_id != current_user.id:
+            raise ForbiddenError(
+                "Solo quien tiene asignado el entregable puede entregar"
+            )
         next_number = (
             deliverable.versions[-1].version_number + 1 if deliverable.versions else 1
         )
@@ -172,32 +189,77 @@ class WorkspaceService:
                 uploaded_by=current_user.id,
             )
         )
-        deliverable.status = DeliverableStatus.EN_REVISION
+
+        # La tarea vinculada (si hay) decide si esto necesita revisión:
+        # `requires_approval=False` (el default) — entregar completa directo,
+        # sin pasar por el líder. `True` — mantiene el flujo clásico
+        # (EN_REVISION → el líder aprueba o devuelve).
+        task = (
+            await self._repo.get_task(deliverable.task_id)
+            if deliverable.task_id
+            else None
+        )
+        auto_complete = task is not None and not task.requires_approval
+
+        deliverable.status = (
+            DeliverableStatus.APROBADO
+            if auto_complete
+            else DeliverableStatus.EN_REVISION
+        )
         await self._repo.save_deliverable(deliverable)
 
-        # Fase 2: si el entregable está vinculado a una Task, entregar mueve la
-        # tarea a "en revisión" y deja rastro en TaskHistory. Idempotente.
-        await self._sync_task_status(deliverable, _TASK_STATUS_ON_DELIVER, current_user)
-
-        # T8: avisar a quien revisa (líder / supervisor) que hay entrega nueva.
-        if self._notifier is not None:
-            members = await self._repo.list_members(team_id)
-            team = await self._repo.get_team(team_id)
-            await self._notifier.deliverable_submitted(
-                team_id=team_id,
-                team_name=team.name if team else "",
-                project_name=team.name if team else "",
-                deliverable_id=deliverable.id,
-                task_id=deliverable.task_id,
-                task_title=deliverable.task_title,
-                submitter_id=current_user.id,
-                submitter_name=getattr(current_user, "name", "Un integrante"),
-                reviewers=members,
+        if auto_complete and task is not None:
+            # Fase 2 + toggle: sin revisión obligatoria, entregar ES completar.
+            await self._repo.transition_task(
+                task,
+                _TASK_STATUS_ON_APPROVE,
+                current_user.id,
+                "Entrega directa: la tarea no requiere aprobación",
             )
+        else:
+            # Fase 2: si el entregable está vinculado a una Task, entregar mueve
+            # la tarea a "en revisión" y deja rastro en TaskHistory. Idempotente.
+            await self._sync_task_status(
+                deliverable, _TASK_STATUS_ON_DELIVER, current_user
+            )
+
+            # T8: avisar a quien revisa (líder / supervisor) que hay entrega
+            # nueva. Si no hace falta revisión, nadie tiene que revisar nada.
+            if self._notifier is not None:
+                members = await self._repo.list_members(team_id)
+                team = await self._repo.get_team(team_id)
+                await self._notifier.deliverable_submitted(
+                    team_id=team_id,
+                    team_name=team.name if team else "",
+                    project_name=team.name if team else "",
+                    deliverable_id=deliverable.id,
+                    task_id=deliverable.task_id,
+                    task_title=deliverable.task_title,
+                    submitter_id=current_user.id,
+                    submitter_name=getattr(current_user, "name", "Un integrante"),
+                    reviewers=members,
+                )
 
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
         )
+
+    async def delete_deliverable(
+        self, team_id: UUID, deliverable_id: UUID, current_user
+    ) -> None:
+        """Borra un entregable propio, mientras no esté ya aprobado.
+
+        Una vez aprobado, ya movió el avance del proyecto — deshacerlo pasa
+        primero por que el líder reabra la revisión (`add_comment`), no por
+        borrar en silencio.
+        """
+        deliverable = await self._require_deliverable(team_id, deliverable_id)
+        if deliverable.assignee_id != current_user.id:
+            raise ForbiddenError("Solo quien entregó puede eliminar su entregable")
+        if deliverable.status == DeliverableStatus.APROBADO:
+            raise ValidationError("No puedes eliminar un entregable ya aprobado")
+        deliverable.soft_delete()
+        await self._repo.save_deliverable(deliverable)
 
     async def update_version(
         self,
@@ -212,6 +274,8 @@ class WorkspaceService:
         if not (await self._access(team_id, current_user)).can_deliver:
             raise ForbiddenError("Solo los integrantes del equipo pueden entregar")
         deliverable = await self._require_deliverable(team_id, deliverable_id)
+        if deliverable.assignee_id != current_user.id:
+            raise ForbiddenError("Solo quien entregó puede corregir su entrega")
         version = next((v for v in deliverable.versions if v.id == version_id), None)
         if version is None:
             raise NotFoundError("La versión no existe")

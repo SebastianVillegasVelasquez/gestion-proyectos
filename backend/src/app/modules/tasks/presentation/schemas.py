@@ -24,6 +24,9 @@ class TaskBase(BaseModelConfig):
     # Equipo al que se delega la tarea (opcional). None = tarea normal del proyecto.
     team_id: Optional[UUID] = None
     status: Optional[TaskStatus] = None
+    # False (por defecto): el responsable entrega y queda COMPLETADA directo.
+    # True: exige aprobación del líder/supervisor (flujo con EN_REVISION).
+    requires_approval: bool = False
 
 
 class BulkTasksFromBranchRequest(BaseModelConfig):
@@ -157,6 +160,9 @@ class CreateTeamTaskRequest(BaseModelConfig):
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
+    # Igual que en `CreateTaskRequest`: desactivado por defecto, se puede
+    # marcar para exigir aprobación del líder/supervisor.
+    requires_approval: bool = False
 
     start_date: Optional[date] = None
     due_date: Optional[date] = None
@@ -249,6 +255,7 @@ class UpdateTaskRequest(BaseModelConfig):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
+    requires_approval: Optional[bool] = None
 
     @model_validator(mode="after")
     def assignee_or_team_exclusive(self) -> "UpdateTaskRequest":
@@ -290,6 +297,7 @@ class TeamTaskItemResponse(BaseModelConfig):
     parent_task_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
+    requires_approval: bool = False
     # Dependencias finish-to-start ya resueltas a título: la vista de equipo
     # necesita mostrar el bloqueo sin pedir /tasks/{id}/dependencies por fila.
     blocked_by: list[BlockingTaskResponse] = []

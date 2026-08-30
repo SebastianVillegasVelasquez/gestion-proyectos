@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Numeric, UUID, Enum, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Numeric, UUID, Enum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import String, Text, Date, DateTime
 
@@ -91,6 +91,15 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Si es False (por defecto), el responsable entrega y la tarea queda
+    # COMPLETADA directo: no hay paso de revisión. Si es True, se mantiene el
+    # flujo clásico (EN_REVISION → el líder/supervisor aprueba o devuelve).
+    # Se fija al asignar la tarea (a una persona o, después, cuando el líder
+    # la reparte desde la bolsa del equipo) y por defecto viene desactivado.
+    requires_approval: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
 
     project: Mapped["Project"] = relationship("Project", lazy="raise")

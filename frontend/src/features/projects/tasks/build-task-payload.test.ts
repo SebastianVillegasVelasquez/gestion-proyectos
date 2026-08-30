@@ -77,6 +77,19 @@ describe("buildTaskPayload", () => {
     expect(payload.start_date).toBeNull();
     expect(payload.duration_days).toBeUndefined();
   });
+
+  it("no exige aprobación por defecto", () => {
+    const payload = buildTaskPayload({ ...emptyTaskForm("wi1"), title: "Tarea" }, "p1");
+    expect(payload.requires_approval).toBe(false);
+  });
+
+  it("envía requires_approval cuando se marca explícitamente", () => {
+    const payload = buildTaskPayload(
+      { ...emptyTaskForm("wi1"), title: "Tarea", requiresApproval: true },
+      "p1",
+    );
+    expect(payload.requires_approval).toBe(true);
+  });
 });
 
 describe("validateTaskForm", () => {

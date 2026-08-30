@@ -219,10 +219,14 @@ async def update_task(
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: UUID,
-    current_user=Depends(_admin),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
+    team_repo=Depends(team_repo_dependency),
 ):
-    await DeleteTaskUseCase(task_repo).execute(task_id)
+    """Administración, o el líder/supervisor de SU equipo (ver `DeleteTaskUseCase`)."""
+    await DeleteTaskUseCase(task_repo, team_repo).execute(
+        task_id, actor_id=current_user.id, actor_role=current_user.role
+    )
 
 
 # ── Listados ─────────────────────────────────────────────────────────────────

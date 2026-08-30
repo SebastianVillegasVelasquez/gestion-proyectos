@@ -54,6 +54,28 @@ const ACTION_LABEL: Partial<Record<TaskStatus, string>> = {
   devuelta: "Devolver con observaciones",
 };
 
+/**
+ * Transiciones del responsable, con la bifurcación que introduce
+ * `requires_approval`: con revisión (true, el flujo clásico) entrega a
+ * EN_REVISION y espera al líder; sin ella (false, el default) entregar ES
+ * completar — no hay paso intermedio ni nadie más que la marque hecha.
+ */
+function assigneeTransitions(status: TaskStatus, requiresApproval: boolean): TaskStatus[] {
+  if (status === "en_progreso") {
+    return requiresApproval ? ["en_revision"] : ["completada"];
+  }
+  return ASSIGNEE_TRANSITIONS[status];
+}
+
+/** Etiqueta del botón de acción, distinguiendo "entregar y completar" (el
+ * propio responsable, sin revisión) de "aprobar" (el líder, con revisión). */
+function actionLabel(status: TaskStatus, actorRole: ActorRole): string {
+  if (status === "completada" && actorRole === "assignee") {
+    return "Entregar y marcar como hecha";
+  }
+  return ACTION_LABEL[status] ?? TASK_STATUS_LABELS[status];
+}
+
 export function TaskDetailPanel({
   projectId,
   task,
@@ -113,7 +135,7 @@ export function TaskDetailPanel({
 
   const allowed =
     actorRole === "assignee"
-      ? ASSIGNEE_TRANSITIONS[task.status]
+      ? assigneeTransitions(task.status, task.requires_approval)
       : actorRole === "leader"
         ? LEADER_TRANSITIONS[task.status]
         : [];
@@ -191,6 +213,12 @@ export function TaskDetailPanel({
                 <dt className="text-xs text-slate-400">Prioridad</dt>
                 <dd className="text-slate-700 dark:text-slate-200">
                   {TASK_PRIORITY_LABELS[task.priority]}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-400">Aprobación</dt>
+                <dd className="text-slate-700 dark:text-slate-200">
+                  {task.requires_approval ? "Requiere líder/supervisor" : "Entrega directa"}
                 </dd>
               </div>
               <div className="col-span-2">
@@ -283,7 +311,7 @@ export function TaskDetailPanel({
                             : "border-brand-blue/40 bg-brand-blue/10 text-brand-blue-dark hover:bg-brand-blue/20 dark:text-brand-blue",
                       )}
                     >
-                      {ACTION_LABEL[status] ?? TASK_STATUS_LABELS[status]}
+                      {actionLabel(status, actorRole)}
                     </button>
                   ))}
                 </div>

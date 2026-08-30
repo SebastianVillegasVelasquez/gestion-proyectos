@@ -65,7 +65,18 @@ class TaskService:
 
     async def delete_task(self, task_id: UUID) -> None:
         task = await self._get_active(task_id)
+        await self._delete_with_subtasks(task)
+
+    async def _delete_with_subtasks(self, task: Task) -> None:
+        """Borra la tarea y, en cascada, sus subtareas vivas.
+
+        El borrado es lógico (`deleted_at`): sin esto, eliminar una tarea
+        general dejaba sus subtareas huérfanas pero visibles en la bolsa del
+        equipo y en el proyecto, como si nada las hubiera tocado.
+        """
         task.soft_delete()
+        for child in await self.repo.get_subtasks(task.id):
+            await self._delete_with_subtasks(child)
 
     async def _get_active(self, task_id: UUID) -> Task:
         task = await self.repo.get_by_id(task_id)
@@ -90,6 +101,7 @@ class TaskService:
             start_date=task.start_date,
             due_date=task.due_date,
             status=task.status or TaskStatus.PENDIENTE_POR_INICIAR,
+            requires_approval=task.requires_approval,
             completed_at=task.completed_at,
             created_at=task.created_at or datetime.now(timezone.utc),
             updated_at=getattr(task, "updated_at", None),

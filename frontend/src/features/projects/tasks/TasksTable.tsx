@@ -5,6 +5,7 @@ import {
   FolderTree,
   Pencil,
   Replace,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useSortableData } from "@/hooks/use-sortable-data";
 import { SortableTh } from "@/components/ui/SortableTh";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { TASK_PRIORITY_LABELS, TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../types/labels";
 import type {
   ProjectMember,
@@ -23,7 +25,12 @@ import type {
   Team,
   WorkItemTree,
 } from "../types/api.types";
-import { useAttachTask, useChangeTaskStatus, useUpdateTask } from "../hooks/use-tasks";
+import {
+  useAttachTask,
+  useChangeTaskStatus,
+  useDeleteTask,
+  useUpdateTask,
+} from "../hooks/use-tasks";
 import { WorkItemPickerModal } from "./WorkItemPickerModal";
 import { useNodeTypes } from "../hooks/use-structure";
 import { commonPrefix, replaceInTitle } from "./bulk-title";
@@ -63,6 +70,12 @@ function allowedStatuses(
   }
   const isAssignee = Boolean(currentUserId) && task.assignee_id === currentUserId;
   if (isAssignee) {
+    // Sin revisión obligatoria (default), el responsable también puede marcar
+    // COMPLETADA directo: solo DEVUELTA sigue siendo exclusiva de quien
+    // revisa, y sin revisor no tiene sentido ofrecerla.
+    if (!task.requires_approval) {
+      return STATUSES.filter((s) => s !== "devuelta");
+    }
     return STATUSES.filter((s) => !REVIEW_TARGET_STATUSES.includes(s));
   }
   return [];
@@ -157,6 +170,7 @@ export function TasksTable({
   const changeStatus = useChangeTaskStatus(projectId);
   const updateTask = useUpdateTask(projectId);
   const attachTask = useAttachTask(projectId);
+  const deleteTask = useDeleteTask(projectId);
   const nodeTypesQuery = useNodeTypes(projectId);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -170,6 +184,11 @@ export function TasksTable({
   const [statusError, setStatusError] = useState<string | null>(null);
   // Ubicación masiva: el mismo modal de árbol que usan crear y editar.
   const [pickingBulkLocation, setPickingBulkLocation] = useState(false);
+  // Tarea a borrar desde su fila (null = ningún diálogo abierto).
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  // Borrado de toda la selección (mismo checkbox de "seleccionar todas").
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const myProjectRole = useMemo(
     () => members.find((m) => m.user_id === currentUserId)?.project_role,
@@ -313,6 +332,41 @@ export function TasksTable({
     setDirtyFind(false);
   };
 
+  /** Borra una tarea suelta desde su fila. Borrado lógico: el backend la marca
+   * `deleted_at` y desaparece de golpe de esta tabla, del espacio de trabajo
+   * del líder y de los grupos del equipo (todos filtran tareas vivas). Como el
+   * responsable vive en la propia fila de la tarea, no queda ningún rastro de
+   * asignación suelto por ahí. */
+  const confirmDeleteOne = () => {
+    if (!deletingTask) {
+      return;
+    }
+    deleteTask.mutate(deletingTask.id, {
+      onSuccess: () => {
+        setDeletingTask(null);
+        setDeleteError(null);
+      },
+      onError: (error) => {
+        setDeleteError(getErrorMessage(error, "No se pudo eliminar la tarea"));
+      },
+    });
+  };
+
+  /** Borra toda la selección: una petición por tarea (no hay endpoint masivo),
+   * igual que el resto de acciones en bloque de esta tabla. */
+  const confirmDeleteSelection = () => {
+    const ids = selectedTasks.map((t) => t.id);
+    Promise.all(ids.map((id) => deleteTask.mutateAsync(id)))
+      .then(() => {
+        setSelected(new Set());
+        setConfirmBulkDelete(false);
+        setDeleteError(null);
+      })
+      .catch((error: unknown) => {
+        setDeleteError(getErrorMessage(error, "No se pudieron eliminar algunas tareas"));
+      });
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Error al cambiar un estado: antes fallaba en silencio y el select
@@ -389,6 +443,19 @@ export function TasksTable({
               <FolderTree className="size-3.5" /> Ubicar…
             </button>
 
+            {isElevated && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirmBulkDelete(true);
+                }}
+                className="flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
+              >
+                <Trash2 className="size-3.5" /> Eliminar
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -455,6 +522,7 @@ export function TasksTable({
             <col className="w-44" />
             <col className="w-32" />
             <col className="w-20" />
+            {isElevated && <col className="w-10" />}
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -501,6 +569,7 @@ export function TasksTable({
                 onSort={toggleSort}
                 className="px-3 py-3"
               />
+              {isElevated && <th className="px-3 py-3" />}
             </tr>
           </thead>
           <tbody>
@@ -672,6 +741,21 @@ export function TasksTable({
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                     {formatDate(task.due_date)}
                   </td>
+                  {isElevated && (
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeletingTask(task);
+                        }}
+                        aria-label={`Eliminar ${task.title}`}
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -706,6 +790,38 @@ export function TasksTable({
           onSelect={bulkLocation}
           onClose={() => {
             setPickingBulkLocation(false);
+          }}
+        />
+      )}
+
+      {deletingTask && (
+        <ConfirmDialog
+          destructive
+          title="Eliminar tarea"
+          message={`¿Eliminar "${deletingTask.title}"? Deja de verse en el proyecto, en el espacio de trabajo del líder y en los grupos del equipo.`}
+          confirmLabel="Eliminar"
+          loading={deleteTask.isPending}
+          errorMessage={deleteError}
+          onConfirm={confirmDeleteOne}
+          onCancel={() => {
+            setDeletingTask(null);
+            setDeleteError(null);
+          }}
+        />
+      )}
+
+      {confirmBulkDelete && (
+        <ConfirmDialog
+          destructive
+          title="Eliminar tareas seleccionadas"
+          message={`¿Eliminar ${String(selected.size)} tarea${selected.size === 1 ? "" : "s"}? Dejan de verse en el proyecto, en el espacio de trabajo del líder y en los grupos del equipo.`}
+          confirmLabel="Eliminar"
+          loading={deleteTask.isPending}
+          errorMessage={deleteError}
+          onConfirm={confirmDeleteSelection}
+          onCancel={() => {
+            setConfirmBulkDelete(false);
+            setDeleteError(null);
           }}
         />
       )}
