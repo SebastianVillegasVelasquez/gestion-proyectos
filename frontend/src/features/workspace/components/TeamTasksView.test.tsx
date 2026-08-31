@@ -85,6 +85,14 @@ function renderView(canReview: boolean, tasks: ApiTeamTask[]) {
   });
 }
 
+/**
+ * La vista abre filtrada a "sin asignar" (la bolsa del equipo). Estos tests
+ * trabajan con tareas ya asignadas, así que primero pulsan "Todas".
+ */
+async function showAllAssignees(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Todas" }));
+}
+
 describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
   const deleteMutate = vi.fn();
   const updateMutate = vi.fn();
@@ -116,6 +124,8 @@ describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
     const user = userEvent.setup();
     renderView(true, [task()]);
 
+    await showAllAssignees(user);
+
     await user.click(screen.getByLabelText(/Eliminar Grabar video intro/i));
     const dialog = screen.getByRole("dialog", { name: /Eliminar tarea/i });
     await user.click(within(dialog).getByRole("button", { name: /Cancelar/i }));
@@ -127,6 +137,8 @@ describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
   it("confirmar el borrado llama a useDeleteTask con el id de la tarea", async () => {
     const user = userEvent.setup();
     renderView(true, [task({ id: "t9", title: "Editar audio" })]);
+
+    await showAllAssignees(user);
 
     await user.click(screen.getByLabelText(/Eliminar Editar audio/i));
     const dialog = screen.getByRole("dialog", { name: /Eliminar tarea/i });
@@ -140,6 +152,8 @@ describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
   it("editar abre el formulario precargado con el título de la tarea", async () => {
     const user = userEvent.setup();
     renderView(true, [task({ title: "Montaje final" })]);
+
+    await showAllAssignees(user);
 
     await user.click(screen.getByLabelText(/Editar Montaje final/i));
     expect(await screen.findByText("Editar tarea")).toBeTruthy();
@@ -165,6 +179,7 @@ describe("TeamTasksView — botón Comenzar", () => {
     // task() por defecto: assignee_id "u1" (== usuario mock) y pendiente_por_iniciar
     renderView(false, [task({ id: "mine", title: "Lo mío" })]);
 
+    await showAllAssignees(user);
     await user.click(screen.getByRole("button", { name: /Comenzar/i }));
     expect(startMutate).toHaveBeenCalledWith(
       { taskId: "mine", status: "en_progreso" },

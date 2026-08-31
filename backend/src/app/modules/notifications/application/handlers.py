@@ -13,6 +13,7 @@ from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.events.events import MemberAssigned
 from app.shared.events.events import (
     TaskAssigned,
+    TaskChainRescheduled,
     TaskCommented,
     TaskCompleted,
     TaskCreated,
@@ -469,6 +470,60 @@ class NotifyProjectLeadsOnTaskCompleted:
                     payload={
                         "project_id": str(event.project_id),
                         "task_id": str(event.task_id),
+                    },
+                )
+            )
+            try:
+                await self._broadcaster.publish(
+                    channel=channel_for(user_id),
+                    message=json.dumps({"type": "notification.new"}),
+                )
+            except Exception:
+                logger.exception(
+                    "Error al publicar la notificacion al usuario %s", user_id
+                )
+
+
+class NotifyOnTaskChainRescheduled:
+    """Un predecesor despejó el camino y las tareas dependientes se
+    reprogramaron: se avisa a sus responsables de la nueva fecha de inicio.
+    Los destinatarios ya vienen resueltos en el evento. Nunca se avisa a quien
+    disparó la cascada.
+    """
+
+    def __init__(
+        self, notification_repo: NotificationRepository, broadcaster: Broadcaster
+    ):
+        self._repo = notification_repo
+        self._broadcaster = broadcaster
+
+    async def __call__(self, event: TaskChainRescheduled) -> None:
+        fecha = event.new_start.isoformat() if event.new_start else None
+        origen = (
+            f"la entrega de «{event.trigger_name}»"
+            if event.trigger_kind == "third_party"
+            else f"que se completó «{event.trigger_name}»"
+        )
+        if fecha:
+            message = (
+                f"Tu tarea se reprogramó tras {origen}: " f"ahora empieza el {fecha}."
+            )
+        else:
+            message = f"Tu tarea se reprogramó tras {origen}."
+
+        for user_id in event.recipient_ids:
+            if event.actor_id is not None and user_id == event.actor_id:
+                continue
+            await self._repo.add(
+                Notification(
+                    user_to_id=user_id,
+                    actor_id=event.actor_id,
+                    notification_type=NotificationType.TAREA_REPROGRAMADA,
+                    message=message,
+                    payload={
+                        "project_id": str(event.project_id),
+                        "new_start": fecha,
+                        "trigger_kind": event.trigger_kind,
                     },
                 )
             )

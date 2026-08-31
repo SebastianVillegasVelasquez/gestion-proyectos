@@ -2,6 +2,7 @@ from app.modules.notifications.application.handlers import (
     NotifyLeadsOnTaskStarted,
     NotifyOnMemberAssignedToProject,
     NotifyOnTaskAssigned,
+    NotifyOnTaskChainRescheduled,
     NotifyOnTaskCommented,
     NotifyOnTaskCompleted,
     NotifyOnTaskCreated,
@@ -17,6 +18,7 @@ from app.shared.events import EventBus
 from app.shared.events.events import (
     MemberAssigned,
     TaskAssigned,
+    TaskChainRescheduled,
     TaskCommented,
     TaskCompleted,
     TaskCreated,
@@ -61,6 +63,10 @@ def register_notification_handlers(
     bus.subscribe(
         ThirdPartyDeliveryDateSet,
         NotifyOnThirdPartyDeliveryDate(notification_repo, broadcaster),
+    )
+    bus.subscribe(
+        TaskChainRescheduled,
+        NotifyOnTaskChainRescheduled(notification_repo, broadcaster),
     )
     if session is not None:
         # Aviso a coordinación/supervisión del proyecto: la aprobación mueve el %.

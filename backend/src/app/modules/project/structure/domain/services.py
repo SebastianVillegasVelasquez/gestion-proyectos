@@ -157,6 +157,14 @@ class WorkTreeService:
             await self._apply_third_party_gate(item, data.parent_id)
         return await self._respond_item(item)
 
+    # Campos que "marcan avance real" de un elemento: no se pueden tocar
+    # mientras una «actividad de terceros» de la que cuelga no esté entregada.
+    _PROGRESS_FIELDS = {
+        "fecha_inicio_real",
+        "fecha_fin_real",
+        "porcentaje_completado",
+    }
+
     async def update_item(
         self, item_id: UUID, data: UpdateWorkItemRequest
     ) -> WorkItemResponse:
@@ -164,10 +172,39 @@ class WorkTreeService:
         payload = data.model_dump(exclude_unset=True)
         if "tipo_id" in payload and payload["tipo_id"] is not None:
             await self._get_valid_tipo_for_project(payload["tipo_id"], item.proyecto_id)
+
+        # Compuerta de «actividad de terceros»: si este PATCH marca avance real
+        # y el elemento cuelga de una actividad de terceros sin entregar, se
+        # rechaza (el trabajo no puede darse por hecho antes que el tercero).
+        marks_progress = any(payload.get(f) is not None for f in self._PROGRESS_FIELDS)
+        if marks_progress:
+            all_items = await self.repo.list_items(item.proyecto_id)
+            if self._has_undelivered_third_party_ancestor(item, all_items):
+                raise ValidationError(
+                    "No puedes marcar avance: la actividad de terceros de la "
+                    "que depende este elemento aún no fue entregada"
+                )
+
         for field, value in payload.items():
             setattr(item, field, value)
         saved = await self.repo.save_item(item)
         return await self._respond_item(saved)
+
+    @classmethod
+    def _has_undelivered_third_party_ancestor(
+        cls, item: WorkItem, items: list[WorkItem]
+    ) -> bool:
+        by_id = {i.id: i for i in items}
+        seen: set[UUID] = set()
+        current: WorkItem | None = by_id.get(item.parent_id) if item.parent_id else None
+        while current is not None and current.id not in seen:
+            seen.add(current.id)
+            if cls._is_third_party(getattr(current, "tipo", None)) and (
+                current.fecha_fin_real is None and current.fecha_inicio_real is None
+            ):
+                return True
+            current = by_id.get(current.parent_id) if current.parent_id else None
+        return False
 
     async def delete_item(self, item_id: UUID) -> None:
         item = await self._get_active_item(item_id)
@@ -628,6 +665,14 @@ class WorkTreeService:
             if successor in items_by_id and predecessor in items_by_id:
                 predecessors.setdefault(successor, []).append(predecessor)
 
+        # «Actividad de terceros»: su fecha plan es un HITO (no un rango hasta
+        # fin de proyecto) y es el INICIO exacto de sus hijos, que la heredan.
+        third_party_ids = {
+            it.id
+            for it in items
+            if WorkTreeService._is_third_party(getattr(it, "tipo", None))
+        }
+
         memo: dict[UUID, DerivedDates] = {}
         visiting: set[UUID] = set()
 
@@ -641,9 +686,23 @@ class WorkTreeService:
                 return DerivedDates(item.fecha_inicio_plan, item.fecha_fin_plan, False)
             visiting.add(node_id)
 
+            # La actividad de terceros no depende de nosotros: su fecha plan (si
+            # la tiene) es un hito, no un tramo de trabajo.
+            if node_id in third_party_ids:
+                fecha_hito = item.fecha_inicio_plan or item.fecha_fin_plan
+                result = DerivedDates(fecha_hito, fecha_hito, False)
+                visiting.discard(node_id)
+                memo[node_id] = result
+                return result
+
             parent_start = None
+            anchor_start = None
             if item.parent_id is not None and item.parent_id in items_by_id:
                 parent_start = derive(item.parent_id).fecha_inicio_plan
+                # Hijo directo de una actividad de terceros: empieza EXACTAMENTE
+                # en su fecha (no un día después).
+                if item.parent_id in third_party_ids:
+                    anchor_start = parent_start
 
             ends = [
                 derive(pred).fecha_fin_plan for pred in predecessors.get(node_id, [])
@@ -658,6 +717,7 @@ class WorkTreeService:
                 duracion_unidad=item.duracion_unidad,
                 predecessor_end=predecessor_end,
                 parent_start=parent_start,
+                anchor_start=anchor_start,
                 project_start=project_start,
                 project_end=project_end,
             )

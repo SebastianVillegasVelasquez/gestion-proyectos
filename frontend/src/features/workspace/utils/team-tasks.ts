@@ -225,6 +225,27 @@ export function buildTaskRows(groupTasks: ApiTeamTask[], allTasks: ApiTeamTask[]
   return rows;
 }
 
+/**
+ * Poda un árbol plano de filas (de `buildTaskRows`) ocultando las que cuelgan
+ * de una tarea plegada. Las filas van en orden DFS con `depth`, así que basta
+ * con arrastrar el nivel bajo el que hay que esconder hasta volver a él.
+ */
+export function visibleRows(rows: TaskTreeRow[], collapsed: Set<string>): TaskTreeRow[] {
+  const out: TaskTreeRow[] = [];
+  let hideDeeperThan: number | null = null;
+  for (const row of rows) {
+    if (hideDeeperThan !== null && row.depth > hideDeeperThan) {
+      continue;
+    }
+    hideDeeperThan = null;
+    out.push(row);
+    if (collapsed.has(row.task.id)) {
+      hideDeeperThan = row.depth;
+    }
+  }
+  return out;
+}
+
 // ── Agrupación ──────────────────────────────────────────────────────────────
 
 // Solo dos ejes: "¿cómo va Ana?" y "¿qué está en revisión?". La lectura por

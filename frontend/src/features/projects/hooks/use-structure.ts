@@ -115,6 +115,22 @@ export function useShiftWorkItem(projectId: string) {
   });
 }
 
+/** Marca una «actividad de terceros» como entregada. Abre la compuerta de su
+ * subárbol y reprograma en cascada las tareas dependientes, así que refresca
+ * el árbol y las tareas. */
+export function useDeliverThirdParty(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, deliveredOn }: { itemId: string; deliveredOn?: string }) =>
+      structureApi.deliverThirdParty(itemId, deliveredOn),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+  });
+}
+
 export function useCloneWorkItem(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

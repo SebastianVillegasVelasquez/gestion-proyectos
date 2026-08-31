@@ -158,6 +158,15 @@ class MoveWorkItemRequest(BaseModelConfig):
     orden: Optional[int] = Field(default=None, ge=0)
 
 
+# ── Marcar una «actividad de terceros» como entregada ─────────────────────────
+class DeliverThirdPartyRequest(BaseModelConfig):
+    """El tercero ya entregó los recursos. `delivered_on` opcional (por defecto
+    hoy): abre la compuerta de sus hijos y arranca la cascada de fechas de las
+    tareas que dependían de la actividad."""
+
+    delivered_on: Optional[datetime.date] = None
+
+
 # ── Desplazar un subárbol en el tiempo (drag de la barra en el cronograma) ─────
 class ShiftWorkItemSubtreeRequest(BaseModelConfig):
     """Suma `offset_days` (puede ser negativo) a las fechas plan de TODO el

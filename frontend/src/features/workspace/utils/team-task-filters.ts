@@ -20,6 +20,16 @@ export const EMPTY_TEAM_TASK_FILTERS: TeamTaskFilters = {
   onlyBlocked: false,
 };
 
+/**
+ * Filtros con los que ABRE la vista de tareas del equipo: solo las tareas sin
+ * asignar (la "bolsa" del equipo). Es lo primero que el líder necesita ver —
+ * qué falta por repartir— y no el trabajo ya en curso de cada integrante.
+ */
+export const DEFAULT_TEAM_TASK_FILTERS: TeamTaskFilters = {
+  ...EMPTY_TEAM_TASK_FILTERS,
+  assignee: UNASSIGNED,
+};
+
 export function filterTeamTasks(tasks: ApiTeamTask[], filters: TeamTaskFilters): ApiTeamTask[] {
   const needle = filters.text.trim().toLowerCase();
   return tasks.filter((t) => {

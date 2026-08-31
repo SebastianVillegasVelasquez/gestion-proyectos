@@ -15,13 +15,15 @@ from app.modules.project.structure.presentation.schemas import (
     WorkItemResponse,
     WorkItemTreeResponse,
 )
+from app.modules.tasks.domain.audit import TaskAuditor, snapshot
+from app.modules.tasks.domain.services import reschedule_task_start
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
-from app.shared.events.events import ThirdPartyDeliveryDateSet
-from app.shared.exceptions import NotFoundError
+from app.shared.events.events import TaskChainRescheduled, ThirdPartyDeliveryDateSet
+from app.shared.exceptions import NotFoundError, ValidationError
 
 
 async def _ensure_project(project_repo: Repository, proyecto_id: UUID) -> None:
@@ -180,6 +182,85 @@ class UpdateWorkItemUseCase:
                 occurred_at=datetime.datetime.now(datetime.timezone.utc),
             )
         )
+
+
+class DeliverThirdPartyActivityUseCase:
+    """Marca una «actividad de terceros» como ENTREGADA: el tercero ya nos dio
+    los recursos (credenciales, aprobación, respuesta…).
+
+    Efectos:
+      * Fija su fecha real de fin → abre la compuerta: el trabajo que colgaba
+        de ella (elementos y tareas, a cualquier profundidad) ya puede avanzar.
+      * Cascada de fechas: las tareas que dependían FtS de esta actividad
+        arrancan en la fecha de entrega (conservando su duración) y se avisa a
+        sus responsables.
+    """
+
+    def __init__(
+        self,
+        repo: WorkTreeRepository,
+        task_repo: TaskRepository,
+        bus: EventBus | None = None,
+    ):
+        self.repo = repo
+        self.service = WorkTreeService(repo)
+        self.task_repo = task_repo
+        self._bus = bus
+
+    async def execute(
+        self,
+        item_id: UUID,
+        delivered_on: datetime.date | None = None,
+        actor_id: UUID | None = None,
+    ) -> WorkItemResponse:
+        item = await self.repo.get_item(item_id)
+        if item is None or item.is_deleted:
+            raise NotFoundError("Nodo de trabajo no encontrado")
+        tipo = await self.repo.get_tipo(item.tipo_id)
+        if not WorkTreeService._is_third_party(tipo):
+            raise ValidationError(
+                "Solo una «actividad de terceros» se marca como entregada"
+            )
+
+        fecha = delivered_on or datetime.date.today()
+        item.fecha_fin_real = fecha
+        if item.fecha_inicio_real is None:
+            item.fecha_inicio_real = item.fecha_inicio_plan or fecha
+        await self.repo.save_item(item)
+
+        await self._cascade_to_dependent_tasks(item, fecha, actor_id)
+        return await self.service.get_item(item_id)
+
+    async def _cascade_to_dependent_tasks(
+        self, item, fecha: datetime.date, actor_id: UUID | None
+    ) -> None:
+        dependents = await self.task_repo.get_dependents_of_work_item(item.id)
+        changed: list[Task] = []
+        for dep in dependents:
+            if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
+                continue
+            before = snapshot(dep)
+            if reschedule_task_start(dep, fecha):
+                await self.task_repo.save(dep)
+                await TaskAuditor(self.task_repo, actor_id).diff(before, dep)
+                changed.append(dep)
+
+        if changed and self._bus is not None:
+            recipients = tuple(
+                {d.assignee_id for d in changed if d.assignee_id is not None}
+            )
+            await self._bus.publish(
+                TaskChainRescheduled(
+                    project_id=item.proyecto_id,
+                    trigger_kind="third_party",
+                    trigger_name=item.nombre,
+                    new_start=fecha,
+                    task_ids=tuple(d.id for d in changed),
+                    recipient_ids=recipients,
+                    actor_id=actor_id,
+                    occurred_at=datetime.datetime.now(datetime.timezone.utc),
+                )
+            )
 
 
 class DeleteWorkItemUseCase:

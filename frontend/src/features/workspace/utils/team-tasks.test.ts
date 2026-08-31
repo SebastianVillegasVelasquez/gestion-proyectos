@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   activeBlockers,
   buildTaskRows,
+  visibleRows,
   daysUntilDue,
   formatDueDate,
   groupTeamTasks,
@@ -237,5 +238,26 @@ describe("buildTaskRows", () => {
     const b = task({ id: "b", parent_task_id: "a" });
     const rows = buildTaskRows([a, b], [a, b]);
     expect(rows.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("visibleRows", () => {
+  const padre = task({ id: "p" });
+  const hija1 = task({ id: "h1", parent_task_id: "p" });
+  const nieta = task({ id: "n", parent_task_id: "h1" });
+  const otra = task({ id: "o" });
+  const all = [padre, hija1, nieta, otra];
+  const rows = buildTaskRows(all, all);
+
+  it("sin plegados devuelve todo", () => {
+    expect(visibleRows(rows, new Set()).map((r) => r.task.id)).toEqual(["p", "h1", "n", "o"]);
+  });
+
+  it("plegar un padre oculta todo su subárbol", () => {
+    expect(visibleRows(rows, new Set(["p"])).map((r) => r.task.id)).toEqual(["p", "o"]);
+  });
+
+  it("plegar un nivel intermedio solo oculta lo que cuelga de él", () => {
+    expect(visibleRows(rows, new Set(["h1"])).map((r) => r.task.id)).toEqual(["p", "h1", "o"]);
   });
 });

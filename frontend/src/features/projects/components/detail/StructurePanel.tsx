@@ -25,6 +25,8 @@ import {
   GripVertical,
   CornerLeftUp,
   UsersRound,
+  PackageCheck,
+  Hourglass,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +42,7 @@ import {
   useUpdateNodeType,
   useDeleteNodeType,
   useMoveWorkItem,
+  useDeliverThirdParty,
 } from "../../hooks/use-structure";
 import { tipoStyle } from "../../utils/tipo-style";
 import {
@@ -305,6 +308,8 @@ interface TreeNodeProps {
   onPromote: (node: WorkItemTree) => void;
   /** Deshace la conversión (pide confirmación en el panel). */
   onDemote: (node: WorkItemTree) => void;
+  /** Marca una «actividad de terceros» como entregada. */
+  onDeliverThirdParty: (node: WorkItemTree) => void;
   /** Tareas colgadas de cada elemento, ya agrupadas por el panel. */
   tasksByItem: Map<string, Task[]>;
   memberById: Map<string, ProjectMember>;
@@ -346,6 +351,7 @@ function TreeNode({
   onBulkTasks,
   onPromote,
   onDemote,
+  onDeliverThirdParty,
   tasksByItem,
   memberById,
   teamById,
@@ -375,6 +381,11 @@ function TreeNode({
   // fila del elemento, no como una tarea hija. Sus subtareas sí bajan al árbol.
   const selfTask = tasks.find((t) => t.represents_work_item) ?? null;
   const selfAssignment = selfTask ? resolveAssignment(selfTask, memberById, teamById) : null;
+  // «Actividad de terceros»: un tercero debe darnos recursos (credenciales,
+  // aprobación…). Hasta que no se marque "entregada", nada de su subárbol
+  // puede avanzar; su fecha plan es solo el inicio previsto de sus hijos.
+  const isThirdParty = depTypeById.get(node.tipo_id) ?? false;
+  const thirdPartyDelivered = node.fecha_fin_real != null || node.fecha_inicio_real != null;
   const taskForest = buildTaskForest(tasks, selfTask?.id);
   const hasChildren = node.children.length > 0 || taskForest.length > 0;
   const pct =
@@ -499,6 +510,25 @@ function TreeNode({
             <ClipboardList className="size-2.5" /> tarea
           </span>
         )}
+
+        {isThirdParty &&
+          (thirdPartyDelivered ? (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+              <PackageCheck className="size-2.5" /> entregada
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeliverThirdParty(node);
+              }}
+              title="El tercero ya entregó los recursos: abre la compuerta de sus hijos y reprograma sus tareas"
+              className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+            >
+              <Hourglass className="size-2.5" /> marcar entregada
+            </button>
+          ))}
 
         <div className="ml-auto flex items-center gap-3">
           {/* El elemento ES una tarea: su responsable/equipo y estado se ven
@@ -725,6 +755,7 @@ function TreeNode({
               onBulkTasks={onBulkTasks}
               onPromote={onPromote}
               onDemote={onDemote}
+              onDeliverThirdParty={onDeliverThirdParty}
               draggingId={draggingId}
               draggingIdRef={draggingIdRef}
               dropTarget={dropTarget}
@@ -1107,6 +1138,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const reorderTask = useReorderTask(projectId);
   const promoteItem = usePromoteWorkItemToTask(projectId);
   const demoteItem = useDemoteWorkItemTask(projectId);
+  const deliverThirdParty = useDeliverThirdParty(projectId);
   // Elemento cuya condición de tarea se va a retirar (pide confirmación: borra
   // la tarea y sus subtareas).
   const [demoteTarget, setDemoteTarget] = useState<WorkItemTree | null>(null);
@@ -1499,6 +1531,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   }}
                   onDemote={(n) => {
                     setDemoteTarget(n);
+                  }}
+                  onDeliverThirdParty={(n) => {
+                    deliverThirdParty.mutate({ itemId: n.id });
                   }}
                   draggingId={draggingId}
                   draggingIdRef={draggingIdRef}

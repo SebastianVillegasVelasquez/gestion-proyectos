@@ -36,6 +36,7 @@ def derive_dates(
     duracion_unidad: DuracionUnidad | None,
     predecessor_end: datetime.date | None = None,
     parent_start: datetime.date | None = None,
+    anchor_start: datetime.date | None = None,
     project_start: datetime.date | None = None,
     project_end: datetime.date | None = None,
 ) -> DerivedDates:
@@ -50,6 +51,10 @@ def derive_dates(
     - Una sola fecha y SIN duración → se ancla el extremo que falta a los
       límites del proyecto: se sabe el fin pero no el inicio (→ inicio del
       proyecto) o al revés (→ fin del proyecto).
+    - `anchor_start` → el nodo EMPIEZA exactamente ahí (no un día después):
+      es el caso de un hijo de una «actividad de terceros», cuya fecha es el
+      inicio de sus hijos. Solo aplica si el nodo no fijó su propio inicio, y
+      gana sobre `predecessor_end` / `parent_start`.
     """
     dur = duration_in_days(duracion_valor, duracion_unidad)
     delta = datetime.timedelta(days=dur) if dur is not None else None
@@ -59,6 +64,17 @@ def derive_dates(
     if inicio is not None and fin is not None:
         advertencia = delta is not None and fin != inicio + delta
         return DerivedDates(inicio, fin, advertencia)
+
+    # Ancla de inicio exacto (hijo de una «actividad de terceros»): empieza en
+    # esa fecha y el fin sale de la duración (o queda abierto si no hay).
+    if anchor_start is not None and inicio is None:
+        if fin is not None:
+            return DerivedDates(
+                anchor_start, fin, delta is not None and fin != anchor_start + delta
+            )
+        if delta is not None:
+            return DerivedDates(anchor_start, anchor_start + delta, False)
+        return DerivedDates(anchor_start, anchor_start, False)
 
     # Modo 1: inicio + duración → fin.
     if inicio is not None and delta is not None:

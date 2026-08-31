@@ -10,6 +10,7 @@ from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
     TaskStatusService,
+    reschedule_task_start,
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import (
@@ -47,6 +48,7 @@ from app.shared.base_repository import Repository
 from app.shared.events import EventBus
 from app.shared.events.events import (
     TaskAssigned,
+    TaskChainRescheduled,
     TaskCommented,
     TaskCompleted,
     TaskCreated,
@@ -1097,7 +1099,51 @@ class ChangeTaskStatusUseCase:
             await self._emit_status_event(
                 new_status, data.status, project_id, current_user_id
             )
+
+        # Cascada de fechas: al completar una tarea, sus dependientes arrancan
+        # en la fecha de fin de esta y se avisa a sus responsables.
+        if data.status == TaskStatus.COMPLETADA:
+            await self._cascade_reschedule_dependents(new_status, current_user_id)
         return new_status
+
+    async def _cascade_reschedule_dependents(
+        self, completed: TaskResponse, actor_id: UUID | None
+    ) -> None:
+        dependents = await self.task_repo.get_dependents(completed.id)
+        if not dependents:
+            return
+        anchor = completed.due_date or (
+            completed.completed_at.date() if completed.completed_at else None
+        )
+        if anchor is None:
+            return
+
+        changed: list = []
+        for dep in dependents:
+            if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
+                continue
+            before = snapshot(dep)
+            if reschedule_task_start(dep, anchor):
+                await self.task_repo.save(dep)
+                await TaskAuditor(self.task_repo, actor_id).diff(before, dep)
+                changed.append(dep)
+
+        if changed and self._bus is not None:
+            recipients = tuple(
+                {d.assignee_id for d in changed if d.assignee_id is not None}
+            )
+            await self._bus.publish(
+                TaskChainRescheduled(
+                    project_id=completed.project_id,
+                    trigger_kind="task",
+                    trigger_name=completed.title,
+                    new_start=anchor,
+                    task_ids=tuple(d.id for d in changed),
+                    recipient_ids=recipients,
+                    actor_id=actor_id,
+                    occurred_at=datetime.now(timezone.utc),
+                )
+            )
 
     async def _authorize(
         self,
