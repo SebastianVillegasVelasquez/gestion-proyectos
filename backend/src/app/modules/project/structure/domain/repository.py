@@ -1,3 +1,4 @@
+import datetime
 from abc import ABC, abstractmethod
 from uuid import UUID
 
@@ -45,6 +46,14 @@ class WorkTreeRepository(ABC):
 
     @abstractmethod
     async def list_items(self, proyecto_id: UUID) -> list[WorkItem]: ...
+
+    @abstractmethod
+    async def get_project_dates(
+        self, proyecto_id: UUID
+    ) -> tuple[datetime.date | None, datetime.date | None]:
+        """(inicio, fin) planificados del proyecto, para anclar los elementos que
+        dan solo una fecha y sin duración. Cualquiera puede ser `None`."""
+        ...
 
     @abstractmethod
     async def next_orden(self, proyecto_id: UUID, parent_id: UUID | None) -> int: ...

@@ -126,6 +126,40 @@ class TestDeriveDates:
         assert out.fecha_inicio_plan == D(2026, 6, 1)
         assert out.fecha_fin_plan is None
 
+    def test_solo_fin_sin_duracion_ancla_inicio_al_inicio_del_proyecto(self):
+        out = _derive(
+            fecha_fin_plan=D(2026, 6, 10),
+            project_start=D(2026, 1, 1),
+            project_end=D(2026, 12, 31),
+        )
+        assert out.fecha_inicio_plan == D(2026, 1, 1)
+        assert out.fecha_fin_plan == D(2026, 6, 10)
+        assert out.advertencia is False
+
+    def test_solo_inicio_sin_duracion_ancla_fin_al_fin_del_proyecto(self):
+        out = _derive(
+            fecha_inicio_plan=D(2026, 6, 1),
+            project_start=D(2026, 1, 1),
+            project_end=D(2026, 12, 31),
+        )
+        assert out.fecha_inicio_plan == D(2026, 6, 1)
+        assert out.fecha_fin_plan == D(2026, 12, 31)
+
+    def test_una_fecha_sin_borde_de_proyecto_queda_tal_cual(self):
+        out = _derive(fecha_fin_plan=D(2026, 6, 10))
+        assert out.fecha_inicio_plan is None
+        assert out.fecha_fin_plan == D(2026, 6, 10)
+
+    def test_duracion_explicita_tiene_prioridad_sobre_el_borde_del_proyecto(self):
+        out = _derive(
+            fecha_fin_plan=D(2026, 6, 10),
+            duracion_valor=4,
+            duracion_unidad=DuracionUnidad.DIAS,
+            project_start=D(2026, 1, 1),
+        )
+        # Con duración se usa el Modo 2 (fin - duración), no el inicio del proyecto.
+        assert out.fecha_inicio_plan == D(2026, 6, 6)
+
 
 class TestViolaFts:
     def test_inicio_antes_o_igual_al_fin_del_predecesor(self):

@@ -19,8 +19,18 @@ interface DatePayload {
 }
 
 const MODES: { id: DateMode; label: string; hint: string; icon: typeof Clock }[] = [
-  { id: "inicio_dur", label: "Inicio + duración", hint: "Calcula el fin", icon: Clock },
-  { id: "fin_dur", label: "Fin + duración", hint: "Calcula el inicio", icon: Hourglass },
+  {
+    id: "inicio_dur",
+    label: "Inicio + duración",
+    hint: "Duración opcional: sin ella llega al fin del proyecto",
+    icon: Clock,
+  },
+  {
+    id: "fin_dur",
+    label: "Fin + duración",
+    hint: "Duración opcional: sin ella arranca en el inicio del proyecto",
+    icon: Hourglass,
+  },
   {
     id: "solo_dur",
     label: "Solo duración",
@@ -86,7 +96,12 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
   const [esTransversal, setEsTransversal] = useState(editItem?.es_transversal ?? false);
   const [error, setError] = useState<string | null>(null);
 
+  // La duración se muestra en los 3 modos que no son "Fechas exactas", pero
+  // solo es OBLIGATORIA en "Solo duración": en "Inicio + duración" y
+  // "Fin + duración" es opcional y, si falta, el backend ancla el extremo que
+  // no diste al borde del proyecto (inicio/fin del proyecto).
   const needsDur = mode !== "fechas";
+  const durRequired = mode === "solo_dur";
   const pending = createItem.isPending || updateItem.isPending;
 
   /** Devuelve las 4 columnas de fecha completas (las no usadas en null) para que
@@ -105,10 +120,20 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         : empty;
     }
     const dur = durValor ? Number(durValor) : null;
-    if (needsDur && (!dur || dur <= 0)) {
+    if (dur !== null && (Number.isNaN(dur) || dur <= 0)) {
       setError("Indica una duración válida.");
       return null;
     }
+    if (durRequired && dur === null) {
+      setError("Indica una duración.");
+      return null;
+    }
+    // En "Inicio/Fin + duración" la duración puede faltar: se manda en null y el
+    // backend completa la otra fecha con el borde del proyecto.
+    const durFields = {
+      duracion_valor: dur,
+      duracion_unidad: dur !== null ? durUnidad : null,
+    };
     switch (mode) {
       case "fechas":
         if (!inicio || !fin) {
@@ -121,20 +146,15 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
           setError("Indica la fecha de inicio.");
           return null;
         }
-        return {
-          ...empty,
-          fecha_inicio_plan: inicio,
-          duracion_valor: dur,
-          duracion_unidad: durUnidad,
-        };
+        return { ...empty, fecha_inicio_plan: inicio, ...durFields };
       case "fin_dur":
         if (!fin) {
           setError("Indica la fecha de fin.");
           return null;
         }
-        return { ...empty, fecha_fin_plan: fin, duracion_valor: dur, duracion_unidad: durUnidad };
+        return { ...empty, fecha_fin_plan: fin, ...durFields };
       case "solo_dur":
-        return { ...empty, duracion_valor: dur, duracion_unidad: durUnidad };
+        return { ...empty, ...durFields };
     }
   }
 
@@ -352,7 +372,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                 {needsDur && (
                   <label className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      Duración
+                      Duración{durRequired ? "" : " (opcional)"}
                     </span>
                     <div className="flex gap-2">
                       <input
