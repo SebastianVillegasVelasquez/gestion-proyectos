@@ -48,13 +48,46 @@ class TaskService:
         )
 
     async def _with_logged_days(self, tasks: list[Task]) -> list["TaskResponse"]:
-        """Añade a cada tarea sus horas dedicados con UNA consulta agregada.
+        """Añade a cada tarea su dedicación con UNA consulta agregada.
 
-        Preguntarlas tarea a tarea sería una consulta por fila (N+1), y estas
+        Preguntarla tarea a tarea sería una consulta por fila (N+1), y estas
         listas se pintan enteras en el cronograma y en el tablero.
         """
         totals = await self.repo.logged_days_by_task([t.id for t in tasks])
-        return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
+        responses = [
+            self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks
+        ]
+        self._rollup_estimates(responses)
+        return responses
+
+    @staticmethod
+    def _rollup_estimates(responses: list["TaskResponse"]) -> None:
+        """El estimado de una tarea con subtareas es, EN TEORÍA, el total de las
+        suyas: si el padre no tiene un estimado propio, se rellena con la suma
+        de los estimados de sus subtareas (recursivo, de las hojas hacia arriba).
+        Un estimado propio del padre se respeta y no se pisa.
+        """
+        children: dict[UUID, list["TaskResponse"]] = {}
+        for r in responses:
+            if r.parent_task_id is not None:
+                children.setdefault(r.parent_task_id, []).append(r)
+        if not children:
+            return
+
+        by_id = {r.id: r for r in responses}
+
+        def resolve(node: "TaskResponse") -> Decimal | None:
+            kids = children.get(node.id)
+            if kids:
+                parts = [resolve(k) for k in kids]
+                total = sum((p for p in parts if p is not None), Decimal("0"))
+                if node.estimated_days is None and any(p is not None for p in parts):
+                    node.estimated_days = total
+            return node.estimated_days
+
+        for r in responses:
+            if r.parent_task_id is None or r.parent_task_id not in by_id:
+                resolve(r)
 
     # Campos de la tarea que se pueden dejar EN BLANCO desde un PATCH (enviando
     # `null` explícito): quitar el responsable / el equipo, borrar una fecha,
