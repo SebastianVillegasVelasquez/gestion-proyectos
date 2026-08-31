@@ -168,8 +168,8 @@ export function TaskDetailModal({
   const teams = useMemo(() => [...teamById.values()], [teamById]);
   const { person, team } = assignment;
   const late = isOverdue(task);
-  const logged = Number(task.logged_hours);
-  const estimated = task.estimated_hours != null ? Number(task.estimated_hours) : null;
+  const logged = Number(task.logged_days);
+  const estimated = task.estimated_days != null ? Number(task.estimated_days) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -266,14 +266,14 @@ export function TaskDetailModal({
                 </Field>
                 <Field icon={Timer} label="Estimado">
                   {estimated != null ? (
-                    `${estimated} h`
+                    `${estimated} d`
                   ) : (
                     <span className="text-muted-foreground">Sin estimar</span>
                   )}
                 </Field>
                 <Field icon={Clock} label="Dedicado">
                   {logged > 0 ? (
-                    `${logged} h`
+                    `${logged} d`
                   ) : (
                     <span className="text-muted-foreground">Sin apuntes</span>
                   )}

@@ -147,7 +147,7 @@ async def delete_comment(
     )
 
 
-# ── Esfuerzo: estimación vs. horas dedicadas ──────────────────────────────────
+# ── Esfuerzo: estimación vs. días dedicados ───────────────────────────────────
 @router.post(
     "/tasks/{task_id}/time-entries",
     response_model=TimeEntryResponse,
@@ -159,7 +159,7 @@ async def log_time(
     current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Apunta horas dedicadas a una tarea, a nombre de quien las apunta.
+    """Apunta días dedicados a una tarea, a nombre de quien los apunta.
 
     No se registra tiempo por otra persona: el dato solo sirve para estimar y
     para pagar si quien lo escribe es quien lo trabajó.
@@ -183,7 +183,7 @@ async def delete_time_entry(
     current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Borra un apunte de horas (solo el propio, o cualquiera si administras)."""
+    """Borra un apunte de esfuerzo (solo el propio, o cualquiera si administras)."""
     await DeleteTimeEntryUseCase(task_repo).execute(
         entry_id, current_user.id, current_user.role
     )

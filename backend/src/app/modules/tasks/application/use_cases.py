@@ -473,9 +473,9 @@ class DeleteCommentUseCase:
 
 
 class LogTimeUseCase:
-    """Apunta horas dedicadas a una tarea.
+    """Apunta días dedicados a una tarea.
 
-    Cualquiera que trabaje en la tarea puede apuntar SUS horas: el apunte
+    Cualquiera que trabaje en la tarea puede apuntar SU esfuerzo: el apunte
     queda a nombre de quien lo hace (no se puede registrar tiempo por otro),
     que es lo que hace fiable el dato para pagar o para estimar mejor.
     """
@@ -494,7 +494,7 @@ class LogTimeUseCase:
             TaskTimeEntry(
                 task_id=task_id,
                 user_id=user_id,
-                hours=data.hours,
+                days=data.days,
                 work_date=data.work_date,
                 notes=data.notes,
             )
@@ -503,7 +503,7 @@ class LogTimeUseCase:
             id=entry.id,
             task_id=entry.task_id,
             user_id=entry.user_id,
-            hours=entry.hours,
+            days=entry.days,
             work_date=entry.work_date,
             notes=entry.notes,
             created_at=entry.created_at,
@@ -528,7 +528,7 @@ class GetTaskEffortUseCase:
                 task_id=entry.task_id,
                 user_id=entry.user_id,
                 user_name=f"{name} {last_name}".strip(),
-                hours=entry.hours,
+                days=entry.days,
                 work_date=entry.work_date,
                 notes=entry.notes,
                 created_at=entry.created_at,
@@ -537,8 +537,8 @@ class GetTaskEffortUseCase:
         ]
         return TaskEffortResponse(
             task_id=task_id,
-            estimated_hours=task.estimated_hours,
-            logged_hours=sum((e.hours for e in entries), Decimal("0")),
+            estimated_days=task.estimated_days,
+            logged_days=sum((e.days for e in entries), Decimal("0")),
             entries=entries,
         )
 
@@ -757,7 +757,7 @@ _TEAM_LEAD_EDITABLE_FIELDS = {
     "priority",
     "start_date",
     "due_date",
-    "estimated_hours",
+    "estimated_days",
     "requires_approval",
 }
 

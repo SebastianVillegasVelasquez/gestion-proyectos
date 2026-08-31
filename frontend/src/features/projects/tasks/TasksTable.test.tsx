@@ -43,8 +43,8 @@ function makeTask(overrides: Partial<Task>): Task {
     completed_at: null,
     created_at: "2026-08-01T00:00:00Z",
     updated_at: null,
-    estimated_hours: null,
-    logged_hours: "0",
+    estimated_days: null,
+    logged_days: "0",
     requires_approval: false,
     ...overrides,
   };

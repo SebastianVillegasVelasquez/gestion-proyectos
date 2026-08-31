@@ -27,15 +27,15 @@ function renderPanel() {
 function effort(over: Partial<TaskEffort> = {}): TaskEffort {
   return {
     task_id: "t1",
-    estimated_hours: "8",
-    logged_hours: "3",
+    estimated_days: "8",
+    logged_days: "3",
     entries: [
       {
         id: "e1",
         task_id: "t1",
         user_id: "u1",
         user_name: "Ana García",
-        hours: "3",
+        days: "0.5",
         work_date: "2026-08-25",
         notes: "Guion y storyboard",
         created_at: null,
@@ -56,9 +56,9 @@ describe("TaskEffortPanel", () => {
   it("muestra lo dedicado frente a lo estimado", async () => {
     renderPanel();
 
-    // "de 8 h" solo está en la cabecera; "3 h" sale también en el apunte.
-    expect(await screen.findByText(/de 8 h/)).toBeTruthy();
-    expect(screen.getAllByText(/3 h/)).toHaveLength(2);
+    expect(await screen.findByText(/de 8 d/)).toBeTruthy();
+    expect(screen.getByText(/3 d/)).toBeTruthy();
+    expect(screen.getByText(/0,5 d/)).toBeTruthy();
   });
 
   it("lista los apuntes con quién y cuándo", async () => {
@@ -68,42 +68,39 @@ describe("TaskEffortPanel", () => {
     expect(screen.getByText("2026-08-25")).toBeTruthy();
   });
 
-  it("registra horas de un día", async () => {
+  it("registra la dedicación de un día", async () => {
     const user = userEvent.setup();
     renderPanel();
     await screen.findByText(/Ana García/);
 
-    await user.click(screen.getByRole("button", { name: /Registrar horas/i }));
-    await user.type(screen.getByLabelText(/Horas dedicadas/i), "2.5");
+    await user.click(screen.getByRole("button", { name: /Registrar dedicación/i }));
+    await user.type(screen.getByLabelText(/Días dedicados/i), "0.5");
     await user.click(screen.getByRole("button", { name: /^Registrar$/i }));
 
     await waitFor(() => {
-      expect(tasksApi.logTime).toHaveBeenCalledWith(
-        "t1",
-        expect.objectContaining({ hours: "2.5" }),
-      );
+      expect(tasksApi.logTime).toHaveBeenCalledWith("t1", expect.objectContaining({ days: "0.5" }));
     });
   });
 
-  it("no deja registrar sin horas", async () => {
+  it("no deja registrar sin dedicación", async () => {
     const user = userEvent.setup();
     renderPanel();
     await screen.findByText(/Ana García/);
 
-    await user.click(screen.getByRole("button", { name: /Registrar horas/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar dedicación/i }));
 
     expect(screen.getByRole("button", { name: /^Registrar$/i })).toHaveProperty("disabled", true);
   });
 
   it("avisa cuando se pasa de lo estimado, sin bloquear nada", async () => {
     vi.mocked(tasksApi.effort).mockResolvedValue(
-      effort({ logged_hours: "12", estimated_hours: "8" }),
+      effort({ logged_days: "12", estimated_days: "8" }),
     );
     renderPanel();
 
     expect(await screen.findByText(/más de lo estimado/i)).toBeTruthy();
     // Y se puede seguir registrando: pasarse es un dato, no un error.
-    expect(screen.getByRole("button", { name: /Registrar horas/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Registrar dedicación/i })).toBeTruthy();
   });
 
   it("borra un apunte", async () => {
@@ -118,12 +115,12 @@ describe("TaskEffortPanel", () => {
     });
   });
 
-  it("indica cuando nadie ha registrado horas todavía", async () => {
+  it("indica cuando nadie ha registrado dedicación todavía", async () => {
     vi.mocked(tasksApi.effort).mockResolvedValue(
-      effort({ entries: [], logged_hours: "0", estimated_hours: null }),
+      effort({ entries: [], logged_days: "0", estimated_days: null }),
     );
     renderPanel();
 
-    expect(await screen.findByText(/Nadie ha registrado horas/i)).toBeTruthy();
+    expect(await screen.findByText(/Nadie ha registrado dedicación/i)).toBeTruthy();
   });
 });

@@ -35,30 +35,30 @@ class TaskService:
 
     async def get_task_by_id(self, task_id: UUID) -> "TaskResponse":
         task = await self._get_active(task_id)
-        return self._to_response(task, await self.repo.logged_hours(task_id))
+        return self._to_response(task, await self.repo.logged_days(task_id))
 
     async def get_tasks_by_work_item(self, work_item_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_by_work_item(work_item_id)
         )
 
     async def get_tasks_by_project(self, project_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_all_by_project(project_id)
         )
 
-    async def _with_logged_hours(self, tasks: list[Task]) -> list["TaskResponse"]:
-        """Añade a cada tarea sus horas dedicadas con UNA consulta agregada.
+    async def _with_logged_days(self, tasks: list[Task]) -> list["TaskResponse"]:
+        """Añade a cada tarea sus horas dedicados con UNA consulta agregada.
 
         Preguntarlas tarea a tarea sería una consulta por fila (N+1), y estas
         listas se pintan enteras en el cronograma y en el tablero.
         """
-        totals = await self.repo.logged_hours_by_task([t.id for t in tasks])
+        totals = await self.repo.logged_days_by_task([t.id for t in tasks])
         return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
 
     # Campos de la tarea que se pueden dejar EN BLANCO desde un PATCH (enviando
     # `null` explícito): quitar el responsable / el equipo, borrar una fecha,
-    # dejar de estimar horas, vaciar la descripción. El resto (`title`,
+    # dejar de estimar días, vaciar la descripción. El resto (`title`,
     # `priority`) nunca se limpia a null, así que un `null` en ellos se ignora.
     _NULLABLE_UPDATE_FIELDS = {
         "description",
@@ -66,7 +66,7 @@ class TaskService:
         "team_id",
         "start_date",
         "due_date",
-        "estimated_hours",
+        "estimated_days",
     }
 
     async def update_task(
@@ -103,7 +103,7 @@ class TaskService:
 
     @staticmethod
     def _to_response(
-        task: "Task", logged_hours: Decimal = Decimal("0")
+        task: "Task", logged_days: Decimal = Decimal("0")
     ) -> "TaskResponse":
         return TaskResponse(
             id=task.id,
@@ -122,8 +122,8 @@ class TaskService:
             completed_at=task.completed_at,
             created_at=task.created_at or datetime.now(timezone.utc),
             updated_at=getattr(task, "updated_at", None),
-            estimated_hours=task.estimated_hours,
-            logged_hours=logged_hours,
+            estimated_days=task.estimated_days,
+            logged_days=logged_days,
         )
 
 

@@ -15,9 +15,9 @@ from app.shared.base_model import BaseModelConfig
 
 class TaskBase(BaseModelConfig):
     title: Annotated[str, StringConstraints(min_length=2, max_length=200)]
-    # Esfuerzo estimado en horas. Opcional: una tarea puede nacer sin estimar
+    # Esfuerzo estimado en días. Opcional: una tarea puede nacer sin estimar
     # y estimarse cuando se sepa de qué va.
-    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
+    estimated_days: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
     assignee_id: Optional[UUID] = None
@@ -190,15 +190,15 @@ class TaskResponse(TaskBase):
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
-    # Horas realmente dedicadas (suma de los apuntes). Se calcula en lectura;
+    # Días realmente dedicados (suma de los apuntes). Se calcula en lectura;
     # 0 cuando nadie ha registrado nada todavía.
-    logged_hours: Decimal = Decimal("0")
+    logged_days: Decimal = Decimal("0")
 
 
 class CreateTimeEntryRequest(BaseModelConfig):
-    """Apunte de horas dedicadas a una tarea en un día."""
+    """Apunte de días dedicados a una tarea en una jornada (p. ej. 0.5)."""
 
-    hours: Annotated[Decimal, Field(gt=0, le=24)]
+    days: Annotated[Decimal, Field(gt=0, le=1)]
     work_date: date
     notes: Optional[Annotated[str, StringConstraints(max_length=500)]] = None
 
@@ -207,10 +207,10 @@ class TimeEntryResponse(BaseModelConfig):
     id: UUID
     task_id: UUID
     user_id: UUID
-    # Nombre de quien dedicó las horas, resuelto en lectura para no pedir el
+    # Nombre de quien dedicó el esfuerzo, resuelto en lectura para no pedir el
     # directorio entero solo para pintar una lista de apuntes.
     user_name: Optional[str] = None
-    hours: Decimal
+    days: Decimal
     work_date: date
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -220,8 +220,8 @@ class TaskEffortResponse(BaseModelConfig):
     """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
 
     task_id: UUID
-    estimated_hours: Optional[Decimal] = None
-    logged_hours: Decimal = Decimal("0")
+    estimated_days: Optional[Decimal] = None
+    logged_days: Decimal = Decimal("0")
     entries: list[TimeEntryResponse] = []
 
 
@@ -254,7 +254,7 @@ class UpdateTaskRequest(BaseModelConfig):
     team_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
-    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
+    estimated_days: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     requires_approval: Optional[bool] = None
 
     @model_validator(mode="after")

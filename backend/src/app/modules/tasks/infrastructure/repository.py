@@ -110,25 +110,25 @@ class TaskRepository(BaseRepository[Task]):
         )
         return (await self._session.execute(query)).all()
 
-    async def logged_hours(self, task_id: UUID) -> Decimal:
+    async def logged_days(self, task_id: UUID) -> Decimal:
         total = await self._session.scalar(
-            select(func.coalesce(func.sum(TaskTimeEntry.hours), 0)).where(
+            select(func.coalesce(func.sum(TaskTimeEntry.days), 0)).where(
                 TaskTimeEntry.task_id == task_id
             )
         )
         return Decimal(total or 0)
 
-    async def logged_hours_by_task(self, task_ids: list[UUID]) -> dict[UUID, Decimal]:
-        """Horas dedicadas de VARIAS tareas en una sola consulta.
+    async def logged_days_by_task(self, task_ids: list[UUID]) -> dict[UUID, Decimal]:
+        """Días dedicados de VARIAS tareas en una sola consulta.
 
-        Las listas de tareas muestran "3 / 8 h" en cada fila; pedir la suma
+        Las listas de tareas muestran "3 / 8 d" en cada fila; pedir la suma
         tarea a tarea sería una consulta por fila (N+1).
         """
         if not task_ids:
             return {}
         rows = (
             await self._session.execute(
-                select(TaskTimeEntry.task_id, func.sum(TaskTimeEntry.hours))
+                select(TaskTimeEntry.task_id, func.sum(TaskTimeEntry.days))
                 .where(TaskTimeEntry.task_id.in_(task_ids))
                 .group_by(TaskTimeEntry.task_id)
             )
