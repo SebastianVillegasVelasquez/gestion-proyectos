@@ -47,6 +47,16 @@ class TipoNodo(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # {"tipos_hijos_permitidos": ["<tipo_id>", ...]}. Si es null, todo vale.
     reglas_anidacion: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
+    # Marca este tipo como "dependencia de terceros": un WorkItem de este tipo,
+    # al colgarse de un padre, se pone delante de sus hermanos previos —que
+    # pasan a colgar de él y a depender de él (FtS)— y actúa como puerta: el
+    # trabajo del proyecto espera a su fecha de entrega, que fija alguien de
+    # fuera. Es una PROPIEDAD del tipo (no de su nombre), así el tipo se puede
+    # renombrar sin perder el comportamiento.
+    es_dependencia_externa: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     __table_args__ = (
         UniqueConstraint("proyecto_id", "nombre", name="uq_tipo_nodo_proyecto_nombre"),
     )

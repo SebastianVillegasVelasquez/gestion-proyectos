@@ -63,6 +63,10 @@ export interface TipoNodo {
   color: string | null;
   icono: string | null;
   reglas_anidacion: Record<string, unknown> | null;
+  // Se comporta como "dependencia de terceros": el elemento de este tipo se
+  // antepone a sus hermanos, ellos cuelgan de él y lo esperan (FtS), y su
+  // fecha la fija alguien de fuera. Propiedad del tipo, no de su nombre.
+  es_dependencia_externa: boolean;
 }
 
 export interface CreateTipoNodoPayload {
@@ -70,6 +74,7 @@ export interface CreateTipoNodoPayload {
   color?: string | null;
   icono?: string | null;
   reglas_anidacion?: Record<string, unknown> | null;
+  es_dependencia_externa?: boolean;
 }
 
 export interface UpdateTipoNodoPayload {
@@ -77,6 +82,7 @@ export interface UpdateTipoNodoPayload {
   color?: string | null;
   icono?: string | null;
   reglas_anidacion?: Record<string, unknown> | null;
+  es_dependencia_externa?: boolean;
 }
 
 export interface WorkItem {

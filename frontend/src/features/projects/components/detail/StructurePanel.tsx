@@ -276,6 +276,8 @@ interface TreeNodeProps {
   /** Nombre del elemento que contiene a este (null en el nivel principal). */
   containerName: string | null;
   typeNameById: Map<string, string>;
+  /** Qué tipos se comportan como "dependencia de terceros" (pinta naranja). */
+  depTypeById: Map<string, boolean>;
   isExpanded: (id: string) => boolean;
   onToggle: (id: string) => void;
   onAddChild: (parent: WorkItemTree) => void;
@@ -311,6 +313,7 @@ function TreeNode({
   depth,
   containerName,
   typeNameById,
+  depTypeById,
   isExpanded,
   onToggle,
   onAddChild,
@@ -337,7 +340,11 @@ function TreeNode({
   onDropNode,
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
-  const style = tipoStyle(node.tipo_id, typeNameById.get(node.tipo_id));
+  const style = tipoStyle(
+    node.tipo_id,
+    typeNameById.get(node.tipo_id),
+    depTypeById.get(node.tipo_id),
+  );
   // Las tareas del elemento son hijas suyas en el árbol, igual que los
   // elementos: se pliegan con la misma flecha y cuentan para saber si hay algo
   // dentro. Un módulo sin sub-elementos pero con tareas ya no se ve vacío.
@@ -600,6 +607,7 @@ function TreeNode({
               depth={depth + 1}
               containerName={node.nombre}
               typeNameById={typeNameById}
+              depTypeById={depTypeById}
               isExpanded={isExpanded}
               onToggle={onToggle}
               onAddChild={onAddChild}
@@ -653,12 +661,14 @@ function TypeChip({
   tipo,
   onRename,
   onRequestDelete,
+  onToggleDependency,
 }: {
   tipo: TipoNodo;
   onRename: (nombre: string) => Promise<void>;
   onRequestDelete: () => void;
+  onToggleDependency: (value: boolean) => Promise<void>;
 }) {
-  const style = tipoStyle(tipo.id, tipo.nombre);
+  const style = tipoStyle(tipo.id, tipo.nombre, tipo.es_dependencia_externa);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(tipo.nombre);
   const [saving, setSaving] = useState(false);
@@ -747,8 +757,11 @@ function TypeChip({
           setShowActions((prev) => !prev);
         }}
         title="Editar o eliminar este tipo"
-        className="relative z-50"
+        className="relative z-50 flex items-center gap-1"
       >
+        {tipo.es_dependencia_externa && (
+          <Link2 className="size-2.5 shrink-0" aria-label="Dependencia de terceros" />
+        )}
         {tipo.nombre}
       </button>
       {showActions && (
@@ -764,6 +777,26 @@ function TypeChip({
             className="relative z-50 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
           >
             <Pencil className="size-2.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowActions(false);
+              void onToggleDependency(!tipo.es_dependencia_externa);
+            }}
+            title={
+              tipo.es_dependencia_externa
+                ? `«${tipo.nombre}» dejará de comportarse como dependencia de terceros`
+                : `«${tipo.nombre}» pasará a comportarse como dependencia de terceros`
+            }
+            aria-label={`Marcar «${tipo.nombre}» como dependencia de terceros`}
+            aria-pressed={tipo.es_dependencia_externa}
+            className={cn(
+              "relative z-50 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10",
+              tipo.es_dependencia_externa && "text-orange-600 dark:text-orange-300",
+            )}
+          >
+            <Link2 className="size-2.5" />
           </button>
           <button
             type="button"
@@ -796,7 +829,8 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
   const [deleteTarget, setDeleteTarget] = useState<TipoNodo | null>(null);
 
   const hasThirdParty = types.some(
-    (t) => t.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase(),
+    (t) =>
+      t.es_dependencia_externa || t.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase(),
   );
 
   // Cierra el input y descarta lo tecleado: vuelve al estado "sin añadir".
@@ -829,6 +863,12 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           }}
           onRequestDelete={() => {
             setDeleteTarget(t);
+          }}
+          onToggleDependency={async (value) => {
+            await updateType.mutateAsync({
+              typeId: t.id,
+              payload: { es_dependencia_externa: value },
+            });
           }}
         />
       ))}
@@ -902,7 +942,10 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
       {!hasThirdParty && (
         <button
           onClick={() => {
-            createType.mutate({ nombre: THIRD_PARTY_TIPO });
+            createType.mutate({
+              nombre: THIRD_PARTY_TIPO,
+              es_dependencia_externa: true,
+            });
           }}
           disabled={createType.isPending}
           title="Crea un tipo para el trabajo que depende de un tercero"
@@ -982,6 +1025,11 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const typeNameById = useMemo(() => {
     const map = new Map<string, string>();
     types.forEach((t) => map.set(t.id, t.nombre));
+    return map;
+  }, [types]);
+  const depTypeById = useMemo(() => {
+    const map = new Map<string, boolean>();
+    types.forEach((t) => map.set(t.id, t.es_dependencia_externa));
     return map;
   }, [types]);
 
@@ -1297,6 +1345,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   depth={0}
                   containerName={null}
                   typeNameById={typeNameById}
+                  depTypeById={depTypeById}
                   isExpanded={isExpanded}
                   onToggle={toggleNode}
                   onAddChild={(p) => {

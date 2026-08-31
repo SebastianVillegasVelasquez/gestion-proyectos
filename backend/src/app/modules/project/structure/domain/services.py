@@ -64,6 +64,7 @@ class WorkTreeService:
                 color=data.color,
                 icono=data.icono,
                 reglas_anidacion=data.reglas_anidacion,
+                es_dependencia_externa=data.es_dependencia_externa,
             )
         )
         return self._to_tipo_response(tipo)
@@ -692,9 +693,12 @@ class WorkTreeService:
 
     @staticmethod
     def _is_third_party(tipo: TipoNodo | None) -> bool:
-        return (
-            tipo is not None
-            and tipo.nombre.strip().lower() == THIRD_PARTY_TIPO_NOMBRE.lower()
+        if tipo is None:
+            return False
+        # El flag manda; el nombre queda como respaldo para tipos antiguos
+        # creados antes de que el comportamiento fuera una propiedad.
+        return bool(getattr(tipo, "es_dependencia_externa", False)) or (
+            tipo.nombre.strip().lower() == THIRD_PARTY_TIPO_NOMBRE.lower()
         )
 
     async def _apply_third_party_gate(
@@ -816,6 +820,7 @@ class WorkTreeService:
             color=tipo.color,
             icono=tipo.icono,
             reglas_anidacion=tipo.reglas_anidacion,
+            es_dependencia_externa=bool(getattr(tipo, "es_dependencia_externa", False)),
         )
 
     @staticmethod

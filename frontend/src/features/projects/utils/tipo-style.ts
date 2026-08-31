@@ -60,8 +60,16 @@ const THIRD_PARTY_STYLE: TipoStyle = {
   bar: "bg-orange-500",
 };
 
-export function tipoStyle(tipoId: string, nombre?: string | null): TipoStyle {
-  if (nombre?.trim().toLowerCase() === THIRD_PARTY_TIPO_NOMBRE.toLowerCase()) {
+export function tipoStyle(
+  tipoId: string,
+  nombre?: string | null,
+  esDependenciaExterna?: boolean,
+): TipoStyle {
+  // El flag del tipo manda; el nombre queda como respaldo para tipos antiguos.
+  if (
+    esDependenciaExterna ||
+    nombre?.trim().toLowerCase() === THIRD_PARTY_TIPO_NOMBRE.toLowerCase()
+  ) {
     return THIRD_PARTY_STYLE;
   }
   return PALETTE[hash(tipoId) % PALETTE.length];
