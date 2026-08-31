@@ -287,6 +287,9 @@ export interface CreateTaskPayload {
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;
   duration_days?: number | null;
+  // Estimación de esfuerzo en días. La captura el mismo campo "duración"; se
+  // guarda aunque la tarea nazca sin fechas.
+  estimated_days?: string | null;
   // Dependencia opcional al crear (finish-to-start).
   depends_on_id?: string | null;
   parent_task_id?: string | null;
