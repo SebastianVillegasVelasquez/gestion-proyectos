@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  UserPlus,
-  Users,
-  UsersRound,
-} from "lucide-react";
+import { ChevronLeft, Pencil, Plus, Search, Trash2, Users, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LoadingSkeleton, ErrorState, EmptyState } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -17,8 +8,8 @@ import { useDeleteTeam, useTeamMembers, useTeams } from "../../hooks/use-teams";
 import { filterTeams } from "../../utils/filter-teams";
 import { colorForName } from "../../utils/entity-color";
 import type { Team } from "../../types/api.types";
-import { AddTeamMemberModal } from "../teams/AddTeamMemberModal";
 import { TeamFormModal } from "../teams/TeamFormModal";
+import { TeamMembersManager } from "../teams/TeamMembersManager";
 import { TeamWorkPanel } from "../teams/TeamWorkPanel";
 
 // El avance de un equipo se calcula igual que el avance individual: tareas
@@ -85,7 +76,6 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [showAddMember, setShowAddMember] = useState(false);
   const [editing, setEditing] = useState<Team | null>(null);
   const [deleting, setDeleting] = useState<Team | null>(null);
 
@@ -93,11 +83,10 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
   const filtered = useMemo(() => filterTeams(teams, search), [teams, search]);
 
   const open = useMemo(() => teams.find((t) => t.id === openId) ?? null, [teams, openId]);
+  // Conteo en vivo de integrantes: la lista real manda sobre el `member_count`
+  // cacheado del equipo, que puede ir un tick por detrás tras agregar/quitar.
   const openMembersQuery = useTeamMembers(projectId, open?.id);
-  const existingMemberIds = useMemo(
-    () => (openMembersQuery.data ?? []).map((m) => m.user_id),
-    [openMembersQuery.data],
-  );
+  const openMemberCount = openMembersQuery.data?.length ?? open?.member_count ?? 0;
 
   const handleDelete = () => {
     if (!deleting) {
@@ -156,18 +145,13 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
                 <span className="text-xs text-muted-foreground">
                   ({open.completed_tasks}/{open.assigned_tasks} tareas)
                 </span>
+                <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                  <Users className="size-3.5" />
+                  {openMemberCount} {openMemberCount === 1 ? "integrante" : "integrantes"}
+                </span>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddMember(true);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
-              >
-                <UserPlus className="size-3.5" /> Agregar integrante
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -195,18 +179,11 @@ export function ProjectTeamsPage({ projectId }: { projectId: string }) {
           <div className="mt-5 border-t border-border pt-5">
             <TeamWorkPanel projectId={projectId} team={open} />
           </div>
-        </div>
 
-        {showAddMember && (
-          <AddTeamMemberModal
-            projectId={projectId}
-            teamId={open.id}
-            existingIds={existingMemberIds}
-            onClose={() => {
-              setShowAddMember(false);
-            }}
-          />
-        )}
+          <div className="mt-5 border-t border-border pt-5">
+            <TeamMembersManager projectId={projectId} teamId={open.id} />
+          </div>
+        </div>
 
         {editing && (
           <TeamFormModal
