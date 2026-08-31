@@ -73,13 +73,16 @@ export const tasksApi = {
   listProjectDependencies: (projectId: string) =>
     http.get<TaskDependency[]>(`/projects/${projectId}/task-dependencies`).then((r) => r.data),
 
-  addDependency: (taskId: string, dependsOnId: string) =>
+  // El predecesor es otra tarea O un elemento del árbol (exactamente uno).
+  addDependency: (taskId: string, target: { dependsOnId?: string; dependsOnWorkItemId?: string }) =>
     http
       .post<TaskDependency>(`/tasks/${taskId}/dependencies`, {
-        depends_on_id: dependsOnId,
+        depends_on_id: target.dependsOnId ?? null,
+        depends_on_work_item_id: target.dependsOnWorkItemId ?? null,
       })
       .then((r) => r.data),
 
+  // El backend acepta el id de una tarea o de un elemento en la misma ruta.
   removeDependency: (taskId: string, dependsOnId: string) =>
     http.delete(`/tasks/${taskId}/dependencies/${dependsOnId}`).then(() => undefined),
 };

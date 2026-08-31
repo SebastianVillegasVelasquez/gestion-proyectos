@@ -48,8 +48,16 @@ function nullIfEmpty(value: string): string | null {
 
 /** Construye el payload de creación a partir del formulario (puro y testeable).
  * `projectId` ancla la tarea al proyecto cuando se crea suelta (sin elemento). */
+/** El selector de "Depende de" mezcla tareas y elementos del árbol; los
+ * elementos van prefijados con `wi:` para distinguirlos en el payload. */
+export const WORK_ITEM_DEP_PREFIX = "wi:";
+
 export function buildTaskPayload(form: TaskFormState, projectId: string): CreateTaskPayload {
   const workItemId = nullIfEmpty(form.workItemId);
+  const dep = nullIfEmpty(form.dependsOnId);
+  const dependsOnWorkItem = dep?.startsWith(WORK_ITEM_DEP_PREFIX)
+    ? dep.slice(WORK_ITEM_DEP_PREFIX.length)
+    : null;
   // Exclusividad persona/equipo: solo se envía el que corresponde al modo, el
   // otro va en null aunque el formulario tuviera un valor viejo seleccionado.
   const payload: CreateTaskPayload = {
@@ -58,7 +66,8 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     priority: form.priority,
     assignee_id: form.assignmentMode === "person" ? nullIfEmpty(form.assigneeId) : null,
     team_id: form.assignmentMode === "team" ? nullIfEmpty(form.teamId) : null,
-    depends_on_id: nullIfEmpty(form.dependsOnId),
+    depends_on_id: dependsOnWorkItem ? null : dep,
+    depends_on_work_item_id: dependsOnWorkItem,
     work_item_id: workItemId,
     project_id: workItemId ? undefined : projectId,
     // Las fechas son opcionales: la tarea puede quedar como borrador y

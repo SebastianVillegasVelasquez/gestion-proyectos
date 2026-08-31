@@ -283,7 +283,55 @@ export function GanttView({
     }
   }, [labelW, labelStorageKey]);
 
-  const realTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  const baseTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+
+  // Fecha efectiva de cada elemento del árbol (fin plan, o inicio si no hay fin).
+  const workItemDateById = useMemo(() => {
+    const map = new Map<string, string>();
+    const walk = (nodes: typeof tree) => {
+      nodes.forEach((n) => {
+        const d = n.fecha_fin_plan ?? n.fecha_inicio_plan;
+        if (d) {
+          map.set(n.id, d);
+        }
+        walk(n.children);
+      });
+    };
+    walk(tree);
+    return map;
+  }, [tree]);
+
+  // Una tarea sin fechas que depende de un elemento con fecha (p. ej. una
+  // «actividad de terceros» ya entregada) se ubica en el cronograma contando
+  // solo sus días estimados desde la fecha de ese elemento.
+  const realTasks = useMemo(() => {
+    const anchorByTask = new Map<string, string>();
+    for (const dep of dependencies) {
+      if (dep.depends_on_work_item_id) {
+        const d = workItemDateById.get(dep.depends_on_work_item_id);
+        if (d) {
+          anchorByTask.set(dep.task_id, d);
+        }
+      }
+    }
+    if (anchorByTask.size === 0) {
+      return baseTasks;
+    }
+    return baseTasks.map((t) => {
+      if (t.start_date != null && t.due_date != null) {
+        return t;
+      }
+      const anchor = anchorByTask.get(t.id);
+      const days = t.estimated_days != null ? Math.round(Number(t.estimated_days)) : 0;
+      if (!anchor || days <= 0) {
+        return t;
+      }
+      const due = new Date(`${anchor}T00:00:00`);
+      due.setDate(due.getDate() + days);
+      return { ...t, start_date: anchor, due_date: due.toISOString().slice(0, 10) };
+    });
+  }, [baseTasks, dependencies, workItemDateById]);
+
   // Solo las tareas con inicio y fin son ubicables en el cronograma.
   const datedTasks = useMemo(
     () => realTasks.filter((t): t is DatedTask => t.start_date != null && t.due_date != null),
@@ -620,13 +668,18 @@ export function GanttView({
     const outLane = new Map<string, number>();
     const inLane = new Map<string, number>();
     for (const dep of dependencies) {
-      const from = layout.positions.get(dep.depends_on_id);
+      // El predecesor puede ser otra tarea o un elemento del árbol.
+      const fromKey = dep.depends_on_id ?? dep.depends_on_work_item_id;
+      if (!fromKey) {
+        continue;
+      }
+      const from = layout.positions.get(fromKey);
       const to = layout.positions.get(dep.task_id);
       if (!from || !to) {
         continue;
       }
-      const k = outLane.get(dep.depends_on_id) ?? 0;
-      outLane.set(dep.depends_on_id, k + 1);
+      const k = outLane.get(fromKey) ?? 0;
+      outLane.set(fromKey, k + 1);
       const j = inLane.get(dep.task_id) ?? 0;
       inLane.set(dep.task_id, j + 1);
       const x1 = from.left + from.width;
