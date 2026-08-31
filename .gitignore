@@ -72,3 +72,5 @@ CLAUDE.md
 # =========================
 docs/
 design/
+# Root-level node_modules (stray tooling caches, e.g. vitest)
+/node_modules/
