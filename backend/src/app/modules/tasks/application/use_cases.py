@@ -50,6 +50,7 @@ from app.shared.events.events import (
     TaskCompleted,
     TaskCreated,
     TaskReturned,
+    TaskStarted,
     TaskSubmitted,
 )
 from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
@@ -1012,7 +1013,18 @@ class ChangeTaskStatusUseCase:
     ) -> None:
         assert task.assignee_id is not None
         now = datetime.now(timezone.utc)
-        if new_status == TaskStatus.EN_REVISION:
+        if new_status == TaskStatus.EN_PROGRESO:
+            await self._bus.publish(  # type: ignore[union-attr]
+                TaskStarted(
+                    task_id=task.id,
+                    project_id=project_id,
+                    assigned_id=task.assignee_id,
+                    team_id=task.team_id,
+                    actor_id=actor_id,
+                    occurred_at=now,
+                )
+            )
+        elif new_status == TaskStatus.EN_REVISION:
             await self._bus.publish(  # type: ignore[union-attr]
                 TaskSubmitted(
                     task_id=task.id,

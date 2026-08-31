@@ -127,7 +127,7 @@ function TaskLeaf({
             <button
               type="button"
               onClick={onMarkDelivered}
-              title="Marcar como entregada sin adjunto (pasa a revisión)"
+              title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
               className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
             >
               <Check className="size-3.5" />

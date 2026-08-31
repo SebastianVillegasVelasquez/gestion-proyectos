@@ -1,4 +1,11 @@
-import { File, GitBranch, GraduationCap, Link as LinkIcon, type LucideIcon } from "lucide-react";
+import {
+  Ban,
+  File,
+  GitBranch,
+  GraduationCap,
+  Link as LinkIcon,
+  type LucideIcon,
+} from "lucide-react";
 import type { ResourceType } from "../types";
 
 export interface ResourceMeta {
@@ -55,6 +62,16 @@ export const RESOURCE_META: Record<ResourceType, ResourceMeta> = {
     placeholder: "",
     hint: "Subida de archivos — próximamente.",
   },
+  sin_adjunto: {
+    label: "Sin adjunto",
+    Icon: Ban,
+    color: "text-slate-400",
+    chip: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+    // No se elige en el formulario de subida: se genera al "entregar sin adjunto".
+    available: false,
+    placeholder: "",
+    hint: "La persona confirmó que el trabajo está hecho; no hay recurso que abrir.",
+  },
 };
 
 /** Tipos que el usuario puede entregar ahora mismo (excluye archivo). */
@@ -94,12 +111,19 @@ export function detectService(url: string): string {
 }
 
 /** Nombre a mostrar para una entrega (servicio del enlace o nombre de archivo). */
-export function resourceDisplayName(type: ResourceType, url: string, fileName?: string): string {
+export function resourceDisplayName(
+  type: ResourceType,
+  url: string | null,
+  fileName?: string,
+): string {
+  if (type === "sin_adjunto") {
+    return "Sin adjunto";
+  }
   if (type === "archivo") {
     return fileName ?? "Archivo";
   }
   if (type === "enlace") {
-    return detectService(url);
+    return detectService(url ?? "");
   }
   return RESOURCE_META[type].label;
 }

@@ -77,6 +77,10 @@ class ActivityRow:
     new_status: TaskStatus | None
     due_date: datetime.date | None
     created_at: datetime.datetime
+    # Para distinguir "el responsable cerró su tarea" (entrega directa) de
+    # "un revisor la aprobó" al clasificar el evento.
+    actor_id: uuid.UUID | None = None
+    assignee_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -316,6 +320,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                     Project.name,
                     User.name,
                     User.last_name,
+                    Task.assignee_id,
                 )
                 .join(Task, TaskHistory.task_id == Task.id)
                 .join(Project, Task.project_id == Project.id)
@@ -327,7 +332,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         ).all()
 
         activity: list[ActivityRow] = []
-        for hist, title, due_date, project_name, name, last_name in rows:
+        for hist, title, due_date, project_name, name, last_name, assignee_id in rows:
             actor_name = f"{name} {last_name}".strip() if name else None
             activity.append(
                 ActivityRow(
@@ -340,6 +345,8 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                     new_status=hist.new_status,
                     due_date=due_date,
                     created_at=hist.created_at,
+                    actor_id=hist.changed_by_id,
+                    assignee_id=assignee_id,
                 )
             )
         return activity

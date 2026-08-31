@@ -21,6 +21,9 @@ class ResourceType(str, enum.Enum):
     REPOSITORIO = "repositorio"
     SCORM = "scorm"
     ARCHIVO = "archivo"
+    # Entrega sin recurso adjunto: la persona confirma que el trabajo está hecho
+    # (algo fuera de la herramienta) y el líder lo aprueba o devuelve igual.
+    SIN_ADJUNTO = "sin_adjunto"
 
 
 class CommentType(str, enum.Enum):

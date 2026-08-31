@@ -12,6 +12,7 @@ import {
   FolderKanban,
   type LucideIcon,
   MessageSquare,
+  PlayCircle,
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ import type { AppNotification, NotificationType } from "../types";
 // tipo nuevo aún no mapeado, caemos a la campana sin romper.
 const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   tarea_asignada: ClipboardList,
+  tarea_iniciada: PlayCircle,
   tarea_entregada: CheckCircle2,
   tarea_rechazada: Undo2,
   tarea_atrasada: AlertTriangle,
@@ -53,6 +55,8 @@ const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
 // violeta, conversación → azul/ámbar. Ayuda a escanear el panel de un vistazo.
 const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   tarea_asignada:
+    "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
+  tarea_iniciada:
     "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
   tarea_entregada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   tarea_rechazada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",

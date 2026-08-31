@@ -294,8 +294,10 @@ export interface UpdateTaskPayload {
   priority?: TaskPriority;
   assignee_id?: string | null;
   team_id?: string | null;
-  start_date?: string;
-  due_date?: string;
+  // `null` explícito = borrar la fecha. `undefined` NO viaja en el JSON, así que
+  // no serviría para limpiar: hay que mandar `null`.
+  start_date?: string | null;
+  due_date?: string | null;
   estimated_hours?: string | null;
   requires_approval?: boolean;
 }

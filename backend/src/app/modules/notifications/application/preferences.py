@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
+from app.modules.teams.infrastructure.enums import TeamRole
+from app.modules.teams.infrastructure.models import TeamMember
 from app.modules.teams.infrastructure.workspace_models import TeamNotificationSetting
 
 # Roles de proyecto a los que «les interesa» que una tarea se apruebe: la
@@ -56,6 +58,24 @@ async def project_lead_ids(
             ProjectMember.project_id == project_id,
             ProjectMember.project_role.in_(_PROJECT_LEAD_ROLES),
             ProjectMember.deleted_at.is_(None),
+        )
+    )
+    return [uid for uid in rows.scalars().all() if uid not in exclude]
+
+
+# Roles DENTRO del equipo que coordinan el trabajo de los integrantes.
+_TEAM_LEAD_ROLES = (TeamRole.LIDER, TeamRole.SUPERVISOR)
+
+
+async def team_lead_ids(
+    session: AsyncSession, team_id: UUID, *, exclude: set[UUID] | None = None
+) -> list[UUID]:
+    """Líderes y supervisores del equipo (rol de EQUIPO, no de proyecto)."""
+    exclude = exclude or set()
+    rows = await session.execute(
+        select(TeamMember.user_id).where(
+            TeamMember.team_id == team_id,
+            TeamMember.team_role.in_(_TEAM_LEAD_ROLES),
         )
     )
     return [uid for uid in rows.scalars().all() if uid not in exclude]

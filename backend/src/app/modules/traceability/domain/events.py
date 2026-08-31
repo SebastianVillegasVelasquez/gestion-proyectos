@@ -1,5 +1,6 @@
 import datetime
 from dataclasses import dataclass
+from uuid import UUID
 
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 
@@ -47,17 +48,42 @@ class EventClassification:
     is_delay: bool
 
 
+def _classify_status_change(
+    new_status: TaskStatus | None,
+    actor_id: UUID | None,
+    assignee_id: UUID | None,
+) -> str:
+    if new_status is None:
+        return EVENT_CAMBIO_ESTADO
+    # El responsable que cierra su propia tarea = entrega directa (sin revisor).
+    if (
+        new_status == TaskStatus.COMPLETADA
+        and actor_id is not None
+        and actor_id == assignee_id
+    ):
+        return EVENT_ENTREGA
+    return _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)
+
+
 def classify_event(
     action: HistoryAction,
     new_status: TaskStatus | None,
     due_date: datetime.date | None,
     occurred_on: datetime.datetime | None,
+    *,
+    actor_id: UUID | None = None,
+    assignee_id: UUID | None = None,
 ) -> EventClassification:
     """Devuelve el tipo de evento y si representa un retraso.
 
     Un evento es "retraso" cuando un cambio de estado ocurre después de la fecha
     límite de la tarea y la tarea aún no está cerrada (sigue pendiente de avanzar
     pese a haber vencido el plazo).
+
+    `actor_id`/`assignee_id` afinan un caso: cuando quien pasa la tarea a
+    COMPLETADA es su propio responsable, es una ENTREGA directa (tarea sin
+    aprobación obligatoria) — "X entregó", no "X aprobó": nadie externo la
+    revisó. Sin esos datos se mantiene el comportamiento clásico.
     """
     if action == HistoryAction.CREACION:
         kind = EVENT_CREACION
@@ -68,11 +94,7 @@ def classify_event(
     elif action in _MANAGEMENT_KINDS:
         kind = _MANAGEMENT_KINDS[action]
     elif action == HistoryAction.CAMBIO_ESTADO:
-        kind = (
-            _STATUS_TO_KIND.get(new_status, EVENT_CAMBIO_ESTADO)
-            if new_status is not None
-            else EVENT_CAMBIO_ESTADO
-        )
+        kind = _classify_status_change(new_status, actor_id, assignee_id)
     else:
         kind = EVENT_CAMBIO_ESTADO
 

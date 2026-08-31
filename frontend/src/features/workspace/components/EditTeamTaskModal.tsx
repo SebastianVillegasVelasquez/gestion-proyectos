@@ -70,10 +70,11 @@ export function EditTeamTaskModal({
       payload.assignee_id = assigneeId || null;
     }
     if ((startDate || null) !== (task.start_date ?? null)) {
-      payload.start_date = startDate || undefined;
+      // `null`, no `undefined`: vaciar el campo debe llegar al backend.
+      payload.start_date = startDate || null;
     }
     if ((dueDate || null) !== (task.due_date ?? null)) {
-      payload.due_date = dueDate || undefined;
+      payload.due_date = dueDate || null;
     }
     if (requiresApproval !== task.requires_approval) {
       payload.requires_approval = requiresApproval;

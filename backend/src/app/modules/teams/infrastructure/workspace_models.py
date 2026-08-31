@@ -90,7 +90,8 @@ class DeliverableVersion(Base, UUIDMixin, TimestampMixin):
     resource_type: Mapped[ResourceType] = mapped_column(
         _enum(ResourceType, "resource_type"), nullable=False
     )
-    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    # Nula para las entregas "sin adjunto" (resource_type == sin_adjunto).
+    url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Instrucciones de quien entrega para el siguiente rol de la cadena ("dejé el
     # guion en la carpeta X, falta revisar el minuto 3"). Dato INTERNO del equipo:

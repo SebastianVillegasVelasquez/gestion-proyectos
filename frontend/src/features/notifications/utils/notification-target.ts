@@ -28,6 +28,7 @@ export function resolveNotificationTarget(
 
   switch (notification.notification_type) {
     case "tarea_asignada":
+    case "tarea_iniciada":
     case "tarea_entregada":
     case "tarea_atrasada":
     case "tarea_completada":

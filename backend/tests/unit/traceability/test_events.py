@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.traceability.domain.events import (
@@ -51,6 +52,38 @@ class TestClassifyKind:
             HistoryAction.CAMBIO_ESTADO, TaskStatus.PENDIENTE_POR_INICIAR, None, None
         )
         assert c.kind == EVENT_CAMBIO_ESTADO
+
+    def test_assignee_completing_own_task_is_a_direct_delivery(self):
+        # Tarea sin aprobación obligatoria: el responsable la cierra él mismo.
+        # No es "aprobó" (no hubo revisor), es "entregó".
+        uid = uuid.uuid4()
+        c = classify_event(
+            HistoryAction.CAMBIO_ESTADO,
+            TaskStatus.COMPLETADA,
+            None,
+            None,
+            actor_id=uid,
+            assignee_id=uid,
+        )
+        assert c.kind == EVENT_ENTREGA
+
+    def test_reviewer_completing_someone_elses_task_is_an_approval(self):
+        c = classify_event(
+            HistoryAction.CAMBIO_ESTADO,
+            TaskStatus.COMPLETADA,
+            None,
+            None,
+            actor_id=uuid.uuid4(),
+            assignee_id=uuid.uuid4(),
+        )
+        assert c.kind == EVENT_APROBACION
+
+    def test_completed_without_ids_stays_approval(self):
+        # Sin datos de actor/responsable se mantiene el comportamiento clásico.
+        c = classify_event(
+            HistoryAction.CAMBIO_ESTADO, TaskStatus.COMPLETADA, None, None
+        )
+        assert c.kind == EVENT_APROBACION
 
 
 class TestClassifyDelay:

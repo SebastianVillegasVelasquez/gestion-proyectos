@@ -100,7 +100,7 @@ describe("TraceabilityPanel", () => {
 
     expect(await screen.findByText("Guion Unidad 1")).toBeInTheDocument();
     expect(screen.getByText("Retraso")).toBeInTheDocument();
-    expect(screen.getByText("Entrega a revisión")).toBeInTheDocument();
+    expect(screen.getByText("Entrega")).toBeInTheDocument();
     expect(screen.getByText("Tarea devuelta")).toBeInTheDocument();
   });
 
@@ -115,7 +115,7 @@ describe("TraceabilityPanel", () => {
 
     // El evento de retraso permanece; los no-retraso desaparecen.
     expect(screen.getByText("Guion Unidad 1")).toBeInTheDocument();
-    expect(screen.queryByText("Entrega a revisión")).not.toBeInTheDocument();
+    expect(screen.queryByText("Entrega")).not.toBeInTheDocument();
     expect(screen.queryByText("Tarea devuelta")).not.toBeInTheDocument();
   });
 

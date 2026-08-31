@@ -7,7 +7,11 @@ import type { ReactNode } from "react";
 import { TeamTasksView } from "./TeamTasksView";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
 import type * as useWorkspaceModule from "../hooks/use-workspace";
-import { useUpdateTask, useDeleteTask } from "@/features/projects/hooks/use-tasks";
+import {
+  useUpdateTask,
+  useDeleteTask,
+  useChangeTaskStatus,
+} from "@/features/projects/hooks/use-tasks";
 import { useWorkTree } from "@/features/projects/hooks/use-structure";
 import type { ApiTeamTask } from "../api/workspace.api";
 
@@ -23,6 +27,11 @@ vi.mock("../hooks/use-workspace", async (importOriginal) => {
 vi.mock("@/features/projects/hooks/use-tasks", () => ({
   useUpdateTask: vi.fn(),
   useDeleteTask: vi.fn(),
+  useChangeTaskStatus: vi.fn(),
+}));
+
+vi.mock("@/features/auth/hooks/use-auth", () => ({
+  useAuth: () => ({ user: { id: "u1", name: "Ana" } }),
 }));
 
 vi.mock("@/features/projects/hooks/use-structure", () => ({
@@ -90,6 +99,10 @@ describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
       mutate: updateMutate,
       isPending: false,
     } as never);
+    vi.mocked(useChangeTaskStatus).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as never);
   });
 
   it("no ofrece editar ni eliminar a quien no lidera el equipo", () => {
@@ -131,5 +144,41 @@ describe("TeamTasksView — edición y borrado de tareas del equipo", () => {
     await user.click(screen.getByLabelText(/Editar Montaje final/i));
     expect(await screen.findByText("Editar tarea")).toBeTruthy();
     expect(screen.getByDisplayValue("Montaje final")).toBeTruthy();
+  });
+});
+
+describe("TeamTasksView — botón Comenzar", () => {
+  const startMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDeleteTask).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    vi.mocked(useUpdateTask).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    vi.mocked(useChangeTaskStatus).mockReturnValue({
+      mutate: startMutate,
+      isPending: false,
+    } as never);
+  });
+
+  it("aparece en la tarea propia sin iniciar y la pasa a en_progreso", async () => {
+    const user = userEvent.setup();
+    // task() por defecto: assignee_id "u1" (== usuario mock) y pendiente_por_iniciar
+    renderView(false, [task({ id: "mine", title: "Lo mío" })]);
+
+    await user.click(screen.getByRole("button", { name: /Comenzar/i }));
+    expect(startMutate).toHaveBeenCalledWith(
+      { taskId: "mine", status: "en_progreso" },
+      expect.anything(),
+    );
+  });
+
+  it("no aparece en la tarea de otra persona", () => {
+    renderView(false, [task({ assignee_id: "otro", assignee_name: "Otro" })]);
+    expect(screen.queryByRole("button", { name: /Comenzar/i })).toBeNull();
+  });
+
+  it("no aparece si la tarea ya está en progreso", () => {
+    renderView(false, [task({ status: "en_progreso" })]);
+    expect(screen.queryByRole("button", { name: /Comenzar/i })).toBeNull();
   });
 });

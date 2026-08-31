@@ -27,7 +27,6 @@ import { TeamGanttPanel } from "./TeamGanttPanel";
 import { TeamProgressView } from "./TeamProgressView";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { WorkspaceStructureView } from "./WorkspaceStructureView";
-import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
@@ -256,7 +255,6 @@ function MemberWorkspace() {
   const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
   const deleteDeliverable = useDeleteDeliverable(activeTeamId);
-  const changeTaskStatus = useChangeTaskStatus(activeTeam?.project_id ?? "");
   const qc = useQueryClient();
   // Reasignar una tarea desde la estructura toca la caché de tareas del
   // proyecto (lo hace el propio hook), pero no la del workspace: la refrescamos.
@@ -280,7 +278,7 @@ function MemberWorkspace() {
       deliverableId: selectedDeliverable.id,
       body: {
         type: version.type,
-        url: version.url,
+        url: version.url ?? undefined,
         note: version.note,
         observations: version.observations || undefined,
       },
@@ -370,10 +368,34 @@ function MemberWorkspace() {
     setShowNew(true);
   };
 
-  // "Entregar sin adjunto": la tarea pasa a revisión sin crear un entregable.
-  // El líder/supervisor la aprueba o devuelve igual que una entrega con adjunto.
+  // "Entregar sin adjunto": crea un entregable REAL (con una versión de tipo
+  // `sin_adjunto`, sin URL) igual que una entrega normal — así el líder lo ve y
+  // lo aprueba/devuelve en la pestaña de Entregables, la tarea se mueve por el
+  // mismo camino (a revisión, o directo a completada si no exige aprobación) y
+  // los avisos se disparan. Antes solo cambiaba el estado de la tarea y no
+  // dejaba nada que revisar.
   const markTaskDelivered = (taskId: string) => {
-    changeTaskStatus.mutate({ taskId, status: "en_revision" });
+    const task = (tasksQuery.data ?? []).find((t) => t.id === taskId);
+    createDeliverable.mutate(
+      {
+        task_title: task?.title ?? "Entrega sin adjunto",
+        assignee_id: currentUserId,
+        task_id: taskId,
+      },
+      {
+        onSuccess: (d) => {
+          addVersion.mutate(
+            { deliverableId: d.id, body: { type: "sin_adjunto" } },
+            {
+              onSuccess: () => {
+                setSelectedDeliverableId(d.id);
+                setActiveTab("entregables");
+              },
+            },
+          );
+        },
+      },
+    );
   };
 
   // ── Estados de carga / vacío ──────────────────────────────────────────────

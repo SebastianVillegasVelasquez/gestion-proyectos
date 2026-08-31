@@ -72,6 +72,23 @@ class TaskCompleted(DomainEvent):
 
 
 @dataclass(frozen=True)
+class TaskStarted(DomainEvent):
+    """El responsable marcó que empezó a trabajar la tarea (PENDIENTE → EN_PROGRESO).
+
+    Sirve para avisar a quien coordina (líder/supervisor del equipo, o
+    coordinación del proyecto si la tarea no está delegada a un equipo) de que
+    el trabajo arrancó.
+    """
+
+    project_id: uuid.UUID
+    task_id: uuid.UUID
+    assigned_id: uuid.UUID
+    team_id: uuid.UUID | None = None
+    # Quién movió el estado: para no avisarle de su propia acción.
+    actor_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
 class TaskReturned(DomainEvent):
     """El líder devolvió la entrega para que el responsable corrija."""
 

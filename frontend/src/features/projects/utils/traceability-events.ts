@@ -5,7 +5,7 @@ export const TRACE_EVENT_LABELS: Record<TraceabilityEventKind, string> = {
   creacion: "Tarea creada",
   asignacion: "Responsable asignado",
   inicio: "Inicio de ejecución",
-  entrega: "Entrega a revisión",
+  entrega: "Entrega",
   aprobacion: "Entrega aprobada",
   devolucion: "Tarea devuelta",
   cancelacion: "Tarea cancelada",

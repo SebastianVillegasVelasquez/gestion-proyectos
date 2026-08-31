@@ -34,7 +34,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
     tone: "bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal",
   },
   entrega: {
-    verb: "envió a revisión",
+    verb: "entregó la tarea",
     icon: Send,
     tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },

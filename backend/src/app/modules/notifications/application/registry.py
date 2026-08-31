@@ -1,4 +1,5 @@
 from app.modules.notifications.application.handlers import (
+    NotifyLeadsOnTaskStarted,
     NotifyOnMemberAssignedToProject,
     NotifyOnTaskAssigned,
     NotifyOnTaskCommented,
@@ -19,6 +20,7 @@ from app.shared.events.events import (
     TaskCompleted,
     TaskCreated,
     TaskReturned,
+    TaskStarted,
     TaskSubmitted,
 )
 
@@ -59,6 +61,11 @@ def register_notification_handlers(
         bus.subscribe(
             TaskCompleted,
             NotifyProjectLeadsOnTaskCompleted(notification_repo, broadcaster, session),
+        )
+        # Aviso a quien coordina cuando el responsable arranca una tarea.
+        bus.subscribe(
+            TaskStarted,
+            NotifyLeadsOnTaskStarted(notification_repo, broadcaster, session),
         )
 
     # El historial de trazabilidad ya NO se escribe aquí. Colgaba del bus de

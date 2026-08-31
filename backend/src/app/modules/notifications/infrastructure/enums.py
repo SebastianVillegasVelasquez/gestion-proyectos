@@ -4,6 +4,7 @@ import enum
 class NotificationType(str, enum.Enum):
     # Notificacion para todos los usuarios acerca de tareas
     TAREA_ASIGNADA = "tarea_asignada"
+    TAREA_INICIADA = "tarea_iniciada"
     TAREA_ENTREGADA = "tarea_entregada"
     TAREA_RECHAZADA = "tarea_rechazada"
     TAREA_ATRASADA = "tarea_atrasada"
