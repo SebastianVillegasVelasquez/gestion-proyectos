@@ -207,11 +207,19 @@ class TaskRepository(BaseRepository[Task]):
         # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
         return [tuple(r) for r in (await self._session.execute(query)).all()]
 
+    # El predecesor puede ser una tarea o un elemento del árbol; para saber si
+    # ese elemento cuenta como "entregado" hay que mirar su tipo (que tiene
+    # lazy="raise"), así que se trae por adelantado con la dependencia.
+    _DEP_LOADS = (
+        selectinload(TaskDependency.depends_on),
+        selectinload(TaskDependency.depends_on_work_item).selectinload(WorkItem.tipo),
+    )
+
     async def get_dependencies(self, task_id: UUID) -> list[TaskDependency]:
         query = (
             select(TaskDependency)
             .where(TaskDependency.task_id == task_id)
-            .options(selectinload(TaskDependency.depends_on))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
 
@@ -227,6 +235,7 @@ class TaskRepository(BaseRepository[Task]):
             select(TaskDependency)
             .join(Task, TaskDependency.task_id == Task.id)
             .where(Task.project_id == project_id, Task.deleted_at.is_(None))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
 
@@ -241,7 +250,7 @@ class TaskRepository(BaseRepository[Task]):
             select(TaskDependency)
             .join(Task, TaskDependency.task_id == Task.id)
             .where(Task.team_id == team_id, Task.deleted_at.is_(None))
-            .options(selectinload(TaskDependency.depends_on))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
 
