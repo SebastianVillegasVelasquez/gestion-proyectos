@@ -604,11 +604,15 @@ class WorkTreeService:
     ) -> tuple[list[WorkItem], dict[UUID, DerivedDates]]:
         items = await self.repo.list_items(proyecto_id)
         edges = await self.repo.list_dependency_edges(proyecto_id)
-        return items, self._compute_derivation(items, edges)
+        project_start, project_end = await self.repo.get_project_dates(proyecto_id)
+        return items, self._compute_derivation(items, edges, project_start, project_end)
 
     @staticmethod
     def _compute_derivation(
-        items: list[WorkItem], edges: list[tuple[UUID, UUID]]
+        items: list[WorkItem],
+        edges: list[tuple[UUID, UUID]],
+        project_start: datetime.date | None = None,
+        project_end: datetime.date | None = None,
     ) -> dict[UUID, DerivedDates]:
         """Deriva las fechas efectivas de cada nodo propagando el motor.
 
@@ -652,6 +656,8 @@ class WorkTreeService:
                 duracion_unidad=item.duracion_unidad,
                 predecessor_end=predecessor_end,
                 parent_start=parent_start,
+                project_start=project_start,
+                project_end=project_end,
             )
             visiting.discard(node_id)
             memo[node_id] = result

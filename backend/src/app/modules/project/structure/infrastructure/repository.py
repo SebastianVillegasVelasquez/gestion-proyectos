@@ -1,9 +1,11 @@
+import datetime
 from uuid import UUID
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.project.infrastructure.models import Project
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.models import (
     TipoNodo,
@@ -89,6 +91,18 @@ class SqlAlchemyWorkTreeRepository(WorkTreeRepository):
             .order_by(WorkItem.orden, WorkItem.created_at)
         )
         return list(result.scalars().all())
+
+    async def get_project_dates(
+        self, proyecto_id: UUID
+    ) -> tuple[datetime.date | None, datetime.date | None]:
+        row = (
+            await self._session.execute(
+                select(Project.start_date, Project.end_date).where(
+                    Project.id == proyecto_id
+                )
+            )
+        ).first()
+        return (row[0], row[1]) if row is not None else (None, None)
 
     async def next_orden(self, proyecto_id: UUID, parent_id: UUID | None) -> int:
         parent_condition = (

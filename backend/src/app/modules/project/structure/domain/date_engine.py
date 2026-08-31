@@ -36,6 +36,8 @@ def derive_dates(
     duracion_unidad: DuracionUnidad | None,
     predecessor_end: datetime.date | None = None,
     parent_start: datetime.date | None = None,
+    project_start: datetime.date | None = None,
+    project_end: datetime.date | None = None,
 ) -> DerivedDates:
     """Deriva las fechas plan faltantes a partir de lo que el usuario aportó.
 
@@ -45,6 +47,9 @@ def derive_dates(
       (`fin + 1`) o, si no hay, del inicio del padre.
     - Par fecha-fecha → prevalece; si además hay una duración que no cuadra,
       se marca `advertencia`.
+    - Una sola fecha y SIN duración → se ancla el extremo que falta a los
+      límites del proyecto: se sabe el fin pero no el inicio (→ inicio del
+      proyecto) o al revés (→ fin del proyecto).
     """
     dur = duration_in_days(duracion_valor, duracion_unidad)
     delta = datetime.timedelta(days=dur) if dur is not None else None
@@ -73,6 +78,13 @@ def derive_dates(
         if base is not None:
             return DerivedDates(base, base + delta, False)
         return DerivedDates(None, None, False)
+
+    # Una sola fecha y sin duración: se completa con el borde del proyecto.
+    # (A veces se sabe cuándo termina algo pero no cuándo empieza, o al revés.)
+    if inicio is None and fin is not None and project_start is not None:
+        return DerivedDates(project_start, fin, False)
+    if fin is None and inicio is not None and project_end is not None:
+        return DerivedDates(inicio, project_end, False)
 
     # Datos incompletos (solo inicio, solo fin o nada): se devuelve tal cual.
     return DerivedDates(inicio, fin, False)

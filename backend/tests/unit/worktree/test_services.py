@@ -32,6 +32,10 @@ class FakeWorkTreeRepository(WorkTreeRepository):
         self._tipos: dict[uuid.UUID, TipoNodo] = {}
         self._items: dict[uuid.UUID, WorkItem] = {}
         self._deps: list[WorkItemDependency] = []
+        # Fechas plan del proyecto (para anclar elementos con una sola fecha y
+        # sin duración). Los tests que lo necesiten las fijan a mano.
+        self.project_start: datetime.date | None = None
+        self.project_end: datetime.date | None = None
 
     async def add_tipo(self, tipo: TipoNodo) -> TipoNodo:
         if tipo.id is None:
@@ -92,6 +96,9 @@ class FakeWorkTreeRepository(WorkTreeRepository):
             self._attach_tipo(item)
         items.sort(key=lambda i: i.orden)
         return items
+
+    async def get_project_dates(self, proyecto_id):
+        return self.project_start, self.project_end
 
     async def next_orden(self, proyecto_id, parent_id):
         siblings = [
@@ -357,6 +364,36 @@ class TestDateDerivationInService:
         )
         assert child.fecha_inicio_plan == D(2026, 7, 1)
         assert child.fecha_fin_plan == D(2026, 7, 4)
+
+    async def test_only_end_without_duration_anchors_start_to_project_start(self):
+        repo = FakeWorkTreeRepository()
+        repo.project_start = D(2026, 1, 1)
+        repo.project_end = D(2026, 12, 31)
+        service = WorkTreeService(repo)
+        t = await service.create_tipo(PROYECTO, CreateTipoNodoRequest(nombre="Fase"))
+        item = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id, nombre="Sé el fin", fecha_fin_plan=D(2026, 6, 10)
+            ),
+        )
+        assert item.fecha_inicio_plan == D(2026, 1, 1)
+        assert item.fecha_fin_plan == D(2026, 6, 10)
+
+    async def test_only_start_without_duration_anchors_end_to_project_end(self):
+        repo = FakeWorkTreeRepository()
+        repo.project_start = D(2026, 1, 1)
+        repo.project_end = D(2026, 12, 31)
+        service = WorkTreeService(repo)
+        t = await service.create_tipo(PROYECTO, CreateTipoNodoRequest(nombre="Fase"))
+        item = await service.create_item(
+            PROYECTO,
+            CreateWorkItemRequest(
+                tipo_id=t.id, nombre="Sé el inicio", fecha_inicio_plan=D(2026, 6, 1)
+            ),
+        )
+        assert item.fecha_inicio_plan == D(2026, 6, 1)
+        assert item.fecha_fin_plan == D(2026, 12, 31)
 
     async def test_create_inconsistent_dates_flags_warning(self, service):
         t = await _tipo(service, "Fase")
