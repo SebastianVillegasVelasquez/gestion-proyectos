@@ -109,7 +109,7 @@ class PersonPerformance:
     cycle_time_bdays: float
     on_time_pct: float
     returns_received: int
-    logged_hours: float
+    logged_days: float
 
 
 @dataclass
@@ -211,7 +211,7 @@ class ProjectAnalyticsBuilder:
 
         history = await self._history(task_ids)
         versions_by_task = await self._version_counts(task_ids)
-        hours_by_user = await self._hours_by_user(project_id)
+        days_by_user = await self._days_by_user(project_id)
         teams = await self._teams(project_id)
         members_by_team = await self._members_by_team([t.id for t in teams])
         user_names = await self._user_names(
@@ -396,7 +396,7 @@ class ProjectAnalyticsBuilder:
                     ),
                     on_time_pct=round(on_time / rated * 100, 1) if rated else 0.0,
                     returns_received=sum(returns_by_task.get(t.id, 0) for t in mine),
-                    logged_hours=float(hours_by_user.get(uid, Decimal("0"))),
+                    logged_days=float(days_by_user.get(uid, Decimal("0"))),
                 )
             )
         by_person.sort(key=lambda p: p.completed, reverse=True)
@@ -537,10 +537,10 @@ class ProjectAnalyticsBuilder:
         ).all()
         return {tid: int(count) for tid, count in rows}
 
-    async def _hours_by_user(self, project_id: UUID) -> dict[UUID, Decimal]:
+    async def _days_by_user(self, project_id: UUID) -> dict[UUID, Decimal]:
         rows = (
             await self._session.execute(
-                select(TaskTimeEntry.user_id, func.sum(TaskTimeEntry.hours))
+                select(TaskTimeEntry.user_id, func.sum(TaskTimeEntry.days))
                 .join(Task, TaskTimeEntry.task_id == Task.id)
                 .where(Task.project_id == project_id, Task.deleted_at.is_(None))
                 .group_by(TaskTimeEntry.user_id)

@@ -7,6 +7,7 @@ from app.modules.notifications.application.handlers import (
     NotifyOnTaskCreated,
     NotifyOnTaskReturned,
     NotifyOnTaskSubmitted,
+    NotifyOnThirdPartyDeliveryDate,
     NotifyProjectLeadsOnTaskCompleted,
 )
 from app.modules.notifications.application.preferences import TeamNotificationGate
@@ -22,6 +23,7 @@ from app.shared.events.events import (
     TaskReturned,
     TaskStarted,
     TaskSubmitted,
+    ThirdPartyDeliveryDateSet,
 )
 
 
@@ -55,6 +57,10 @@ def register_notification_handlers(
     )
     bus.subscribe(
         TaskCommented, NotifyOnTaskCommented(notification_repo, broadcaster, gate)
+    )
+    bus.subscribe(
+        ThirdPartyDeliveryDateSet,
+        NotifyOnThirdPartyDeliveryDate(notification_repo, broadcaster),
     )
     if session is not None:
         # Aviso a coordinación/supervisión del proyecto: la aprobación mueve el %.

@@ -63,6 +63,10 @@ export interface TipoNodo {
   color: string | null;
   icono: string | null;
   reglas_anidacion: Record<string, unknown> | null;
+  // Se comporta como "dependencia de terceros": el elemento de este tipo se
+  // antepone a sus hermanos, ellos cuelgan de él y lo esperan (FtS), y su
+  // fecha la fija alguien de fuera. Propiedad del tipo, no de su nombre.
+  es_dependencia_externa: boolean;
 }
 
 export interface CreateTipoNodoPayload {
@@ -70,6 +74,7 @@ export interface CreateTipoNodoPayload {
   color?: string | null;
   icono?: string | null;
   reglas_anidacion?: Record<string, unknown> | null;
+  es_dependencia_externa?: boolean;
 }
 
 export interface UpdateTipoNodoPayload {
@@ -77,6 +82,7 @@ export interface UpdateTipoNodoPayload {
   color?: string | null;
   icono?: string | null;
   reglas_anidacion?: Record<string, unknown> | null;
+  es_dependencia_externa?: boolean;
 }
 
 export interface WorkItem {
@@ -120,20 +126,20 @@ export interface CreateCommentPayload {
   mentioned_user_ids?: string[];
 }
 
-/** Apunte de horas dedicadas a una tarea por una persona en un día. */
+/** Apunte de días dedicados a una tarea por una persona en una jornada. */
 export interface TimeEntry {
   id: string;
   task_id: string;
   user_id: string;
   user_name: string | null;
-  hours: string;
+  days: string;
   work_date: string;
   notes: string | null;
   created_at: string | null;
 }
 
 export interface CreateTimeEntryPayload {
-  hours: string;
+  days: string;
   work_date: string;
   notes?: string | null;
 }
@@ -141,8 +147,8 @@ export interface CreateTimeEntryPayload {
 /** Estimado vs. dedicado de una tarea, con el detalle de los apuntes. */
 export interface TaskEffort {
   task_id: string;
-  estimated_hours: string | null;
-  logged_hours: string;
+  estimated_days: string | null;
+  logged_days: string;
   entries: TimeEntry[];
 }
 
@@ -253,10 +259,10 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string | null;
-  /** Esfuerzo estimado en horas (null = sin estimar). */
-  estimated_hours: string | null;
-  /** Horas realmente dedicadas: suma de los apuntes, calculada en lectura. */
-  logged_hours: string;
+  /** Esfuerzo estimado en días (null = sin estimar). */
+  estimated_days: string | null;
+  /** Días realmente dedicados: suma de los apuntes, calculada en lectura. */
+  logged_days: string;
   /**
    * false (por defecto): el responsable entrega y la tarea queda COMPLETADA
    * directo, sin pasar por nadie más. true: exige aprobación del líder o
@@ -281,6 +287,9 @@ export interface CreateTaskPayload {
   // Fecha de fin O duración en días (el backend calcula la fecha de fin).
   due_date?: string | null;
   duration_days?: number | null;
+  // Estimación de esfuerzo en días. La captura el mismo campo "duración"; se
+  // guarda aunque la tarea nazca sin fechas.
+  estimated_days?: string | null;
   // Dependencia opcional al crear (finish-to-start).
   depends_on_id?: string | null;
   parent_task_id?: string | null;
@@ -298,7 +307,7 @@ export interface UpdateTaskPayload {
   // no serviría para limpiar: hay que mandar `null`.
   start_date?: string | null;
   due_date?: string | null;
-  estimated_hours?: string | null;
+  estimated_days?: string | null;
   requires_approval?: boolean;
 }
 

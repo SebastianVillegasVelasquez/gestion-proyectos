@@ -1,3 +1,4 @@
+import datetime as _dt
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -114,6 +115,27 @@ class TaskCommented(DomainEvent):
     mentioned_user_ids: tuple[uuid.UUID, ...] = ()
     project_id: uuid.UUID | None = None
     team_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class ThirdPartyDeliveryDateSet(DomainEvent):
+    """Una "actividad de terceros" (elemento de un tipo con
+    `es_dependencia_externa`) recibió o cambió su fecha de entrega.
+
+    El trabajo del proyecto colgado de ella estaba a la espera; ahora sus
+    tareas dependientes ya pueden planificarse. Lleva RESUELTOS los ids de los
+    responsables a avisar y los de sus tareas, para que el manejador de
+    notificaciones no toque la base de datos.
+    """
+
+    project_id: uuid.UUID
+    work_item_id: uuid.UUID
+    work_item_nombre: str
+    delivery_date: _dt.date | None = None
+    recipient_ids: tuple[uuid.UUID, ...] = ()
+    task_ids: tuple[uuid.UUID, ...] = ()
+    # Quién movió la fecha: para no avisarle de su propia acción.
+    actor_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)

@@ -17,6 +17,8 @@ class CreateTipoNodoRequest(BaseModelConfig):
     color: Optional[str] = None
     icono: Optional[str] = None
     reglas_anidacion: Optional[dict] = None
+    # Marca el tipo como "dependencia de terceros" (ver TipoNodo.es_dependencia_externa).
+    es_dependencia_externa: bool = False
 
 
 class UpdateTipoNodoRequest(BaseModelConfig):
@@ -24,6 +26,7 @@ class UpdateTipoNodoRequest(BaseModelConfig):
     color: Optional[str] = None
     icono: Optional[str] = None
     reglas_anidacion: Optional[dict] = None
+    es_dependencia_externa: Optional[bool] = None
 
 
 class TipoNodoResponse(BaseModelConfig):
@@ -33,6 +36,7 @@ class TipoNodoResponse(BaseModelConfig):
     color: Optional[str] = None
     icono: Optional[str] = None
     reglas_anidacion: Optional[dict] = None
+    es_dependencia_externa: bool = False
 
 
 # ── WorkItem ──────────────────────────────────────────────────────────────────

@@ -43,10 +43,10 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # Toda tarea pertenece a un proyecto desde su creación, exista o no todavía
     # una estructura para colgarla. Es la referencia estable para listarlas.
-    # Esfuerzo ESTIMADO en horas (lo que se cree que costará). Lo realmente
+    # Esfuerzo ESTIMADO en días (lo que se cree que costará). Lo realmente
     # dedicado vive en `time_entries`: comparar ambos es lo que permite
-    # planificar mejor la próxima vez y sostener un modelo de pago por horas.
-    estimated_hours: Mapped[Optional[Decimal]] = mapped_column(
+    # planificar mejor la próxima vez y sostener el modelo de pago.
+    estimated_days: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(6, 2), nullable=True
     )
 
@@ -211,12 +211,13 @@ class TaskDependency(Base, UUIDMixin, TimestampMixin):
 
 
 class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
-    """Horas dedicadas a una tarea por una persona en un día.
+    """Días dedicados a una tarea por una persona en un día concreto.
 
     Se registra por DÍA y no como un cronómetro: aquí nadie va a arrancar y
     parar un contador mientras graba un video; lo que se hace es apuntar al
-    final de la jornada. Cada apunte es una fila (no un acumulador) para poder
-    corregir uno sin recalcular nada, y para saber quién dedicó qué.
+    final de la jornada (p. ej. `0.5` = media jornada). Cada apunte es una fila
+    (no un acumulador) para poder corregir uno sin recalcular nada, y para
+    saber quién dedicó qué.
     """
 
     __tablename__ = "task_time_entries"
@@ -233,8 +234,8 @@ class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
-    # Día al que se imputan las horas (no cuándo se apuntaron).
+    days: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    # Día al que se imputa el esfuerzo (no cuándo se apuntó).
     work_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

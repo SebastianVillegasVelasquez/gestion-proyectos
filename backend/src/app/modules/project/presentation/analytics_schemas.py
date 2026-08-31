@@ -61,7 +61,7 @@ class PersonPerformanceResponse(BaseModelConfig):
     cycle_time_bdays: float
     on_time_pct: float
     returns_received: int
-    logged_hours: float
+    logged_days: float
 
 
 class DeliveryLapseResponse(BaseModelConfig):

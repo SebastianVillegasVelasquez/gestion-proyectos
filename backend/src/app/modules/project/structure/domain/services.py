@@ -64,6 +64,7 @@ class WorkTreeService:
                 color=data.color,
                 icono=data.icono,
                 reglas_anidacion=data.reglas_anidacion,
+                es_dependencia_externa=data.es_dependencia_externa,
             )
         )
         return self._to_tipo_response(tipo)
@@ -531,7 +532,8 @@ class WorkTreeService:
 
     async def get_tree(self, proyecto_id: UUID) -> list[WorkItemTreeResponse]:
         items, derivation = await self._project_derivation(proyecto_id)
-        return self._build_tree(items, derivation)
+        edges = await self.repo.list_dependency_edges(proyecto_id)
+        return self._build_tree(items, derivation, edges)
 
     # ── Dependencias Finish-to-Start ──────────────────────────────────────────
     async def add_dependency(
@@ -692,9 +694,12 @@ class WorkTreeService:
 
     @staticmethod
     def _is_third_party(tipo: TipoNodo | None) -> bool:
-        return (
-            tipo is not None
-            and tipo.nombre.strip().lower() == THIRD_PARTY_TIPO_NOMBRE.lower()
+        if tipo is None:
+            return False
+        # El flag manda; el nombre queda como respaldo para tipos antiguos
+        # creados antes de que el comportamiento fuera una propiedad.
+        return bool(getattr(tipo, "es_dependencia_externa", False)) or (
+            tipo.nombre.strip().lower() == THIRD_PARTY_TIPO_NOMBRE.lower()
         )
 
     async def _apply_third_party_gate(
@@ -788,7 +793,10 @@ class WorkTreeService:
         return would_create_cycle(edges, work_item_id, depends_on_id)
 
     def _build_tree(
-        self, items: list[WorkItem], derivation: dict[UUID, DerivedDates]
+        self,
+        items: list[WorkItem],
+        derivation: dict[UUID, DerivedDates],
+        edges: list[tuple[UUID, UUID]] | None = None,
     ) -> list[WorkItemTreeResponse]:
         conflicts = self._compute_date_conflicts(items, derivation)
         nodes = {
@@ -805,7 +813,55 @@ class WorkTreeService:
                 parent.children.append(node)
             else:
                 roots.append(node)
+
+        # Reordena cada grupo de hermanos por sus dependencias FtS: si B depende
+        # de A, A va antes que B. Así el árbol se lee en el orden en que se
+        # trabaja (la actividad de terceros —de la que todo cuelga— primero, y
+        # luego la cadena tarea 1 → tarea 2 …). Estable: sin dependencias entre
+        # hermanos se respeta el `orden` existente.
+        if edges:
+            for node in nodes.values():
+                if node.children:
+                    node.children[:] = self._sort_siblings_by_dependencies(
+                        node.children, edges
+                    )
+            return self._sort_siblings_by_dependencies(roots, edges)
         return roots
+
+    @staticmethod
+    def _sort_siblings_by_dependencies(
+        siblings: list[WorkItemTreeResponse], edges: list[tuple[UUID, UUID]]
+    ) -> list[WorkItemTreeResponse]:
+        """Orden topológico estable de un grupo de hermanos: un nodo nunca
+        aparece antes que un hermano del que depende. Empate → orden previo."""
+        ids = {s.id for s in siblings}
+        preds: dict[UUID, set[UUID]] = {}
+        for successor, predecessor in edges:
+            if successor in ids and predecessor in ids and successor != predecessor:
+                preds.setdefault(successor, set()).add(predecessor)
+        if not preds:
+            return siblings
+
+        original_index = {s.id: i for i, s in enumerate(siblings)}
+        remaining = list(siblings)
+        result: list[WorkItemTreeResponse] = []
+        placed: set[UUID] = set()
+        while remaining:
+            ready = next(
+                (
+                    s
+                    for s in sorted(remaining, key=lambda x: original_index[x.id])
+                    if preds.get(s.id, set()).issubset(placed)
+                ),
+                None,
+            )
+            # Ciclo inesperado (las aristas ya se validan al crearlas): se cae
+            # al orden previo para no perder nodos.
+            pick = ready or min(remaining, key=lambda x: original_index[x.id])
+            result.append(pick)
+            placed.add(pick.id)
+            remaining.remove(pick)
+        return result
 
     @staticmethod
     def _to_tipo_response(tipo: TipoNodo) -> TipoNodoResponse:
@@ -816,6 +872,7 @@ class WorkTreeService:
             color=tipo.color,
             icono=tipo.icono,
             reglas_anidacion=tipo.reglas_anidacion,
+            es_dependencia_externa=bool(getattr(tipo, "es_dependencia_externa", False)),
         )
 
     @staticmethod

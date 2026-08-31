@@ -7,7 +7,9 @@ import type { DuracionUnidad, TipoNodo, WorkItemTree } from "../../types/api.typ
 
 type DateMode = "fechas" | "inicio_dur" | "fin_dur" | "solo_dur";
 
-/** Tipo cuyo trabajo lo hace un tercero: no lo planificamos nosotros, así que
+/** Nombre histórico del tipo "dependencia de terceros"; el comportamiento vive
+ * ahora en el flag `es_dependencia_externa` del tipo, no en su nombre. Se deja
+ * como respaldo para tipos antiguos. Un tipo así no lo planificamos nosotros:
  * su tiempo es una única fecha exacta (la entrega) o directamente ninguna. */
 const THIRD_PARTY_TIPO = "Actividad de terceros";
 
@@ -88,11 +90,10 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
     editItem?.fecha_fin_plan ?? editItem?.fecha_inicio_plan ?? "",
   );
 
+  const selectedTipo = nodeTypes.find((t) => t.id === tipoId);
   const isThirdParty =
-    nodeTypes
-      .find((t) => t.id === tipoId)
-      ?.nombre.trim()
-      .toLowerCase() === THIRD_PARTY_TIPO.toLowerCase();
+    selectedTipo?.es_dependencia_externa ||
+    selectedTipo?.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase();
   const [esTransversal, setEsTransversal] = useState(editItem?.es_transversal ?? false);
   const [error, setError] = useState<string | null>(null);
 

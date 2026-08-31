@@ -33,7 +33,7 @@ function MemberRow({
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
       <div
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
@@ -43,10 +43,10 @@ function MemberRow({
         {teamMemberInitials(member)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+        <p className="truncate text-sm font-medium text-foreground">
           {member.name} {member.last_name}
         </p>
-        <p className="flex items-center gap-1 truncate text-xs text-slate-400 dark:text-slate-500">
+        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
           <Briefcase className="size-3 shrink-0" />
           {positionLabel(member.position)}
         </p>
@@ -59,7 +59,7 @@ function MemberRow({
         onChange={(e) => {
           changeRole.mutate({ userId: member.user_id, teamRole: e.target.value as TeamRole });
         }}
-        className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 outline-none focus:border-violet-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+        className="shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground outline-none transition focus:border-brand-gold disabled:opacity-50"
       >
         {TEAM_ROLE_ORDER.map((r) => (
           <option key={r} value={r}>
@@ -74,7 +74,7 @@ function MemberRow({
           setConfirmRemove(true);
         }}
         aria-label={`Quitar a ${member.name}`}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
       >
         <Trash2 className="size-4" />
       </button>
@@ -108,6 +108,8 @@ function MemberRow({
 }
 
 // Gestión de integrantes de un equipo: listar, agregar, cambiar rol y quitar.
+// El conteo del encabezado sale de la lista real de integrantes (no del
+// `member_count` cacheado del equipo), así queda al día tras agregar o quitar.
 export function TeamMembersManager({ projectId, teamId }: { projectId: string; teamId: string }) {
   const membersQuery = useTeamMembers(projectId, teamId);
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
@@ -117,9 +119,9 @@ export function TeamMembersManager({ projectId, teamId }: { projectId: string; t
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-          <Users2 className="size-4 text-violet-500" /> Integrantes
-          <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500 dark:bg-slate-800">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+          <Users2 className="size-4 text-brand-gold" /> Integrantes
+          <span className="rounded-full bg-accent px-1.5 text-[10px] font-bold text-muted-foreground">
             {members.length}
           </span>
         </h3>
@@ -128,9 +130,9 @@ export function TeamMembersManager({ projectId, teamId }: { projectId: string; t
           onClick={() => {
             setShowAdd(true);
           }}
-          className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
         >
-          <UserPlus className="size-3.5" /> Agregar
+          <UserPlus className="size-3.5" /> Agregar integrante
         </button>
       </div>
 
@@ -145,7 +147,7 @@ export function TeamMembersManager({ projectId, teamId }: { projectId: string; t
         <EmptyState
           icon={Users2}
           title="Este equipo aún no tiene integrantes"
-          hint="Usa «Agregar» para sumar personas al equipo."
+          hint="Usa «Agregar integrante» para sumar personas al equipo."
         />
       ) : (
         <div className="flex flex-col gap-2">

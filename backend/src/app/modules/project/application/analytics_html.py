@@ -174,12 +174,12 @@ def _people_table(rows: list[PersonPerformance]) -> str:
         f"<tr><td>{_e(p.name)}</td><td class='n'>{p.completed}</td>"
         f"<td class='n'>{p.open_count}</td><td class='n'>{_d(p.cycle_time_bdays)}</td>"
         f"<td class='n'>{p.on_time_pct}%</td><td class='n'>{p.returns_received}</td>"
-        f"<td class='n'>{p.logged_hours:g} h</td></tr>"
+        f"<td class='n'>{p.logged_days:g} d</td></tr>"
         for p in rows
     )
     return (
         "<table><thead><tr><th>Persona</th><th>Completadas</th><th>Abiertas</th>"
-        "<th>Cycle</th><th>A tiempo</th><th>Devoluciones</th><th>Horas</th>"
+        "<th>Cycle</th><th>A tiempo</th><th>Devoluciones</th><th>Días</th>"
         f"</tr></thead><tbody>{body}</tbody></table>"
     )
 

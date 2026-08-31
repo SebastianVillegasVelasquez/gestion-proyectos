@@ -1,4 +1,11 @@
-import { AlertTriangle, CalendarRange, ClipboardList, User, UsersRound } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarRange,
+  ClipboardList,
+  Trash2,
+  User,
+  UsersRound,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
 import { fullName, initialsOf, resolveAssignment } from "../../utils/task-assignment";
@@ -18,11 +25,14 @@ export function StructureTaskRow({
   memberById,
   teamById,
   onOpen,
+  onDelete,
 }: {
   task: Task;
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
   onOpen: () => void;
+  /** Si se pasa, aparece un botón de eliminar la tarea al pasar el ratón. */
+  onDelete?: () => void;
 }) {
   const { person, team, label } = resolveAssignment(task, memberById, teamById);
   const late = isOverdue(task);
@@ -31,7 +41,7 @@ export function StructureTaskRow({
   return (
     <div
       className={cn(
-        "relative",
+        "group/row relative flex items-center",
         "before:absolute before:left-[-16px] before:top-[20px] before:h-[1.5px] before:w-4 before:bg-border before:content-['']",
       )}
     >
@@ -39,7 +49,7 @@ export function StructureTaskRow({
         type="button"
         onClick={onOpen}
         title={`Ver la ficha de «${task.title}»`}
-        className="group flex w-full items-center gap-2.5 rounded-lg py-2 pl-2 pr-4 text-left transition-colors hover:bg-accent/40"
+        className="group flex w-full min-w-0 flex-1 items-center gap-2.5 rounded-lg py-2 pl-2 pr-4 text-left transition-colors hover:bg-accent/40"
       >
         {/* Hueco del chevron: alinea el título con el de los elementos hermanos. */}
         <span className="size-5 shrink-0" aria-hidden />
@@ -105,6 +115,21 @@ export function StructureTaskRow({
           </span>
         </span>
       </button>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          title={`Eliminar la tarea «${task.title}»`}
+          aria-label={`Eliminar la tarea ${task.title}`}
+          className="ml-1 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-500/15 hover:text-rose-600 focus-visible:opacity-100 group-hover/row:opacity-100 dark:hover:text-rose-400"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      )}
     </div>
   );
 }

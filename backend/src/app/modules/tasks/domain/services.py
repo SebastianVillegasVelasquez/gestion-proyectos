@@ -35,30 +35,63 @@ class TaskService:
 
     async def get_task_by_id(self, task_id: UUID) -> "TaskResponse":
         task = await self._get_active(task_id)
-        return self._to_response(task, await self.repo.logged_hours(task_id))
+        return self._to_response(task, await self.repo.logged_days(task_id))
 
     async def get_tasks_by_work_item(self, work_item_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_by_work_item(work_item_id)
         )
 
     async def get_tasks_by_project(self, project_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_all_by_project(project_id)
         )
 
-    async def _with_logged_hours(self, tasks: list[Task]) -> list["TaskResponse"]:
-        """Añade a cada tarea sus horas dedicadas con UNA consulta agregada.
+    async def _with_logged_days(self, tasks: list[Task]) -> list["TaskResponse"]:
+        """Añade a cada tarea su dedicación con UNA consulta agregada.
 
-        Preguntarlas tarea a tarea sería una consulta por fila (N+1), y estas
+        Preguntarla tarea a tarea sería una consulta por fila (N+1), y estas
         listas se pintan enteras en el cronograma y en el tablero.
         """
-        totals = await self.repo.logged_hours_by_task([t.id for t in tasks])
-        return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
+        totals = await self.repo.logged_days_by_task([t.id for t in tasks])
+        responses = [
+            self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks
+        ]
+        self._rollup_estimates(responses)
+        return responses
+
+    @staticmethod
+    def _rollup_estimates(responses: list["TaskResponse"]) -> None:
+        """El estimado de una tarea con subtareas es, EN TEORÍA, el total de las
+        suyas: si el padre no tiene un estimado propio, se rellena con la suma
+        de los estimados de sus subtareas (recursivo, de las hojas hacia arriba).
+        Un estimado propio del padre se respeta y no se pisa.
+        """
+        children: dict[UUID, list["TaskResponse"]] = {}
+        for r in responses:
+            if r.parent_task_id is not None:
+                children.setdefault(r.parent_task_id, []).append(r)
+        if not children:
+            return
+
+        by_id = {r.id: r for r in responses}
+
+        def resolve(node: "TaskResponse") -> Decimal | None:
+            kids = children.get(node.id)
+            if kids:
+                parts = [resolve(k) for k in kids]
+                total = sum((p for p in parts if p is not None), Decimal("0"))
+                if node.estimated_days is None and any(p is not None for p in parts):
+                    node.estimated_days = total
+            return node.estimated_days
+
+        for r in responses:
+            if r.parent_task_id is None or r.parent_task_id not in by_id:
+                resolve(r)
 
     # Campos de la tarea que se pueden dejar EN BLANCO desde un PATCH (enviando
     # `null` explícito): quitar el responsable / el equipo, borrar una fecha,
-    # dejar de estimar horas, vaciar la descripción. El resto (`title`,
+    # dejar de estimar días, vaciar la descripción. El resto (`title`,
     # `priority`) nunca se limpia a null, así que un `null` en ellos se ignora.
     _NULLABLE_UPDATE_FIELDS = {
         "description",
@@ -66,7 +99,7 @@ class TaskService:
         "team_id",
         "start_date",
         "due_date",
-        "estimated_hours",
+        "estimated_days",
     }
 
     async def update_task(
@@ -103,7 +136,7 @@ class TaskService:
 
     @staticmethod
     def _to_response(
-        task: "Task", logged_hours: Decimal = Decimal("0")
+        task: "Task", logged_days: Decimal = Decimal("0")
     ) -> "TaskResponse":
         return TaskResponse(
             id=task.id,
@@ -122,8 +155,8 @@ class TaskService:
             completed_at=task.completed_at,
             created_at=task.created_at or datetime.now(timezone.utc),
             updated_at=getattr(task, "updated_at", None),
-            estimated_hours=task.estimated_hours,
-            logged_hours=logged_hours,
+            estimated_days=task.estimated_days,
+            logged_days=logged_days,
         )
 
 

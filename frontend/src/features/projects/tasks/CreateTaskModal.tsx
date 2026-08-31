@@ -319,7 +319,8 @@ export function CreateTaskModal({
           </Field>
 
           {/* Fechas: inicio + (fin o duración). Opcionales: la tarea puede
-              crearse sin planificar y ajustarse después. */}
+              crearse sin planificar y ajustarse después. La duración en días
+              queda además como estimación de esfuerzo aunque no haya fecha. */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Inicio (opcional)">
               <input
@@ -331,7 +332,7 @@ export function CreateTaskModal({
                 }}
               />
             </Field>
-            <Field label={form.dateMode === "duration" ? "Duración (días)" : "Fin"}>
+            <Field label={form.dateMode === "duration" ? "Duración / estimado (días)" : "Fin"}>
               <div className="flex gap-1">
                 {form.dateMode === "duration" ? (
                   <input

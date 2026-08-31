@@ -67,8 +67,20 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     requires_approval: form.requiresApproval,
   };
 
+  // La "duración en días" es también la estimación de esfuerzo de la tarea: se
+  // guarda como `estimated_days` aunque no haya fecha de inicio, así se ve y se
+  // edita después (antes se perdía si no dabas fecha).
+  if (
+    form.dateMode === "duration" &&
+    form.durationDays.trim() !== "" &&
+    Number(form.durationDays) > 0
+  ) {
+    payload.estimated_days = form.durationDays.trim();
+  }
+
   if (form.startDate) {
     if (form.dateMode === "duration" && form.durationDays.trim() !== "") {
+      // Con fecha de inicio, el backend además deriva el fin de esta duración.
       payload.duration_days = Number(form.durationDays);
     } else if (form.dateMode === "end") {
       payload.due_date = nullIfEmpty(form.dueDate);
@@ -83,19 +95,17 @@ export function validateTaskForm(form: TaskFormState): string | null {
   if (form.title.trim().length < 2) {
     return "El título debe tener al menos 2 caracteres";
   }
-  // Las fechas son opcionales, pero si el usuario abre la duración/fin sobre una
-  // fecha de inicio, validamos coherencia mínima.
-  if (form.startDate) {
-    if (
-      form.dateMode === "duration" &&
-      form.durationDays.trim() !== "" &&
-      Number(form.durationDays) <= 0
-    ) {
-      return "La duración debe ser mayor a 0 días";
-    }
-    if (form.dateMode === "end" && form.dueDate && form.dueDate < form.startDate) {
-      return "La fecha de fin no puede ser anterior al inicio";
-    }
+  // La duración/estimado en días se valida siempre que se escriba (vale con o
+  // sin fecha de inicio); la coherencia inicio/fin, solo si hay inicio.
+  if (
+    form.dateMode === "duration" &&
+    form.durationDays.trim() !== "" &&
+    Number(form.durationDays) <= 0
+  ) {
+    return "La duración debe ser mayor a 0 días";
+  }
+  if (form.startDate && form.dateMode === "end" && form.dueDate && form.dueDate < form.startDate) {
+    return "La fecha de fin no puede ser anterior al inicio";
   }
   return null;
 }

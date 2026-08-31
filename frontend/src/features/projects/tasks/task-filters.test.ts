@@ -27,8 +27,8 @@ function task(overrides: Partial<Task> = {}): Task {
     start_date: null,
     due_date: null,
     completed_at: null,
-    estimated_hours: null,
-    logged_hours: 0,
+    estimated_days: null,
+    logged_days: 0,
     ...overrides,
   } as Task;
 }

@@ -19,6 +19,7 @@ Idempotente: si el proyecto ya tiene tareas, no vuelve a crear nada.
 import datetime
 import random
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import func, select
 
@@ -72,10 +73,11 @@ _INDEPENDIENTE = (
 )
 
 # Qué se produce en cada unidad. Es el trabajo real de una virtualización.
+# (plantilla de título, días estimados)
 _TAREAS_POR_UNIDAD = [
-    ("Guion de {unidad}", 6),
-    ("Grabación de {unidad}", 8),
-    ("Montaje en LMS de {unidad}", 4),
+    ("Guion de {unidad}", 3),
+    ("Grabación de {unidad}", 4),
+    ("Montaje en LMS de {unidad}", 2),
 ]
 
 # Mezcla de estados para que el tablero y el informe no salgan todos iguales.
@@ -220,11 +222,11 @@ async def ensure_project_work() -> None:
             rng = random.Random(2026)
             asignables = [*produccion, *contenidos, independiente]
             # (tarea, quien la hace) — la segunda parte sirve para imputarle
-            # después las horas dedicadas.
+            # después el esfuerzo dedicado.
             tareas: list[tuple[Task, User | None]] = []
 
             for i, unidad in enumerate(unidades[:60]):
-                for j, (plantilla, horas) in enumerate(_TAREAS_POR_UNIDAD):
+                for j, (plantilla, dias_estimados) in enumerate(_TAREAS_POR_UNIDAD):
                     estado = _ESTADOS[(i + j) % len(_ESTADOS)]
                     inicio = unidad.fecha_inicio_plan
                     fin = unidad.fecha_fin_plan
@@ -257,7 +259,7 @@ async def ensure_project_work() -> None:
                         team_id=equipo.id if equipo else None,
                         start_date=inicio,
                         due_date=fin,
-                        estimated_hours=horas,
+                        estimated_days=dias_estimados,
                         completed_at=(
                             datetime.datetime.now(datetime.timezone.utc)
                             if estado == TaskStatus.COMPLETADA
@@ -269,20 +271,20 @@ async def ensure_project_work() -> None:
 
             await session.flush()
 
-            # ── Horas dedicadas en lo que ya está hecho o en marcha ──
+            # ── Días dedicados en lo que ya está hecho o en marcha ──
             for task, responsable in tareas:
                 if (
                     responsable is None
                     or task.status == TaskStatus.PENDIENTE_POR_INICIAR
                 ):
                     continue
-                dedicadas = rng.choice([2, 3, 4, 6, 9])
+                dedicados = rng.choice(["0.25", "0.5", "0.75", "1"])
                 session.add(
                     TaskTimeEntry(
                         id=uuid.uuid4(),
                         task_id=task.id,
                         user_id=responsable.id,
-                        hours=dedicadas,
+                        days=Decimal(dedicados),
                         work_date=task.start_date or datetime.date.today(),
                         notes=None,
                     )

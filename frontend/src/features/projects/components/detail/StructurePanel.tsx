@@ -49,7 +49,7 @@ import {
   type DropPos,
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
-import { useProjectTasks } from "../../hooks/use-tasks";
+import { useDeleteTask, useProjectTasks } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import { indexById } from "../../utils/task-assignment";
@@ -276,6 +276,8 @@ interface TreeNodeProps {
   /** Nombre del elemento que contiene a este (null en el nivel principal). */
   containerName: string | null;
   typeNameById: Map<string, string>;
+  /** Qué tipos se comportan como "dependencia de terceros" (pinta naranja). */
+  depTypeById: Map<string, boolean>;
   isExpanded: (id: string) => boolean;
   onToggle: (id: string) => void;
   onAddChild: (parent: WorkItemTree) => void;
@@ -293,6 +295,7 @@ interface TreeNodeProps {
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
   onOpenTask: (task: Task, containerName: string) => void;
+  onDeleteTask: (task: Task) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -311,6 +314,7 @@ function TreeNode({
   depth,
   containerName,
   typeNameById,
+  depTypeById,
   isExpanded,
   onToggle,
   onAddChild,
@@ -327,6 +331,7 @@ function TreeNode({
   memberById,
   teamById,
   onOpenTask,
+  onDeleteTask,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -337,7 +342,11 @@ function TreeNode({
   onDropNode,
 }: TreeNodeProps) {
   const open = isExpanded(node.id);
-  const style = tipoStyle(node.tipo_id, typeNameById.get(node.tipo_id));
+  const style = tipoStyle(
+    node.tipo_id,
+    typeNameById.get(node.tipo_id),
+    depTypeById.get(node.tipo_id),
+  );
   // Las tareas del elemento son hijas suyas en el árbol, igual que los
   // elementos: se pliegan con la misma flecha y cuentan para saber si hay algo
   // dentro. Un módulo sin sub-elementos pero con tareas ya no se ve vacío.
@@ -600,6 +609,7 @@ function TreeNode({
               depth={depth + 1}
               containerName={node.nombre}
               typeNameById={typeNameById}
+              depTypeById={depTypeById}
               isExpanded={isExpanded}
               onToggle={onToggle}
               onAddChild={onAddChild}
@@ -624,6 +634,7 @@ function TreeNode({
               memberById={memberById}
               teamById={teamById}
               onOpenTask={onOpenTask}
+              onDeleteTask={onDeleteTask}
             />
           ))}
           {/* Las tareas van DESPUÉS de los sub-elementos: primero se lee cómo
@@ -637,6 +648,9 @@ function TreeNode({
               teamById={teamById}
               onOpen={() => {
                 onOpenTask(task, node.nombre);
+              }}
+              onDelete={() => {
+                onDeleteTask(task);
               }}
             />
           ))}
@@ -653,12 +667,14 @@ function TypeChip({
   tipo,
   onRename,
   onRequestDelete,
+  onToggleDependency,
 }: {
   tipo: TipoNodo;
   onRename: (nombre: string) => Promise<void>;
   onRequestDelete: () => void;
+  onToggleDependency: (value: boolean) => Promise<void>;
 }) {
-  const style = tipoStyle(tipo.id, tipo.nombre);
+  const style = tipoStyle(tipo.id, tipo.nombre, tipo.es_dependencia_externa);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(tipo.nombre);
   const [saving, setSaving] = useState(false);
@@ -747,8 +763,11 @@ function TypeChip({
           setShowActions((prev) => !prev);
         }}
         title="Editar o eliminar este tipo"
-        className="relative z-50"
+        className="relative z-50 flex items-center gap-1"
       >
+        {tipo.es_dependencia_externa && (
+          <Link2 className="size-2.5 shrink-0" aria-label="Dependencia de terceros" />
+        )}
         {tipo.nombre}
       </button>
       {showActions && (
@@ -764,6 +783,26 @@ function TypeChip({
             className="relative z-50 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
           >
             <Pencil className="size-2.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowActions(false);
+              void onToggleDependency(!tipo.es_dependencia_externa);
+            }}
+            title={
+              tipo.es_dependencia_externa
+                ? `«${tipo.nombre}» dejará de comportarse como dependencia de terceros`
+                : `«${tipo.nombre}» pasará a comportarse como dependencia de terceros`
+            }
+            aria-label={`Marcar «${tipo.nombre}» como dependencia de terceros`}
+            aria-pressed={tipo.es_dependencia_externa}
+            className={cn(
+              "relative z-50 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10",
+              tipo.es_dependencia_externa && "text-orange-600 dark:text-orange-300",
+            )}
+          >
+            <Link2 className="size-2.5" />
           </button>
           <button
             type="button"
@@ -796,7 +835,8 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
   const [deleteTarget, setDeleteTarget] = useState<TipoNodo | null>(null);
 
   const hasThirdParty = types.some(
-    (t) => t.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase(),
+    (t) =>
+      t.es_dependencia_externa || t.nombre.trim().toLowerCase() === THIRD_PARTY_TIPO.toLowerCase(),
   );
 
   // Cierra el input y descarta lo tecleado: vuelve al estado "sin añadir".
@@ -829,6 +869,12 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           }}
           onRequestDelete={() => {
             setDeleteTarget(t);
+          }}
+          onToggleDependency={async (value) => {
+            await updateType.mutateAsync({
+              typeId: t.id,
+              payload: { es_dependencia_externa: value },
+            });
           }}
         />
       ))}
@@ -902,7 +948,10 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
       {!hasThirdParty && (
         <button
           onClick={() => {
-            createType.mutate({ nombre: THIRD_PARTY_TIPO });
+            createType.mutate({
+              nombre: THIRD_PARTY_TIPO,
+              es_dependencia_externa: true,
+            });
           }}
           disabled={createType.isPending}
           title="Crea un tipo para el trabajo que depende de un tercero"
@@ -947,6 +996,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const deleteItem = useDeleteWorkItem(projectId);
+  const deleteTask = useDeleteTask(projectId);
   const moveItem = useMoveWorkItem(projectId);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -964,6 +1014,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // Elemento cuyo conflicto de fechas se está resolviendo (termina después que
   // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
   const [conflictItem, setConflictItem] = useState<WorkItemTree | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   // Tarea cuya ficha se está viendo, junto al elemento del que cuelga (el nodo
   // ya se conoce en el punto del árbol donde se pulsa; buscarlo otra vez aquí
@@ -982,6 +1033,11 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const typeNameById = useMemo(() => {
     const map = new Map<string, string>();
     types.forEach((t) => map.set(t.id, t.nombre));
+    return map;
+  }, [types]);
+  const depTypeById = useMemo(() => {
+    const map = new Map<string, boolean>();
+    types.forEach((t) => map.set(t.id, t.es_dependencia_externa));
     return map;
   }, [types]);
 
@@ -1297,6 +1353,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   depth={0}
                   containerName={null}
                   typeNameById={typeNameById}
+                  depTypeById={depTypeById}
                   isExpanded={isExpanded}
                   onToggle={toggleNode}
                   onAddChild={(p) => {
@@ -1347,6 +1404,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onOpenTask={(task, containerName) => {
                     setOpenTask({ task, containerName });
                   }}
+                  onDeleteTask={setTaskToDelete}
                 />
               </div>
             ))}
@@ -1492,6 +1550,31 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           }}
           onCancel={() => {
             setDeleteTarget(null);
+          }}
+        />
+      )}
+
+      {taskToDelete && (
+        <ConfirmDialog
+          title="Eliminar tarea"
+          message={`Se eliminará la tarea “${taskToDelete.title}” (y sus subtareas, si tiene). Esta acción no se puede deshacer. ¿Continuar?`}
+          confirmLabel="Eliminar"
+          destructive
+          loading={deleteTask.isPending}
+          errorMessage={
+            deleteTask.isError
+              ? getErrorMessage(deleteTask.error, "No se pudo eliminar la tarea")
+              : null
+          }
+          onConfirm={() => {
+            deleteTask.mutate(taskToDelete.id, {
+              onSuccess: () => {
+                setTaskToDelete(null);
+              },
+            });
+          }}
+          onCancel={() => {
+            setTaskToDelete(null);
           }}
         />
       )}
