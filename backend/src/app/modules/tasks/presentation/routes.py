@@ -299,7 +299,9 @@ async def add_task_dependency(
     task_repo=Depends(task_repo_dependency),
 ):
     return await AddTaskDependencyUseCase(task_repo).execute(
-        task_id, payload.depends_on_id
+        task_id,
+        depends_on_id=payload.depends_on_id,
+        depends_on_work_item_id=payload.depends_on_work_item_id,
     )
 
 
@@ -313,7 +315,8 @@ async def remove_task_dependency(
     _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Quita una dependencia FtS de la tarea (edición posterior a la creación)."""
+    """Quita una dependencia FtS de la tarea. `depends_on_id` puede ser el id de
+    otra tarea o el de un elemento del árbol; se prueban ambos."""
     await RemoveTaskDependencyUseCase(task_repo).execute(task_id, depends_on_id)
 
 

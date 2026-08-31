@@ -245,29 +245,55 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_work_item(self, work_item_id: UUID):
+        """El WorkItem (con su tipo) o None. Para validar una dependencia
+        tarea→elemento sin arrastrar el repositorio del árbol."""
+        query = (
+            select(WorkItem)
+            .where(WorkItem.id == work_item_id)
+            .options(selectinload(WorkItem.tipo))
+        )
+        return (await self._session.execute(query)).scalars().first()
+
     async def add_dependency(self, dependency: TaskDependency) -> TaskDependency:
         self._session.add(dependency)
         await self._session.flush()
         await self._session.refresh(dependency)
         return dependency
 
-    async def dependency_exists(self, task_id: UUID, depends_on_id: UUID) -> bool:
+    async def dependency_exists(
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> bool:
+        target = (
+            TaskDependency.depends_on_id == depends_on_id
+            if depends_on_id is not None
+            else TaskDependency.depends_on_work_item_id == depends_on_work_item_id
+        )
         query = select(TaskDependency.id).where(
-            TaskDependency.task_id == task_id,
-            TaskDependency.depends_on_id == depends_on_id,
+            TaskDependency.task_id == task_id, target
         )
         return (await self._session.execute(query)).first() is not None
 
-    async def delete_dependency(self, task_id: UUID, depends_on_id: UUID) -> bool:
+    async def delete_dependency(
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> bool:
         """Borra la arista FtS (borrado físico: la tabla no tiene soft-delete).
 
         Devuelve True si se borró alguna fila, False si no existía.
         """
+        target = (
+            TaskDependency.depends_on_id == depends_on_id
+            if depends_on_id is not None
+            else TaskDependency.depends_on_work_item_id == depends_on_work_item_id
+        )
         result = await self._session.execute(
-            delete(TaskDependency).where(
-                TaskDependency.task_id == task_id,
-                TaskDependency.depends_on_id == depends_on_id,
-            )
+            delete(TaskDependency).where(TaskDependency.task_id == task_id, target)
         )
         await self._session.flush()
         return bool(getattr(result, "rowcount", 0))

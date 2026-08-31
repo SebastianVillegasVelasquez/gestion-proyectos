@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.modules.project.structure.domain.repository import WorkTreeRepository
 from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.tasks.domain import rules
 from app.modules.tasks.domain.audit import TaskAuditor, snapshot
 from app.modules.tasks.domain.services import (
     TaskDependencyService,
@@ -108,6 +109,18 @@ class CreateTaskUseCase:
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
+        # Duración SIN inicio: se ancla al arranque del proyecto (igual que un
+        # componente «sin fecha, con duración»). Si el proyecto tampoco tiene
+        # fecha, la tarea queda solo con su estimación.
+        if data.duration_days is not None and data.start_date is None:
+            project = await self.project_repo.get_by_id(data.project_id)
+            project_start = getattr(project, "start_date", None) if project else None
+            if project_start is not None:
+                from datetime import timedelta
+
+                data.start_date = project_start
+                data.due_date = project_start + timedelta(days=data.duration_days)
+
         # Fase 3: si la nueva tarea cuelga de otra (líder repartiendo subtareas
         # de una tarea general del equipo), hereda lo que no se envíe explícito:
         #   - `team_id`  → aparece en `GET /teams/{id}/tasks`.
@@ -126,7 +139,11 @@ class CreateTaskUseCase:
         created = await self.service.add_task(data)
         if data.depends_on_id is not None:
             await TaskDependencyService(self.task_repo).add_dependency(
-                created.id, data.depends_on_id
+                created.id, depends_on_id=data.depends_on_id
+            )
+        if data.depends_on_work_item_id is not None:
+            await TaskDependencyService(self.task_repo).add_dependency(
+                created.id, depends_on_work_item_id=data.depends_on_work_item_id
             )
 
         # El historial se escribe aquí y no en un manejador del bus: el actor
@@ -234,6 +251,7 @@ class CreateTeamTaskUseCase:
                 work_item_id=data.work_item_id,
                 parent_task_id=data.parent_task_id,
                 depends_on_id=data.depends_on_id,
+                depends_on_work_item_id=data.depends_on_work_item_id,
                 start_date=data.start_date,
                 due_date=data.due_date,
                 requires_approval=data.requires_approval,
@@ -592,6 +610,22 @@ class GetTasksByTeamUseCase:
         # agrupamos las bloqueantes por task_id antes de armar la respuesta.
         blocking: dict[UUID, list[BlockingTaskResponse]] = {}
         for dep in await self.task_repo.get_dependencies_by_team(team_id):
+            if dep.depends_on_work_item_id is not None:
+                wi = dep.depends_on_work_item
+                blocking.setdefault(dep.task_id, []).append(
+                    BlockingTaskResponse(
+                        id=dep.depends_on_work_item_id,
+                        title=(wi.nombre if wi is not None else "Elemento"),
+                        status=(
+                            TaskStatus.COMPLETADA
+                            if rules.work_item_is_done(wi)
+                            else TaskStatus.PENDIENTE_POR_INICIAR
+                        ),
+                    )
+                )
+                continue
+            if dep.depends_on is None:
+                continue
             blocking.setdefault(dep.task_id, []).append(
                 BlockingTaskResponse(
                     id=dep.depends_on.id,
@@ -852,9 +886,16 @@ class AddTaskDependencyUseCase:
         self.service = TaskDependencyService(task_repo)
 
     async def execute(
-        self, task_id: UUID, depends_on_id: UUID
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
     ) -> TaskDependencyResponse:
-        return await self.service.add_dependency(task_id, depends_on_id)
+        return await self.service.add_dependency(
+            task_id,
+            depends_on_id=depends_on_id,
+            depends_on_work_item_id=depends_on_work_item_id,
+        )
 
 
 class RemoveTaskDependencyUseCase:

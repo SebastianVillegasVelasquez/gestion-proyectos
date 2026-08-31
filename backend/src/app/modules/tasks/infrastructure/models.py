@@ -6,7 +6,15 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, UUID, Enum, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Numeric,
+    UUID,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import String, Text, Date, DateTime
 
@@ -182,9 +190,13 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
 
 
 class TaskDependency(Base, UUIDMixin, TimestampMixin):
-    """Dependencia finish-to-start entre dos tareas.
+    """Dependencia finish-to-start de una tarea sobre OTRA tarea o sobre un
+    elemento del árbol (`work_items`).
 
-    `task` no puede iniciar hasta que `depends_on` esté completada.
+    `task` no puede avanzar hasta que su predecesor esté "hecho": la otra tarea
+    COMPLETADA, o el elemento entregado (fecha real de fin, o —si es una
+    actividad de terceros— su fecha de entrega ya fijada). Exactamente uno de
+    `depends_on_id` / `depends_on_work_item_id` va relleno.
     """
 
     __tablename__ = "task_dependencies"
@@ -194,19 +206,39 @@ class TaskDependency(Base, UUIDMixin, TimestampMixin):
         ForeignKey("tasks.id", ondelete="CASCADE"),
         nullable=False,
     )
-    depends_on_id: Mapped[uuid.UUID] = mapped_column(
+    depends_on_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tasks.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    # Predecesor que es un elemento del árbol (típico: una «actividad de
+    # terceros», o cualquier módulo/unidad del que cuelga trabajo).
+    depends_on_work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("work_items.id", ondelete="CASCADE"),
+        nullable=True,
     )
 
     task: Mapped["Task"] = relationship(
         "Task", foreign_keys=[task_id], back_populates="dependencies"
     )
-    depends_on: Mapped["Task"] = relationship("Task", foreign_keys=[depends_on_id])
+    depends_on: Mapped[Optional["Task"]] = relationship(
+        "Task", foreign_keys=[depends_on_id]
+    )
+    depends_on_work_item: Mapped[Optional["WorkItem"]] = relationship(
+        "WorkItem", foreign_keys=[depends_on_work_item_id], lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("task_id", "depends_on_id", name="uq_task_dependency"),
+        UniqueConstraint(
+            "task_id", "depends_on_work_item_id", name="uq_task_dep_work_item"
+        ),
+        CheckConstraint(
+            "(depends_on_id IS NOT NULL)::int "
+            "+ (depends_on_work_item_id IS NOT NULL)::int = 1",
+            name="ck_task_dep_one_target",
+        ),
     )
 
 
