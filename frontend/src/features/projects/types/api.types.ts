@@ -290,8 +290,10 @@ export interface CreateTaskPayload {
   // Estimación de esfuerzo en días. La captura el mismo campo "duración"; se
   // guarda aunque la tarea nazca sin fechas.
   estimated_days?: string | null;
-  // Dependencia opcional al crear (finish-to-start).
+  // Dependencia opcional al crear (finish-to-start): otra tarea O un elemento
+  // del árbol (p. ej. una actividad de terceros).
   depends_on_id?: string | null;
+  depends_on_work_item_id?: string | null;
   parent_task_id?: string | null;
   // Desactivado por defecto en el backend si se omite.
   requires_approval?: boolean;
@@ -318,7 +320,10 @@ export interface AttachTaskPayload {
 export interface TaskDependency {
   id: string;
   task_id: string;
-  depends_on_id: string;
+  // Predecesor: otra tarea O un elemento del árbol (p. ej. una actividad de
+  // terceros). Exactamente uno de los dos viene relleno.
+  depends_on_id: string | null;
+  depends_on_work_item_id: string | null;
 }
 
 // ── Members / team ───────────────────────────────────────────────────────────
