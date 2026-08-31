@@ -147,7 +147,7 @@ async def delete_comment(
     )
 
 
-# ── Esfuerzo: estimación vs. horas dedicadas ──────────────────────────────────
+# ── Esfuerzo: estimación vs. días dedicados ───────────────────────────────────
 @router.post(
     "/tasks/{task_id}/time-entries",
     response_model=TimeEntryResponse,
@@ -159,7 +159,7 @@ async def log_time(
     current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Apunta horas dedicadas a una tarea, a nombre de quien las apunta.
+    """Apunta días dedicados a una tarea, a nombre de quien los apunta.
 
     No se registra tiempo por otra persona: el dato solo sirve para estimar y
     para pagar si quien lo escribe es quien lo trabajó.
@@ -183,7 +183,7 @@ async def delete_time_entry(
     current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Borra un apunte de horas (solo el propio, o cualquiera si administras)."""
+    """Borra un apunte de esfuerzo (solo el propio, o cualquiera si administras)."""
     await DeleteTimeEntryUseCase(task_repo).execute(
         entry_id, current_user.id, current_user.role
     )
@@ -299,7 +299,9 @@ async def add_task_dependency(
     task_repo=Depends(task_repo_dependency),
 ):
     return await AddTaskDependencyUseCase(task_repo).execute(
-        task_id, payload.depends_on_id
+        task_id,
+        depends_on_id=payload.depends_on_id,
+        depends_on_work_item_id=payload.depends_on_work_item_id,
     )
 
 
@@ -313,7 +315,8 @@ async def remove_task_dependency(
     _=Depends(_admin),
     task_repo=Depends(task_repo_dependency),
 ):
-    """Quita una dependencia FtS de la tarea (edición posterior a la creación)."""
+    """Quita una dependencia FtS de la tarea. `depends_on_id` puede ser el id de
+    otra tarea o el de un elemento del árbol; se prueban ambos."""
     await RemoveTaskDependencyUseCase(task_repo).execute(task_id, depends_on_id)
 
 

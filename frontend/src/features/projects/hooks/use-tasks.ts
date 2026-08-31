@@ -232,7 +232,10 @@ export function useProjectTaskDependencies(projectId: string | undefined) {
 
 interface DependencyVars {
   taskId: string;
-  dependsOnId: string;
+  /** Predecesor: otra tarea O un elemento del árbol (exactamente uno). Para
+   * quitar la dependencia basta con el id del predecesor, sea del tipo que sea. */
+  dependsOnId?: string;
+  dependsOnWorkItemId?: string;
   /** Del proyecto: refresca también las flechas FtS del cronograma. */
   projectId?: string;
 }
@@ -249,8 +252,8 @@ function invalidateDeps(qc: ReturnType<typeof useQueryClient>, vars: DependencyV
 export function useAddTaskDependency() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, dependsOnId }: DependencyVars) =>
-      tasksApi.addDependency(taskId, dependsOnId),
+    mutationFn: ({ taskId, dependsOnId, dependsOnWorkItemId }: DependencyVars) =>
+      tasksApi.addDependency(taskId, { dependsOnId, dependsOnWorkItemId }),
     onSuccess: (_data, vars) => {
       invalidateDeps(qc, vars);
     },
@@ -260,8 +263,8 @@ export function useAddTaskDependency() {
 export function useRemoveTaskDependency() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, dependsOnId }: DependencyVars) =>
-      tasksApi.removeDependency(taskId, dependsOnId),
+    mutationFn: ({ taskId, dependsOnId, dependsOnWorkItemId }: DependencyVars) =>
+      tasksApi.removeDependency(taskId, (dependsOnId ?? dependsOnWorkItemId)!),
     onSuccess: (_data, vars) => {
       invalidateDeps(qc, vars);
     },

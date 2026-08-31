@@ -29,36 +29,69 @@ class TaskService:
     async def add_task(self, data: "CreateTaskRequest") -> "TaskResponse":
         payload = data.model_dump(exclude_none=True)
         # Campos del request que NO son columnas del modelo.
-        for field in ("duration_days", "depends_on_id"):
+        for field in ("duration_days", "depends_on_id", "depends_on_work_item_id"):
             payload.pop(field, None)
         return self._to_response(await self.repo.add(Task(**payload)))
 
     async def get_task_by_id(self, task_id: UUID) -> "TaskResponse":
         task = await self._get_active(task_id)
-        return self._to_response(task, await self.repo.logged_hours(task_id))
+        return self._to_response(task, await self.repo.logged_days(task_id))
 
     async def get_tasks_by_work_item(self, work_item_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_by_work_item(work_item_id)
         )
 
     async def get_tasks_by_project(self, project_id: UUID) -> list["TaskResponse"]:
-        return await self._with_logged_hours(
+        return await self._with_logged_days(
             await self.repo.get_all_by_project(project_id)
         )
 
-    async def _with_logged_hours(self, tasks: list[Task]) -> list["TaskResponse"]:
-        """Añade a cada tarea sus horas dedicadas con UNA consulta agregada.
+    async def _with_logged_days(self, tasks: list[Task]) -> list["TaskResponse"]:
+        """Añade a cada tarea su dedicación con UNA consulta agregada.
 
-        Preguntarlas tarea a tarea sería una consulta por fila (N+1), y estas
+        Preguntarla tarea a tarea sería una consulta por fila (N+1), y estas
         listas se pintan enteras en el cronograma y en el tablero.
         """
-        totals = await self.repo.logged_hours_by_task([t.id for t in tasks])
-        return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
+        totals = await self.repo.logged_days_by_task([t.id for t in tasks])
+        responses = [
+            self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks
+        ]
+        self._rollup_estimates(responses)
+        return responses
+
+    @staticmethod
+    def _rollup_estimates(responses: list["TaskResponse"]) -> None:
+        """El estimado de una tarea con subtareas es, EN TEORÍA, el total de las
+        suyas: si el padre no tiene un estimado propio, se rellena con la suma
+        de los estimados de sus subtareas (recursivo, de las hojas hacia arriba).
+        Un estimado propio del padre se respeta y no se pisa.
+        """
+        children: dict[UUID, list["TaskResponse"]] = {}
+        for r in responses:
+            if r.parent_task_id is not None:
+                children.setdefault(r.parent_task_id, []).append(r)
+        if not children:
+            return
+
+        by_id = {r.id: r for r in responses}
+
+        def resolve(node: "TaskResponse") -> Decimal | None:
+            kids = children.get(node.id)
+            if kids:
+                parts = [resolve(k) for k in kids]
+                total = sum((p for p in parts if p is not None), Decimal("0"))
+                if node.estimated_days is None and any(p is not None for p in parts):
+                    node.estimated_days = total
+            return node.estimated_days
+
+        for r in responses:
+            if r.parent_task_id is None or r.parent_task_id not in by_id:
+                resolve(r)
 
     # Campos de la tarea que se pueden dejar EN BLANCO desde un PATCH (enviando
     # `null` explícito): quitar el responsable / el equipo, borrar una fecha,
-    # dejar de estimar horas, vaciar la descripción. El resto (`title`,
+    # dejar de estimar días, vaciar la descripción. El resto (`title`,
     # `priority`) nunca se limpia a null, así que un `null` en ellos se ignora.
     _NULLABLE_UPDATE_FIELDS = {
         "description",
@@ -66,7 +99,7 @@ class TaskService:
         "team_id",
         "start_date",
         "due_date",
-        "estimated_hours",
+        "estimated_days",
     }
 
     async def update_task(
@@ -103,7 +136,7 @@ class TaskService:
 
     @staticmethod
     def _to_response(
-        task: "Task", logged_hours: Decimal = Decimal("0")
+        task: "Task", logged_days: Decimal = Decimal("0")
     ) -> "TaskResponse":
         return TaskResponse(
             id=task.id,
@@ -122,44 +155,69 @@ class TaskService:
             completed_at=task.completed_at,
             created_at=task.created_at or datetime.now(timezone.utc),
             updated_at=getattr(task, "updated_at", None),
-            estimated_hours=task.estimated_hours,
-            logged_hours=logged_hours,
+            estimated_days=task.estimated_days,
+            logged_days=logged_days,
         )
 
 
+def _dep_response(d: "TaskDependency") -> "TaskDependencyResponse":
+    return TaskDependencyResponse(
+        id=d.id,
+        task_id=d.task_id,
+        depends_on_id=d.depends_on_id,
+        depends_on_work_item_id=d.depends_on_work_item_id,
+    )
+
+
 class TaskDependencyService:
-    """Dependencias finish-to-start entre tareas."""
+    """Dependencias finish-to-start de una tarea sobre otra tarea o sobre un
+    elemento del árbol (p. ej. una «actividad de terceros»)."""
 
     def __init__(self, repo: "TaskRepository"):
         self.repo = repo
 
     async def add_dependency(
-        self, task_id: UUID, depends_on_id: UUID
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> "TaskDependencyResponse":
+        if (depends_on_id is None) == (depends_on_work_item_id is None):
+            raise ValidationError(
+                "Indica una tarea O un elemento del que depender, no ambos ni ninguno"
+            )
+
+        task = await self.repo.get_by_id(task_id)
+        if not task or task.is_deleted:
+            raise NotFoundError("La tarea no existe")
+
+        if depends_on_work_item_id is not None:
+            return await self._add_work_item_dependency(task, depends_on_work_item_id)
+
+        assert depends_on_id is not None
+        return await self._add_task_dependency(task_id, task, depends_on_id)
+
+    async def _add_task_dependency(
+        self, task_id: UUID, task: "Task", depends_on_id: UUID
     ) -> "TaskDependencyResponse":
         if rules.is_self_dependency(task_id, depends_on_id):
             raise ConflictError("Una tarea no puede depender de sí misma")
 
-        tasks: dict[str, "Task"] = {}
-        for tid, name in ((task_id, "tarea"), (depends_on_id, "tarea origen")):
-            t = await self.repo.get_by_id(tid)
-            if not t or t.is_deleted:
-                raise NotFoundError(f"La {name} no existe")
-            tasks[name] = t
-
-        if tasks["tarea"].project_id != tasks["tarea origen"].project_id:
+        origen = await self.repo.get_by_id(depends_on_id)
+        if not origen or origen.is_deleted:
+            raise NotFoundError("La tarea origen no existe")
+        if task.project_id != origen.project_id:
             raise ValidationError("Las dependencias deben ser del mismo proyecto")
 
-        if await self.repo.dependency_exists(task_id, depends_on_id):
+        if await self.repo.dependency_exists(task_id, depends_on_id=depends_on_id):
             raise ConflictError("La dependencia ya existe")
 
-        # Anti-ciclos: la nueva arista no puede cerrar un ciclo con las que ya
-        # existen en el proyecto (misma regla que las dependencias de la
-        # estructura, en app.shared.graph).
+        # Anti-ciclos: solo entre tareas (una arista tarea→elemento no puede
+        # cerrar un ciclo con las tarea→tarea).
         edges = [
             (d.task_id, d.depends_on_id)
-            for d in await self.repo.get_dependencies_by_project(
-                tasks["tarea"].project_id
-            )
+            for d in await self.repo.get_dependencies_by_project(task.project_id)
+            if d.depends_on_id is not None
         ]
         if would_create_cycle(edges, task_id, depends_on_id):
             raise CyclicDependencyError("La dependencia crearía un ciclo")
@@ -167,30 +225,57 @@ class TaskDependencyService:
         dep = await self.repo.add_dependency(
             TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
         )
-        return TaskDependencyResponse(
-            id=dep.id, task_id=dep.task_id, depends_on_id=dep.depends_on_id
-        )
+        return _dep_response(dep)
 
-    async def remove_dependency(self, task_id: UUID, depends_on_id: UUID) -> None:
-        """Quita una dependencia FtS. Idempotente-ish: 404 si no existía."""
-        if not await self.repo.delete_dependency(task_id, depends_on_id):
+    async def _add_work_item_dependency(
+        self, task: "Task", work_item_id: UUID
+    ) -> "TaskDependencyResponse":
+        work_item = await self.repo.get_work_item(work_item_id)
+        if work_item is None or getattr(work_item, "is_deleted", False):
+            raise NotFoundError("El elemento del que depender no existe")
+        if work_item.proyecto_id != task.project_id:
+            raise ValidationError("Las dependencias deben ser del mismo proyecto")
+        if await self.repo.dependency_exists(
+            task.id, depends_on_work_item_id=work_item_id
+        ):
+            raise ConflictError("La dependencia ya existe")
+
+        dep = await self.repo.add_dependency(
+            TaskDependency(task_id=task.id, depends_on_work_item_id=work_item_id)
+        )
+        return _dep_response(dep)
+
+    async def remove_dependency(
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> None:
+        """Quita una dependencia FtS. El id del predecesor puede ser de otra
+        tarea o de un elemento; se prueban ambos. 404 si no existía."""
+        if depends_on_id is not None:
+            deleted = await self.repo.delete_dependency(
+                task_id, depends_on_id=depends_on_id
+            )
+            if not deleted:
+                deleted = await self.repo.delete_dependency(
+                    task_id, depends_on_work_item_id=depends_on_id
+                )
+        else:
+            deleted = await self.repo.delete_dependency(
+                task_id, depends_on_work_item_id=depends_on_work_item_id
+            )
+        if not deleted:
             raise NotFoundError("La dependencia no existe")
 
     async def list_dependencies(self, task_id: UUID) -> list["TaskDependencyResponse"]:
-        return [
-            TaskDependencyResponse(
-                id=d.id, task_id=d.task_id, depends_on_id=d.depends_on_id
-            )
-            for d in await self.repo.get_dependencies(task_id)
-        ]
+        return [_dep_response(d) for d in await self.repo.get_dependencies(task_id)]
 
     async def list_dependencies_by_project(
         self, project_id: UUID
     ) -> list["TaskDependencyResponse"]:
         return [
-            TaskDependencyResponse(
-                id=d.id, task_id=d.task_id, depends_on_id=d.depends_on_id
-            )
+            _dep_response(d)
             for d in await self.repo.get_dependencies_by_project(project_id)
         ]
 

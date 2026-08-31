@@ -88,7 +88,7 @@ function analytics(over: Partial<ProjectAnalytics> = {}): ProjectAnalytics {
         cycle_time_bdays: 6,
         on_time_pct: 80,
         returns_received: 1,
-        logged_hours: 12,
+        logged_days: 12,
       },
     ],
     delivery_lapses: [

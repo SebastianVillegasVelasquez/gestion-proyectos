@@ -110,25 +110,25 @@ class TaskRepository(BaseRepository[Task]):
         )
         return (await self._session.execute(query)).all()
 
-    async def logged_hours(self, task_id: UUID) -> Decimal:
+    async def logged_days(self, task_id: UUID) -> Decimal:
         total = await self._session.scalar(
-            select(func.coalesce(func.sum(TaskTimeEntry.hours), 0)).where(
+            select(func.coalesce(func.sum(TaskTimeEntry.days), 0)).where(
                 TaskTimeEntry.task_id == task_id
             )
         )
         return Decimal(total or 0)
 
-    async def logged_hours_by_task(self, task_ids: list[UUID]) -> dict[UUID, Decimal]:
-        """Horas dedicadas de VARIAS tareas en una sola consulta.
+    async def logged_days_by_task(self, task_ids: list[UUID]) -> dict[UUID, Decimal]:
+        """Días dedicados de VARIAS tareas en una sola consulta.
 
-        Las listas de tareas muestran "3 / 8 h" en cada fila; pedir la suma
+        Las listas de tareas muestran "3 / 8 d" en cada fila; pedir la suma
         tarea a tarea sería una consulta por fila (N+1).
         """
         if not task_ids:
             return {}
         rows = (
             await self._session.execute(
-                select(TaskTimeEntry.task_id, func.sum(TaskTimeEntry.hours))
+                select(TaskTimeEntry.task_id, func.sum(TaskTimeEntry.days))
                 .where(TaskTimeEntry.task_id.in_(task_ids))
                 .group_by(TaskTimeEntry.task_id)
             )
@@ -207,11 +207,19 @@ class TaskRepository(BaseRepository[Task]):
         # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
         return [tuple(r) for r in (await self._session.execute(query)).all()]
 
+    # El predecesor puede ser una tarea o un elemento del árbol; para saber si
+    # ese elemento cuenta como "entregado" hay que mirar su tipo (que tiene
+    # lazy="raise"), así que se trae por adelantado con la dependencia.
+    _DEP_LOADS = (
+        selectinload(TaskDependency.depends_on),
+        selectinload(TaskDependency.depends_on_work_item).selectinload(WorkItem.tipo),
+    )
+
     async def get_dependencies(self, task_id: UUID) -> list[TaskDependency]:
         query = (
             select(TaskDependency)
             .where(TaskDependency.task_id == task_id)
-            .options(selectinload(TaskDependency.depends_on))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
 
@@ -227,6 +235,7 @@ class TaskRepository(BaseRepository[Task]):
             select(TaskDependency)
             .join(Task, TaskDependency.task_id == Task.id)
             .where(Task.project_id == project_id, Task.deleted_at.is_(None))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
 
@@ -241,9 +250,19 @@ class TaskRepository(BaseRepository[Task]):
             select(TaskDependency)
             .join(Task, TaskDependency.task_id == Task.id)
             .where(Task.team_id == team_id, Task.deleted_at.is_(None))
-            .options(selectinload(TaskDependency.depends_on))
+            .options(*self._DEP_LOADS)
         )
         return list((await self._session.execute(query)).scalars().all())
+
+    async def get_work_item(self, work_item_id: UUID):
+        """El WorkItem (con su tipo) o None. Para validar una dependencia
+        tarea→elemento sin arrastrar el repositorio del árbol."""
+        query = (
+            select(WorkItem)
+            .where(WorkItem.id == work_item_id)
+            .options(selectinload(WorkItem.tipo))
+        )
+        return (await self._session.execute(query)).scalars().first()
 
     async def add_dependency(self, dependency: TaskDependency) -> TaskDependency:
         self._session.add(dependency)
@@ -251,23 +270,39 @@ class TaskRepository(BaseRepository[Task]):
         await self._session.refresh(dependency)
         return dependency
 
-    async def dependency_exists(self, task_id: UUID, depends_on_id: UUID) -> bool:
+    async def dependency_exists(
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> bool:
+        target = (
+            TaskDependency.depends_on_id == depends_on_id
+            if depends_on_id is not None
+            else TaskDependency.depends_on_work_item_id == depends_on_work_item_id
+        )
         query = select(TaskDependency.id).where(
-            TaskDependency.task_id == task_id,
-            TaskDependency.depends_on_id == depends_on_id,
+            TaskDependency.task_id == task_id, target
         )
         return (await self._session.execute(query)).first() is not None
 
-    async def delete_dependency(self, task_id: UUID, depends_on_id: UUID) -> bool:
+    async def delete_dependency(
+        self,
+        task_id: UUID,
+        depends_on_id: UUID | None = None,
+        depends_on_work_item_id: UUID | None = None,
+    ) -> bool:
         """Borra la arista FtS (borrado físico: la tabla no tiene soft-delete).
 
         Devuelve True si se borró alguna fila, False si no existía.
         """
+        target = (
+            TaskDependency.depends_on_id == depends_on_id
+            if depends_on_id is not None
+            else TaskDependency.depends_on_work_item_id == depends_on_work_item_id
+        )
         result = await self._session.execute(
-            delete(TaskDependency).where(
-                TaskDependency.task_id == task_id,
-                TaskDependency.depends_on_id == depends_on_id,
-            )
+            delete(TaskDependency).where(TaskDependency.task_id == task_id, target)
         )
         await self._session.flush()
         return bool(getattr(result, "rowcount", 0))

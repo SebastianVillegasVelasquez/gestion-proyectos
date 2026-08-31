@@ -56,7 +56,7 @@ export function TaskEditForm({
   const [assignment, setAssignment] = useState<Assignment>(initialAssignment(task));
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
   const [teamId, setTeamId] = useState(task.team_id ?? "");
-  const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours ?? "");
+  const [estimatedDays, setEstimatedDays] = useState(task.estimated_days ?? "");
   const [requiresApproval, setRequiresApproval] = useState(task.requires_approval);
 
   const save = () => {
@@ -78,9 +78,9 @@ export function TaskEditForm({
     if ((dueDate || null) !== (task.due_date ?? null)) {
       payload.due_date = dueDate || null;
     }
-    if ((estimatedHours || null) !== (task.estimated_hours ?? null)) {
+    if ((estimatedDays || null) !== (task.estimated_days ?? null)) {
       // Vacío = sin estimar (null), no cero: son cosas distintas.
-      payload.estimated_hours = estimatedHours || null;
+      payload.estimated_days = estimatedDays || null;
     }
     if (requiresApproval !== task.requires_approval) {
       payload.requires_approval = requiresApproval;
@@ -169,7 +169,7 @@ export function TaskEditForm({
         </div>
         <div>
           <label className={labelClass} htmlFor="task-estimated">
-            Horas estimadas
+            Días estimados
           </label>
           <input
             id="task-estimated"
@@ -177,9 +177,9 @@ export function TaskEditForm({
             step="0.25"
             min="0"
             placeholder="Sin estimar"
-            value={estimatedHours}
+            value={estimatedDays}
             onChange={(e) => {
-              setEstimatedHours(e.target.value);
+              setEstimatedDays(e.target.value);
             }}
             className={fieldClass}
           />

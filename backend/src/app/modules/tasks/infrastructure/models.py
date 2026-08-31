@@ -6,7 +6,15 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, UUID, Enum, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Numeric,
+    UUID,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import String, Text, Date, DateTime
 
@@ -43,10 +51,10 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     # Toda tarea pertenece a un proyecto desde su creación, exista o no todavía
     # una estructura para colgarla. Es la referencia estable para listarlas.
-    # Esfuerzo ESTIMADO en horas (lo que se cree que costará). Lo realmente
+    # Esfuerzo ESTIMADO en días (lo que se cree que costará). Lo realmente
     # dedicado vive en `time_entries`: comparar ambos es lo que permite
-    # planificar mejor la próxima vez y sostener un modelo de pago por horas.
-    estimated_hours: Mapped[Optional[Decimal]] = mapped_column(
+    # planificar mejor la próxima vez y sostener el modelo de pago.
+    estimated_days: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(6, 2), nullable=True
     )
 
@@ -182,9 +190,13 @@ class TaskHistory(Base, UUIDMixin, TimestampMixin):
 
 
 class TaskDependency(Base, UUIDMixin, TimestampMixin):
-    """Dependencia finish-to-start entre dos tareas.
+    """Dependencia finish-to-start de una tarea sobre OTRA tarea o sobre un
+    elemento del árbol (`work_items`).
 
-    `task` no puede iniciar hasta que `depends_on` esté completada.
+    `task` no puede avanzar hasta que su predecesor esté "hecho": la otra tarea
+    COMPLETADA, o el elemento entregado (fecha real de fin, o —si es una
+    actividad de terceros— su fecha de entrega ya fijada). Exactamente uno de
+    `depends_on_id` / `depends_on_work_item_id` va relleno.
     """
 
     __tablename__ = "task_dependencies"
@@ -194,29 +206,50 @@ class TaskDependency(Base, UUIDMixin, TimestampMixin):
         ForeignKey("tasks.id", ondelete="CASCADE"),
         nullable=False,
     )
-    depends_on_id: Mapped[uuid.UUID] = mapped_column(
+    depends_on_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tasks.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    # Predecesor que es un elemento del árbol (típico: una «actividad de
+    # terceros», o cualquier módulo/unidad del que cuelga trabajo).
+    depends_on_work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("work_items.id", ondelete="CASCADE"),
+        nullable=True,
     )
 
     task: Mapped["Task"] = relationship(
         "Task", foreign_keys=[task_id], back_populates="dependencies"
     )
-    depends_on: Mapped["Task"] = relationship("Task", foreign_keys=[depends_on_id])
+    depends_on: Mapped[Optional["Task"]] = relationship(
+        "Task", foreign_keys=[depends_on_id]
+    )
+    depends_on_work_item: Mapped[Optional["WorkItem"]] = relationship(
+        "WorkItem", foreign_keys=[depends_on_work_item_id], lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("task_id", "depends_on_id", name="uq_task_dependency"),
+        UniqueConstraint(
+            "task_id", "depends_on_work_item_id", name="uq_task_dep_work_item"
+        ),
+        CheckConstraint(
+            "(depends_on_id IS NOT NULL)::int "
+            "+ (depends_on_work_item_id IS NOT NULL)::int = 1",
+            name="ck_task_dep_one_target",
+        ),
     )
 
 
 class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
-    """Horas dedicadas a una tarea por una persona en un día.
+    """Días dedicados a una tarea por una persona en un día concreto.
 
     Se registra por DÍA y no como un cronómetro: aquí nadie va a arrancar y
     parar un contador mientras graba un video; lo que se hace es apuntar al
-    final de la jornada. Cada apunte es una fila (no un acumulador) para poder
-    corregir uno sin recalcular nada, y para saber quién dedicó qué.
+    final de la jornada (p. ej. `0.5` = media jornada). Cada apunte es una fila
+    (no un acumulador) para poder corregir uno sin recalcular nada, y para
+    saber quién dedicó qué.
     """
 
     __tablename__ = "task_time_entries"
@@ -233,8 +266,8 @@ class TaskTimeEntry(Base, UUIDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
-    # Día al que se imputan las horas (no cuándo se apuntaron).
+    days: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    # Día al que se imputa el esfuerzo (no cuándo se apuntó).
     work_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

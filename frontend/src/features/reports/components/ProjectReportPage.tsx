@@ -213,7 +213,7 @@ function IndividualTab({ rows }: { rows: PersonPerformance[] }) {
             <th className="px-3 py-3 text-right">Cycle</th>
             <th className="px-3 py-3 text-right">A tiempo</th>
             <th className="px-3 py-3 text-right">Devoluciones</th>
-            <th className="px-3 py-3 text-right">Horas</th>
+            <th className="px-3 py-3 text-right">Días</th>
           </tr>
         </thead>
         <tbody>
@@ -242,7 +242,7 @@ function IndividualTab({ rows }: { rows: PersonPerformance[] }) {
                 {p.returns_received}
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                {p.logged_hours.toLocaleString("es-CO", { maximumFractionDigits: 1 })} h
+                {p.logged_days.toLocaleString("es-CO", { maximumFractionDigits: 1 })} d
               </td>
             </tr>
           ))}

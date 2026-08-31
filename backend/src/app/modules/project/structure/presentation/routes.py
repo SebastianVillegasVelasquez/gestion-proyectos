@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.core.dependencies import (
+    event_bus_dependency,
     project_repo_dependency,
     require_role,
     task_repo_dependency,
@@ -140,9 +141,13 @@ async def update_work_item(
     item_id: UUID,
     data: UpdateWorkItemRequest,
     repo=Depends(worktree_repo_dependency),
+    task_repo=Depends(task_repo_dependency),
+    bus=Depends(event_bus_dependency),
     current_user=Depends(_admin),
 ):
-    return await UpdateWorkItemUseCase(repo).execute(item_id, data)
+    return await UpdateWorkItemUseCase(repo, task_repo, bus).execute(
+        item_id, data, actor_id=current_user.id
+    )
 
 
 @router.delete("/work-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

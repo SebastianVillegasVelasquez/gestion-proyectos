@@ -19,6 +19,8 @@ from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.base_repository import Repository
+from app.shared.events import EventBus
+from app.shared.events.events import ThirdPartyDeliveryDateSet
 from app.shared.exceptions import NotFoundError
 
 
@@ -81,13 +83,103 @@ class CreateWorkItemUseCase:
 
 
 class UpdateWorkItemUseCase:
-    def __init__(self, repo: WorkTreeRepository):
+    """Edita un elemento del árbol.
+
+    Si el elemento es de un tipo "dependencia de terceros" y este PATCH cambia
+    su fecha plan (la de entrega del tercero), publica
+    `ThirdPartyDeliveryDateSet`: los responsables de las tareas colgadas de sus
+    hijos directos —que estaban a la espera— reciben aviso de que ya pueden
+    planificarse. Necesita `task_repo` y `bus` para eso; sin ellos, se comporta
+    como antes (solo edita).
+    """
+
+    def __init__(
+        self,
+        repo: WorkTreeRepository,
+        task_repo: TaskRepository | None = None,
+        bus: EventBus | None = None,
+    ):
+        self.repo = repo
         self.service = WorkTreeService(repo)
+        self.task_repo = task_repo
+        self._bus = bus
 
     async def execute(
-        self, item_id: UUID, data: UpdateWorkItemRequest
+        self,
+        item_id: UUID,
+        data: UpdateWorkItemRequest,
+        actor_id: UUID | None = None,
     ) -> WorkItemResponse:
-        return await self.service.update_item(item_id, data)
+        before = await self.repo.get_item(item_id)
+        before_dates = (
+            (before.fecha_inicio_plan, before.fecha_fin_plan)
+            if before is not None
+            else (None, None)
+        )
+        response = await self.service.update_item(item_id, data)
+
+        if self._bus is not None and self.task_repo is not None:
+            await self._maybe_notify_third_party(item_id, data, before_dates, actor_id)
+        return response
+
+    async def _maybe_notify_third_party(
+        self,
+        item_id: UUID,
+        data: UpdateWorkItemRequest,
+        before_dates: tuple,
+        actor_id: UUID | None,
+    ) -> None:
+        assert self.task_repo is not None and self._bus is not None
+        touched = set(data.model_dump(exclude_unset=True))
+        if not touched & {"fecha_inicio_plan", "fecha_fin_plan"}:
+            return
+
+        item = await self.repo.get_item(item_id)
+        if item is None:
+            return
+        tipo = await self.repo.get_tipo(item.tipo_id)
+        if not WorkTreeService._is_third_party(tipo):
+            return
+
+        after_dates = (item.fecha_inicio_plan, item.fecha_fin_plan)
+        if after_dates == before_dates:
+            return
+
+        # Los hijos directos son los que "heredan" la fecha del tercero; sus
+        # tareas son las que dependían primero de él.
+        all_items = await self.repo.list_items(item.proyecto_id)
+        child_ids = {
+            i.id for i in all_items if i.parent_id == item_id and not i.is_deleted
+        }
+        if not child_ids:
+            return
+
+        tasks = await self.task_repo.get_all_by_project(item.proyecto_id)
+        affected = [
+            t
+            for t in tasks
+            if t.work_item_id in child_ids
+            and not t.is_deleted
+            and t.assignee_id is not None
+        ]
+        recipient_ids = tuple(
+            {t.assignee_id for t in affected if t.assignee_id is not None}
+        )
+        if not recipient_ids:
+            return
+
+        await self._bus.publish(
+            ThirdPartyDeliveryDateSet(
+                project_id=item.proyecto_id,
+                work_item_id=item.id,
+                work_item_nombre=item.nombre,
+                delivery_date=item.fecha_fin_plan or item.fecha_inicio_plan,
+                recipient_ids=recipient_ids,
+                task_ids=tuple(t.id for t in affected),
+                actor_id=actor_id,
+                occurred_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+        )
 
 
 class DeleteWorkItemUseCase:

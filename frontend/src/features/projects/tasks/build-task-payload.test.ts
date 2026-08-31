@@ -69,13 +69,44 @@ describe("buildTaskPayload", () => {
     expect(payload.duration_days).toBeUndefined();
   });
 
-  it("omits duration when there is no start date", () => {
+  it("omits duration but keeps the estimate when there is no start date", () => {
     const payload = buildTaskPayload(
       { ...emptyTaskForm("wi1"), title: "Sin inicio", dateMode: "duration", durationDays: "5" },
       "p1",
     );
     expect(payload.start_date).toBeNull();
     expect(payload.duration_days).toBeUndefined();
+    // La duración se conserva como estimación de esfuerzo.
+    expect(payload.estimated_days).toBe("5");
+  });
+
+  it("keeps the duration as the estimate when there IS a start date too", () => {
+    const payload = buildTaskPayload(
+      {
+        ...emptyTaskForm("wi1"),
+        title: "Con inicio",
+        startDate: "2026-07-01",
+        dateMode: "duration",
+        durationDays: "3",
+      },
+      "p1",
+    );
+    expect(payload.duration_days).toBe(3);
+    expect(payload.estimated_days).toBe("3");
+  });
+
+  it("does not set an estimate from an explicit end date", () => {
+    const payload = buildTaskPayload(
+      {
+        ...emptyTaskForm("wi1"),
+        title: "Con fin",
+        startDate: "2026-07-01",
+        dateMode: "end",
+        dueDate: "2026-07-10",
+      },
+      "p1",
+    );
+    expect(payload.estimated_days).toBeUndefined();
   });
 
   it("no exige aprobación por defecto", () => {
@@ -115,6 +146,17 @@ describe("validateTaskForm", () => {
 
   it("requires positive duration", () => {
     expect(validateTaskForm({ ...base, durationDays: "0" })).toMatch(/duración/i);
+  });
+
+  it("validates the duration even without a start date", () => {
+    expect(
+      validateTaskForm({
+        ...emptyTaskForm("wi1"),
+        title: "Sin inicio",
+        dateMode: "duration",
+        durationDays: "-2",
+      }),
+    ).toMatch(/duración/i);
   });
 
   it("allows a task with no dates (draft)", () => {

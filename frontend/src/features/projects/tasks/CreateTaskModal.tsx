@@ -13,6 +13,7 @@ import {
   buildTaskPayload,
   emptyTaskForm,
   validateTaskForm,
+  WORK_ITEM_DEP_PREFIX,
   type TaskFormState,
 } from "./build-task-payload";
 
@@ -80,6 +81,29 @@ export function CreateTaskModal({
     const path = workItemPath(treeQuery.data ?? [], form.workItemId || null);
     return path ? (path.split(" / ").pop() ?? null) : null;
   }, [treeQuery.data, form.workItemId]);
+
+  // Elementos que se comportan como dependencia de terceros: una tarea puede
+  // depender de ellos (además de depender de otra tarea).
+  const depWorkItems = useMemo(() => {
+    const depTypeIds = new Set(
+      (nodeTypesQuery.data ?? []).filter((t) => t.es_dependencia_externa).map((t) => t.id),
+    );
+    if (depTypeIds.size === 0) {
+      return [] as { id: string; nombre: string }[];
+    }
+    const out: { id: string; nombre: string }[] = [];
+    const roots = treeQuery.data ?? [];
+    const walk = (nodes: typeof roots) => {
+      nodes.forEach((n) => {
+        if (depTypeIds.has(n.tipo_id)) {
+          out.push({ id: n.id, nombre: n.nombre });
+        }
+        walk(n.children);
+      });
+    };
+    walk(roots);
+    return out;
+  }, [nodeTypesQuery.data, treeQuery.data]);
 
   const handleSubmit = () => {
     const error = validateTaskForm(form);
@@ -293,11 +317,22 @@ export function CreateTaskModal({
               }}
             >
               <option value="">Sin dependencia</option>
-              {tasks.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
+              {depWorkItems.length > 0 && (
+                <optgroup label="Elementos (actividad de terceros)">
+                  {depWorkItems.map((w) => (
+                    <option key={w.id} value={`${WORK_ITEM_DEP_PREFIX}${w.id}`}>
+                      {w.nombre}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Tareas">
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </Field>
 
@@ -319,7 +354,8 @@ export function CreateTaskModal({
           </Field>
 
           {/* Fechas: inicio + (fin o duración). Opcionales: la tarea puede
-              crearse sin planificar y ajustarse después. */}
+              crearse sin planificar y ajustarse después. La duración en días
+              queda además como estimación de esfuerzo aunque no haya fecha. */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Inicio (opcional)">
               <input
@@ -331,7 +367,7 @@ export function CreateTaskModal({
                 }}
               />
             </Field>
-            <Field label={form.dateMode === "duration" ? "Duración (días)" : "Fin"}>
+            <Field label={form.dateMode === "duration" ? "Duración / estimado (días)" : "Fin"}>
               <div className="flex gap-1">
                 {form.dateMode === "duration" ? (
                   <input

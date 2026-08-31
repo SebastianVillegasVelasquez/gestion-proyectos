@@ -1081,3 +1081,42 @@ class TestShiftSubtree:
         await service.shift_subtree(root.id, 7)
         unchanged = await service.get_item(sibling.id)
         assert unchanged.fecha_inicio_plan == D(2026, 1, 1)
+
+
+class TestSiblingOrderingByDependencies:
+    """`get_tree` ordena cada grupo de hermanos por sus dependencias FtS:
+    la predecesora va antes que la que depende de ella."""
+
+    async def _ids_at_root(self, service):
+        tree = await service.get_tree(PROYECTO)
+        return [n.nombre for n in tree]
+
+    async def test_predecessor_comes_before_successor(self, service):
+        t = await _tipo(service, "Nodo")
+        a = await _item(service, t.id, "A")  # orden 0
+        b = await _item(service, t.id, "B")  # orden 1
+        c = await _item(service, t.id, "C")  # orden 2
+
+        # B depende de A; A depende de C  →  orden esperado: C, A, B
+        await service.add_dependency(b.id, a.id)
+        await service.add_dependency(a.id, c.id)
+
+        assert await self._ids_at_root(service) == ["C", "A", "B"]
+
+    async def test_stable_without_dependencies(self, service):
+        t = await _tipo(service, "Nodo")
+        await _item(service, t.id, "A")
+        await _item(service, t.id, "B")
+        await _item(service, t.id, "C")
+        assert await self._ids_at_root(service) == ["A", "B", "C"]
+
+    async def test_ordering_is_scoped_per_sibling_group(self, service):
+        t = await _tipo(service, "Nodo")
+        padre = await _item(service, t.id, "P")
+        h1 = await _item(service, t.id, "H1", parent_id=padre.id)  # orden 0
+        h2 = await _item(service, t.id, "H2", parent_id=padre.id)  # orden 1
+        await service.add_dependency(h1.id, h2.id)  # H1 depende de H2
+
+        tree = await service.get_tree(PROYECTO)
+        p_node = next(n for n in tree if n.nombre == "P")
+        assert [c.nombre for c in p_node.children] == ["H2", "H1"]

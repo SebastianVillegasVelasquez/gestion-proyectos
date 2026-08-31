@@ -15,9 +15,9 @@ from app.shared.base_model import BaseModelConfig
 
 class TaskBase(BaseModelConfig):
     title: Annotated[str, StringConstraints(min_length=2, max_length=200)]
-    # Esfuerzo estimado en horas. Opcional: una tarea puede nacer sin estimar
+    # Esfuerzo estimado en días. Opcional: una tarea puede nacer sin estimar
     # y estimarse cuando se sepa de qué va.
-    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
+    estimated_days: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIA
     assignee_id: Optional[UUID] = None
@@ -105,21 +105,26 @@ class CreateTaskRequest(TaskBase):
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
+    # Predecesor que es un elemento del árbol (p. ej. una actividad de terceros).
+    depends_on_work_item_id: Optional[UUID] = None
 
     # Las fechas son opcionales: una tarea puede crearse "por acomodar" y fijar
     # inicio, fin y responsable más tarde. Se puede dar la fecha de fin o la
-    # duración en días (de la que se calcula el fin) cuando ya hay inicio.
+    # duración en días (de la que se calcula el fin).
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     duration_days: Optional[int] = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def resolve_dates(self) -> "CreateTaskRequest":
-        # Solo derivamos y validamos coherencia cuando los datos vienen; sin
-        # fechas la tarea queda como borrador a la espera de planificación.
-        if self.due_date is None and self.duration_days is not None:
-            if self.start_date is None:
-                raise ValueError("Indica la fecha de inicio para usar la duración")
+        # Con inicio + duración se calcula el fin. SIN inicio, la duración se
+        # conserva (la usa el caso de uso para anclar al inicio del proyecto);
+        # no es un error.
+        if (
+            self.due_date is None
+            and self.duration_days is not None
+            and self.start_date is not None
+        ):
             self.due_date = self.start_date + timedelta(days=self.duration_days)
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
@@ -160,6 +165,7 @@ class CreateTeamTaskRequest(BaseModelConfig):
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
     # Igual que en `CreateTaskRequest`: desactivado por defecto, se puede
     # marcar para exigir aprobación del líder/supervisor.
     requires_approval: bool = False
@@ -170,9 +176,11 @@ class CreateTeamTaskRequest(BaseModelConfig):
 
     @model_validator(mode="after")
     def resolve_dates(self) -> "CreateTeamTaskRequest":
-        if self.due_date is None and self.duration_days is not None:
-            if self.start_date is None:
-                raise ValueError("Indica la fecha de inicio para usar la duración")
+        if (
+            self.due_date is None
+            and self.duration_days is not None
+            and self.start_date is not None
+        ):
             self.due_date = self.start_date + timedelta(days=self.duration_days)
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
@@ -190,15 +198,15 @@ class TaskResponse(TaskBase):
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
-    # Horas realmente dedicadas (suma de los apuntes). Se calcula en lectura;
+    # Días realmente dedicados (suma de los apuntes). Se calcula en lectura;
     # 0 cuando nadie ha registrado nada todavía.
-    logged_hours: Decimal = Decimal("0")
+    logged_days: Decimal = Decimal("0")
 
 
 class CreateTimeEntryRequest(BaseModelConfig):
-    """Apunte de horas dedicadas a una tarea en un día."""
+    """Apunte de días dedicados a una tarea en una jornada (p. ej. 0.5)."""
 
-    hours: Annotated[Decimal, Field(gt=0, le=24)]
+    days: Annotated[Decimal, Field(gt=0, le=1)]
     work_date: date
     notes: Optional[Annotated[str, StringConstraints(max_length=500)]] = None
 
@@ -207,10 +215,10 @@ class TimeEntryResponse(BaseModelConfig):
     id: UUID
     task_id: UUID
     user_id: UUID
-    # Nombre de quien dedicó las horas, resuelto en lectura para no pedir el
+    # Nombre de quien dedicó el esfuerzo, resuelto en lectura para no pedir el
     # directorio entero solo para pintar una lista de apuntes.
     user_name: Optional[str] = None
-    hours: Decimal
+    days: Decimal
     work_date: date
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -220,8 +228,8 @@ class TaskEffortResponse(BaseModelConfig):
     """Estimado vs. dedicado de una tarea, con el detalle de los apuntes."""
 
     task_id: UUID
-    estimated_hours: Optional[Decimal] = None
-    logged_hours: Decimal = Decimal("0")
+    estimated_days: Optional[Decimal] = None
+    logged_days: Decimal = Decimal("0")
     entries: list[TimeEntryResponse] = []
 
 
@@ -230,13 +238,24 @@ class AttachTaskRequest(BaseModelConfig):
 
 
 class CreateTaskDependencyRequest(BaseModelConfig):
-    depends_on_id: UUID
+    # Predecesor: otra tarea O un elemento del árbol. Exactamente uno.
+    depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def one_target(self) -> "CreateTaskDependencyRequest":
+        if (self.depends_on_id is None) == (self.depends_on_work_item_id is None):
+            raise ValueError(
+                "Indica una tarea O un elemento del que depender, no ambos ni ninguno"
+            )
+        return self
 
 
 class TaskDependencyResponse(BaseModelConfig):
     id: UUID
     task_id: UUID
-    depends_on_id: UUID
+    depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
 
 
 class UpdateTaskStatusRequest(BaseModelConfig):
@@ -254,7 +273,7 @@ class UpdateTaskRequest(BaseModelConfig):
     team_id: Optional[UUID] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
-    estimated_hours: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
+    estimated_days: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     requires_approval: Optional[bool] = None
 
     @model_validator(mode="after")

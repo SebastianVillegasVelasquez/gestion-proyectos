@@ -48,8 +48,16 @@ function nullIfEmpty(value: string): string | null {
 
 /** Construye el payload de creación a partir del formulario (puro y testeable).
  * `projectId` ancla la tarea al proyecto cuando se crea suelta (sin elemento). */
+/** El selector de "Depende de" mezcla tareas y elementos del árbol; los
+ * elementos van prefijados con `wi:` para distinguirlos en el payload. */
+export const WORK_ITEM_DEP_PREFIX = "wi:";
+
 export function buildTaskPayload(form: TaskFormState, projectId: string): CreateTaskPayload {
   const workItemId = nullIfEmpty(form.workItemId);
+  const dep = nullIfEmpty(form.dependsOnId);
+  const dependsOnWorkItem = dep?.startsWith(WORK_ITEM_DEP_PREFIX)
+    ? dep.slice(WORK_ITEM_DEP_PREFIX.length)
+    : null;
   // Exclusividad persona/equipo: solo se envía el que corresponde al modo, el
   // otro va en null aunque el formulario tuviera un valor viejo seleccionado.
   const payload: CreateTaskPayload = {
@@ -58,7 +66,8 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     priority: form.priority,
     assignee_id: form.assignmentMode === "person" ? nullIfEmpty(form.assigneeId) : null,
     team_id: form.assignmentMode === "team" ? nullIfEmpty(form.teamId) : null,
-    depends_on_id: nullIfEmpty(form.dependsOnId),
+    depends_on_id: dependsOnWorkItem ? null : dep,
+    depends_on_work_item_id: dependsOnWorkItem,
     work_item_id: workItemId,
     project_id: workItemId ? undefined : projectId,
     // Las fechas son opcionales: la tarea puede quedar como borrador y
@@ -67,8 +76,20 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     requires_approval: form.requiresApproval,
   };
 
+  // La "duración en días" es también la estimación de esfuerzo de la tarea: se
+  // guarda como `estimated_days` aunque no haya fecha de inicio, así se ve y se
+  // edita después (antes se perdía si no dabas fecha).
+  if (
+    form.dateMode === "duration" &&
+    form.durationDays.trim() !== "" &&
+    Number(form.durationDays) > 0
+  ) {
+    payload.estimated_days = form.durationDays.trim();
+  }
+
   if (form.startDate) {
     if (form.dateMode === "duration" && form.durationDays.trim() !== "") {
+      // Con fecha de inicio, el backend además deriva el fin de esta duración.
       payload.duration_days = Number(form.durationDays);
     } else if (form.dateMode === "end") {
       payload.due_date = nullIfEmpty(form.dueDate);
@@ -83,19 +104,17 @@ export function validateTaskForm(form: TaskFormState): string | null {
   if (form.title.trim().length < 2) {
     return "El título debe tener al menos 2 caracteres";
   }
-  // Las fechas son opcionales, pero si el usuario abre la duración/fin sobre una
-  // fecha de inicio, validamos coherencia mínima.
-  if (form.startDate) {
-    if (
-      form.dateMode === "duration" &&
-      form.durationDays.trim() !== "" &&
-      Number(form.durationDays) <= 0
-    ) {
-      return "La duración debe ser mayor a 0 días";
-    }
-    if (form.dateMode === "end" && form.dueDate && form.dueDate < form.startDate) {
-      return "La fecha de fin no puede ser anterior al inicio";
-    }
+  // La duración/estimado en días se valida siempre que se escriba (vale con o
+  // sin fecha de inicio); la coherencia inicio/fin, solo si hay inicio.
+  if (
+    form.dateMode === "duration" &&
+    form.durationDays.trim() !== "" &&
+    Number(form.durationDays) <= 0
+  ) {
+    return "La duración debe ser mayor a 0 días";
+  }
+  if (form.startDate && form.dateMode === "end" && form.dueDate && form.dueDate < form.startDate) {
+    return "La fecha de fin no puede ser anterior al inicio";
   }
   return null;
 }

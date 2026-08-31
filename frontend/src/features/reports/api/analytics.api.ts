@@ -52,7 +52,7 @@ export interface PersonPerformance {
   cycle_time_bdays: number;
   on_time_pct: number;
   returns_received: number;
-  logged_hours: number;
+  logged_days: number;
 }
 export interface DeliveryLapse {
   task_id: string;
