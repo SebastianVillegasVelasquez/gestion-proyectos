@@ -11,9 +11,12 @@ from sqlalchemy import (
     CheckConstraint,
     Enum,
     ForeignKey,
+    Index,
+    Integer,
     Numeric,
     UUID,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import String, Text, Date, DateTime
@@ -108,6 +111,30 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # la reparte desde la bolsa del equipo) y por defecto viene desactivado.
     requires_approval: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
+    )
+
+    # Posición entre las tareas hermanas (mismo `work_item_id` y mismo
+    # `parent_task_id`). Es el orden de prioridad / cumplimiento que el usuario
+    # fija a mano; no tiene nada que ver con las fechas. Menor = antes.
+    orden: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # True cuando esta tarea ES el elemento de la estructura del que cuelga
+    # (`work_item_id`): "Elemento 1" que además es una tarea asignable, con sus
+    # propias subtareas, sin dejar de ser un contenedor en el árbol. Como mucho
+    # una viva por elemento (índice único parcial en `__table_args__`).
+    represents_work_item: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_task_represents_work_item",
+            "work_item_id",
+            unique=True,
+            postgresql_where=text("represents_work_item AND deleted_at IS NULL"),
+        ),
     )
 
     project: Mapped["Project"] = relationship("Project", lazy="raise")

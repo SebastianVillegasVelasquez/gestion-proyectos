@@ -247,6 +247,12 @@ export interface Task {
   // null = tarea suelta, todavía sin adjuntar a un elemento de la estructura.
   work_item_id: string | null;
   parent_task_id: string | null;
+  /** Posición entre las tareas hermanas: la prioridad / orden de cumplimiento
+   * que se fija a mano (menor = antes). No tiene relación con las fechas. */
+  orden: number;
+  /** true cuando esta tarea ES el elemento de la estructura del que cuelga
+   * (un "Elemento 1" que además es una tarea asignable, con sus subtareas). */
+  represents_work_item: boolean;
   title: string;
   description: string | null;
   priority: TaskPriority;

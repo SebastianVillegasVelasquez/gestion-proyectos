@@ -15,6 +15,8 @@ import {
   Link2,
   ListChecks,
   ListPlus,
+  ClipboardList,
+  ClipboardX,
   Search,
   GanttChartSquare,
   ChevronsDownUp,
@@ -22,6 +24,7 @@ import {
   MoreVertical,
   GripVertical,
   CornerLeftUp,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -49,11 +52,18 @@ import {
   type DropPos,
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
-import { useDeleteTask, useProjectTasks } from "../../hooks/use-tasks";
+import {
+  useDeleteTask,
+  useDemoteWorkItemTask,
+  useProjectTasks,
+  usePromoteWorkItemToTask,
+  useReorderTask,
+} from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
-import { indexById } from "../../utils/task-assignment";
+import { fullName, indexById, resolveAssignment } from "../../utils/task-assignment";
 import { formatShortDate } from "../../utils/task-dates";
+import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
 import { CreateTaskModal } from "../../tasks/CreateTaskModal";
 import { BulkTasksFromBranchModal } from "./BulkTasksFromBranchModal";
 import { DateConflictModal } from "./DateConflictModal";
@@ -62,7 +72,8 @@ import { WorkItemModal } from "./WorkItemModal";
 import { CloneWorkItemModal } from "./CloneWorkItemModal";
 import { DependenciesModal } from "./DependenciesModal";
 import { NodeTasksModal } from "./NodeTasksModal";
-import { StructureTaskRow } from "./StructureTaskRow";
+import { StructureTaskTree } from "./StructureTaskRow";
+import { buildTaskForest } from "../../utils/task-order";
 import { TaskDetailModal } from "./TaskDetailModal";
 import type { ProjectMember, Task, Team, TipoNodo, WorkItemTree } from "../../types/api.types";
 
@@ -290,12 +301,18 @@ interface TreeNodeProps {
   onOutdent: (node: WorkItemTree) => void;
   onCreateTask: (node: WorkItemTree) => void;
   onBulkTasks: (node: WorkItemTree) => void;
+  /** Convierte el elemento en una tarea (1:1) sin sacarlo del árbol. */
+  onPromote: (node: WorkItemTree) => void;
+  /** Deshace la conversión (pide confirmación en el panel). */
+  onDemote: (node: WorkItemTree) => void;
   /** Tareas colgadas de cada elemento, ya agrupadas por el panel. */
   tasksByItem: Map<string, Task[]>;
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
   onOpenTask: (task: Task, containerName: string) => void;
   onDeleteTask: (task: Task) => void;
+  /** Recoloca una tarea entre sus hermanas (prioridad / orden de cumplimiento). */
+  onReorderTask: (task: Task, afterId: string | null) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -327,11 +344,14 @@ function TreeNode({
   onOutdent,
   onCreateTask,
   onBulkTasks,
+  onPromote,
+  onDemote,
   tasksByItem,
   memberById,
   teamById,
   onOpenTask,
   onDeleteTask,
+  onReorderTask,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -351,7 +371,12 @@ function TreeNode({
   // elementos: se pliegan con la misma flecha y cuentan para saber si hay algo
   // dentro. Un módulo sin sub-elementos pero con tareas ya no se ve vacío.
   const tasks = tasksByItem.get(node.id) ?? [];
-  const hasChildren = node.children.length > 0 || tasks.length > 0;
+  // La tarea que ES este elemento (si se convirtió en tarea): se muestra EN la
+  // fila del elemento, no como una tarea hija. Sus subtareas sí bajan al árbol.
+  const selfTask = tasks.find((t) => t.represents_work_item) ?? null;
+  const selfAssignment = selfTask ? resolveAssignment(selfTask, memberById, teamById) : null;
+  const taskForest = buildTaskForest(tasks, selfTask?.id);
+  const hasChildren = node.children.length > 0 || taskForest.length > 0;
   const pct =
     node.porcentaje_completado != null ? Math.round(node.porcentaje_completado * 100) : null;
   // ¿Este nodo es un destino de suelta válido, y en qué zona?
@@ -469,7 +494,53 @@ function TreeNode({
           </span>
         )}
 
+        {selfTask && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand-gold/15 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-gold-dark dark:text-brand-gold">
+            <ClipboardList className="size-2.5" /> tarea
+          </span>
+        )}
+
         <div className="ml-auto flex items-center gap-3">
+          {/* El elemento ES una tarea: su responsable/equipo y estado se ven
+              aquí mismo. Un clic abre su ficha. */}
+          {selfTask && selfAssignment && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTask(selfTask, containerName ?? node.nombre);
+              }}
+              title="Abrir la tarea de este elemento"
+              className="flex items-center gap-2 rounded-full px-1 py-0.5 transition-colors hover:bg-accent"
+            >
+              {selfAssignment.person ? (
+                <span className="flex items-center gap-1 rounded-full bg-brand-teal/10 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal">
+                  <span className="flex size-4 items-center justify-center rounded-full bg-brand-teal/25 text-[8px] font-bold">
+                    {selfAssignment.person.name.charAt(0)}
+                    {selfAssignment.person.last_name.charAt(0)}
+                  </span>
+                  <span className="max-w-[110px] truncate">{fullName(selfAssignment.person)}</span>
+                </span>
+              ) : selfAssignment.team ? (
+                <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                  <UsersRound className="size-2.5" />
+                  <span className="max-w-[110px] truncate">{selfAssignment.team.name}</span>
+                </span>
+              ) : (
+                <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  sin asignar
+                </span>
+              )}
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  TASK_STATUS_COLORS[selfTask.status],
+                )}
+              >
+                {TASK_STATUS_LABELS[selfTask.status]}
+              </span>
+            </button>
+          )}
           {pct != null && (
             <div className="hidden items-center gap-1.5 sm:flex">
               <div className="h-1.5 w-16 overflow-hidden rounded-full bg-accent">
@@ -558,6 +629,36 @@ function TreeNode({
                   onDeps(node);
                 },
               },
+              // El elemento ES una tarea: "Elemento 1" que además se asigna
+              // (a una persona o a un equipo) y puede tener subtareas, sin
+              // dejar de ser un contenedor del árbol.
+              ...(selfTask
+                ? [
+                    {
+                      label: "Abrir la tarea del elemento",
+                      icon: ClipboardList,
+                      onClick: () => {
+                        onOpenTask(selfTask, containerName ?? node.nombre);
+                      },
+                    },
+                    {
+                      label: "Quitar la condición de tarea",
+                      icon: ClipboardX,
+                      danger: true,
+                      onClick: () => {
+                        onDemote(node);
+                      },
+                    },
+                  ]
+                : [
+                    {
+                      label: "Convertir en tarea",
+                      icon: ClipboardList,
+                      onClick: () => {
+                        onPromote(node);
+                      },
+                    },
+                  ]),
               {
                 // Atajo al caso habitual: el elemento de la estructura ES la
                 // tarea que alguien tiene que hacer (un video, un guion). Abre
@@ -622,6 +723,8 @@ function TreeNode({
               onOutdent={onOutdent}
               onCreateTask={onCreateTask}
               onBulkTasks={onBulkTasks}
+              onPromote={onPromote}
+              onDemote={onDemote}
               draggingId={draggingId}
               draggingIdRef={draggingIdRef}
               dropTarget={dropTarget}
@@ -635,25 +738,28 @@ function TreeNode({
               teamById={teamById}
               onOpenTask={onOpenTask}
               onDeleteTask={onDeleteTask}
+              onReorderTask={onReorderTask}
             />
           ))}
           {/* Las tareas van DESPUÉS de los sub-elementos: primero se lee cómo
               se descompone el elemento y al final qué trabajo concreto cuelga
-              directamente de él. */}
-          {tasks.map((task) => (
-            <StructureTaskRow
-              key={task.id}
-              task={task}
+              directamente de él. Las subtareas se anidan bajo su tarea madre;
+              la que ES el elemento no se repite aquí (se ve en su fila). */}
+          {taskForest.length > 0 && (
+            <StructureTaskTree
+              nodes={taskForest}
+              allTasks={tasks}
               memberById={memberById}
               teamById={teamById}
-              onOpen={() => {
+              onOpen={(task) => {
                 onOpenTask(task, node.nombre);
               }}
-              onDelete={() => {
+              onDelete={(task) => {
                 onDeleteTask(task);
               }}
+              onReorder={onReorderTask}
             />
-          ))}
+          )}
         </div>
       )}
     </div>
@@ -998,6 +1104,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const deleteItem = useDeleteWorkItem(projectId);
   const deleteTask = useDeleteTask(projectId);
   const moveItem = useMoveWorkItem(projectId);
+  const reorderTask = useReorderTask(projectId);
+  const promoteItem = usePromoteWorkItemToTask(projectId);
+  const demoteItem = useDemoteWorkItemTask(projectId);
+  // Elemento cuya condición de tarea se va a retirar (pide confirmación: borra
+  // la tarea y sus subtareas).
+  const [demoteTarget, setDemoteTarget] = useState<WorkItemTree | null>(null);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
@@ -1382,6 +1494,12 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onBulkTasks={(n) => {
                     setBulkTasksNode(n);
                   }}
+                  onPromote={(n) => {
+                    promoteItem.mutate(n.id);
+                  }}
+                  onDemote={(n) => {
+                    setDemoteTarget(n);
+                  }}
                   draggingId={draggingId}
                   draggingIdRef={draggingIdRef}
                   dropTarget={dropTarget}
@@ -1405,6 +1523,9 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setOpenTask({ task, containerName });
                   }}
                   onDeleteTask={setTaskToDelete}
+                  onReorderTask={(task, afterId) => {
+                    reorderTask.mutate({ taskId: task.id, afterId });
+                  }}
                 />
               </div>
             ))}
@@ -1575,6 +1696,31 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           }}
           onCancel={() => {
             setTaskToDelete(null);
+          }}
+        />
+      )}
+
+      {demoteTarget && (
+        <ConfirmDialog
+          title="Quitar la condición de tarea"
+          message={`“${demoteTarget.nombre}” dejará de ser una tarea: se eliminará su asignación, su estado y sus subtareas. El elemento permanece en la estructura. ¿Continuar?`}
+          confirmLabel="Quitar"
+          destructive
+          loading={demoteItem.isPending}
+          errorMessage={
+            demoteItem.isError
+              ? getErrorMessage(demoteItem.error, "No se pudo quitar la condición de tarea")
+              : null
+          }
+          onConfirm={() => {
+            demoteItem.mutate(demoteTarget.id, {
+              onSuccess: () => {
+                setDemoteTarget(null);
+              },
+            });
+          }}
+          onCancel={() => {
+            setDemoteTarget(null);
           }}
         />
       )}

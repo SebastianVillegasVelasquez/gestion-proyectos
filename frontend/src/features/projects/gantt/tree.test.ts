@@ -45,6 +45,8 @@ function task(over: Partial<DatedTask> & { id: string; work_item_id: string }): 
     logged_days: "0",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: null,
+    orden: 0,
+    represents_work_item: false,
     requires_approval: false,
     ...over,
   };

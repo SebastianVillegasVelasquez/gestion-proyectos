@@ -881,6 +881,109 @@ class DetachTaskUseCase:
         return TaskService._to_response(updated)
 
 
+class PromoteWorkItemToTaskUseCase:
+    """Convierte un elemento de la estructura en una tarea asignable SIN dejar
+    de ser un contenedor: crea una única tarea enlazada 1:1 con él
+    (`represents_work_item`), con su mismo nombre. Idempotente: si el elemento
+    ya es una tarea, devuelve la que hay.
+    """
+
+    def __init__(
+        self,
+        task_repo: TaskRepository,
+        work_tree_repo: WorkTreeRepository,
+        user_repo: Repository,
+        project_repo: Repository,
+        bus: EventBus | None = None,
+    ):
+        self.task_repo = task_repo
+        self.work_tree_repo = work_tree_repo
+        self.user_repo = user_repo
+        self.project_repo = project_repo
+        self._bus = bus
+
+    async def execute(
+        self, work_item_id: UUID, actor_id: UUID | None = None
+    ) -> TaskResponse:
+        work_item = await _get_work_item(self.work_tree_repo, work_item_id)
+
+        existing = await self.task_repo.get_representing_task(work_item_id)
+        if existing is not None:
+            return TaskService._to_response(
+                existing, await self.task_repo.logged_days(existing.id)
+            )
+
+        return await CreateTaskUseCase(
+            self.task_repo,
+            self.work_tree_repo,
+            self.user_repo,
+            self.project_repo,
+            self._bus,
+        ).execute(
+            CreateTaskRequest(
+                title=work_item.nombre,
+                work_item_id=work_item_id,
+                represents_work_item=True,
+            ),
+            actor_id=actor_id,
+        )
+
+
+class DemoteWorkItemTaskUseCase:
+    """Deshace la conversión: borra (lógico) la tarea que representa al elemento
+    y, en cascada, sus subtareas. El elemento sigue en la estructura."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+        self.service = TaskService(task_repo)
+
+    async def execute(self, work_item_id: UUID, actor_id: UUID | None = None) -> None:
+        task = await self.task_repo.get_representing_task(work_item_id)
+        if task is None:
+            raise NotFoundError("El elemento no es una tarea")
+        await self.service.delete_task(task.id)
+
+
+class ReorderTaskUseCase:
+    """Recoloca una tarea entre sus hermanas (mismo elemento y misma tarea
+    padre). El resultado es un `orden` 0,1,2… sin huecos para todo el grupo.
+
+    Solo cambia la prioridad / orden de cumplimiento; fechas y dependencias no
+    se tocan (para eso está el cronograma y las dependencias FtS).
+    """
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(
+        self, task_id: UUID, after_id: UUID | None = None
+    ) -> TaskResponse:
+        task = await _get_active_task(self.task_repo, task_id)
+        if after_id == task_id:
+            raise ValidationError("Una tarea no puede ir después de sí misma")
+
+        siblings = await self.task_repo.get_siblings_in_order(task)
+        others = [s for s in siblings if s.id != task_id]
+
+        if after_id is None:
+            ordered = [task, *others]
+        else:
+            ref_index = next(
+                (i for i, s in enumerate(others) if s.id == after_id), None
+            )
+            if ref_index is None:
+                raise ValidationError("La tarea de referencia no es hermana de esta")
+            ordered = [
+                *others[: ref_index + 1],
+                task,
+                *others[ref_index + 1 :],
+            ]
+
+        await self.task_repo.renumber(ordered)
+        refreshed = await _get_active_task(self.task_repo, task_id)
+        return TaskService._to_response(refreshed)
+
+
 class AddTaskDependencyUseCase:
     def __init__(self, task_repo: TaskRepository):
         self.service = TaskDependencyService(task_repo)

@@ -17,6 +17,11 @@ const WorkspacePage = lazy(() =>
     default: m.WorkspacePage,
   })),
 );
+const PersonalDeliverablesPage = lazy(() =>
+  import("@/features/personal/components/PersonalDeliverablesPage.tsx").then((m) => ({
+    default: m.PersonalDeliverablesPage,
+  })),
+);
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
 const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
 const ClientPortal = lazy(() => import("@/features/client/components/ClientPortal.tsx"));
@@ -109,6 +114,7 @@ export const AppRouter = () => (
         <Route path="/" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<WorkspacePage />} />
+        <Route path="/mis-entregas" element={<PersonalDeliverablesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />

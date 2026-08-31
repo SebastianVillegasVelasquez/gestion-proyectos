@@ -104,6 +104,9 @@ class CreateTaskRequest(TaskBase):
     project_id: Optional[UUID] = None
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
+    # True: esta tarea ES el elemento (`work_item_id`) del que cuelga. Lo usa el
+    # atajo "convertir el elemento en tarea"; el resto de altas lo dejan en False.
+    represents_work_item: bool = False
     depends_on_id: Optional[UUID] = None
     # Predecesor que es un elemento del árbol (p. ej. una actividad de terceros).
     depends_on_work_item_id: Optional[UUID] = None
@@ -192,6 +195,10 @@ class TaskResponse(TaskBase):
     project_id: UUID
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
+    # Posición entre las tareas hermanas (prioridad / orden de cumplimiento).
+    orden: int = 0
+    # True cuando esta tarea ES el elemento de la estructura del que cuelga.
+    represents_work_item: bool = False
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     status: TaskStatus
@@ -235,6 +242,15 @@ class TaskEffortResponse(BaseModelConfig):
 
 class AttachTaskRequest(BaseModelConfig):
     work_item_id: UUID
+
+
+class ReorderTaskRequest(BaseModelConfig):
+    """Recoloca una tarea entre sus hermanas (mismo elemento y misma tarea
+    padre). `after_id` = la hermana tras la cual queda; `null` (o ausente) = al
+    principio. Solo cambia la prioridad / orden de cumplimiento; no toca fechas.
+    """
+
+    after_id: Optional[UUID] = None
 
 
 class CreateTaskDependencyRequest(BaseModelConfig):

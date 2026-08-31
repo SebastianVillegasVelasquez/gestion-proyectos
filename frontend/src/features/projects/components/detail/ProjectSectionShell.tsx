@@ -16,12 +16,16 @@ export function ProjectSectionShell({
   title,
   icon: Icon,
   accentClass = "bg-brand-blue/10 text-brand-blue",
+  wide = false,
   children,
 }: {
   projectId: string;
   title: string;
   icon: LucideIcon;
   accentClass?: string;
+  /** Ensancha el contenedor: para vistas con mucha información por fila (la
+   * Estructura, ahora que cada elemento puede ser tarea y traer subtareas). */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -31,7 +35,11 @@ export function ProjectSectionShell({
   const backToDetail = () => void navigate(`/projects/${projectId}`);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12">
+    <div
+      className={`mx-auto flex h-full w-full flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12 ${
+        wide ? "max-w-[1600px]" : "max-w-6xl"
+      }`}
+    >
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <button

@@ -26,7 +26,7 @@ class TaskRepository(BaseRepository[Task]):
         query = (
             select(Task)
             .where(Task.work_item_id == work_item_id, Task.deleted_at.is_(None))
-            .order_by(Task.created_at)
+            .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
 
@@ -47,13 +47,59 @@ class TaskRepository(BaseRepository[Task]):
         return {row[0] for row in rows.all()}
 
     async def get_all_by_project(self, project_id: UUID) -> list[Task]:
-        """Todas las tareas del proyecto: adjuntas a un elemento o sueltas."""
+        """Todas las tareas del proyecto: adjuntas a un elemento o sueltas.
+
+        Ordenadas por `orden` (la prioridad / orden de cumplimiento que se fija
+        a mano) y, a igualdad, por antigüedad. El agrupado por elemento y por
+        tarea padre lo hace la vista; aquí basta con que el orden entre
+        hermanas sea estable y respete lo que el usuario colocó.
+        """
         query = (
             select(Task)
             .where(Task.deleted_at.is_(None), Task.project_id == project_id)
-            .order_by(Task.start_date)
+            .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
+
+    async def get_siblings_in_order(self, task: Task) -> list[Task]:
+        """Las tareas hermanas de `task` (ella incluida), en su orden actual.
+
+        Hermanas = mismo proyecto, mismo elemento (`work_item_id`) y misma
+        tarea padre (`parent_task_id`), contando NULL como un valor más. Es el
+        conjunto sobre el que opera el reordenamiento.
+        """
+        query = (
+            select(Task)
+            .where(
+                Task.deleted_at.is_(None),
+                Task.project_id == task.project_id,
+                Task.work_item_id.is_not_distinct_from(task.work_item_id),
+                Task.parent_task_id.is_not_distinct_from(task.parent_task_id),
+            )
+            .order_by(Task.orden, Task.created_at)
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def renumber(self, tasks_in_order: list[Task]) -> None:
+        """Reescribe `orden` = 0, 1, 2… siguiendo la lista dada, en la misma
+        transacción. Renumerar todo el grupo (en vez de parchear una fila)
+        evita huecos y empates tras arrastres repetidos."""
+        for index, task in enumerate(tasks_in_order):
+            task.orden = index
+            self._session.add(task)
+        await self._session.flush()
+
+    async def get_representing_task(self, work_item_id: UUID) -> Task | None:
+        """La tarea viva que ES este elemento (`represents_work_item`), o None.
+
+        Como mucho hay una (índice único parcial). Es la que se muestra "en la
+        fila del elemento" en vez de como una tarea hija más."""
+        query = select(Task).where(
+            Task.work_item_id == work_item_id,
+            Task.represents_work_item.is_(True),
+            Task.deleted_at.is_(None),
+        )
+        return (await self._session.execute(query)).scalars().first()
 
     async def get_subtasks(self, parent_task_id: UUID) -> list[Task]:
         """Subtareas vivas de una tarea, para el borrado en cascada."""

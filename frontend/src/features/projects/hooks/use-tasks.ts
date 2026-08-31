@@ -197,6 +197,59 @@ export function useUpdateTask(projectId: string) {
   });
 }
 
+/**
+ * Recoloca una tarea entre sus hermanas (prioridad / orden de cumplimiento).
+ * `afterId` = la hermana tras la cual queda; `null` la deja primera. El backend
+ * renumera todo el grupo, así que basta con invalidar el listado del proyecto.
+ */
+export function useReorderTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, afterId }: { taskId: string; afterId: string | null }) =>
+      tasksApi.reorder(taskId, afterId),
+    onSuccess: (task) => {
+      invalidateTaskViews(qc, projectId);
+      if (task.work_item_id) {
+        void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+      }
+      void qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+  });
+}
+
+/**
+ * Convierte un elemento de la estructura en una tarea asignable (1:1). Toca el
+ * árbol (la fila del elemento pasa a mostrar responsable/estado) y el listado
+ * de tareas, así que invalida ambos.
+ */
+export function usePromoteWorkItemToTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (workItemId: string) => tasksApi.promoteWorkItem(workItemId),
+    onSuccess: (task) => {
+      invalidateTaskViews(qc, projectId);
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      if (task.work_item_id) {
+        void qc.invalidateQueries({ queryKey: taskKeys.byWorkItem(task.work_item_id) });
+      }
+    },
+  });
+}
+
+/** Deshace la conversión: la tarea del elemento (y sus subtareas) se borra. */
+export function useDemoteWorkItemTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (workItemId: string) => tasksApi.demoteWorkItem(workItemId),
+    onSuccess: () => {
+      invalidateTaskViews(qc, projectId);
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+      void qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
+  });
+}
+
 export function useChangeTaskStatus(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

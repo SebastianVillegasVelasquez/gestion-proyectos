@@ -36,10 +36,14 @@ from app.modules.tasks.application.use_cases import (
     GetTasksByProjectUseCase,
     GetTasksByTeamUseCase,
     GetTasksByWorkItemUseCase,
+    PromoteWorkItemToTaskUseCase,
+    DemoteWorkItemTaskUseCase,
+    ReorderTaskUseCase,
     UpdateTaskUseCase,
 )
 from app.modules.tasks.presentation.schemas import (
     AttachTaskRequest,
+    ReorderTaskRequest,
     CreateTaskDependencyRequest,
     BulkTasksFromBranchRequest,
     BulkTasksResultResponse,
@@ -104,6 +108,40 @@ async def create_tasks_from_branch(
     return await CreateTasksFromBranchUseCase(
         task_repo, work_tree_repo, user_repo, project_repo, bus
     ).execute(item_id, payload)
+
+
+@router.post(
+    "/work-items/{item_id}/promote-to-task",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def promote_work_item_to_task(
+    item_id: UUID,
+    current_user=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+    work_tree_repo=Depends(worktree_repo_dependency),
+    user_repo=Depends(user_repo_dependency),
+    project_repo=Depends(project_repo_dependency),
+    bus: EventBus = Depends(event_bus_dependency),
+):
+    """Convierte el elemento en una tarea asignable (1:1) sin sacarlo del árbol.
+    Idempotente: si ya es una tarea, devuelve la que hay."""
+    return await PromoteWorkItemToTaskUseCase(
+        task_repo, work_tree_repo, user_repo, project_repo, bus
+    ).execute(item_id, actor_id=current_user.id)
+
+
+@router.delete("/work-items/{item_id}/task", status_code=status.HTTP_204_NO_CONTENT)
+async def demote_work_item_task(
+    item_id: UUID,
+    current_user=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Deshace la conversión: borra la tarea del elemento (y sus subtareas). El
+    elemento permanece en la estructura."""
+    await DemoteWorkItemTaskUseCase(task_repo).execute(
+        item_id, actor_id=current_user.id
+    )
 
 
 # ── Comentarios y menciones ───────────────────────────────────────────────────
@@ -379,6 +417,18 @@ async def attach_task(
     return await AttachTaskToWorkItemUseCase(task_repo, work_tree_repo).execute(
         task_id, payload.work_item_id, actor_id=current_user.id
     )
+
+
+@router.patch("/tasks/{task_id}/reorder", response_model=TaskResponse)
+async def reorder_task(
+    task_id: UUID,
+    payload: ReorderTaskRequest,
+    _=Depends(_admin),
+    task_repo=Depends(task_repo_dependency),
+):
+    """Recoloca la tarea entre sus hermanas (mismo elemento y misma tarea
+    padre): fija la prioridad / orden de cumplimiento. No toca fechas."""
+    return await ReorderTaskUseCase(task_repo).execute(task_id, payload.after_id)
 
 
 @router.patch("/tasks/{task_id}/detach", response_model=TaskResponse)
