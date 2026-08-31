@@ -49,7 +49,7 @@ import {
   type DropPos,
 } from "../../utils/work-tree-dnd";
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
-import { useProjectTasks } from "../../hooks/use-tasks";
+import { useDeleteTask, useProjectTasks } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
 import { indexById } from "../../utils/task-assignment";
@@ -295,6 +295,7 @@ interface TreeNodeProps {
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
   onOpenTask: (task: Task, containerName: string) => void;
+  onDeleteTask: (task: Task) => void;
   // ── Drag & drop para recolocar nodos ──
   draggingId: string | null;
   /** Mismo id que `draggingId`, pero escrito de forma síncrona al empezar a
@@ -330,6 +331,7 @@ function TreeNode({
   memberById,
   teamById,
   onOpenTask,
+  onDeleteTask,
   draggingId,
   draggingIdRef,
   dropTarget,
@@ -632,6 +634,7 @@ function TreeNode({
               memberById={memberById}
               teamById={teamById}
               onOpenTask={onOpenTask}
+              onDeleteTask={onDeleteTask}
             />
           ))}
           {/* Las tareas van DESPUÉS de los sub-elementos: primero se lee cómo
@@ -645,6 +648,9 @@ function TreeNode({
               teamById={teamById}
               onOpen={() => {
                 onOpenTask(task, node.nombre);
+              }}
+              onDelete={() => {
+                onDeleteTask(task);
               }}
             />
           ))}
@@ -990,6 +996,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const deleteItem = useDeleteWorkItem(projectId);
+  const deleteTask = useDeleteTask(projectId);
   const moveItem = useMoveWorkItem(projectId);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -1007,6 +1014,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // Elemento cuyo conflicto de fechas se está resolviendo (termina después que
   // su padre). Se guarda el nodo; el padre se busca en el árbol al renderizar.
   const [conflictItem, setConflictItem] = useState<WorkItemTree | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   // Tarea cuya ficha se está viendo, junto al elemento del que cuelga (el nodo
   // ya se conoce en el punto del árbol donde se pulsa; buscarlo otra vez aquí
@@ -1396,6 +1404,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                   onOpenTask={(task, containerName) => {
                     setOpenTask({ task, containerName });
                   }}
+                  onDeleteTask={setTaskToDelete}
                 />
               </div>
             ))}
@@ -1541,6 +1550,31 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           }}
           onCancel={() => {
             setDeleteTarget(null);
+          }}
+        />
+      )}
+
+      {taskToDelete && (
+        <ConfirmDialog
+          title="Eliminar tarea"
+          message={`Se eliminará la tarea “${taskToDelete.title}” (y sus subtareas, si tiene). Esta acción no se puede deshacer. ¿Continuar?`}
+          confirmLabel="Eliminar"
+          destructive
+          loading={deleteTask.isPending}
+          errorMessage={
+            deleteTask.isError
+              ? getErrorMessage(deleteTask.error, "No se pudo eliminar la tarea")
+              : null
+          }
+          onConfirm={() => {
+            deleteTask.mutate(taskToDelete.id, {
+              onSuccess: () => {
+                setTaskToDelete(null);
+              },
+            });
+          }}
+          onCancel={() => {
+            setTaskToDelete(null);
           }}
         />
       )}
