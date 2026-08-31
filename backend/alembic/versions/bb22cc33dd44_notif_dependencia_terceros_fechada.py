@@ -1,7 +1,7 @@
 """Agrega DEPENDENCIA_TERCEROS_FECHADA al enum notification_type
 
-Revision ID: b2c3d4e5f6a7
-Revises: a1b2c3d4e5f6
+Revision ID: bb22cc33dd44
+Revises: aa11bb22cc33
 Create Date: 2026-08-31
 
 Cuando una "actividad de terceros" (tipo con `es_dependencia_externa`) de la
@@ -19,8 +19,8 @@ migración; se usa `autocommit_block()`.
 
 from alembic import op
 
-revision = "b2c3d4e5f6a7"
-down_revision = "a1b2c3d4e5f6"
+revision = "bb22cc33dd44"
+down_revision = "aa11bb22cc33"
 branch_labels = None
 depends_on = None
 

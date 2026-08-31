@@ -1,6 +1,6 @@
 """Tipo de nodo: flag `es_dependencia_externa`
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: aa11bb22cc33
 Revises: fab82eace345
 Create Date: 2026-08-31
 
@@ -17,7 +17,7 @@ no romper los proyectos que ya lo usan.
 import sqlalchemy as sa
 from alembic import op
 
-revision = "a1b2c3d4e5f6"
+revision = "aa11bb22cc33"
 down_revision = "fab82eace345"
 branch_labels = None
 depends_on = None
