@@ -105,21 +105,26 @@ class CreateTaskRequest(TaskBase):
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
+    # Predecesor que es un elemento del árbol (p. ej. una actividad de terceros).
+    depends_on_work_item_id: Optional[UUID] = None
 
     # Las fechas son opcionales: una tarea puede crearse "por acomodar" y fijar
     # inicio, fin y responsable más tarde. Se puede dar la fecha de fin o la
-    # duración en días (de la que se calcula el fin) cuando ya hay inicio.
+    # duración en días (de la que se calcula el fin).
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     duration_days: Optional[int] = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def resolve_dates(self) -> "CreateTaskRequest":
-        # Solo derivamos y validamos coherencia cuando los datos vienen; sin
-        # fechas la tarea queda como borrador a la espera de planificación.
-        if self.due_date is None and self.duration_days is not None:
-            if self.start_date is None:
-                raise ValueError("Indica la fecha de inicio para usar la duración")
+        # Con inicio + duración se calcula el fin. SIN inicio, la duración se
+        # conserva (la usa el caso de uso para anclar al inicio del proyecto);
+        # no es un error.
+        if (
+            self.due_date is None
+            and self.duration_days is not None
+            and self.start_date is not None
+        ):
             self.due_date = self.start_date + timedelta(days=self.duration_days)
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
@@ -160,6 +165,7 @@ class CreateTeamTaskRequest(BaseModelConfig):
     work_item_id: Optional[UUID] = None
     parent_task_id: Optional[UUID] = None
     depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
     # Igual que en `CreateTaskRequest`: desactivado por defecto, se puede
     # marcar para exigir aprobación del líder/supervisor.
     requires_approval: bool = False
@@ -170,9 +176,11 @@ class CreateTeamTaskRequest(BaseModelConfig):
 
     @model_validator(mode="after")
     def resolve_dates(self) -> "CreateTeamTaskRequest":
-        if self.due_date is None and self.duration_days is not None:
-            if self.start_date is None:
-                raise ValueError("Indica la fecha de inicio para usar la duración")
+        if (
+            self.due_date is None
+            and self.duration_days is not None
+            and self.start_date is not None
+        ):
             self.due_date = self.start_date + timedelta(days=self.duration_days)
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("La fecha límite no puede ser menor a la fecha de inicio")
@@ -230,13 +238,24 @@ class AttachTaskRequest(BaseModelConfig):
 
 
 class CreateTaskDependencyRequest(BaseModelConfig):
-    depends_on_id: UUID
+    # Predecesor: otra tarea O un elemento del árbol. Exactamente uno.
+    depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def one_target(self) -> "CreateTaskDependencyRequest":
+        if (self.depends_on_id is None) == (self.depends_on_work_item_id is None):
+            raise ValueError(
+                "Indica una tarea O un elemento del que depender, no ambos ni ninguno"
+            )
+        return self
 
 
 class TaskDependencyResponse(BaseModelConfig):
     id: UUID
     task_id: UUID
-    depends_on_id: UUID
+    depends_on_id: Optional[UUID] = None
+    depends_on_work_item_id: Optional[UUID] = None
 
 
 class UpdateTaskStatusRequest(BaseModelConfig):

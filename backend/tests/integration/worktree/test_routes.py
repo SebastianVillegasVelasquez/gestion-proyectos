@@ -292,11 +292,13 @@ class TestDependencyRoutes:
         )
         assert removed.status_code == 204
 
-        # Sin predecesor, "solo duración" vuelve a quedar sin posicionar.
+        # Sin predecesor ni padre, "solo duración" se ancla al inicio del
+        # proyecto (2026-08-01 + 3 días).
         item = (
             await client.get(f"/api/v1/work-items/{succ['id']}", headers=admin_headers)
         ).json()
-        assert item["fecha_inicio_plan"] is None
+        assert item["fecha_inicio_plan"] == "2026-08-01"
+        assert item["fecha_fin_plan"] == "2026-08-04"
 
 
 class TestThirdPartyGate:

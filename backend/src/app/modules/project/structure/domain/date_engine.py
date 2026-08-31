@@ -68,13 +68,19 @@ def derive_dates(
     if fin is not None and delta is not None:
         return DerivedDates(fin - delta, fin, False)
 
-    # Modo 3: solo duración → posición heredada.
+    # Modo 3: solo duración → posición heredada. Prioridad: fin del predecesor
+    # FtS (p. ej. la entrega de una actividad de terceros) → inicio del padre →
+    # inicio del proyecto. Este último ancla el elemento «sin fecha, con
+    # duración» al arranque del proyecto en vez de dejarlo sin posicionar (y es
+    # el placeholder mientras la dependencia de terceros aún no tiene fecha).
     if delta is not None:
         base: datetime.date | None
         if predecessor_end is not None:
             base = predecessor_end + datetime.timedelta(days=1)
-        else:
+        elif parent_start is not None:
             base = parent_start
+        else:
+            base = project_start
         if base is not None:
             return DerivedDates(base, base + delta, False)
         return DerivedDates(None, None, False)

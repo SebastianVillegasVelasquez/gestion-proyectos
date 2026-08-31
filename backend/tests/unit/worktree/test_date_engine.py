@@ -94,6 +94,24 @@ class TestDeriveDates:
         assert out.fecha_inicio_plan is None
         assert out.fecha_fin_plan is None
 
+    def test_modo3_sin_predecesor_ni_padre_ancla_al_inicio_del_proyecto(self):
+        out = _derive(
+            duracion_valor=3,
+            duracion_unidad=DuracionUnidad.DIAS,
+            project_start=D(2026, 8, 1),
+        )
+        assert out.fecha_inicio_plan == D(2026, 8, 1)
+        assert out.fecha_fin_plan == D(2026, 8, 4)
+
+    def test_modo3_padre_tiene_prioridad_sobre_inicio_del_proyecto(self):
+        out = _derive(
+            duracion_valor=2,
+            duracion_unidad=DuracionUnidad.DIAS,
+            parent_start=D(2026, 7, 1),
+            project_start=D(2026, 1, 1),
+        )
+        assert out.fecha_inicio_plan == D(2026, 7, 1)
+
     def test_par_fecha_fecha_prevalece_sin_duracion(self):
         out = _derive(fecha_inicio_plan=D(2026, 6, 1), fecha_fin_plan=D(2026, 6, 30))
         assert out.fecha_inicio_plan == D(2026, 6, 1)
