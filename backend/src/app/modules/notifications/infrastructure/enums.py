@@ -11,6 +11,10 @@ class NotificationType(str, enum.Enum):
     TAREA_COMPLETADA = "tarea_completada"
     TAREA_DEVUELTA = "tarea_devuelta"
 
+    # Una "actividad de terceros" de la que cuelga trabajo del proyecto ya
+    # tiene fecha de entrega: sus tareas dependientes ya pueden planificarse.
+    DEPENDENCIA_TERCEROS_FECHADA = "dependencia_terceros_fechada"
+
     # Notificacion para todos los usuarios acerca de proyectos
     PROYECTO_MIEMBRO_AGREGADO = "proyecto_miembro_agregado"
     PROYECTO_CERRADO = "proyecto_cerrado"

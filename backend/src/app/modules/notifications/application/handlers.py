@@ -19,6 +19,7 @@ from app.shared.events.events import (
     TaskReturned,
     TaskStarted,
     TaskSubmitted,
+    ThirdPartyDeliveryDateSet,
 )
 
 logger = get_logger(__name__)
@@ -468,6 +469,59 @@ class NotifyProjectLeadsOnTaskCompleted:
                     payload={
                         "project_id": str(event.project_id),
                         "task_id": str(event.task_id),
+                    },
+                )
+            )
+            try:
+                await self._broadcaster.publish(
+                    channel=channel_for(user_id),
+                    message=json.dumps({"type": "notification.new"}),
+                )
+            except Exception:
+                logger.exception(
+                    "Error al publicar la notificacion al usuario %s", user_id
+                )
+
+
+class NotifyOnThirdPartyDeliveryDate:
+    """Una "actividad de terceros" recibió/cambió su fecha de entrega: se avisa
+    a los responsables de las tareas que dependían de ella. Los destinatarios
+    ya vienen resueltos en el evento; aquí solo se escribe el aviso. Nunca se
+    notifica a quien movió la fecha.
+    """
+
+    def __init__(
+        self, notification_repo: NotificationRepository, broadcaster: Broadcaster
+    ):
+        self._repo = notification_repo
+        self._broadcaster = broadcaster
+
+    async def __call__(self, event: ThirdPartyDeliveryDateSet) -> None:
+        fecha = event.delivery_date.isoformat() if event.delivery_date else None
+        if fecha:
+            message = (
+                f"«{event.work_item_nombre}» ya tiene fecha de entrega ({fecha}). "
+                "El trabajo que dependía de ella ya puede planificarse."
+            )
+        else:
+            message = (
+                f"«{event.work_item_nombre}» se quedó sin fecha de entrega. "
+                "El trabajo que depende de ella queda a la espera."
+            )
+
+        for user_id in event.recipient_ids:
+            if event.actor_id is not None and user_id == event.actor_id:
+                continue
+            await self._repo.add(
+                Notification(
+                    user_to_id=user_id,
+                    actor_id=event.actor_id,
+                    notification_type=NotificationType.DEPENDENCIA_TERCEROS_FECHADA,
+                    message=message,
+                    payload={
+                        "project_id": str(event.project_id),
+                        "work_item_id": str(event.work_item_id),
+                        "delivery_date": fecha,
                     },
                 )
             )

@@ -7,6 +7,7 @@ export type NotificationType =
   | "tarea_atrasada"
   | "tarea_completada"
   | "tarea_devuelta"
+  | "dependencia_terceros_fechada"
   | "proyecto_miembro_agregado"
   | "proyecto_cerrado"
   | "proyecto_iniciado"

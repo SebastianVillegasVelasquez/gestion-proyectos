@@ -43,6 +43,13 @@ export function resolveNotificationTarget(
       return `/workspace${focus}`;
     }
 
+    case "dependencia_terceros_fechada": {
+      if (isAdmin && projectId) {
+        return `/projects/${projectId}/estructura`;
+      }
+      return `/workspace${focus}`;
+    }
+
     case "proyecto_miembro_agregado":
     case "proyecto_iniciado":
     case "proyecto_pausado":

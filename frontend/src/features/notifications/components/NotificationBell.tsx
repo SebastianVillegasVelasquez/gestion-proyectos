@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardList,
   FolderKanban,
+  Link2,
   type LucideIcon,
   MessageSquare,
   PlayCircle,
@@ -41,6 +42,7 @@ const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   tarea_atrasada: AlertTriangle,
   tarea_completada: CheckCircle2,
   tarea_devuelta: Undo2,
+  dependencia_terceros_fechada: Link2,
   proyecto_miembro_agregado: FolderKanban,
   proyecto_cerrado: FolderKanban,
   proyecto_iniciado: FolderKanban,
@@ -72,6 +74,8 @@ const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   comentario_publicado: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300",
   comentario_respuesta: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300",
   mencion: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
+  dependencia_terceros_fechada:
+    "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
 const DEFAULT_TONE = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";
