@@ -55,6 +55,13 @@ export const structureApi = {
   shift: (itemId: string, payload: ShiftWorkItemSubtreePayload) =>
     http.post<WorkItem>(`/work-items/${itemId}/shift`, payload).then((r) => r.data),
 
+  /** Marca una «actividad de terceros» como entregada: abre la compuerta de su
+   * subárbol y reprograma en cascada las tareas que dependían de ella. */
+  deliverThirdParty: (itemId: string, deliveredOn?: string) =>
+    http
+      .post<WorkItem>(`/work-items/${itemId}/deliver`, { delivered_on: deliveredOn ?? null })
+      .then((r) => r.data),
+
   /** Duplica un elemento con todo su contenido bajo el destino (spec §9). */
   clone: (itemId: string, payload: CloneWorkItemPayload) =>
     http.post<WorkItem>(`/work-items/${itemId}/clone`, payload).then((r) => r.data),

@@ -310,6 +310,60 @@ class TaskRepository(BaseRepository[Task]):
         )
         return (await self._session.execute(query)).scalars().first()
 
+    async def has_undelivered_third_party_ancestor(self, work_item_id: UUID) -> bool:
+        """¿Algún ancestro de `work_item_id` (él incluido) es una «actividad de
+        terceros» que todavía NO se marcó como entregada (sin fecha real)?
+
+        Es la compuerta automática: mientras el tercero no entregue, nada de lo
+        que cuelga de él puede avanzar, sin necesidad de una dependencia FtS
+        explícita. Sube por `parent_id`; los árboles son poco profundos.
+        """
+        seen: set[UUID] = set()
+        current: UUID | None = work_item_id
+        while current is not None and current not in seen:
+            seen.add(current)
+            item = await self.get_work_item(current)
+            if item is None:
+                break
+            tipo = getattr(item, "tipo", None)
+            is_third_party = tipo is not None and (
+                getattr(tipo, "es_dependencia_externa", False)
+                or tipo.nombre.strip().lower() == "actividad de terceros"
+            )
+            if is_third_party and (
+                item.fecha_fin_real is None and item.fecha_inicio_real is None
+            ):
+                return True
+            current = item.parent_id
+        return False
+
+    async def get_dependents(self, task_id: UUID) -> list[Task]:
+        """Las tareas VIVAS que dependen (FtS) de `task_id`: al completarla,
+        su fecha de inicio se recalcula en cascada."""
+        query = (
+            select(Task)
+            .join(TaskDependency, TaskDependency.task_id == Task.id)
+            .where(
+                TaskDependency.depends_on_id == task_id,
+                Task.deleted_at.is_(None),
+            )
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def get_dependents_of_work_item(self, work_item_id: UUID) -> list[Task]:
+        """Las tareas VIVAS que dependen (FtS) de un elemento del árbol
+        (típico: una «actividad de terceros»): al marcarla como entregada,
+        arrancan en su fecha."""
+        query = (
+            select(Task)
+            .join(TaskDependency, TaskDependency.task_id == Task.id)
+            .where(
+                TaskDependency.depends_on_work_item_id == work_item_id,
+                Task.deleted_at.is_(None),
+            )
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
     async def add_dependency(self, dependency: TaskDependency) -> TaskDependency:
         self._session.add(dependency)
         await self._session.flush()

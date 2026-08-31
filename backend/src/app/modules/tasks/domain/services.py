@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -20,6 +20,20 @@ from app.shared.exceptions import (
     ValidationError,
 )
 from app.shared.graph import would_create_cycle
+
+
+def reschedule_task_start(task: "Task", new_start: date) -> bool:
+    """Mueve el inicio de `task` a `new_start` conservando su duración: si tenía
+    inicio y fin, el fin se desplaza el mismo delta. Devuelve True si cambió
+    algo. Es la pieza de la "cascada de fechas": cuando un predecesor se
+    completa/entrega, sus dependientes arrancan en la fecha nueva.
+    """
+    if task.start_date == new_start:
+        return False
+    if task.start_date is not None and task.due_date is not None:
+        task.due_date = task.due_date + (new_start - task.start_date)
+    task.start_date = new_start
+    return True
 
 
 class TaskService:
@@ -308,6 +322,20 @@ class TaskStatusService:
                 raise ValidationError(
                     "No puedes avanzar: la tarea de la que depende aún no está completada"
                 )
+            # Compuerta automática de «actividad de terceros»: si esta tarea
+            # cuelga (a cualquier profundidad) de una actividad de terceros que
+            # aún no fue entregada, no puede avanzar aunque no tenga una
+            # dependencia FtS explícita hacia ella.
+            if task.work_item_id is not None and hasattr(
+                self.task_repo, "has_undelivered_third_party_ancestor"
+            ):
+                if await self.task_repo.has_undelivered_third_party_ancestor(
+                    task.work_item_id
+                ):
+                    raise ValidationError(
+                        "No puedes avanzar: la actividad de terceros de la que "
+                        "depende este trabajo aún no fue entregada"
+                    )
 
         patch: dict = {"status": data.status}
         if data.status == TaskStatus.COMPLETADA:

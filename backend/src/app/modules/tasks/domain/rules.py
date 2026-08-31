@@ -15,24 +15,18 @@ FORWARD_STATUSES = (
 
 
 def work_item_is_done(work_item) -> bool:
-    """Un elemento del árbol cuenta como "entregado" para desbloquear una
-    dependencia FtS cuando tiene fecha real de fin/inicio, o —si es una
-    actividad de terceros (`es_dependencia_externa`)— cuando ya tiene fijada
-    su fecha de entrega (fin o inicio plan)."""
+    """Un elemento del árbol cuenta como "entregado" —y por tanto desbloquea a
+    quien depende de él— cuando tiene una fecha REAL de fin o de inicio.
+
+    Para una «actividad de terceros» esto significa que alguien pulsó "Marcar
+    como entregada": su fecha PLAN es solo lo previsto (y sirve para posicionar
+    a sus hijos), no confirma que el tercero ya entregó los recursos."""
     if work_item is None:
         return False
-    if (
+    return (
         getattr(work_item, "fecha_fin_real", None) is not None
         or getattr(work_item, "fecha_inicio_real", None) is not None
-    ):
-        return True
-    tipo = getattr(work_item, "tipo", None)
-    if tipo is not None and getattr(tipo, "es_dependencia_externa", False):
-        return (
-            getattr(work_item, "fecha_fin_plan", None) is not None
-            or getattr(work_item, "fecha_inicio_plan", None) is not None
-        )
-    return False
+    )
 
 
 def incomplete_dependency_ids(dependencies) -> list[UUID]:

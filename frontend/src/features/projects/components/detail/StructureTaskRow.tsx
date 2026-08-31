@@ -1,7 +1,9 @@
+import { useState } from "react";
 import {
   AlertTriangle,
   CalendarRange,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   ClipboardList,
   CornerDownRight,
@@ -100,6 +102,10 @@ function StructureTaskRow({
   const late = isOverdue(task);
   const done = task.status === "completada";
   const isSubtask = Boolean(task.parent_task_id);
+  const hasSubtasks = children.length > 0;
+  // Las subtareas se ocultan por defecto: son un detalle que no siempre
+  // interesa al recorrer la estructura. El chevron las despliega.
+  const [showSubtasks, setShowSubtasks] = useState(false);
 
   const siblings = siblingsOf(task, allTasks);
   const upAfter = moveUpAfterId(task, siblings);
@@ -188,6 +194,32 @@ function StructureTaskRow({
           className="size-3.5 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover/row:opacity-100"
           aria-hidden
         />
+
+        {/* Desplegable de subtareas: ocultas por defecto, "opcional verlas". */}
+        {hasSubtasks ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowSubtasks((v) => !v);
+            }}
+            aria-expanded={showSubtasks}
+            title={
+              showSubtasks
+                ? "Ocultar subtareas"
+                : `Ver ${String(children.length)} subtarea${children.length === 1 ? "" : "s"}`
+            }
+            className="flex shrink-0 items-center gap-0.5 rounded px-0.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showSubtasks ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
+            <span className="text-[10px] font-bold tabular-nums">{children.length}</span>
+          </button>
+        ) : (
+          <span className="size-3.5 shrink-0" aria-hidden />
+        )}
 
         <button
           type="button"
@@ -280,7 +312,7 @@ function StructureTaskRow({
         )}
       </div>
 
-      {children.length > 0 && (
+      {hasSubtasks && showSubtasks && (
         <div className="ml-[24px] border-l-[1.5px] border-border/70 pl-4">
           <StructureTaskTree
             nodes={children}

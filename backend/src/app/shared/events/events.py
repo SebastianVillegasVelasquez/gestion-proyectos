@@ -139,6 +139,26 @@ class ThirdPartyDeliveryDateSet(DomainEvent):
 
 
 @dataclass(frozen=True)
+class TaskChainRescheduled(DomainEvent):
+    """Un predecesor despejó el camino —otra tarea se completó, o una «actividad
+    de terceros» se marcó como entregada— y las tareas dependientes se
+    reprogramaron en cascada (su inicio pasó a la nueva fecha, conservando su
+    duración). Lleva RESUELTOS los ids de tareas y de responsables a avisar,
+    para que el manejador de notificaciones no toque la base de datos.
+    """
+
+    project_id: uuid.UUID
+    # "task" (predecesor = otra tarea) | "third_party" (actividad de terceros).
+    trigger_kind: str
+    trigger_name: str
+    new_start: _dt.date | None = None
+    task_ids: tuple[uuid.UUID, ...] = ()
+    recipient_ids: tuple[uuid.UUID, ...] = ()
+    # Quién disparó la cascada: no se le avisa de su propia acción.
+    actor_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
 class UserCreated(DomainEvent):
     """Se creó una cuenta nueva (alta individual o carga masiva por CSV)."""
 

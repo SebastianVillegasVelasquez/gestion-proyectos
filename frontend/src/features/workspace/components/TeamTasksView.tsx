@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   CornerDownRight,
   FolderKanban,
   History,
@@ -34,6 +36,7 @@ import {
   STATUS_META,
   activeBlockers,
   buildTaskRows,
+  visibleRows,
   daysUntilDue,
   formatDueDate,
   groupTeamTasks,
@@ -45,6 +48,7 @@ import {
 } from "../utils/team-tasks";
 import { TeamTaskFilterBar } from "./TeamTaskFilterBar";
 import {
+  DEFAULT_TEAM_TASK_FILTERS,
   EMPTY_TEAM_TASK_FILTERS,
   filterTeamTasks,
   type TeamTaskFilters,
@@ -208,6 +212,9 @@ function TaskRow({
   projectId,
   teamMembers,
   pathOf,
+  hasChildren,
+  collapsed,
+  onToggleCollapse,
   onAddSubtask,
   onReassigned,
   onEdit,
@@ -219,6 +226,10 @@ function TaskRow({
   projectId: string;
   teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
+  /** La tarea tiene subtareas: se muestra el chevron para ocultarlas/verlas. */
+  hasChildren: boolean;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   onAddSubtask: (task: ApiTeamTask) => void;
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
@@ -248,7 +259,27 @@ function TaskRow({
               className="size-3.5 shrink-0 text-slate-300 dark:text-slate-600"
             />
           )}
+          {hasChildren && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-expanded={!collapsed}
+              title={collapsed ? "Ver subtareas" : "Ocultar subtareas"}
+              className="flex shrink-0 items-center rounded text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              {collapsed ? (
+                <ChevronRight className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+            </button>
+          )}
           <span className="truncate">{task.title}</span>
+          {hasChildren && collapsed && (
+            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              subtareas ocultas
+            </span>
+          )}
         </p>
         <p className="truncate text-[11px] text-slate-400 dark:text-slate-500">
           {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
@@ -373,6 +404,14 @@ function ListView({
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
 }) {
+  // Subtareas plegables por tarea padre (por defecto visibles). El estado vive
+  // aquí: se reinicia al salir de la vista Lista, que es lo esperable.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const childIds = useMemo(
+    () => new Set(allTasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
+    [allTasks],
+  );
+
   return (
     // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
     // depender de que `h-full` resuelva contra un alto definido en cadena.
@@ -412,7 +451,7 @@ function ListView({
                 </span>
               </header>
               <div>
-                {buildTaskRows(group.tasks, allTasks).map((row) => (
+                {visibleRows(buildTaskRows(group.tasks, allTasks), collapsed).map((row) => (
                   <TaskRow
                     key={row.task.id}
                     row={row}
@@ -421,6 +460,19 @@ function ListView({
                     projectId={projectId}
                     teamMembers={teamMembers}
                     pathOf={pathOf}
+                    hasChildren={childIds.has(row.task.id)}
+                    collapsed={collapsed.has(row.task.id)}
+                    onToggleCollapse={() => {
+                      setCollapsed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(row.task.id)) {
+                          next.delete(row.task.id);
+                        } else {
+                          next.add(row.task.id);
+                        }
+                        return next;
+                      });
+                    }}
                     onAddSubtask={onAddSubtask}
                     onReassigned={onReassigned}
                     onEdit={onEdit}
@@ -719,7 +771,9 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
   const [grouping, setGrouping] = useState<TaskGrouping>("integrante");
   const [subtaskParent, setSubtaskParent] = useState<ApiTeamTask | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
-  const [filters, setFilters] = useState<TeamTaskFilters>(EMPTY_TEAM_TASK_FILTERS);
+  // Abre mostrando solo la bolsa del equipo (tareas sin asignar); los botones
+  // por integrante de la barra de filtros llevan al trabajo de cada persona.
+  const [filters, setFilters] = useState<TeamTaskFilters>(DEFAULT_TEAM_TASK_FILTERS);
   // Edición/borrado de una tarea (o subtarea) del equipo, solo para el líder.
   const [editingTask, setEditingTask] = useState<ApiTeamTask | null>(null);
   const [deletingTask, setDeletingTask] = useState<ApiTeamTask | null>(null);

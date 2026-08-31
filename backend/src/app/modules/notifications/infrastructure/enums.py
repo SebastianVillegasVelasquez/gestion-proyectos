@@ -15,6 +15,10 @@ class NotificationType(str, enum.Enum):
     # tiene fecha de entrega: sus tareas dependientes ya pueden planificarse.
     DEPENDENCIA_TERCEROS_FECHADA = "dependencia_terceros_fechada"
 
+    # Un predecesor despejó el camino (otra tarea se completó, o una actividad
+    # de terceros se entregó) y esta tarea se reprogramó en cascada.
+    TAREA_REPROGRAMADA = "tarea_reprogramada"
+
     # Notificacion para todos los usuarios acerca de proyectos
     PROYECTO_MIEMBRO_AGREGADO = "proyecto_miembro_agregado"
     PROYECTO_CERRADO = "proyecto_cerrado"

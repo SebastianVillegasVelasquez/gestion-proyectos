@@ -17,6 +17,7 @@ from app.modules.project.structure.application.use_cases import (
     CreateWorkItemUseCase,
     DeleteTipoNodoUseCase,
     DeleteWorkItemUseCase,
+    DeliverThirdPartyActivityUseCase,
     ListTrashUseCase,
     RestoreWorkItemUseCase,
     GetWorkItemUseCase,
@@ -33,6 +34,7 @@ from app.modules.project.structure.presentation.schemas import (
     CloneWorkItemRequest,
     CreateTipoNodoRequest,
     CreateWorkItemRequest,
+    DeliverThirdPartyRequest,
     MoveWorkItemRequest,
     ShiftWorkItemSubtreeRequest,
     TipoNodoResponse,
@@ -207,6 +209,22 @@ async def shift_work_item_subtree(
     """Desplaza en el tiempo el subárbol completo (drag de la barra del nodo)."""
     return await ShiftWorkItemSubtreeUseCase(repo, task_repo).execute(
         item_id, data.offset_days, data.shift_tasks
+    )
+
+
+@router.post("/work-items/{item_id}/deliver", response_model=WorkItemResponse)
+async def deliver_third_party_activity(
+    item_id: UUID,
+    data: DeliverThirdPartyRequest,
+    repo=Depends(worktree_repo_dependency),
+    task_repo=Depends(task_repo_dependency),
+    bus=Depends(event_bus_dependency),
+    current_user=Depends(_admin),
+):
+    """Marca una «actividad de terceros» como entregada: abre la compuerta de
+    su subárbol y reprograma en cascada las tareas que dependían de ella."""
+    return await DeliverThirdPartyActivityUseCase(repo, task_repo, bus).execute(
+        item_id, data.delivered_on, actor_id=current_user.id
     )
 
 
