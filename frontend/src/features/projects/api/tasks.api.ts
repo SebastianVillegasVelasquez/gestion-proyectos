@@ -61,6 +61,21 @@ export const tasksApi = {
   // Quita la tarea de la estructura; vuelve a quedar suelta en el proyecto.
   detach: (taskId: string) => http.patch<Task>(`/tasks/${taskId}/detach`).then((r) => r.data),
 
+  /** Recoloca la tarea entre sus hermanas (mismo elemento y misma tarea padre):
+   * fija la prioridad / orden de cumplimiento. `afterId = null` la deja primera. */
+  reorder: (taskId: string, afterId: string | null) =>
+    http.patch<Task>(`/tasks/${taskId}/reorder`, { after_id: afterId }).then((r) => r.data),
+
+  /** Convierte un elemento de la estructura en una tarea asignable (1:1), sin
+   * sacarlo del árbol. Idempotente: si ya lo es, devuelve la tarea existente. */
+  promoteWorkItem: (workItemId: string) =>
+    http.post<Task>(`/work-items/${workItemId}/promote-to-task`).then((r) => r.data),
+
+  /** Deshace la conversión: borra la tarea que representa al elemento (y sus
+   * subtareas). El elemento permanece en la estructura. */
+  demoteWorkItem: (workItemId: string) =>
+    http.delete(`/work-items/${workItemId}/task`).then(() => undefined),
+
   changeStatus: (taskId: string, status: TaskStatus, reason?: string) =>
     http
       .patch<Task>(`/tasks/${taskId}/status`, { status, change_reason: reason })

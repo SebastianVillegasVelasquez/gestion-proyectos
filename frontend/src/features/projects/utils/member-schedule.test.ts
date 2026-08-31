@@ -20,6 +20,8 @@ const task = (over: Partial<Task>): Task => ({
   updated_at: null,
   estimated_days: null,
   logged_days: "0",
+  orden: 0,
+  represents_work_item: false,
   requires_approval: false,
   ...over,
 });

@@ -57,7 +57,8 @@ export interface ApiComment {
 
 export interface ApiDeliverable {
   id: string;
-  team_id: string;
+  // Nulo en un entregable personal (sin equipo); siempre presente en los de equipo.
+  team_id: string | null;
   task_title: string;
   assignee_id: string;
   // Fase 2: cuando el entregable está enganchado a una Task real del proyecto,

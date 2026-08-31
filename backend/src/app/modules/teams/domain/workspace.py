@@ -85,6 +85,37 @@ class WorkspaceRepository(ABC):
         self, team_id: UUID, deliverable_id: UUID
     ) -> Deliverable | None: ...
 
+    # ── Entregables personales (sin equipo) ─────────────────────────────────
+    # Mismo modelo `Deliverable` con `team_id IS NULL`; el dueño es
+    # `assignee_id`. La autorización vive en el caso de uso personal, no aquí.
+
+    @abstractmethod
+    async def list_personal_deliverables(self, user_id: UUID) -> list[Deliverable]: ...
+
+    @abstractmethod
+    async def get_personal_deliverable(
+        self, deliverable_id: UUID
+    ) -> Deliverable | None: ...
+
+    @abstractmethod
+    async def list_personal_review_queue(
+        self, reviewer_id: UUID, statuses: list[TaskStatus]
+    ) -> list[tuple[Deliverable, UUID, str]]:
+        """Entregables personales cuya tarea vive en un proyecto que
+        `reviewer_id` coordina o supervisa, en alguno de los `statuses` de
+        tarea dados. Devuelve (deliverable, project_id, project_name)."""
+        ...
+
+    @abstractmethod
+    async def get_project_review_role(
+        self, project_id: UUID, user_id: UUID
+    ) -> str | None:
+        """`project_role` del usuario en el proyecto (o None si no es miembro)."""
+        ...
+
+    @abstractmethod
+    async def get_project_name(self, project_id: UUID) -> str | None: ...
+
     @abstractmethod
     async def get_deliverable_by_task(self, task_id: UUID) -> Deliverable | None:
         """El entregable vivo (si existe) ya enganchado a esta Task.
@@ -126,6 +157,12 @@ class WorkspaceRepository(ABC):
 
     @abstractmethod
     async def get_task(self, task_id: UUID) -> Task | None: ...
+
+    @abstractmethod
+    async def save_task(self, task: Task) -> Task:
+        """Persiste cambios sueltos de la tarea (p. ej. el toggle
+        `requires_approval` desde la pantalla de entregas personales)."""
+        ...
 
     @abstractmethod
     async def transition_task(

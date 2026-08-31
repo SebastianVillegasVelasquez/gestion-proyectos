@@ -33,6 +33,9 @@ from app.modules.teams.presentation.routes import router as teams_router
 from app.modules.teams.presentation.workspace_routes import (
     router as workspace_router,
 )
+from app.modules.teams.presentation.personal_routes import (
+    router as personal_deliverables_router,
+)
 from app.modules.traceability.presentation.routes import (
     router as traceability_router,
 )
@@ -196,6 +199,7 @@ app.include_router(public_router, prefix="/api/v1")
 # El router del workspace va ANTES que el de teams: su ruta literal /teams/mine
 # debe resolverse antes que /teams/{team_id} (que tomaría "mine" como UUID -> 422).
 app.include_router(workspace_router, prefix="/api/v1")
+app.include_router(personal_deliverables_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 app.include_router(collaborators_router, prefix="/api/v1")
 app.include_router(traceability_router, prefix="/api/v1")

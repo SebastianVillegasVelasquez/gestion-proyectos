@@ -120,7 +120,8 @@ class CommentResponse(BaseModelConfig):
 
 class DeliverableResponse(BaseModelConfig):
     id: UUID
-    team_id: UUID
+    # Nulo en un entregable PERSONAL (sin equipo): pertenece a `assignee_id`.
+    team_id: Optional[UUID] = None
     task_title: str
     assignee_id: UUID
     task_id: Optional[UUID] = None
@@ -143,6 +144,64 @@ class DeliverableResponse(BaseModelConfig):
             comments=[CommentResponse.of(c) for c in d.comments],
             created_at=d.created_at,
             updated_at=d.updated_at,
+        )
+
+
+# ── Entregables personales (sin equipo) ──────────────────────────────────────
+
+
+class CreatePersonalDeliverableRequest(BaseModelConfig):
+    """Alta de un entregable PERSONAL: lo crea quien tiene la tarea individual
+    (sin equipo). El proyecto y el responsable salen del contexto (la ruta y el
+    usuario), no del cuerpo."""
+
+    task_title: Annotated[str, StringConstraints(min_length=2, max_length=300)]
+    # Vínculo opcional con la Task individual del proyecto. Sin él, es una
+    # entrega suelta con título libre.
+    task_id: Optional[UUID] = None
+    # Toggle de revisión: si viene y hay `task_id`, fija `Task.requires_approval`
+    # (True → la entrega pasa por revisión de un responsable del proyecto;
+    # False → entregar completa la tarea directo).
+    requires_approval: Optional[bool] = None
+
+
+class SetApprovalRequest(BaseModelConfig):
+    """Cambia el toggle de revisión de la tarea vinculada al entregable."""
+
+    requires_approval: bool
+
+
+class PersonalDeliverableResponse(DeliverableResponse):
+    """Entregable personal con lo que la pantalla necesita sin pedir el
+    proyecto aparte: en qué proyecto está, si el que mira puede revisarlo y en
+    qué estado va el toggle de aprobación de la tarea."""
+
+    project_id: Optional[UUID] = None
+    project_name: Optional[str] = None
+    task_requires_approval: Optional[bool] = None
+    # Resueltos para el usuario que hace la petición.
+    viewer_is_owner: bool = False
+    viewer_can_review: bool = False
+
+    @classmethod
+    def of_personal(
+        cls,
+        d,
+        *,
+        project_id: Optional[UUID] = None,
+        project_name: Optional[str] = None,
+        task_requires_approval: Optional[bool] = None,
+        viewer_is_owner: bool = False,
+        viewer_can_review: bool = False,
+    ) -> "PersonalDeliverableResponse":
+        base = DeliverableResponse.of(d)
+        return cls(
+            **base.model_dump(),
+            project_id=project_id,
+            project_name=project_name,
+            task_requires_approval=task_requires_approval,
+            viewer_is_owner=viewer_is_owner,
+            viewer_can_review=viewer_can_review,
         )
 
 

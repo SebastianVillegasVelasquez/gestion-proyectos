@@ -34,15 +34,18 @@ def _enum(py_enum, name: str):
 
 
 class Deliverable(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
-    """Entregable de una tarea dentro del espacio de trabajo de un equipo.
+    """Entregable de una tarea, dentro del espacio de un equipo o personal.
 
-    Pertenece a un equipo (team_id) — la información vive y se queda en ese equipo.
+    Con `team_id`, pertenece a ese equipo y la información vive y se queda ahí.
+    Sin `team_id` (NULL) es un entregable PERSONAL: propiedad de `assignee_id`,
+    la vía para que quien tiene una tarea individual (sin equipo) también pueda
+    entregar y —si la tarea lo exige— pasar por revisión.
     """
 
     __tablename__ = "team_deliverables"
 
-    team_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    team_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=True
     )
     task_title: Mapped[str] = mapped_column(String(300), nullable=False)
     assignee_id: Mapped[uuid.UUID] = mapped_column(

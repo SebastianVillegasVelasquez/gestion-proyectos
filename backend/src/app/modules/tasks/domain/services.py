@@ -143,6 +143,8 @@ class TaskService:
             project_id=task.project_id,
             work_item_id=task.work_item_id,
             parent_task_id=task.parent_task_id,
+            orden=getattr(task, "orden", 0) or 0,
+            represents_work_item=getattr(task, "represents_work_item", False),
             title=task.title,
             description=task.description,
             priority=task.priority,

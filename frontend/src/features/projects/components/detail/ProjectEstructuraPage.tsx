@@ -11,6 +11,7 @@ export function ProjectEstructuraPage() {
       title="Estructura del proyecto"
       icon={FolderTree}
       accentClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+      wide
     >
       <StructurePanel projectId={projectId!} />
     </ProjectSectionShell>

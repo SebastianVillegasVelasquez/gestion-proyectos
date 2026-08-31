@@ -5,6 +5,7 @@ import {
   Inbox,
   LayoutDashboard,
   LogOut,
+  PackageCheck,
   type LucideIcon,
   Moon,
   PanelLeftClose,
@@ -66,7 +67,10 @@ const SECTIONS: NavSection[] = [
   {
     id: "collaborators",
     title: "Colaboradores",
-    items: [{ id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" }],
+    items: [
+      { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
+      { id: "my-deliverables", label: "Mis entregas", icon: PackageCheck, href: "/mis-entregas" },
+    ],
   },
   {
     id: "general",
@@ -92,6 +96,7 @@ const USER_SECTIONS: NavSection[] = [
     items: [
       { id: "my-projects", label: "Mis proyectos", icon: FolderKanban, href: "/mis-proyectos" },
       { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
+      { id: "my-deliverables", label: "Mis entregas", icon: PackageCheck, href: "/mis-entregas" },
     ],
   },
   {
@@ -120,6 +125,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/projects/builder": "project-builder",
   "/mis-proyectos": "my-projects",
   "/workspace": "workspace",
+  "/mis-entregas": "my-deliverables",
   "/settings": "settings",
   "/feedback": "feedback",
 };

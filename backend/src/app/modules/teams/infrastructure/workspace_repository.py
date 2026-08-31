@@ -83,6 +83,84 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
             )
         )
 
+    # ── Entregables personales (sin equipo) ─────────────────────────────────
+    async def list_personal_deliverables(self, user_id: UUID) -> list[Deliverable]:
+        rows = await self._session.execute(
+            self._with_children()
+            .where(
+                Deliverable.team_id.is_(None),
+                Deliverable.assignee_id == user_id,
+                Deliverable.deleted_at.is_(None),
+            )
+            .order_by(Deliverable.created_at.desc())
+        )
+        return list(rows.scalars().all())
+
+    async def get_personal_deliverable(
+        self, deliverable_id: UUID
+    ) -> Deliverable | None:
+        return await self._session.scalar(
+            self._with_children().where(
+                Deliverable.id == deliverable_id,
+                Deliverable.team_id.is_(None),
+                Deliverable.deleted_at.is_(None),
+            )
+        )
+
+    async def list_personal_review_queue(
+        self, reviewer_id: UUID, statuses: list[TaskStatus]
+    ) -> list[tuple[Deliverable, UUID, str]]:
+        from app.modules.project.infrastructure.enums import ProjectRole
+        from app.modules.project.infrastructure.models import Project, ProjectMember
+
+        reviewable = (
+            select(ProjectMember.project_id)
+            .where(
+                ProjectMember.user_id == reviewer_id,
+                ProjectMember.deleted_at.is_(None),
+                ProjectMember.project_role.in_(
+                    [ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR]
+                ),
+            )
+            .scalar_subquery()
+        )
+        rows = await self._session.execute(
+            self._with_children()
+            .add_columns(Project.id, Project.name)
+            .join(Task, Task.id == Deliverable.task_id)
+            .join(Project, Project.id == Task.project_id)
+            .where(
+                Deliverable.team_id.is_(None),
+                Deliverable.deleted_at.is_(None),
+                Task.deleted_at.is_(None),
+                Task.status.in_(statuses),
+                Task.project_id.in_(reviewable),
+            )
+            .order_by(Deliverable.created_at.desc())
+        )
+        return [(d, pid, pname) for d, pid, pname in rows.all()]
+
+    async def get_project_review_role(
+        self, project_id: UUID, user_id: UUID
+    ) -> str | None:
+        from app.modules.project.infrastructure.models import ProjectMember
+
+        role = await self._session.scalar(
+            select(ProjectMember.project_role).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == user_id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        return role.value if role is not None else None
+
+    async def get_project_name(self, project_id: UUID) -> str | None:
+        from app.modules.project.infrastructure.models import Project
+
+        return await self._session.scalar(
+            select(Project.name).where(Project.id == project_id)
+        )
+
     async def get_deliverable_by_task(self, task_id: UUID) -> Deliverable | None:
         return await self._session.scalar(
             self._with_children().where(
@@ -123,6 +201,9 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
         return await self._session.scalar(
             select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
         )
+
+    async def save_task(self, task: Task) -> Task:
+        return await self._persist(task)
 
     async def transition_task(
         self,
