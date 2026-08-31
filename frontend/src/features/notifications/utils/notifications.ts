@@ -3,6 +3,7 @@ import type { NotificationType } from "../types";
 // Etiqueta legible por tipo de notificación (para accesibilidad/agrupar).
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   tarea_asignada: "Tarea asignada",
+  tarea_iniciada: "Tarea iniciada",
   tarea_entregada: "Tarea entregada",
   tarea_rechazada: "Tarea devuelta",
   tarea_atrasada: "Tarea atrasada",

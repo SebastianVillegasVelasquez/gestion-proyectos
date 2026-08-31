@@ -1,6 +1,7 @@
 // Espejo de NotificationType del backend.
 export type NotificationType =
   | "tarea_asignada"
+  | "tarea_iniciada"
   | "tarea_entregada"
   | "tarea_rechazada"
   | "tarea_atrasada"

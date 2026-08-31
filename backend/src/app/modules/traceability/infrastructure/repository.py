@@ -39,6 +39,10 @@ class TraceabilityEventRow:
     change_reason: str | None
     due_date: datetime.date | None
     created_at: datetime.datetime
+    # Ids crudos: dejan distinguir "el responsable cerró su tarea" (entrega
+    # directa) de "un revisor la aprobó". No se exponen en la respuesta.
+    actor_id: UUID | None = None
+    assignee_id: UUID | None = None
     # Delta legible de los cambios que no son de estado. Con valor por defecto
     # porque la mayoría de eventos (los de estado) no lo llevan.
     old_value: str | None = None
@@ -94,6 +98,7 @@ class SqlAlchemyTraceabilityRepository(TraceabilityRepository):
                     actor.last_name,
                     assignee.name,
                     assignee.last_name,
+                    Task.assignee_id,
                 )
                 .join(Task, TaskHistory.task_id == Task.id)
                 # Todo lo demás es OUTER: la ubicación, el equipo y el
@@ -134,6 +139,8 @@ class SqlAlchemyTraceabilityRepository(TraceabilityRepository):
                 team_id=team_id,
                 team_name=team_name,
                 assignee_name=full_name(assignee_name, assignee_last),
+                actor_id=hist.changed_by_id,
+                assignee_id=assignee_id,
             )
             for (
                 hist,
@@ -147,5 +154,6 @@ class SqlAlchemyTraceabilityRepository(TraceabilityRepository):
                 actor_last,
                 assignee_name,
                 assignee_last,
+                assignee_id,
             ) in rows
         ]

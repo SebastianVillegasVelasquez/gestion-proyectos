@@ -370,6 +370,27 @@ export function GanttView({
   const nodeCount = useMemo(() => rows.filter((r) => r.kind === "node").length, [rows]);
   const taskRowCount = rows.length - nodeCount;
 
+  // Diagnóstico del cronograma incrustado de un equipo: si sale vacío, decir por
+  // qué (sin tareas / sin fechas / fuera de la estructura) en vez de "no hay
+  // elementos que coincidan con los filtros", que ahí no aplica.
+  const embedTeamDiagnosis = useMemo(() => {
+    if (!embed?.teamId) {
+      return null;
+    }
+    const teamTasks = realTasks.filter((t) => t.team_id === embed.teamId);
+    if (teamTasks.length === 0) {
+      return "Este equipo todavía no tiene tareas.";
+    }
+    const dated = teamTasks.filter((t) => t.start_date != null && t.due_date != null);
+    if (dated.length === 0) {
+      return "Las tareas de este equipo aún no tienen fechas. Ponles inicio y fin para verlas en el cronograma.";
+    }
+    if (dated.every((t) => t.work_item_id == null)) {
+      return "Las tareas con fechas de este equipo no cuelgan de la estructura. Adjúntalas a un elemento para ubicarlas en el cronograma.";
+    }
+    return null;
+  }, [embed, realTasks]);
+
   // El rango cubre tareas + fechas plan de la estructura, para que el eje exista
   // desde que hay estructura (aunque aún no haya tareas). Se calcula sobre TODO
   // (no lo filtrado) para que el eje sea estable y filtrar no "salte" la escala.
@@ -1356,8 +1377,8 @@ export function GanttView({
 
                 {rows.length === 0 ? (
                   <div className="flex h-32 items-center justify-center">
-                    <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
-                      No hay elementos que coincidan con los filtros.
+                    <p className="sticky left-0 max-w-md px-4 text-center text-sm italic text-muted-foreground">
+                      {embedTeamDiagnosis ?? "No hay elementos que coincidan con los filtros."}
                     </p>
                   </div>
                 ) : (

@@ -40,7 +40,7 @@ export const DELIVERABLE_STATUS_BADGE: Record<DeliverableStatus, string> = {
  * de cursos + TI): enlaces (Figma/Drive), repositorios de código, paquetes SCORM
  * para el LMS y archivos. `archivo` es un nice-to-have aún NO disponible.
  */
-export type ResourceType = "enlace" | "repositorio" | "scorm" | "archivo";
+export type ResourceType = "enlace" | "repositorio" | "scorm" | "archivo" | "sin_adjunto";
 
 /** Alias retrocompatible. */
 export type VersionType = ResourceType;
@@ -81,7 +81,8 @@ export interface DeliverableVersion {
   id: string;
   versionNumber: number;
   type: ResourceType;
-  url: string;
+  /** Nula en las entregas "sin adjunto". */
+  url: string | null;
   fileName?: string;
   mimeType?: string;
   uploadedBy: string; // WorkspaceMember.id

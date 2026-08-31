@@ -4,6 +4,7 @@ from app.core.logger import get_logger
 from app.modules.notifications.application.preferences import (
     TeamNotificationGate,
     project_lead_ids,
+    team_lead_ids,
 )
 from app.modules.notifications.domain.repository import NotificationRepository
 from app.modules.notifications.infrastructure.enums import NotificationType
@@ -16,6 +17,7 @@ from app.shared.events.events import (
     TaskCompleted,
     TaskCreated,
     TaskReturned,
+    TaskStarted,
     TaskSubmitted,
 )
 
@@ -352,6 +354,72 @@ class NotifyOnTaskAssigned:
             logger.exception(
                 "Error al publicar la notificacion al usuario %s", event.assignee_id
             )
+
+
+class NotifyLeadsOnTaskStarted:
+    """El responsable marcó que empezó una tarea (→ EN_PROGRESO): se avisa a
+    quien coordina. Si la tarea está delegada a un equipo, a sus líderes y
+    supervisores; si no, a coordinación/supervisión del proyecto. Nunca al
+    propio responsable ni a quien movió el estado.
+
+    Necesita la sesión del request para leer los miembros del equipo/proyecto.
+    """
+
+    def __init__(
+        self,
+        notification_repo: NotificationRepository,
+        broadcaster: Broadcaster,
+        session,
+    ):
+        self._repo = notification_repo
+        self._broadcaster = broadcaster
+        self._session = session
+
+    async def __call__(self, event: TaskStarted) -> None:
+        if self._session is None:
+            return
+        exclude = {event.assigned_id}
+        if event.actor_id is not None:
+            exclude.add(event.actor_id)
+        try:
+            if event.team_id is not None:
+                recipients = await team_lead_ids(
+                    self._session, event.team_id, exclude=exclude
+                )
+            else:
+                recipients = await project_lead_ids(
+                    self._session, event.project_id, exclude=exclude
+                )
+        except Exception:
+            logger.exception(
+                "No se pudieron resolver los líderes para la tarea iniciada %s",
+                event.task_id,
+            )
+            return
+
+        for user_id in recipients:
+            await self._repo.add(
+                Notification(
+                    user_to_id=user_id,
+                    actor_id=event.actor_id,
+                    notification_type=NotificationType.TAREA_INICIADA,
+                    message="Un integrante empezó a trabajar una tarea.",
+                    payload={
+                        "project_id": str(event.project_id),
+                        "task_id": str(event.task_id),
+                        "team_id": (str(event.team_id) if event.team_id else None),
+                    },
+                )
+            )
+            try:
+                await self._broadcaster.publish(
+                    channel=channel_for(user_id),
+                    message=json.dumps({"type": "notification.new"}),
+                )
+            except Exception:
+                logger.exception(
+                    "Error al publicar la notificacion al usuario %s", user_id
+                )
 
 
 class NotifyProjectLeadsOnTaskCompleted:

@@ -2,7 +2,7 @@ import datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
-from pydantic import StringConstraints
+from pydantic import StringConstraints, model_validator
 
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.workspace_enums import (
@@ -25,10 +25,30 @@ class CreateDeliverableRequest(BaseModelConfig):
 
 class AddVersionRequest(BaseModelConfig):
     type: ResourceType
-    url: Annotated[str, StringConstraints(min_length=1, max_length=1000)]
+    # `sin_adjunto` = la persona confirma que terminó pero no hay recurso que
+    # entregar (una llamada hecha, una reunión, trabajo fuera de la herramienta).
+    # En ese caso `url` va vacía; para el resto sigue siendo obligatoria.
+    url: Optional[Annotated[str, StringConstraints(max_length=1000)]] = None
     note: Optional[str] = None
     # Instrucciones para el siguiente rol de la cadena. Interno del equipo.
     observations: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _url_matches_type(cls, data):
+        # `mode="before"`: se ejecuta sobre el dict de entrada. Con `mode="after"`
+        # reasignar `self.url` reentra en la validación (validate_assignment).
+        if not isinstance(data, dict):
+            return data
+        raw_type = data.get("type")
+        type_value = raw_type.value if isinstance(raw_type, ResourceType) else raw_type
+        raw_url = data.get("url")
+        has_url = isinstance(raw_url, str) and raw_url.strip() != ""
+        if type_value == ResourceType.SIN_ADJUNTO.value:
+            return {**data, "url": None}  # sin adjunto no guarda URL
+        if not has_url:
+            raise ValueError("La entrega necesita una URL (o marca 'sin adjunto')")
+        return data
 
 
 class UpdateVersionRequest(BaseModelConfig):
@@ -56,7 +76,8 @@ class VersionResponse(BaseModelConfig):
     id: UUID
     version_number: int
     type: ResourceType
-    url: str
+    # Nula cuando `type == sin_adjunto`.
+    url: Optional[str] = None
     note: Optional[str] = None
     # Solo para la trazabilidad interna del equipo (vista de entregables).
     observations: Optional[str] = None

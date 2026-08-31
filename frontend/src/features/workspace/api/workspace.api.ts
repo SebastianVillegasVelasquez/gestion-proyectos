@@ -38,7 +38,7 @@ export interface ApiVersion {
   id: string;
   version_number: number;
   type: ResourceType;
-  url: string;
+  url: string | null;
   note: string | null;
   /** Instrucciones para el siguiente rol. Interno del equipo (no va al cliente). */
   observations: string | null;
@@ -129,7 +129,8 @@ export interface ApiTeamNotificationSettings {
 
 export interface NewVersionBody {
   type: ResourceType;
-  url: string;
+  /** Obligatoria salvo `type: "sin_adjunto"`. */
+  url?: string;
   note?: string;
   observations?: string;
 }

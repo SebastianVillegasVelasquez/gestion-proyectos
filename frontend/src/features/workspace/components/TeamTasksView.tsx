@@ -27,6 +27,7 @@ import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
 import { EditTeamTaskModal } from "./EditTeamTaskModal";
 import { NewSubtaskModal } from "./NewSubtaskModal";
 import { NewTeamTaskModal } from "./NewTeamTaskModal";
+import { StartTaskButton } from "./StartTaskButton";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
 import type { WorkspaceMember } from "../types";
 import {
@@ -292,6 +293,9 @@ function TaskRow({
         <UrgencyBadge task={task} />
       </span>
 
+      {/* "Comenzar": solo lo ve el responsable en su propia tarea sin iniciar. */}
+      <StartTaskButton task={task} projectId={projectId} />
+
       {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
           eliminar (cualquier nivel — la tarea sigue siendo de SU equipo). */}
       {canReview ? (
@@ -471,6 +475,7 @@ function TaskCard({
         </p>
         <div className="flex shrink-0 items-center gap-1">
           <UrgencyBadge task={task} />
+          <StartTaskButton task={task} projectId={projectId} />
           {canReview && (
             <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <button

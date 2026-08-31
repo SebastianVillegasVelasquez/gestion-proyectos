@@ -124,6 +124,8 @@ class GetRecentActivityUseCase:
                         new_status=row.new_status,
                         due_date=row.due_date,
                         occurred_on=row.created_at,
+                        actor_id=row.actor_id,
+                        assignee_id=row.assignee_id,
                     ).kind,
                     created_at=row.created_at,
                 )

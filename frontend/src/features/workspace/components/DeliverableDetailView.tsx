@@ -51,8 +51,12 @@ function VersionEditor({
   onSave: (patch: EditVersionPatch) => void;
   onCancel: () => void;
 }) {
-  const [type, setType] = useState<ResourceType>(version.type);
-  const [url, setUrl] = useState(version.url === "#" ? "" : version.url);
+  // Una entrega "sin adjunto" que se corrige pasa a ser una entrega normal:
+  // arranca sin tipo forzado ni URL y el editor exige elegir recurso + URL.
+  const [type, setType] = useState<ResourceType>(
+    version.type === "sin_adjunto" ? "enlace" : version.type,
+  );
+  const [url, setUrl] = useState(!version.url || version.url === "#" ? "" : version.url);
   const [note, setNote] = useState(version.note);
   const [observations, setObservations] = useState(version.observations);
 

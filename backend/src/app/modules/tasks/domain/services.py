@@ -56,11 +56,28 @@ class TaskService:
         totals = await self.repo.logged_hours_by_task([t.id for t in tasks])
         return [self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks]
 
+    # Campos de la tarea que se pueden dejar EN BLANCO desde un PATCH (enviando
+    # `null` explícito): quitar el responsable / el equipo, borrar una fecha,
+    # dejar de estimar horas, vaciar la descripción. El resto (`title`,
+    # `priority`) nunca se limpia a null, así que un `null` en ellos se ignora.
+    _NULLABLE_UPDATE_FIELDS = {
+        "description",
+        "assignee_id",
+        "team_id",
+        "start_date",
+        "due_date",
+        "estimated_hours",
+    }
+
     async def update_task(
         self, task_id: UUID, data: "UpdateTaskRequest"
     ) -> "TaskResponse":
         task = await self._get_active(task_id)
-        updated = await self.repo.patch(task, data.model_dump(exclude_unset=True))
+        updated = await self.repo.patch(
+            task,
+            data.model_dump(exclude_unset=True),
+            nullable_fields=self._NULLABLE_UPDATE_FIELDS,
+        )
         return self._to_response(updated)
 
     async def delete_task(self, task_id: UUID) -> None:

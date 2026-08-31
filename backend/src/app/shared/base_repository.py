@@ -33,7 +33,9 @@ class Repository(Generic[T], ABC):
     async def add(self, entity: T) -> T: ...
 
     @abstractmethod
-    async def patch(self, entity: T, data: dict[str, Any]) -> T: ...
+    async def patch(
+        self, entity: T, data: dict[str, Any], nullable_fields: set[str] | None = None
+    ) -> T: ...
 
 
 class BaseRepository(Repository[T], Generic[T]):
@@ -79,9 +81,21 @@ class BaseRepository(Repository[T], Generic[T]):
     async def update(self, entity: T) -> T:
         return await self.save(entity)
 
-    async def patch(self, entity: T, data: dict[str, Any]) -> T:
+    async def patch(
+        self, entity: T, data: dict[str, Any], nullable_fields: set[str] | None = None
+    ) -> T:
+        """Aplica un cambio parcial sobre `entity`.
+
+        Por defecto ignora los valores `None`: un PATCH que omite un campo no
+        debe tocarlo. Pero "omitir" y "poner a vacío" son cosas distintas —
+        quitarle el responsable o la fecha a una tarea es un `None` deliberado.
+        Los campos en `nullable_fields` sí se escriben aunque lleguen `None`;
+        quien llama ya se aseguró (vía `model_dump(exclude_unset=True)`) de que
+        solo llegan las claves que el cliente mandó de verdad.
+        """
+        nullable = nullable_fields or set()
         for field, value in data.items():
-            if value is not None:
+            if value is not None or field in nullable:
                 setattr(entity, field, value)
 
         return await self.save(entity)

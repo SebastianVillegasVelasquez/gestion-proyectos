@@ -89,6 +89,39 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
     );
   }
 
+  // Estado terminal: ya no hay decisión que tomar. Sobre todo importa para las
+  // tareas SIN aprobación obligatoria — entregar YA las deja "aprobado", así
+  // que ofrecer "aprobar / rechazar / solicitar cambios" no tiene sentido.
+  if (deliverable.status === "aprobado" || deliverable.status === "rechazado") {
+    const done = deliverable.status === "aprobado";
+    return (
+      <div
+        className={cn(
+          "flex items-start gap-2 rounded-lg border px-4 py-3",
+          done
+            ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/30"
+            : "border-rose-200 bg-rose-50/60 dark:border-rose-800 dark:bg-rose-950/30",
+        )}
+      >
+        {done ? (
+          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+        ) : (
+          <XCircle className="mt-0.5 size-3.5 shrink-0 text-rose-500" />
+        )}
+        <p
+          className={cn(
+            "text-[12px] leading-relaxed",
+            done ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300",
+          )}
+        >
+          {done
+            ? "Este entregable ya está aprobado y la tarea quedó completada."
+            : "Este entregable fue rechazado. La entrega quedó cerrada tal como estaba."}
+        </p>
+      </div>
+    );
+  }
+
   const meta = decision ? DECISIONS[decision] : null;
   const missingReason = meta?.requiresReason === true && reason.trim() === "";
 

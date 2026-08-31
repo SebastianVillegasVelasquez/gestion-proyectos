@@ -155,3 +155,34 @@ describe("DeliverableDetailView — eliminar", () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DeliverableDetailView — acciones de revisión", () => {
+  it("ofrece aprobar/rechazar/solicitar cambios al revisor mientras está en revisión", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        deliverable={deliverableWithVersion()}
+        canDeliver={false}
+        canReview
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^Aprobar$/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Rechazar$/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /solicitar cambios/i })).toBeTruthy();
+  });
+
+  it("NO ofrece decisiones sobre un entregable ya aprobado (p. ej. tarea sin aprobación obligatoria)", () => {
+    render(
+      <DeliverableDetailView
+        {...base}
+        deliverable={{ ...deliverableWithVersion(), status: "aprobado" }}
+        canDeliver={false}
+        canReview
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^Aprobar$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Rechazar$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /solicitar cambios/i })).toBeNull();
+    expect(screen.getByText(/ya está aprobado/i)).toBeTruthy();
+  });
+});
