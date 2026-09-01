@@ -588,7 +588,7 @@ function TreeNode({
               title="Abrir la tarea de este elemento"
               className="flex items-center gap-2 rounded-full px-1 py-0.5 transition-colors hover:bg-accent"
             >
-              {isThirdParty ? (
+              {isThirdParty && !selfAssignment.assigneeName && !selfAssignment.team ? (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                   <ExternalLink className="size-2.5" />
                   Responsable externo

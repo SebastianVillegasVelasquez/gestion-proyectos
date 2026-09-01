@@ -133,7 +133,6 @@ class PublicScheduleItemResponse(BaseModelConfig):
     due_date: datetime.date
     status: str  # value del enum de tareas (para el color de la barra)
     progress_pct: int
-    is_task: bool = False  # True si la fila es una tarea (hoja), no un componente
 
 
 class PublicProjectScheduleResponse(BaseModelConfig):

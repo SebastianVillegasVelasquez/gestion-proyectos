@@ -24,8 +24,9 @@ import type { TaskStatus } from "@/features/projects/types/api.types";
 import type { PublicProjectSchedule, PublicScheduleItem } from "../api/portal.api";
 
 // Espejo de las constantes del cronograma interno: una fila, una escala, un
-// mismo lenguaje visual. Aquí cada fila es un ELEMENTO de la estructura (un
-// componente/entregable), no una tarea; no hay columnas de personas.
+// mismo lenguaje visual. Aquí cada fila es un ELEMENTO padre de la estructura (un
+// componente/entregable), nunca una tarea ni una subtarea; no hay columnas de
+// personas.
 const LABEL_W = 260;
 const MIN_TRACK = 480;
 const ROW_H = 36;
@@ -52,12 +53,13 @@ const STATUS_ORDER: TaskStatus[] = [
 const TODAY = new Date().toISOString().slice(0, 10);
 
 /**
- * Cronograma del proyecto para el portal público del cliente: la misma
- * información que el cronograma interno —componentes/entregables Y sus tareas—
- * pero omitiendo todo lo sensible: sin responsables, equipos ni cargos. Cada
- * fila lleva su barra (rango), estado y avance; los componentes se colapsan para
- * mostrar/ocultar sus tareas. Reutiliza la matemática del cronograma interno
- * (timeline/metrics). Filtros permitidos: estado, "solo en riesgo", zoom y búsqueda.
+ * Cronograma del proyecto para el portal público del cliente: el mismo diseño
+ * que el cronograma interno, pero mostrando ÚNICAMENTE los elementos padre de la
+ * estructura —ninguna tarea ni subtarea— y omitiendo todo lo sensible: sin
+ * responsables, equipos ni cargos. Cada fila lleva su barra (rango), estado y
+ * avance agregado de su subárbol; los elementos con hijos se colapsan. Reutiliza
+ * la matemática del cronograma interno (timeline/metrics). Filtros permitidos:
+ * estado, "solo en riesgo", zoom y búsqueda.
  */
 export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedule }) {
   const items: PublicScheduleItem[] = schedule.items;
@@ -233,7 +235,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Búsqueda por nombre del componente */}
+          {/* Búsqueda por nombre del elemento */}
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -241,8 +243,8 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               onChange={(e) => {
                 setSearch(e.target.value);
               }}
-              placeholder="Buscar componente o tarea"
-              aria-label="Buscar componente o tarea por nombre"
+              placeholder="Buscar componente"
+              aria-label="Buscar componente por nombre"
               className={cn(inputCls, "pl-7")}
             />
           </div>
@@ -464,13 +466,9 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                           ) : (
                             <span className="w-3.5 shrink-0" aria-hidden />
                           )}
-                          {/* Marcador: círculo = componente, cuadrado = tarea. */}
+                          {/* Marcador de estado del elemento. */}
                           <span
-                            className={cn(
-                              "size-2 shrink-0",
-                              item.is_task ? "rounded-[2px]" : "rounded-full",
-                              STATUS_DOT[item.status],
-                            )}
+                            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[item.status])}
                           />
                           <p
                             className={cn(
