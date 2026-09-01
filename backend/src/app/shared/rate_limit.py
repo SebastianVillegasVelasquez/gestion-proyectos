@@ -37,6 +37,17 @@ def _allow(key: str, max_hits: int, window_seconds: float) -> bool:
     return True
 
 
+def enforce_rate_limit(key: str, max_hits: int, window_seconds: float) -> None:
+    """Consume un intento para `key` y lanza 429 si se pasó del límite en la
+    ventana. Útil cuando el contador debe ir por USUARIO (no por IP): el
+    llamador arma la clave, p. ej. ``f"email-test:{user_id}"``.
+    """
+    if not _allow(key, max_hits, window_seconds):
+        raise TooManyRequestsError(
+            "Demasiados envíos en poco tiempo. Espera un minuto e inténtalo de nuevo."
+        )
+
+
 def rate_limiter(max_hits: int, window_seconds: float, scope: str):
     """Crea una dependencia de FastAPI que limita por IP del cliente.
 

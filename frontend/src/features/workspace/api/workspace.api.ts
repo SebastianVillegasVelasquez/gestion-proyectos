@@ -108,6 +108,10 @@ export interface ApiTeamTask {
   // false (por defecto): quien la tiene asignada la entrega y queda hecha
   // directo. true: pasa por aprobación del líder/supervisor.
   requires_approval: boolean;
+  // Avance 0-100 calculado por el backend. Con subtareas: promedio del avance
+  // de sus subtareas (una tarea padre es un entregable: no llega a 100 hasta
+  // aprobarse). Sin subtareas: por estado.
+  progress_pct: number;
   // Dependencias finish-to-start ya resueltas a título por el backend: la vista
   // pinta "Bloqueada por: …" sin una llamada por fila.
   blocked_by: ApiBlockingTask[];
@@ -160,6 +164,9 @@ export interface NewTeamTaskBody {
   assignee_id?: string | null;
   work_item_id?: string | null;
   parent_task_id?: string | null;
+  /** Dependencia FtS al crear una subtarea: otra subtarea hermana que debe
+   *  quedar completada antes de poder empezar esta. */
+  depends_on_id?: string | null;
   start_date?: string | null;
   due_date?: string | null;
   duration_days?: number | null;

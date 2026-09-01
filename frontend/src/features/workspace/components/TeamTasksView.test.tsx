@@ -28,6 +28,9 @@ vi.mock("@/features/projects/hooks/use-tasks", () => ({
   useUpdateTask: vi.fn(),
   useDeleteTask: vi.fn(),
   useChangeTaskStatus: vi.fn(),
+  useTaskDependencies: () => ({ data: [] }),
+  useAddTaskDependency: () => ({ mutate: vi.fn(), isPending: false }),
+  useRemoveTaskDependency: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
@@ -54,6 +57,7 @@ function task(over: Partial<ApiTeamTask> = {}): ApiTeamTask {
     start_date: null,
     due_date: null,
     requires_approval: false,
+    progress_pct: 0,
     blocked_by: [],
     ...over,
   };

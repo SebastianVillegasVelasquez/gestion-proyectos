@@ -275,6 +275,14 @@ export interface Task {
    * supervisor del proyecto (pasa primero por EN_REVISION).
    */
   requires_approval: boolean;
+  /** Nombre del responsable resuelto por el backend en los listados de
+   * proyecto / elemento; sirve aunque la persona no figure entre los
+   * integrantes directos del proyecto. `null` = sin responsable. */
+  assignee_name: string | null;
+  /** Avance 0-100 calculado por el backend. Sin subtareas: por estado. Con
+   * subtareas: promedio del avance de sus subtareas, sin llegar a 100 hasta
+   * que el entregable padre se aprueba. */
+  progress_pct: number;
 }
 
 export interface CreateTaskPayload {

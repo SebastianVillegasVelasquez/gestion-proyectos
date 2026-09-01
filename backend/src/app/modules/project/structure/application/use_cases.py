@@ -212,6 +212,7 @@ class DeliverThirdPartyActivityUseCase:
         item_id: UUID,
         delivered_on: datetime.date | None = None,
         actor_id: UUID | None = None,
+        delivered: bool = True,
     ) -> WorkItemResponse:
         item = await self.repo.get_item(item_id)
         if item is None or item.is_deleted:
@@ -222,10 +223,21 @@ class DeliverThirdPartyActivityUseCase:
                 "Solo una «actividad de terceros» se marca como entregada"
             )
 
+        # Reabrir la compuerta: el tercero aún no entregó (o fue un error). Se
+        # limpian las fechas reales; los hijos vuelven a posicionarse sobre la
+        # fecha PLAN al re-derivarse y su subárbol queda gateado otra vez.
+        if not delivered:
+            item.fecha_fin_real = None
+            item.fecha_inicio_real = None
+            await self.repo.save_item(item)
+            return await self.service.get_item(item_id)
+
         fecha = delivered_on or datetime.date.today()
         item.fecha_fin_real = fecha
-        if item.fecha_inicio_real is None:
-            item.fecha_inicio_real = item.fecha_inicio_plan or fecha
+        # La fecha de entrega es también el INICIO real: es cuando el trabajo
+        # que colgaba del tercero puede empezar. (Se re-fija en cada entrega
+        # para que corregir la fecha corrija ambas.)
+        item.fecha_inicio_real = fecha
         await self.repo.save_item(item)
 
         await self._cascade_to_dependent_tasks(item, fecha, actor_id)

@@ -175,6 +175,21 @@ class WorkspaceService:
             raise ForbiddenError(
                 "Solo quien tiene asignado el entregable puede entregar"
             )
+
+        # Compuerta FtS: entregar mueve el estado de la tarea sin pasar por
+        # ChangeTaskStatusUseCase, así que revisamos aquí que la tarea no
+        # dependa de algo (otra tarea, o una actividad de terceros) que aún no
+        # está listo. Antes de crear la versión, para no dejar rastro a medias.
+        task = (
+            await self._repo.get_task(deliverable.task_id)
+            if deliverable.task_id
+            else None
+        )
+        if task is not None:
+            blocked = await self._repo.task_delivery_block_reason(task)
+            if blocked:
+                raise ValidationError(blocked)
+
         next_number = (
             deliverable.versions[-1].version_number + 1 if deliverable.versions else 1
         )
@@ -194,11 +209,6 @@ class WorkspaceService:
         # `requires_approval=False` (el default) — entregar completa directo,
         # sin pasar por el líder. `True` — mantiene el flujo clásico
         # (EN_REVISION → el líder aprueba o devuelve).
-        task = (
-            await self._repo.get_task(deliverable.task_id)
-            if deliverable.task_id
-            else None
-        )
         auto_complete = task is not None and not task.requires_approval
 
         deliverable.status = (

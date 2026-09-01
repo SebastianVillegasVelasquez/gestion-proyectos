@@ -121,8 +121,15 @@ export function useShiftWorkItem(projectId: string) {
 export function useDeliverThirdParty(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, deliveredOn }: { itemId: string; deliveredOn?: string }) =>
-      structureApi.deliverThirdParty(itemId, deliveredOn),
+    mutationFn: ({
+      itemId,
+      deliveredOn,
+      delivered,
+    }: {
+      itemId: string;
+      deliveredOn?: string | null;
+      delivered?: boolean;
+    }) => structureApi.deliverThirdParty(itemId, { deliveredOn, delivered }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
       void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });

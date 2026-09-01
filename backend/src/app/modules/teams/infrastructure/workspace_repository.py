@@ -205,6 +205,29 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
     async def save_task(self, task: Task) -> Task:
         return await self._persist(task)
 
+    async def task_delivery_block_reason(self, task: Task) -> str | None:
+        # Reusa la misma regla FtS del módulo de tareas: una dependencia que no
+        # está COMPLETADA / un elemento del árbol no entregado, o una actividad
+        # de terceros ancestro sin fecha real. `TaskRepository` comparte sesión.
+        from app.modules.tasks.domain import rules
+        from app.modules.tasks.infrastructure.repository import TaskRepository
+
+        task_repo = TaskRepository(self._session)
+        deps = await task_repo.get_dependencies(task.id)
+        if rules.incomplete_dependency_ids(deps):
+            return (
+                "No puedes entregar: una tarea o actividad de la que depende "
+                "aún no está completada."
+            )
+        if task.work_item_id is not None and (
+            await task_repo.has_undelivered_third_party_ancestor(task.work_item_id)
+        ):
+            return (
+                "No puedes entregar: la actividad de terceros de la que depende "
+                "este trabajo aún no fue entregada."
+            )
+        return None
+
     async def transition_task(
         self,
         task: Task,

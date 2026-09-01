@@ -21,7 +21,7 @@ from app.modules.notifications.application.use_cases import (
     MarkAllAsReadUseCase,
     MarkNotificationAsReadUseCase,
 )
-from app.shared.email.sender import SmtpEmailSender
+from app.shared.email.sender import build_email_sender
 from app.modules.notifications.presentation.schemas import (
     MarkAllReadResponse,
     NotificationResponse,
@@ -87,7 +87,7 @@ async def run_overdue_scan(
     settings = get_settings()
     result = await scan_overdue_tasks(
         db,
-        email_sender=SmtpEmailSender(settings),
+        email_sender=build_email_sender(settings),
         public_url=settings.APP_PUBLIC_URL,
     )
     return {

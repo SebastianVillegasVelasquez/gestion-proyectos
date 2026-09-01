@@ -25,6 +25,8 @@ import {
   GripVertical,
   CornerLeftUp,
   UsersRound,
+  User,
+  ExternalLink,
   PackageCheck,
   Hourglass,
   X,
@@ -64,7 +66,7 @@ import {
 } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
 import { useTeams } from "../../hooks/use-teams";
-import { fullName, indexById, resolveAssignment } from "../../utils/task-assignment";
+import { indexById, resolveAssignment } from "../../utils/task-assignment";
 import { formatShortDate } from "../../utils/task-dates";
 import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
 import { CreateTaskModal } from "../../tasks/CreateTaskModal";
@@ -227,13 +229,44 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
 function DateBadge({
   node,
   containerName,
+  isThirdParty = false,
   onResolveConflict,
 }: {
   node: WorkItemTree;
   /** Nombre del elemento que lo contiene, para el aviso (no decimos "padre"). */
   containerName: string | null;
+  /** «Actividad de terceros»: es un HITO (una sola fecha, la de entrega), no un
+   *  tramo con inicio y fin. */
+  isThirdParty?: boolean;
   onResolveConflict: () => void;
 }) {
+  // El tercero tiene UNA fecha: la real de entrega si ya entregó, o la prevista.
+  if (isThirdParty) {
+    const delivered = node.fecha_fin_real ?? node.fecha_inicio_real;
+    const milestone = delivered ?? node.fecha_inicio_plan ?? node.fecha_fin_plan;
+    if (!milestone) {
+      return (
+        <span className="text-[11px] italic text-slate-300 dark:text-slate-600">
+          sin fecha de entrega
+        </span>
+      );
+    }
+    return (
+      <span
+        className={cn(
+          "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+          delivered
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+            : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+        )}
+        title={delivered ? "Fecha real de entrega del tercero" : "Fecha de entrega prevista"}
+      >
+        <CalendarClock className="size-3" />
+        {formatShortDate(milestone)}
+      </span>
+    );
+  }
+
   const hasRange = node.fecha_inicio_plan ?? node.fecha_fin_plan;
   if (!hasRange && node.duracion_valor == null) {
     return (
@@ -511,24 +544,36 @@ function TreeNode({
           </span>
         )}
 
-        {isThirdParty &&
-          (thirdPartyDelivered ? (
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-              <PackageCheck className="size-2.5" /> entregada
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeliverThirdParty(node);
-              }}
-              title="El tercero ya entregó los recursos: abre la compuerta de sus hijos y reprograma sus tareas"
-              className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
-            >
-              <Hourglass className="size-2.5" /> marcar entregada
-            </button>
-          ))}
+        {isThirdParty && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeliverThirdParty(node);
+            }}
+            title={
+              thirdPartyDelivered
+                ? `Entregada${node.fecha_fin_real ? ` el ${node.fecha_fin_real}` : ""}. Clic para cambiar la fecha o revertir.`
+                : "El tercero ya entregó los recursos: abre la compuerta de sus hijos y reprograma sus tareas"
+            }
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors",
+              thirdPartyDelivered
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+                : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50",
+            )}
+          >
+            {thirdPartyDelivered ? (
+              <>
+                <PackageCheck className="size-2.5" /> entregada
+              </>
+            ) : (
+              <>
+                <Hourglass className="size-2.5" /> marcar entregada
+              </>
+            )}
+          </button>
+        )}
 
         <div className="ml-auto flex items-center gap-3">
           {/* El elemento ES una tarea: su responsable/equipo y estado se ven
@@ -543,13 +588,25 @@ function TreeNode({
               title="Abrir la tarea de este elemento"
               className="flex items-center gap-2 rounded-full px-1 py-0.5 transition-colors hover:bg-accent"
             >
-              {selfAssignment.person ? (
+              {isThirdParty ? (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  <ExternalLink className="size-2.5" />
+                  Responsable externo
+                </span>
+              ) : selfAssignment.assigneeName ? (
                 <span className="flex items-center gap-1 rounded-full bg-brand-teal/10 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal">
-                  <span className="flex size-4 items-center justify-center rounded-full bg-brand-teal/25 text-[8px] font-bold">
-                    {selfAssignment.person.name.charAt(0)}
-                    {selfAssignment.person.last_name.charAt(0)}
-                  </span>
-                  <span className="max-w-[110px] truncate">{fullName(selfAssignment.person)}</span>
+                  {selfAssignment.person ? (
+                    <span className="flex size-4 items-center justify-center rounded-full bg-brand-teal/25 text-[8px] font-bold">
+                      {selfAssignment.person.name.charAt(0)}
+                      {selfAssignment.person.last_name.charAt(0)}
+                    </span>
+                  ) : (
+                    <User className="ml-0.5 size-2.5" />
+                  )}
+                  <span className="max-w-[110px] truncate">{selfAssignment.assigneeName}</span>
+                  {selfAssignment.kind === "person" && (
+                    <span className="opacity-70">· individual</span>
+                  )}
                 </span>
               ) : selfAssignment.team ? (
                 <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
@@ -585,6 +642,7 @@ function TreeNode({
           <DateBadge
             node={node}
             containerName={containerName}
+            isThirdParty={isThirdParty}
             onResolveConflict={() => {
               onResolveConflict(node);
             }}
@@ -782,6 +840,7 @@ function TreeNode({
               allTasks={tasks}
               memberById={memberById}
               teamById={teamById}
+              isThirdParty={isThirdParty}
               onOpen={(task) => {
                 onOpenTask(task, node.nombre);
               }}
@@ -1142,6 +1201,8 @@ export function StructurePanel({ projectId }: { projectId: string }) {
   // Elemento cuya condición de tarea se va a retirar (pide confirmación: borra
   // la tarea y sus subtareas).
   const [demoteTarget, setDemoteTarget] = useState<WorkItemTree | null>(null);
+  // «Actividad de terceros» cuya entrega se va a marcar / corregir / revertir.
+  const [deliverTarget, setDeliverTarget] = useState<WorkItemTree | null>(null);
   const [modalParent, setModalParent] = useState<WorkItemTree | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<WorkItemTree | null>(null);
@@ -1533,7 +1594,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
                     setDemoteTarget(n);
                   }}
                   onDeliverThirdParty={(n) => {
-                    deliverThirdParty.mutate({ itemId: n.id });
+                    setDeliverTarget(n);
                   }}
                   draggingId={draggingId}
                   draggingIdRef={draggingIdRef}
@@ -1735,6 +1796,41 @@ export function StructurePanel({ projectId }: { projectId: string }) {
         />
       )}
 
+      {deliverTarget && (
+        <ThirdPartyDeliverDialog
+          node={deliverTarget}
+          loading={deliverThirdParty.isPending}
+          errorMessage={
+            deliverThirdParty.isError
+              ? getErrorMessage(deliverThirdParty.error, "No se pudo actualizar la entrega")
+              : null
+          }
+          onDeliver={(deliveredOn) => {
+            deliverThirdParty.mutate(
+              { itemId: deliverTarget.id, deliveredOn, delivered: true },
+              {
+                onSuccess: () => {
+                  setDeliverTarget(null);
+                },
+              },
+            );
+          }}
+          onRevert={() => {
+            deliverThirdParty.mutate(
+              { itemId: deliverTarget.id, delivered: false },
+              {
+                onSuccess: () => {
+                  setDeliverTarget(null);
+                },
+              },
+            );
+          }}
+          onCancel={() => {
+            setDeliverTarget(null);
+          }}
+        />
+      )}
+
       {demoteTarget && (
         <ConfirmDialog
           title="Quitar la condición de tarea"
@@ -1759,6 +1855,108 @@ export function StructurePanel({ projectId }: { projectId: string }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** Marca / corrige / revierte la entrega de una «actividad de terceros». La
+ * fecha elegida es el inicio de sus elementos hijos y de las tareas que
+ * dependen de ella (el fin lo pone la duración estimada de cada uno). */
+function ThirdPartyDeliverDialog({
+  node,
+  loading,
+  errorMessage,
+  onDeliver,
+  onRevert,
+  onCancel,
+}: {
+  node: WorkItemTree;
+  loading: boolean;
+  errorMessage: string | null;
+  onDeliver: (deliveredOn: string) => void;
+  onRevert: () => void;
+  onCancel: () => void;
+}) {
+  const delivered = node.fecha_fin_real != null || node.fecha_inicio_real != null;
+  const [date, setDate] = useState(node.fecha_fin_real ?? new Date().toISOString().slice(0, 10));
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Entrega de la actividad de terceros"
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onCancel}
+      />
+      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="p-5">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+            {delivered ? "Corregir la entrega" : "Marcar como entregada"}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            “{node.nombre}”. La fecha de entrega será el inicio de sus elementos hijos y de las
+            tareas que dependen de esta actividad; el fin se recalcula con la duración estimada de
+            cada uno.
+          </p>
+          <label className="mt-4 block text-xs font-medium text-slate-600 dark:text-slate-300">
+            Fecha de entrega
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+              }}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            />
+          </label>
+          {errorMessage && (
+            <p
+              role="alert"
+              className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400"
+            >
+              {errorMessage}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+          {delivered ? (
+            <button
+              type="button"
+              onClick={onRevert}
+              disabled={loading}
+              className="rounded-lg border border-amber-300 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+            >
+              Revertir entrega
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDeliver(date);
+              }}
+              disabled={loading || !date}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Procesando…" : delivered ? "Guardar fecha" : "Marcar entregada"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

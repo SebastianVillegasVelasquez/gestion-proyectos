@@ -11,11 +11,17 @@ const keys = {
   all: ["personal-deliverables"] as const,
   mine: ["personal-deliverables", "mine"] as const,
   reviewQueue: ["personal-deliverables", "review-queue"] as const,
+  myTasks: ["personal-deliverables", "my-tasks"] as const,
 };
 
 /** Mis entregas personales (tareas individuales, sin equipo). */
 export function useMyPersonalDeliverables() {
   return useQuery({ queryKey: keys.mine, queryFn: personalApi.list });
+}
+
+/** «Mis tareas»: todo lo asignado a mí, individual o de equipo. */
+export function useMyTasks() {
+  return useQuery({ queryKey: keys.myTasks, queryFn: personalApi.myTasks });
 }
 
 /** Entregas personales que me toca revisar (soy coordinador/supervisor del

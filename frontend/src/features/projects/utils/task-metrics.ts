@@ -127,6 +127,16 @@ export function deriveTaskMetrics(tasks: Task[]): TaskMetrics {
 
   const status: ProjectStatus = overdue > 0 ? "at-risk" : inReview > 0 ? "in-review" : "active";
 
+  // El avance del proyecto se mide sobre las tareas PADRE (cada una es un
+  // entregable). El backend ya da a cada tarea su `progress_pct` —promedio de
+  // sus subtareas para las padre, por estado para el resto—; aquí solo
+  // promediamos el de las padre no canceladas. Las subtareas no cuentan aparte:
+  // ya están dentro del porcentaje de su padre.
+  const parents = tasks.filter((t) => t.parent_task_id === null && t.status !== "cancelada");
+  const progress = parents.length
+    ? Math.round(parents.reduce((sum, t) => sum + (t.progress_pct || 0), 0) / parents.length)
+    : 0;
+
   return {
     total,
     completed,
@@ -136,7 +146,7 @@ export function deriveTaskMetrics(tasks: Task[]): TaskMetrics {
     returned,
     cancelled,
     overdue,
-    progress: total ? Math.round((completed / total) * 100) : 0,
+    progress,
     status,
     segments,
   };

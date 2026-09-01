@@ -24,10 +24,14 @@ const labelCls =
 export function NewSubtaskModal({
   teamId,
   parent,
+  siblings,
   onClose,
 }: {
   teamId: string;
   parent: ApiTeamTask;
+  /** Subtareas ya existentes de la misma tarea padre: una de ellas puede ser
+   *  la dependencia FtS de la nueva (no se puede empezar antes que ella). */
+  siblings: ApiTeamTask[];
   onClose: () => void;
 }) {
   const membersQuery = useTeamMembers(teamId);
@@ -35,6 +39,9 @@ export function NewSubtaskModal({
   const createSubtask = useCreateTeamSubtask(teamId);
 
   const [title, setTitle] = useState("");
+  // Dependencia opcional: hasta que esta hermana esté completada, la nueva
+  // subtarea no puede iniciarse. Su fecha de fin marca el inicio de esta.
+  const [dependsOnId, setDependsOnId] = useState("");
   // Por defecto la subtarea la hace quien tiene la tarea padre: es lo más común
   // y evita volver a elegir. El líder puede cambiarlo aquí mismo antes de crear.
   const [assigneeId, setAssigneeId] = useState<string>(parent.assignee_id ?? "");
@@ -70,6 +77,7 @@ export function NewSubtaskModal({
         parent_task_id: parent.id,
         // team_id lo hereda el backend del padre; no hace falta enviarlo.
         assignee_id: assigneeId || null,
+        depends_on_id: dependsOnId || undefined,
         // Sin fecha de inicio, la subtarea queda sin planificar (como el padre).
         start_date: startDate || null,
         duration_days: startDate ? duration : undefined,
@@ -135,6 +143,36 @@ export function NewSubtaskModal({
               ))}
             </select>
           </div>
+
+          {siblings.length > 0 && (
+            <div>
+              <label className={labelCls}>Depende de</label>
+              <select
+                value={dependsOnId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDependsOnId(next);
+                  // Arranca cuando termina su dependencia: precargamos la fecha
+                  // de inicio con el fin de la hermana elegida.
+                  const dep = siblings.find((s) => s.id === next);
+                  if (dep?.due_date) {
+                    setStartDate(dep.due_date);
+                  }
+                }}
+                className={inputCls}
+              >
+                <option value="">Sin dependencia</option>
+                {siblings.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                No podrá comenzar hasta que esa subtarea esté completada.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

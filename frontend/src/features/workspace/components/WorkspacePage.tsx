@@ -459,6 +459,21 @@ function MemberWorkspace() {
                   projectId={activeTeam.project_id}
                   members={members}
                   teamMembers={membersQuery.data ?? []}
+                  onDeliver={
+                    canDeliver
+                      ? (t) => {
+                          openDeliverForTask(t.id);
+                        }
+                      : undefined
+                  }
+                  onMarkDelivered={
+                    canDeliver
+                      ? (t) => {
+                          markTaskDelivered(t.id);
+                        }
+                      : undefined
+                  }
+                  canDeliverTask={(t) => linkableTaskIds.has(t.id)}
                 />
               </div>
             )}

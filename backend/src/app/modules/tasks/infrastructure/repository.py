@@ -26,6 +26,7 @@ class TaskRepository(BaseRepository[Task]):
         query = (
             select(Task)
             .where(Task.work_item_id == work_item_id, Task.deleted_at.is_(None))
+            .options(selectinload(Task.assignee))
             .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
@@ -57,6 +58,7 @@ class TaskRepository(BaseRepository[Task]):
         query = (
             select(Task)
             .where(Task.deleted_at.is_(None), Task.project_id == project_id)
+            .options(selectinload(Task.assignee))
             .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
@@ -251,6 +253,28 @@ class TaskRepository(BaseRepository[Task]):
             .order_by(Task.start_date)
         )
         # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
+        return [tuple(r) for r in (await self._session.execute(query)).all()]
+
+    async def get_assigned_to_user(self, user_id: UUID) -> list[tuple]:
+        """Todas las tareas VIVAS cuyo responsable es `user_id`, en cualquier
+        proyecto: es "Mis tareas". Trae ya resueltos el nombre del elemento, del
+        proyecto y del equipo (si la tarea es de uno), para la lista sin N+1.
+        """
+        from app.modules.project.infrastructure.models import Project
+
+        query = (
+            select(
+                Task,
+                WorkItem.nombre.label("work_item_name"),
+                Project.name.label("project_name"),
+                Team.name.label("team_name"),
+            )
+            .outerjoin(WorkItem, Task.work_item_id == WorkItem.id)
+            .join(Project, Task.project_id == Project.id)
+            .outerjoin(Team, Task.team_id == Team.id)
+            .where(Task.assignee_id == user_id, Task.deleted_at.is_(None))
+            .order_by(Task.due_date.is_(None), Task.due_date, Task.start_date)
+        )
         return [tuple(r) for r in (await self._session.execute(query)).all()]
 
     # El predecesor puede ser una tarea o un elemento del árbol; para saber si

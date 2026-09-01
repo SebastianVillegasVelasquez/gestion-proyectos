@@ -55,11 +55,19 @@ export const structureApi = {
   shift: (itemId: string, payload: ShiftWorkItemSubtreePayload) =>
     http.post<WorkItem>(`/work-items/${itemId}/shift`, payload).then((r) => r.data),
 
-  /** Marca una «actividad de terceros» como entregada: abre la compuerta de su
-   * subárbol y reprograma en cascada las tareas que dependían de ella. */
-  deliverThirdParty: (itemId: string, deliveredOn?: string) =>
+  /** Marca (o revierte) una «actividad de terceros» como entregada. Al
+   * entregar, su fecha pasa a ser el inicio de sus elementos hijos y de las
+   * tareas que dependen de ella; al revertir (`delivered: false`), el subárbol
+   * vuelve a lo previsto y queda bloqueado. */
+  deliverThirdParty: (
+    itemId: string,
+    opts?: { deliveredOn?: string | null; delivered?: boolean },
+  ) =>
     http
-      .post<WorkItem>(`/work-items/${itemId}/deliver`, { delivered_on: deliveredOn ?? null })
+      .post<WorkItem>(`/work-items/${itemId}/deliver`, {
+        delivered_on: opts?.deliveredOn ?? null,
+        delivered: opts?.delivered ?? true,
+      })
       .then((r) => r.data),
 
   /** Duplica un elemento con todo su contenido bajo el destino (spec §9). */

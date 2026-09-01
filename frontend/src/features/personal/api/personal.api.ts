@@ -1,6 +1,29 @@
 import http from "@/lib/http";
 import type { ApiComment, ApiVersion } from "@/features/workspace/api/workspace.api";
 import type { CommentType, DeliverableStatus, ResourceType } from "@/features/workspace/types";
+import type { TaskPriority, TaskStatus } from "@/features/projects/types/api.types";
+
+/** Una tarea asignada al usuario (cualquier proyecto). `team_id` presente = se
+ * entrega por el espacio del equipo; ausente = entrega individual. */
+export interface ApiMyTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  project_id: string;
+  project_name: string;
+  work_item_id: string | null;
+  work_item_name: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  parent_task_id: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  requires_approval: boolean;
+  /** Avance 0-100 (backend). Para tareas padre cuyas subtareas no viajan en
+   * esta lista es el avance por estado; la cifra fina vive en proyecto/equipo. */
+  progress_pct: number;
+}
 
 /** Entregable personal (sin equipo). Superset del entregable de equipo: trae
  * además en qué proyecto está y qué puede hacer con él quien lo pide. */
@@ -52,6 +75,9 @@ const base = "/me/deliverables";
 
 export const personalApi = {
   list: () => http.get<ApiPersonalDeliverable[]>(base).then((r) => r.data),
+
+  /** «Mis tareas»: todo lo asignado a mí, de cualquier proyecto. */
+  myTasks: () => http.get<ApiMyTask[]>("/me/tasks").then((r) => r.data),
 
   reviewQueue: () => http.get<ApiPersonalDeliverable[]>(`${base}/review-queue`).then((r) => r.data),
 

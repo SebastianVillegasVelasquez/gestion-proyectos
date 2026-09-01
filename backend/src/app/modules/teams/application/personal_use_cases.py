@@ -190,6 +190,21 @@ class PersonalDeliverableService:
         self, deliverable_id: UUID, data: AddVersionRequest, current_user
     ) -> PersonalDeliverableResponse:
         deliverable = await self._require_own(deliverable_id, current_user)
+
+        # Compuerta FtS también en "Mis tareas": entregar salta
+        # ChangeTaskStatusUseCase, así que si la tarea depende de algo (otra
+        # tarea o una actividad de terceros) que aún no está listo, no deja
+        # entregar. Antes de crear la versión.
+        task = (
+            await self._repo.get_task(deliverable.task_id)
+            if deliverable.task_id
+            else None
+        )
+        if task is not None:
+            blocked = await self._repo.task_delivery_block_reason(task)
+            if blocked:
+                raise ValidationError(blocked)
+
         next_number = (
             deliverable.versions[-1].version_number + 1 if deliverable.versions else 1
         )
@@ -205,11 +220,6 @@ class PersonalDeliverableService:
             )
         )
 
-        task = (
-            await self._repo.get_task(deliverable.task_id)
-            if deliverable.task_id
-            else None
-        )
         auto_complete = task is not None and not task.requires_approval
         deliverable.status = (
             DeliverableStatus.APROBADO

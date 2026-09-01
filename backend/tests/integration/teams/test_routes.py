@@ -433,3 +433,88 @@ class TestTeamMemberRoutes:
 
         assert response.status_code == 200
         assert response.json()["member_count"] == 1
+
+
+class TestLeadManagesOwnMembers:
+    """El líder del equipo puede mover (rol) y quitar a SUS integrantes; nada
+    más. Administración global sigue sin restricciones."""
+
+    async def _setup(self, client, admin_headers, valid_project_payload):
+        from app.core.security import create_access_token
+
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team = await _create_team(client, admin_headers, project_id)
+        lead = await _create_user(
+            client, admin_headers, email="lead-fx@x.com", project_id=project_id
+        )
+        member = await _create_user(
+            client, admin_headers, email="member-fx@x.com", project_id=project_id
+        )
+        for user, role in ((lead, TeamRole.LIDER), (member, TeamRole.INTEGRANTE)):
+            r = await client.post(
+                f"/api/v1/projects/{project_id}/teams/{team['id']}/members",
+                json={"user_id": user["id"], "team_role": role.value},
+                headers=admin_headers,
+            )
+            assert r.status_code == 201, r.text
+        lead_headers = {
+            "Authorization": f"Bearer {create_access_token(user_id=lead['id'], role='user')}"
+        }
+        return project_id, team["id"], lead, member, lead_headers
+
+    async def test_lead_changes_and_removes_its_integrante(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid, tid, _lead, member, lead_headers = await self._setup(
+            client, admin_headers, valid_project_payload
+        )
+
+        promoted = await client.patch(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
+            json={"team_role": TeamRole.LIDER.value},
+            headers=lead_headers,
+        )
+        assert promoted.status_code == 200, promoted.text
+        assert promoted.json()["team_role"] == TeamRole.LIDER.value
+
+        # (ya es líder: el propio líder no puede tocar a otro líder → se restaura por admin)
+        await client.patch(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
+            json={"team_role": TeamRole.INTEGRANTE.value},
+            headers=admin_headers,
+        )
+        removed = await client.delete(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
+            headers=lead_headers,
+        )
+        assert removed.status_code == 204, removed.text
+
+    async def test_lead_cannot_touch_self_or_a_non_member(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid, tid, lead, _member, lead_headers = await self._setup(
+            client, admin_headers, valid_project_payload
+        )
+        # A sí mismo, no.
+        r = await client.delete(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{lead['id']}",
+            headers=lead_headers,
+        )
+        assert r.status_code == 403, r.text
+
+    async def test_plain_member_cannot_manage(
+        self, client, admin_headers, valid_project_payload
+    ):
+        from app.core.security import create_access_token
+
+        pid, tid, _lead, member, _lead_headers = await self._setup(
+            client, admin_headers, valid_project_payload
+        )
+        member_headers = {
+            "Authorization": f"Bearer {create_access_token(user_id=member['id'], role='user')}"
+        }
+        r = await client.delete(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
+            headers=member_headers,
+        )
+        assert r.status_code == 403, r.text

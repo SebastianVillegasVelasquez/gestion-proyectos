@@ -23,6 +23,8 @@ const task = (over: Partial<Task>): Task => ({
   orden: 0,
   represents_work_item: false,
   requires_approval: false,
+  progress_pct: 0,
+  assignee_name: null,
   ...over,
 });
 

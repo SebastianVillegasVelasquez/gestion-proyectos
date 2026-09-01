@@ -24,6 +24,11 @@ const PersonalDeliverablesPage = lazy(() =>
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
 const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
+const EmailTestPage = lazy(() =>
+  import("@/features/dev/components/EmailTestPage.tsx").then((m) => ({
+    default: m.EmailTestPage,
+  })),
+);
 const ClientPortal = lazy(() => import("@/features/client/components/ClientPortal.tsx"));
 const ClientProjectPortal = lazy(
   () => import("@/features/client/components/ClientProjectPortal.tsx"),
@@ -119,9 +124,10 @@ export const AppRouter = () => (
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />
 
-        {/* Bandeja de feedback: solo el rol técnico (developer). */}
+        {/* Herramientas del rol técnico (developer). */}
         <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
           <Route path="/feedback" element={<FeedbackInbox />} />
+          <Route path="/dev/email-test" element={<EmailTestPage />} />
         </Route>
         {/* Vistas del rol User acotadas por membresía (el backend valida el
             acceso; no van dentro del RoleGuard de administración). */}

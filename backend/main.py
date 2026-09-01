@@ -19,6 +19,7 @@ from app.modules.dashboard.presentation.public_routes import (
     router as public_router,
 )
 from app.modules.dashboard.presentation.routes import router as dashboard_router
+from app.modules.dev_tools.presentation.routes import router as dev_tools_router
 from app.modules.feedback.presentation.routes import router as feedback_router
 from app.modules.identity.presentation.routes import router as users_router  # noqa: E402
 from app.modules.notifications.presentation.routes import (
@@ -206,4 +207,5 @@ app.include_router(traceability_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(reminders_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
+app.include_router(dev_tools_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")

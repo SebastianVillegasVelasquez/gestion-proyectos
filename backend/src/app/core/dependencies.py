@@ -61,7 +61,7 @@ from app.modules.traceability.infrastructure.repository import (
 )
 from app.shared.authz import role_satisfies
 from app.shared.broadcasting.broadcaster import Broadcaster
-from app.shared.email.sender import SmtpEmailSender
+from app.shared.email.sender import build_email_sender
 from app.shared.events import EventBus
 from app.shared.events.events import UserCreated
 from app.shared.exceptions import ForbiddenError, NotFoundError
@@ -173,7 +173,7 @@ def deliverable_notifier_dependency(
     return DeliverableNotifier(
         session=db,
         broadcaster=broadcaster,
-        email_sender=SmtpEmailSender(settings),
+        email_sender=build_email_sender(settings),
         public_url=settings.APP_PUBLIC_URL,
     )
 
@@ -197,7 +197,7 @@ def event_bus_dependency(
     bus.subscribe(
         UserCreated,
         NotifyUserCreatedByEmail(
-            SmtpEmailSender(settings), public_url=settings.APP_PUBLIC_URL
+            build_email_sender(settings), public_url=settings.APP_PUBLIC_URL
         ),
     )
     return bus

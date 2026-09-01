@@ -153,3 +153,68 @@ class TestDependencyBlocksStatus:
             headers=admin_headers,
         )
         assert r.status_code == 200, r.text
+
+
+async def _subtask(client, admin_headers, project_id, parent_id, title) -> str:
+    r = await client.post(
+        "/api/v1/tasks",
+        headers=admin_headers,
+        json={
+            "title": title,
+            "project_id": project_id,
+            "parent_task_id": parent_id,
+            "start_date": BASE.isoformat(),
+            "duration_days": 2,
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+class TestSubtaskDependenciesAreSiblingsOnly:
+    """Una subtarea (objetivo específico) solo puede depender de otra subtarea
+    de la MISMA tarea padre."""
+
+    async def test_two_siblings_can_depend(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        parent = await _task(client, admin_headers, pid, "Objetivo general")
+        s1 = await _subtask(client, admin_headers, pid, parent, "Específico 1")
+        s2 = await _subtask(client, admin_headers, pid, parent, "Específico 2")
+
+        r = await _add_dep(client, admin_headers, s2, s1)
+        assert r.status_code == 201, r.text
+
+    async def test_subtask_cannot_depend_on_non_sibling(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        p1 = await _task(client, admin_headers, pid, "Objetivo A")
+        p2 = await _task(client, admin_headers, pid, "Objetivo B")
+        s1 = await _subtask(client, admin_headers, pid, p1, "A.1")
+        other = await _subtask(client, admin_headers, pid, p2, "B.1")
+
+        r = await _add_dep(client, admin_headers, s1, other)
+        assert r.status_code == 422, r.text
+
+    async def test_subtask_cannot_depend_on_its_parent(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        parent = await _task(client, admin_headers, pid, "Objetivo general")
+        s1 = await _subtask(client, admin_headers, pid, parent, "Específico 1")
+
+        r = await _add_dep(client, admin_headers, s1, parent)
+        assert r.status_code == 422, r.text
+
+    async def test_root_task_cannot_depend_on_a_subtask(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        parent = await _task(client, admin_headers, pid, "Objetivo general")
+        s1 = await _subtask(client, admin_headers, pid, parent, "Específico 1")
+        loose = await _task(client, admin_headers, pid, "Tarea suelta")
+
+        r = await _add_dep(client, admin_headers, loose, s1)
+        assert r.status_code == 422, r.text

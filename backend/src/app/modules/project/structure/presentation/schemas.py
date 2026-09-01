@@ -160,11 +160,18 @@ class MoveWorkItemRequest(BaseModelConfig):
 
 # ── Marcar una «actividad de terceros» como entregada ─────────────────────────
 class DeliverThirdPartyRequest(BaseModelConfig):
-    """El tercero ya entregó los recursos. `delivered_on` opcional (por defecto
-    hoy): abre la compuerta de sus hijos y arranca la cascada de fechas de las
-    tareas que dependían de la actividad."""
+    """Marca (o des-marca) una «actividad de terceros» como entregada.
+
+    - `delivered=True` (por defecto): el tercero entregó. `delivered_on` opcional
+      (por defecto hoy) fija la fecha real; esa fecha pasa a ser el INICIO de los
+      elementos hijos y de las tareas que dependen de la actividad, y su fin se
+      recalcula con la duración estimada de cada uno.
+    - `delivered=False`: se revierte la entrega (corrección). Los hijos vuelven a
+      posicionarse sobre la fecha prevista y el subárbol queda bloqueado de nuevo.
+    """
 
     delivered_on: Optional[datetime.date] = None
+    delivered: bool = True
 
 
 # ── Desplazar un subárbol en el tiempo (drag de la barra en el cronograma) ─────

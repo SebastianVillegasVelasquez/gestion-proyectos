@@ -53,14 +53,14 @@ const SECTIONS: {
     label: "Cronograma",
     meta: "Línea de tiempo por fases",
     icon: GanttChartSquare,
-    accent: "bg-brand-blue/10 text-brand-blue",
+    accent: "bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal",
   },
   {
     to: "tareas",
     label: "Tareas",
     meta: "Crea, asigna y da seguimiento",
     icon: ListChecks,
-    accent: "bg-brand-blue/10 text-brand-blue",
+    accent: "bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold",
   },
   {
     to: "integrantes",
@@ -105,7 +105,7 @@ function SectionsCard({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
   return (
     <Card className="rounded-2xl">
-      <CardContent className="flex h-full flex-col gap-1 py-5">
+      <CardContent className="flex h-full flex-col gap-1 py-5 sm:pt-5">
         <div className="mb-1 flex items-center gap-2.5">
           <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             <LayoutGrid className="size-[18px]" />
@@ -189,7 +189,7 @@ export function ProjectDetailView({
     // El scroll vive en el contenedor de ancho completo (la barra queda pegada al
     // borde derecho de la pantalla); el contenido se centra con un ancho máximo.
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 p-4 sm:p-6 lg:px-10">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 pb-6 pt-6 sm:px-6 sm:pb-8 sm:pt-8 lg:px-10">
         {/* Encabezado compacto: título + meta (fecha · institución) a la izquierda,
             acciones agrupadas a la derecha. */}
         <header className="shrink-0">
@@ -219,14 +219,14 @@ export function ProjectDetailView({
                         setEditingName(false);
                       }
                     }}
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-2xl font-semibold tracking-tight text-foreground outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 disabled:opacity-60 sm:text-[28px]"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-2xl font-semibold tracking-tight text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 sm:text-[28px]"
                   />
                   <button
                     type="button"
                     onClick={saveName}
                     disabled={updateProject.isPending}
                     aria-label="Guardar nombre"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue text-white transition-colors hover:bg-brand-blue-dark disabled:opacity-50"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-50"
                   >
                     <Check className="size-4" />
                   </button>
