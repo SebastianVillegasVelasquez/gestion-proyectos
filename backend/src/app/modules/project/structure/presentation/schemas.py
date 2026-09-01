@@ -131,9 +131,12 @@ class CloneWorkItemRequest(BaseModelConfig):
 
     - `times`: cuántas copias pegar (por defecto 1). Útil para replicar la misma
       estructura muchas veces (p. ej. 32 cursos idénticos) en una sola acción.
-    - `include_tasks`: si se copian también las tareas colgadas del subárbol, con
-      su responsable/equipo (deep copy). El estado y las fechas reales se
-      resetean; las fechas plan se desplazan igual que la estructura.
+    - `include_tasks`: si se copian también las tareas colgadas del subárbol
+      (deep copy). Se replican con TODAS sus subtareas a cualquier profundidad,
+      su responsable/equipo, prioridad, estimación de esfuerzo en días, orden,
+      si requieren aprobación y las dependencias FtS internas al subárbol. El
+      estado y las fechas reales se resetean; las fechas plan se desplazan igual
+      que la estructura. Clonar no notifica a los responsables.
     """
 
     target_parent_id: Optional[UUID] = None

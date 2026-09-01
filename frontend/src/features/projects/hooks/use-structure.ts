@@ -143,7 +143,13 @@ export function useCloneWorkItem(projectId: string) {
   return useMutation({
     mutationFn: ({ itemId, payload }: { itemId: string; payload: CloneWorkItemPayload }) =>
       structureApi.clone(itemId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) }),
+    onSuccess: () => {
+      // El clon puede traer tareas y subtareas nuevas: refrescamos también las
+      // vistas de tareas y del espacio de trabajo para que se muestren.
+      void qc.invalidateQueries({ queryKey: projectKeys.tree(projectId) });
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) });
+      void qc.invalidateQueries({ queryKey: ["workspace"] });
+    },
   });
 }
 
