@@ -110,9 +110,6 @@ class ScheduleItem:
     due_date: datetime.date
     status: str  # value del enum de tareas (para el color de la barra)
     progress_pct: int
-    # Distingue una fila de tarea (hoja) de un elemento de la estructura, para que
-    # la UI las muestre con matiz distinto. Nunca se expone responsable ni equipo.
-    is_task: bool = False
 
 
 @dataclass
@@ -157,18 +154,6 @@ _OPEN_EXCLUDED = [_COMPLETED, _CANCELLED]
 _PENDING = [TaskStatus.PENDIENTE_POR_INICIAR, TaskStatus.DEVUELTA]
 _IN_PROGRESS = [TaskStatus.EN_PROGRESO, TaskStatus.EN_REVISION]
 _COMPLETED_BUCKET = [TaskStatus.COMPLETADA]
-
-# Avance derivado del estado de una tarea (no hay % por tarea en el modelo).
-# Espejo de STATUS_PROGRESS del cronograma del frontend, para que la barra de una
-# tarea en el portal del cliente comunique lo mismo que dentro del proyecto.
-_TASK_STATUS_PROGRESS = {
-    TaskStatus.PENDIENTE_POR_INICIAR: 0,
-    TaskStatus.EN_PROGRESO: 35,
-    TaskStatus.EN_REVISION: 70,
-    TaskStatus.DEVUELTA: 50,
-    TaskStatus.COMPLETADA: 100,
-    TaskStatus.CANCELADA: 0,
-}
 
 
 def _status_value(raw) -> str:
@@ -968,36 +953,11 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 child_parent = key
                 child_depth = depth + 1
 
-                # Tareas fechadas del elemento como filas hijas (hojas). El cliente
-                # ve la tarea, su plazo y su estado, pero NUNCA el responsable ni el
-                # equipo. Las sin fechas no dibujan barra, así que se omiten.
-                dated_tasks: list[tuple[datetime.date, datetime.date, Task]] = [
-                    (t.start_date, t.due_date, t)
-                    for t in tasks_by_item.get(node.id, [])
-                    if t.start_date is not None and t.due_date is not None
-                ]
-                dated_tasks.sort(key=lambda row: (row[0], row[2].title))
-                for start_date, due_date, task in dated_tasks:
-                    task_status = (
-                        task.status
-                        if isinstance(task.status, TaskStatus)
-                        else TaskStatus(task.status)
-                    )
-                    items.append(
-                        ScheduleItem(
-                            key=f"n{counter}",
-                            parent_key=key,
-                            name=task.title,
-                            depth=child_depth,
-                            order=len(items),
-                            start_date=start_date,
-                            due_date=due_date,
-                            status=task_status.value,
-                            progress_pct=_TASK_STATUS_PROGRESS.get(task_status, 0),
-                            is_task=True,
-                        )
-                    )
-                    counter += 1
+                # Las tareas del elemento NO se listan como filas: el cronograma
+                # del cliente es un espejo de la ESTRUCTURA del proyecto (sólo
+                # elementos padre), no del trabajo individual. Las tareas siguen
+                # aportando su rango y su avance al agregado del elemento (ver
+                # `subtree`), pero nunca aparecen —ni ellas ni sus responsables—.
             for child in children.get(node.id, []):
                 walk(child, child_parent, child_depth)
 
