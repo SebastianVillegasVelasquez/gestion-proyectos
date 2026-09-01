@@ -225,8 +225,9 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 <ListChecks className="size-3.5" /> Copiar también las tareas
               </span>
               <span className="text-[11px] text-slate-400">
-                Duplica las tareas colgadas del contenido con su responsable o equipo. El estado y
-                las fechas reales se reinician; las fechas plan se desplazan igual.
+                Copia profunda: tareas y todas sus subtareas con su responsable o equipo, estimación
+                de días, orden y dependencias internas. El estado y las fechas reales se reinician;
+                las fechas plan se desplazan igual. No se envían avisos a los responsables.
               </span>
             </span>
           </label>
@@ -240,7 +241,9 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 <span className="font-medium text-slate-700 dark:text-slate-200">Sí</span>:
                 jerarquía completa, fechas plan (desplazadas), duraciones, tipos y dependencias FtS
                 internas al contenido copiado
-                {includeTasks && ", y las tareas con su responsable o equipo"}.
+                {includeTasks &&
+                  ", y las tareas y subtareas con su responsable o equipo, estimación de días, orden y dependencias internas"}
+                .
               </li>
               <li>
                 <span className="font-medium text-rose-600 dark:text-rose-400">No</span>: fechas
