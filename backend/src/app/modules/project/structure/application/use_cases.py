@@ -19,7 +19,7 @@ from app.modules.tasks.application.use_cases import cascade_reschedule_dependent
 from app.modules.tasks.domain.audit import TaskAuditor, snapshot
 from app.modules.tasks.domain.services import reschedule_task_start
 from app.modules.tasks.infrastructure.enums import TaskStatus
-from app.modules.tasks.infrastructure.models import Task
+from app.modules.tasks.infrastructure.models import Task, TaskDependency
 from app.modules.tasks.infrastructure.repository import TaskRepository
 from app.shared.base_repository import Repository
 from app.shared.events import EventBus
@@ -419,11 +419,20 @@ class CloneWorkItemUseCase:
     ) -> None:
         """Replica, por cada pegada, las tareas colgadas del subárbol origen.
 
-        Se copian las tareas adjuntas a los elementos copiados y sus subtareas
-        (aunque cuelguen por `parent_task_id` sin elemento propio). Se conserva
-        responsable/equipo, prioridad y duración; se RESETEA el estado y las
-        fechas reales, y se desplazan `start_date`/`due_date` igual que la
-        estructura. Las dependencias FtS entre tareas no se copian.
+        Copia PROFUNDA: se replican las tareas adjuntas a los elementos copiados
+        y TODAS sus subtareas —a cualquier profundidad, aunque cuelguen solo por
+        `parent_task_id` sin elemento propio— conservando responsable/equipo,
+        prioridad, estimación de esfuerzo en días, orden entre hermanas, si
+        requieren aprobación y si la tarea ES su elemento (`represents_work_item`).
+        Se RESETEA el estado y las fechas reales; las fechas plan se desplazan
+        igual que la estructura. Las dependencias FtS se recrean cuando ambos
+        extremos caen dentro del subárbol copiado (tarea→tarea) o el predecesor
+        es uno de los elementos clonados (tarea→elemento); las que apuntan fuera
+        se descartan.
+
+        Nada de esto emite notificaciones: clonar decenas de cursos con sus
+        tareas dispararía un aluvión de avisos de asignación sin valor. El clon
+        llega "en frío" y el responsable lo ve al abrir el proyecto.
         """
         source_work_item_ids = {old for m in id_maps for old in m}
         if not source_work_item_ids:
@@ -434,9 +443,13 @@ class CloneWorkItemUseCase:
         if not scoped:
             return
 
+        scoped_ids = {t.id for t in scoped}
+        all_deps = await self.task_repo.get_dependencies_by_project(project_id)
+        scoped_deps = [d for d in all_deps if d.task_id in scoped_ids]
+
         offset = datetime.timedelta(days=offset_days)
         for id_map in id_maps:
-            await self._paste_tasks(scoped, id_map, offset)
+            await self._paste_tasks(scoped, scoped_deps, id_map, offset)
 
     @staticmethod
     def _tasks_in_scope(
@@ -462,6 +475,7 @@ class CloneWorkItemUseCase:
     async def _paste_tasks(
         self,
         scoped: list[Task],
+        scoped_deps: list[TaskDependency],
         id_map: dict[UUID, UUID],
         offset: datetime.timedelta,
     ) -> None:
@@ -483,6 +497,13 @@ class CloneWorkItemUseCase:
                 assignee_id=task.assignee_id,
                 team_id=task.team_id,
                 parent_task_id=None,
+                # Esfuerzo ESTIMADO en días: es plan, se conserva. El tiempo
+                # realmente dedicado (`time_entries`) NO se copia: el clon
+                # arranca sin horas registradas.
+                estimated_days=task.estimated_days,
+                orden=task.orden,
+                requires_approval=task.requires_approval,
+                represents_work_item=task.represents_work_item,
                 # Las fechas son opcionales: si la tarea original no tiene, el
                 # clon tampoco; solo desplazamos las que existen.
                 start_date=task.start_date + offset if task.start_date else None,
@@ -499,6 +520,28 @@ class CloneWorkItemUseCase:
             if parent_old is not None and parent_old in scoped_ids:
                 clone.parent_task_id = new_task_id_by_old[parent_old]
                 await self.task_repo.add(clone)
+
+        # Pasada 3: recrear las dependencias FtS internas al subárbol.
+        # tarea→tarea si ambos extremos se copiaron; tarea→elemento si el
+        # predecesor es uno de los elementos clonados. Las externas se descartan.
+        for dep in scoped_deps:
+            new_task_id = new_task_id_by_old.get(dep.task_id)
+            if new_task_id is None:
+                continue
+            if dep.depends_on_id is not None:
+                new_pred = new_task_id_by_old.get(dep.depends_on_id)
+                if new_pred is None:
+                    continue
+                await self.task_repo.add_dependency(
+                    TaskDependency(task_id=new_task_id, depends_on_id=new_pred)
+                )
+            elif dep.depends_on_work_item_id is not None:
+                new_wi = id_map.get(dep.depends_on_work_item_id)
+                if new_wi is None:
+                    continue
+                await self.task_repo.add_dependency(
+                    TaskDependency(task_id=new_task_id, depends_on_work_item_id=new_wi)
+                )
 
 
 # ── Dependencias Finish-to-Start ────────────────────────────────────────────────
