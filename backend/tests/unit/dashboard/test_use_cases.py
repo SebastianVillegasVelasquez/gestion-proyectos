@@ -3,9 +3,15 @@ import uuid
 
 from app.modules.dashboard.application.use_cases import (
     GetDashboardSummaryUseCase,
+    GetPublicProjectScheduleUseCase,
     GetRecentActivityUseCase,
 )
-from app.modules.dashboard.infrastructure.repository import ActivityRow
+from app.modules.dashboard.infrastructure.repository import (
+    ActivityRow,
+    DashboardSummary,
+    ProjectSchedule,
+    ScheduleItem,
+)
 from app.modules.dashboard.presentation.schemas import (
     DashboardSummaryResponse,
     RecentActivityResponse,
@@ -104,3 +110,54 @@ class TestGetRecentActivityUseCase:
         repo = build_fake_dashboard_repo()
         response = await GetRecentActivityUseCase(repo).execute()
         assert response.items == []
+
+
+class TestGetPublicProjectScheduleUseCase:
+    async def test_should_pass_tipo_through_for_bar_colours(self):
+        # El portal del cliente pinta cada barra con el color de su TIPO de
+        # elemento (mismo que la Estructura): el caso de uso debe propagar
+        # `tipo_id` / `tipo_nombre` / `es_dependencia_externa` sin tocarlos.
+        schedule = ProjectSchedule(
+            project_name="Diplomado",
+            items=[
+                ScheduleItem(
+                    key="n0",
+                    parent_key=None,
+                    name="Módulo 1",
+                    depth=0,
+                    order=0,
+                    start_date=datetime.date(2026, 7, 1),
+                    due_date=datetime.date(2026, 7, 20),
+                    status="en_progreso",
+                    progress_pct=45,
+                    tipo_id="tipo-modulo",
+                    tipo_nombre="Módulo",
+                    es_dependencia_externa=False,
+                ),
+                ScheduleItem(
+                    key="n1",
+                    parent_key="n0",
+                    name="Proveedor externo",
+                    depth=1,
+                    order=1,
+                    start_date=datetime.date(2026, 7, 2),
+                    due_date=datetime.date(2026, 7, 10),
+                    status="pendiente_por_iniciar",
+                    progress_pct=0,
+                    tipo_id="tipo-terceros",
+                    tipo_nombre="Actividad de terceros",
+                    es_dependencia_externa=True,
+                ),
+            ],
+        )
+        repo = FakeDashboardRepository(
+            DashboardSummary(0, 0, 0, 0, 0), project_schedule=schedule
+        )
+
+        response = await GetPublicProjectScheduleUseCase(repo).execute("tok")
+
+        assert [(i.tipo_nombre, i.es_dependencia_externa) for i in response.items] == [
+            ("Módulo", False),
+            ("Actividad de terceros", True),
+        ]
+        assert response.items[0].tipo_id == "tipo-modulo"

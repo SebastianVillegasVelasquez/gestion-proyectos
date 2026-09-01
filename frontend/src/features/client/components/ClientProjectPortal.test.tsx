@@ -92,6 +92,9 @@ describe("ClientProjectPortal", () => {
           due_date: "2026-07-20",
           status: "en_progreso",
           progress_pct: 45,
+          tipo_id: "t-modulo",
+          tipo_nombre: "Módulo",
+          es_dependencia_externa: false,
         },
         {
           key: "n1",
@@ -103,6 +106,9 @@ describe("ClientProjectPortal", () => {
           due_date: "2026-07-10",
           status: "completada",
           progress_pct: 100,
+          tipo_id: "t-unidad",
+          tipo_nombre: "Unidad",
+          es_dependencia_externa: false,
         },
       ],
     };

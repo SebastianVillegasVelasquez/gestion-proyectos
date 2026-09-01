@@ -133,6 +133,12 @@ class PublicScheduleItemResponse(BaseModelConfig):
     due_date: datetime.date
     status: str  # value del enum de tareas (para el color de la barra)
     progress_pct: int
+    # Tipo del elemento: el portal pinta la barra con el MISMO color que la
+    # Estructura y el cronograma interno (paleta determinista sobre `tipo_id`,
+    # naranja fijo si `es_dependencia_externa`).
+    tipo_id: str | None = None
+    tipo_nombre: str | None = None
+    es_dependencia_externa: bool = False
 
 
 class PublicProjectScheduleResponse(BaseModelConfig):
