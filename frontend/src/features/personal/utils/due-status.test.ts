@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dueStatus } from "./due-status";
+import { daysUntil, dueStatus } from "./due-status";
 
 const TODAY = "2026-08-31";
 
@@ -24,5 +24,17 @@ describe("dueStatus", () => {
 
   it("vence más adelante → on_track", () => {
     expect(dueStatus({ status: "en_progreso", due_date: "2026-09-10" }, TODAY)).toBe("on_track");
+  });
+});
+
+describe("daysUntil", () => {
+  it("futuro → positivo, hoy → 0, pasado → negativo", () => {
+    expect(daysUntil("2026-09-03", TODAY)).toBe(3);
+    expect(daysUntil(TODAY, TODAY)).toBe(0);
+    expect(daysUntil("2026-08-28", TODAY)).toBe(-3);
+  });
+
+  it("sin fecha → null", () => {
+    expect(daysUntil(null, TODAY)).toBeNull();
   });
 });

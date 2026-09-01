@@ -283,6 +283,8 @@ export interface Task {
    * subtareas: promedio del avance de sus subtareas, sin llegar a 100 hasta
    * que el entregable padre se aprueba. */
   progress_pct: number;
+  /** true si la tarea depende (FtS) de una «actividad de terceros». */
+  depends_on_third_party: boolean;
 }
 
 export interface CreateTaskPayload {

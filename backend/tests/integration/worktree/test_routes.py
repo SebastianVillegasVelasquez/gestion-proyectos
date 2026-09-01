@@ -313,13 +313,16 @@ class TestDependencyRoutes:
         )
         assert removed.status_code == 204
 
-        # Sin predecesor ni padre, "solo duración" se ancla al inicio del
-        # proyecto (2026-08-01 + 3 días).
+        # Sin predecesor ni padre, "solo duración" (3 días) se ancla al inicio
+        # del proyecto — que `valid_project_payload` fija en `hoy - 30 días`.
+        from datetime import date, timedelta
+
+        project_start = date.today() - timedelta(days=30)
         item = (
             await client.get(f"/api/v1/work-items/{succ['id']}", headers=admin_headers)
         ).json()
-        assert item["fecha_inicio_plan"] == "2026-08-01"
-        assert item["fecha_fin_plan"] == "2026-08-04"
+        assert item["fecha_inicio_plan"] == project_start.isoformat()
+        assert item["fecha_fin_plan"] == (project_start + timedelta(days=3)).isoformat()
 
 
 class TestThirdPartyGate:

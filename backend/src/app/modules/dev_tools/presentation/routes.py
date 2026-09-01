@@ -4,6 +4,7 @@ Hoy: un endpoint para probar el envío de correo en PRODUCCIÓN sin tener que
 disparar un flujo real (alta de usuario, entrega, etc.).
 """
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.config import get_settings
@@ -32,6 +33,23 @@ _developer = require_role("developer")
 _TEST_EMAIL_MAX_PER_MINUTE = 5
 
 
+async def _check_logo_reachable(logo_url: str) -> tuple[bool, str]:
+    """GET corto al logo que se embebe en los correos. Devuelve
+    (alcanzable, detalle) para que el developer confirme de un vistazo si
+    `APP_PUBLIC_URL` del servidor apunta a un host público que sirve la imagen.
+    """
+    if not logo_url:
+        return False, "APP_PUBLIC_URL vacío: los correos saldrán sin logo."
+    try:
+        async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as client:
+            resp = await client.get(logo_url)
+    except httpx.HTTPError as exc:
+        return False, f"No se pudo abrir {logo_url}: {exc}"
+    ctype = resp.headers.get("content-type", "")
+    ok = resp.status_code == 200 and ctype.startswith("image/")
+    return ok, f"HTTP {resp.status_code} · content-type: {ctype or '—'}"
+
+
 @router.post("/email-test", response_model=SendTestEmailResponse)
 async def send_test_email(
     data: SendTestEmailRequest,
@@ -55,6 +73,13 @@ async def send_test_email(
     settings = get_settings()
     sender = build_email_sender(settings)
 
+    # Las mismas URLs que arma producción a partir de `APP_PUBLIC_URL`
+    # (sin barra final). Se resuelven siempre para devolverlas en el
+    # diagnóstico, use o no la plantilla real.
+    public_url = (settings.APP_PUBLIC_URL or "").rstrip("/")
+    login_url = f"{public_url}/login" if public_url else ""
+    logo_url = f"{public_url}/logo-email.jpg" if public_url else ""
+
     if data.html_body:
         # Modo avanzado: HTML crudo tal cual lo escribió el developer.
         subject = data.subject or "Correo de prueba — Bitácora"
@@ -64,16 +89,17 @@ async def send_test_email(
         # Por defecto: la plantilla REAL de bienvenida (con logo, botón y
         # pie de marca) — así la prueba valida exactamente lo que recibe
         # cualquier usuario, imágenes incluidas, y no un <p> suelto sin marca.
-        public_url = settings.APP_PUBLIC_URL
         rendered = welcome_email(
             name="Prueba",
             email=str(data.to),
-            login_url=f"{public_url}/login" if public_url else "",
-            logo_url=f"{public_url}/logo-email.jpg" if public_url else "",
+            login_url=login_url,
+            logo_url=logo_url,
         )
         subject = data.subject or rendered.subject
         html_body = rendered.html
         text_body = rendered.text
+
+    logo_reachable, logo_check_detail = await _check_logo_reachable(logo_url)
 
     logger.info(
         "Correo de prueba solicitado",
@@ -81,6 +107,10 @@ async def send_test_email(
         triggered_by_email=current_user.email,
         to=str(data.to),
         provider=getattr(sender, "provider_name", "unknown"),
+        resolved_public_url=public_url or "—",
+        resolved_logo_url=logo_url or "—",
+        logo_reachable=logo_reachable,
+        logo_check_detail=logo_check_detail,
     )
 
     try:
@@ -107,4 +137,9 @@ async def send_test_email(
         sent=True,
         provider=getattr(sender, "provider_name", "unknown"),
         to=str(data.to),
+        resolved_public_url=public_url,
+        resolved_login_url=login_url,
+        resolved_logo_url=logo_url,
+        logo_reachable=logo_reachable,
+        logo_check_detail=logo_check_detail,
     )

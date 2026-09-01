@@ -15,6 +15,7 @@ from app.modules.project.structure.presentation.schemas import (
     WorkItemResponse,
     WorkItemTreeResponse,
 )
+from app.modules.tasks.application.use_cases import cascade_reschedule_dependents
 from app.modules.tasks.domain.audit import TaskAuditor, snapshot
 from app.modules.tasks.domain.services import reschedule_task_start
 from app.modules.tasks.infrastructure.enums import TaskStatus
@@ -248,14 +249,29 @@ class DeliverThirdPartyActivityUseCase:
     ) -> None:
         dependents = await self.task_repo.get_dependents_of_work_item(item.id)
         changed: list[Task] = []
+        seen: set[UUID] = set()
         for dep in dependents:
             if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
                 continue
             before = snapshot(dep)
-            if reschedule_task_start(dep, fecha):
+            if reschedule_task_start(dep, fecha, recompute_due_from_estimate=True):
                 await self.task_repo.save(dep)
                 await TaskAuditor(self.task_repo, actor_id).diff(before, dep)
                 changed.append(dep)
+                seen.add(dep.id)
+                # En cadena: las tareas que dependen de ESTA tarea (no del
+                # tercero) arrancan tras su nuevo fin y recalculan el suyo.
+                if dep.due_date is not None:
+                    await cascade_reschedule_dependents(
+                        self.task_repo,
+                        self._bus,
+                        source_id=dep.id,
+                        source_title=dep.title,
+                        project_id=item.proyecto_id,
+                        anchor=dep.due_date,
+                        actor_id=actor_id,
+                        _seen=seen,
+                    )
 
         if changed and self._bus is not None:
             recipients = tuple(

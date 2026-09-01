@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.teams.application._task_sync import cascade_after_completion
 from app.modules.teams.domain.workspace import WorkspaceAccess, WorkspaceRepository
 from app.modules.teams.infrastructure.workspace_enums import (
     CommentType,
@@ -44,12 +45,21 @@ _TASK_STATUS_ON_DELIVER = TaskStatus.EN_REVISION
 class WorkspaceService:
     """Casos de uso del espacio de trabajo. Exige la política antes de actuar."""
 
-    def __init__(self, repo: WorkspaceRepository, notifier=None):
+    def __init__(self, repo: WorkspaceRepository, notifier=None, bus=None):
         self._repo = repo
         # Colaborador opcional: avisa a líder/supervisor cuando se entrega.
         # Solo la ruta de "subir versión" lo inyecta; el resto crea el
         # servicio sin él y nada cambia.
         self._notifier = notifier
+        # Bus opcional para publicar TaskChainRescheduled tras una cascada.
+        self._bus = bus
+
+    async def _cascade_if_completed(self, task) -> None:
+        """Tras dejar una tarea en COMPLETADA por una entrega/aprobación,
+        dispara la cascada de fechas FtS (no pasa por ChangeTaskStatusUseCase)."""
+        await cascade_after_completion(
+            getattr(self._repo, "_session", None), self._bus, task, None
+        )
 
     # ── acceso ───────────────────────────────────────────────────────────────
     async def _access(self, team_id: UUID, current_user) -> WorkspaceAccess:
@@ -220,12 +230,15 @@ class WorkspaceService:
 
         if auto_complete and task is not None:
             # Fase 2 + toggle: sin revisión obligatoria, entregar ES completar.
+            was_completed = task.status == TaskStatus.COMPLETADA
             await self._repo.transition_task(
                 task,
                 _TASK_STATUS_ON_APPROVE,
                 current_user.id,
                 "Entrega directa: la tarea no requiere aprobación",
             )
+            if not was_completed:
+                await self._cascade_if_completed(task)
         else:
             # Fase 2: si el entregable está vinculado a una Task, entregar mueve
             # la tarea a "en revisión" y deja rastro en TaskHistory. Idempotente.
@@ -404,4 +417,7 @@ class WorkspaceService:
         task = await self._repo.get_task(deliverable.task_id)
         if task is None:
             return
+        was_completed = task.status == TaskStatus.COMPLETADA
         await self._repo.transition_task(task, new_status, actor.id, reason)
+        if not was_completed:
+            await self._cascade_if_completed(task)

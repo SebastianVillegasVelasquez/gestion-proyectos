@@ -8,7 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from starlette import status
 
-from app.core.dependencies import get_current_user, workspace_repo_dependency
+from app.core.dependencies import (
+    event_bus_dependency,
+    get_current_user,
+    workspace_repo_dependency,
+)
 from app.modules.teams.application.personal_use_cases import PersonalDeliverableService
 from app.modules.teams.presentation.workspace_schemas import (
     AddCommentRequest,
@@ -74,9 +78,10 @@ async def add_my_version(
     deliverable_id: UUID,
     data: AddVersionRequest,
     repo=Depends(workspace_repo_dependency),
+    bus=Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await PersonalDeliverableService(repo).add_version(
+    return await PersonalDeliverableService(repo, bus).add_version(
         deliverable_id, data, current_user
     )
 
@@ -115,8 +120,9 @@ async def add_my_comment(
     deliverable_id: UUID,
     data: AddCommentRequest,
     repo=Depends(workspace_repo_dependency),
+    bus=Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await PersonalDeliverableService(repo).add_comment(
+    return await PersonalDeliverableService(repo, bus).add_comment(
         deliverable_id, data, current_user
     )

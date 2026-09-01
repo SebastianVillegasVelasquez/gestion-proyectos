@@ -16,6 +16,7 @@ Reutiliza el modelo `Deliverable` con `team_id IS NULL`; el dueño es
 from uuid import UUID
 
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.teams.application._task_sync import cascade_after_completion
 from app.modules.teams.domain.workspace import WorkspaceRepository
 from app.modules.teams.infrastructure.workspace_enums import (
     CommentType,
@@ -53,8 +54,16 @@ _REVIEW_QUEUE_TASK_STATUSES = [TaskStatus.EN_REVISION]
 
 
 class PersonalDeliverableService:
-    def __init__(self, repo: WorkspaceRepository):
+    def __init__(self, repo: WorkspaceRepository, bus=None):
         self._repo = repo
+        self._bus = bus
+
+    async def _cascade_if_completed(self, task) -> None:
+        """Tras dejar una tarea en COMPLETADA por una entrega/aprobación,
+        dispara la cascada de fechas FtS (no pasa por ChangeTaskStatusUseCase)."""
+        await cascade_after_completion(
+            getattr(self._repo, "_session", None), self._bus, task, None
+        )
 
     # ── helpers ─────────────────────────────────────────────────────────────
     async def _is_reviewer_of_task(self, current_user, task) -> bool:
@@ -229,6 +238,7 @@ class PersonalDeliverableService:
         await self._repo.save_deliverable(deliverable)
 
         if task is not None:
+            was_completed = task.status == TaskStatus.COMPLETADA
             await self._repo.transition_task(
                 task,
                 _TASK_STATUS_ON_APPROVE if auto_complete else _TASK_STATUS_ON_DELIVER,
@@ -239,6 +249,8 @@ class PersonalDeliverableService:
                     else None
                 ),
             )
+            if not was_completed:
+                await self._cascade_if_completed(task)
         return await self._view(
             await self._repo.get_personal_deliverable(deliverable_id), current_user
         )
@@ -314,9 +326,12 @@ class PersonalDeliverableService:
             await self._repo.save_deliverable(deliverable)
             if task is not None:
                 if data.type == CommentType.APROBACION:
+                    was_completed = task.status == TaskStatus.COMPLETADA
                     await self._repo.transition_task(
                         task, _TASK_STATUS_ON_APPROVE, current_user.id
                     )
+                    if not was_completed:
+                        await self._cascade_if_completed(task)
                 else:
                     await self._repo.transition_task(
                         task,

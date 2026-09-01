@@ -14,6 +14,7 @@ from app.modules.tasks.infrastructure.models import (
     TaskHistory,
     TaskTimeEntry,
 )
+from app.modules.tasks.domain import rules
 from app.modules.teams.infrastructure.models import Team
 from app.shared.base_repository import BaseRepository
 
@@ -324,6 +325,21 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_dependencies_by_tasks(
+        self, task_ids: Sequence[UUID]
+    ) -> list[TaskDependency]:
+        """Dependencias FtS de un lote de tareas, en UNA consulta. Igual que
+        `get_dependencies_by_team` pero por ids explícitos: lo usa «Mis tareas»
+        para pintar el bloqueo/etiqueta sin un N+1 por fila."""
+        if not task_ids:
+            return []
+        query = (
+            select(TaskDependency)
+            .where(TaskDependency.task_id.in_(list(task_ids)))
+            .options(*self._DEP_LOADS)
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
     async def get_work_item(self, work_item_id: UUID):
         """El WorkItem (con su tipo) o None. Para validar una dependencia
         tarea→elemento sin arrastrar el repositorio del árbol."""
@@ -349,11 +365,7 @@ class TaskRepository(BaseRepository[Task]):
             item = await self.get_work_item(current)
             if item is None:
                 break
-            tipo = getattr(item, "tipo", None)
-            is_third_party = tipo is not None and (
-                getattr(tipo, "es_dependencia_externa", False)
-                or tipo.nombre.strip().lower() == "actividad de terceros"
-            )
+            is_third_party = rules.is_third_party_tipo(getattr(item, "tipo", None))
             if is_third_party and (
                 item.fecha_fin_real is None and item.fecha_inicio_real is None
             ):

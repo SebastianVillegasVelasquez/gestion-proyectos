@@ -43,6 +43,19 @@ export function dueStatus(
   return "on_track";
 }
 
+/**
+ * Días de calendario entre hoy y la fecha límite: positivo = faltan N días,
+ * 0 = vence hoy, negativo = venció hace N días. `null` si no hay fecha.
+ * Reusa el mismo cómputo en días-epoch que `dueStatus` para que nunca
+ * discrepen a medianoche.
+ */
+export function daysUntil(dueDate: string | null, today: string): number | null {
+  if (!dueDate) {
+    return null;
+  }
+  return toDay(dueDate) - toDay(today);
+}
+
 export const DUE_STATUS_LABELS: Record<DueStatus, string> = {
   done: "Completada",
   overdue: "Vencida",

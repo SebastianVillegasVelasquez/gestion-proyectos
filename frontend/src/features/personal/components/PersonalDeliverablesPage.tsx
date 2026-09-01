@@ -462,7 +462,7 @@ export function PersonalDeliverablesPage() {
           />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden rounded-2xl border border-border">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card">
           <div className="w-72 shrink-0 overflow-hidden border-r border-border">
             <DeliverableList
               deliverables={deliverables}

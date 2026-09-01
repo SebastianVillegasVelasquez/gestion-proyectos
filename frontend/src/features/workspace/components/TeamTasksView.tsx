@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   CornerDownRight,
+  ExternalLink,
   Filter,
   FolderKanban,
   History,
@@ -231,6 +232,22 @@ function UrgencyBadge({ task }: { task: ApiTeamTask }) {
  * así que va en un contenedor `min-w-0` con `truncate` y su texto completo en
  * el `title`: nunca empuja ni se superpone a las columnas vecinas.
  */
+/** Etiqueta "Depende de terceros": solo cuando la tarea tiene una dependencia
+ * FtS hacia una «actividad de terceros». */
+function ThirdPartyDepBadge({ task }: { task: ApiTeamTask }) {
+  if (!task.depends_on_third_party) {
+    return null;
+  }
+  return (
+    <span
+      title="Depende de una actividad de terceros"
+      className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+    >
+      <ExternalLink className="size-2.5" /> Depende de terceros
+    </span>
+  );
+}
+
 function BlockedBy({ task }: { task: ApiTeamTask }) {
   const blockers = activeBlockers(task);
   if (blockers.length === 0) {
@@ -379,6 +396,7 @@ function TaskRow({
           )}
           <Crumb path={pathOf(task)} /> · {task.project_name}
         </p>
+        <ThirdPartyDepBadge task={task} />
         <BlockedBy task={task} />
       </div>
 
@@ -694,6 +712,7 @@ function TaskCard({
           <DeliverActions task={task} cbs={deliverCbs} />
         </div>
       )}
+      <ThirdPartyDepBadge task={task} />
       <BlockedBy task={task} />
       <ProgressBar task={task} className="mt-2.5" />
 

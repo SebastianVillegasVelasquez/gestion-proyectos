@@ -25,6 +25,7 @@ function t(over: Partial<ApiTeamTask>): ApiTeamTask {
     requires_approval: false,
     progress_pct: 0,
     blocked_by: [],
+    depends_on_third_party: false,
     ...over,
   };
 }

@@ -108,6 +108,85 @@ class TestMyTasks:
         assert by_title["Tarea de equipo"]["team_name"] is not None
         assert by_title["Tarea de equipo"]["work_item_name"] == "Módulo 1"
 
+    async def test_delivery_gate_estimate_and_third_party_flags(
+        self, client, admin_headers, valid_project_payload
+    ):
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        me = await _plain_user(client, admin_headers, "gate-tasks@test.com")
+        await _add_project_member(client, admin_headers, pid, me["id"])
+
+        tercero_tipo = (
+            await client.post(
+                f"/api/v1/projects/{pid}/node-types",
+                headers=admin_headers,
+                json={"nombre": "Proveedor", "es_dependencia_externa": True},
+            )
+        ).json()["id"]
+        tercero = await _create_item(
+            client, admin_headers, pid, tercero_tipo, "Entrega del proveedor"
+        )
+
+        # Tarea A: libre, con días estimados → se puede entregar.
+        a = (
+            await client.post(
+                "/api/v1/tasks",
+                headers=admin_headers,
+                json={
+                    "title": "A libre",
+                    "project_id": pid,
+                    "assignee_id": me["id"],
+                    "estimated_days": 6,
+                },
+            )
+        ).json()["id"]
+        # Tarea B: depende de A (no completada) → bloqueada por dependencia.
+        await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={
+                "title": "B depende de tarea",
+                "project_id": pid,
+                "assignee_id": me["id"],
+                "depends_on_id": a,
+            },
+        )
+        # Tarea C: depende de la actividad de terceros (sin entregar).
+        await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={
+                "title": "C depende de terceros",
+                "project_id": pid,
+                "assignee_id": me["id"],
+                "depends_on_work_item_id": tercero["id"],
+            },
+        )
+
+        items = {
+            i["title"]: i
+            for i in (
+                await client.get("/api/v1/me/tasks", headers=_headers_for(me["id"]))
+            ).json()
+        }
+
+        assert items["A libre"]["estimated_days"] == "6.00"
+        assert items["A libre"]["delivery_blocked_reason"] is None
+        assert items["A libre"]["depends_on_third_party"] is False
+
+        assert items["B depende de tarea"]["delivery_blocked_reason"] is not None
+        assert (
+            "no está completada"
+            in items["B depende de tarea"]["delivery_blocked_reason"]
+        )
+        assert items["B depende de tarea"]["depends_on_third_party"] is False
+        assert [x["id"] for x in items["B depende de tarea"]["blocked_by"]] == [a]
+
+        # La etiqueta de terceros distingue el origen; el motivo de bloqueo es
+        # el genérico "…una tarea o actividad de la que depende…".
+        assert items["C depende de terceros"]["depends_on_third_party"] is True
+        assert items["C depende de terceros"]["delivery_blocked_reason"] is not None
+        assert len(items["C depende de terceros"]["blocked_by"]) == 1
+
     async def test_requires_authentication(self, client):
         r = await client.get("/api/v1/me/tasks")
         assert r.status_code == 401

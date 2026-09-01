@@ -215,6 +215,9 @@ class TaskResponse(TaskBase):
     # avance de las subtareas, sin llegar a 100 hasta que el entregable padre
     # se aprueba. Se calcula en lectura (rollup de las hojas hacia arriba).
     progress_pct: int = 0
+    # True solo si la tarea depende (FtS) de una «actividad de terceros». La
+    # estructura muestra la etiqueta "Depende de terceros".
+    depends_on_third_party: bool = False
 
 
 class CreateTimeEntryRequest(BaseModelConfig):
@@ -343,6 +346,8 @@ class TeamTaskItemResponse(BaseModelConfig):
     # Dependencias finish-to-start ya resueltas a título: la vista de equipo
     # necesita mostrar el bloqueo sin pedir /tasks/{id}/dependencies por fila.
     blocked_by: list[BlockingTaskResponse] = []
+    # True solo si la tarea depende (FtS) de una «actividad de terceros».
+    depends_on_third_party: bool = False
 
 
 class MyTaskItemResponse(BaseModelConfig):
@@ -370,6 +375,18 @@ class MyTaskItemResponse(BaseModelConfig):
     requires_approval: bool = False
     # Avance 0-100 (mismo cálculo que en el resto de vistas).
     progress_pct: int = 0
+    # Días estimados de trabajo (los que fijan el fin al resolverse una
+    # dependencia). La UI los pinta como pill de duración.
+    estimated_days: Optional[Decimal] = None
+    # Motivo por el que NO se puede entregar todavía (dependencia FtS incompleta
+    # o actividad de terceros ancestro sin entregar), o None si se puede. Mismo
+    # texto que el 422 del servidor: la UI desactiva el botón "Entregar" con él.
+    delivery_blocked_reason: Optional[str] = None
+    # True solo si la tarea depende (FtS) de una «actividad de terceros»: la UI
+    # muestra la etiqueta "Depende de terceros".
+    depends_on_third_party: bool = False
+    # Dependencias FtS ya resueltas a título (misma forma que la vista de equipo).
+    blocked_by: list[BlockingTaskResponse] = []
 
 
 ###############

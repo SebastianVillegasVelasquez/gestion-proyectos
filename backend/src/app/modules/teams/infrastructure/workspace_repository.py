@@ -214,19 +214,10 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
 
         task_repo = TaskRepository(self._session)
         deps = await task_repo.get_dependencies(task.id)
-        if rules.incomplete_dependency_ids(deps):
-            return (
-                "No puedes entregar: una tarea o actividad de la que depende "
-                "aún no está completada."
-            )
-        if task.work_item_id is not None and (
+        has_tp_ancestor = task.work_item_id is not None and (
             await task_repo.has_undelivered_third_party_ancestor(task.work_item_id)
-        ):
-            return (
-                "No puedes entregar: la actividad de terceros de la que depende "
-                "este trabajo aún no fue entregada."
-            )
-        return None
+        )
+        return rules.delivery_block_reason(deps, has_tp_ancestor)
 
     async def transition_task(
         self,

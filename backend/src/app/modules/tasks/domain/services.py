@@ -102,7 +102,12 @@ def _estimate_in_days(value) -> int:
     return max(1, days)
 
 
-def reschedule_task_start(task: "Task", new_start: date) -> bool:
+def reschedule_task_start(
+    task: "Task",
+    new_start: date,
+    *,
+    recompute_due_from_estimate: bool = False,
+) -> bool:
     """Mueve el inicio de `task` a `new_start` y recalcula su fin. Devuelve True
     si cambió algo. Es la pieza de la "cascada de fechas": cuando un predecesor
     se completa/entrega, sus dependientes arrancan en la fecha nueva.
@@ -110,8 +115,15 @@ def reschedule_task_start(task: "Task", new_start: date) -> bool:
     - Si la tarea ya tenía inicio Y fin, se conserva la duración (el fin se
       desplaza el mismo delta).
     - Si NO tenía fin pero sí `estimated_days`, el fin sale de ahí:
-      `fin = nuevo inicio + días estimados`. Es lo que pide la dependencia sobre
-      una «actividad de terceros» / otra tarea: entrega + estimado.
+      `fin = nuevo inicio + días estimados`.
+
+    `recompute_due_from_estimate` (solo lo pasan las cascadas de dependencias):
+    cuando la tarea tiene `estimated_days`, el fin SIEMPRE se recalcula como
+    `nuevo inicio + días estimados`, aunque ya tuviera un fin fijado a mano. Es
+    lo que se espera de una dependencia FtS sobre una «actividad de terceros» u
+    otra tarea: al abrirse la compuerta, la dependiente arranca en la fecha de
+    entrega y dura lo estimado. Sin el flag (p. ej. arrastre de barra en el
+    Gantt vía `UpdateTaskUseCase`) se mantiene el desplazamiento por delta.
     """
     changed = False
     if task.start_date != new_start:
@@ -120,10 +132,11 @@ def reschedule_task_start(task: "Task", new_start: date) -> bool:
         task.start_date = new_start
         changed = True
 
-    if task.due_date is None and getattr(task, "estimated_days", None) is not None:
-        est = _estimate_in_days(task.estimated_days)
-        if est > 0:
-            task.due_date = new_start + timedelta(days=est)
+    est = _estimate_in_days(getattr(task, "estimated_days", None))
+    if est > 0 and (recompute_due_from_estimate or task.due_date is None):
+        new_due = new_start + timedelta(days=est)
+        if task.due_date != new_due:
+            task.due_date = new_due
             changed = True
 
     return changed
@@ -143,6 +156,11 @@ class TaskService:
     async def get_task_by_id(self, task_id: UUID) -> "TaskResponse":
         task = await self._get_active(task_id)
         resp = self._to_response(task, await self.repo.logged_days(task_id))
+        resp.depends_on_third_party = any(
+            d.depends_on_work_item_id is not None
+            and rules.is_third_party_tipo(getattr(d.depends_on_work_item, "tipo", None))
+            for d in await self.repo.get_dependencies(task_id)
+        )
         # Con subtareas, el avance es el promedio del suyo (el `_to_response`
         # solo sabe el del estado). Un nivel: las subtareas anidadas cuentan por
         # estado, que es su avance real como hojas.
@@ -178,9 +196,25 @@ class TaskService:
         Preguntarla tarea a tarea sería una consulta por fila (N+1), y estas
         listas se pintan enteras en el cronograma y en el tablero.
         """
-        totals = await self.repo.logged_days_by_task([t.id for t in tasks])
+        task_ids = [t.id for t in tasks]
+        totals = await self.repo.logged_days_by_task(task_ids)
+        # Una consulta para todas las dependencias FtS de la lista: marca qué
+        # tareas dependen de una «actividad de terceros».
+        third_party = {
+            dep.task_id
+            for dep in await self.repo.get_dependencies_by_tasks(task_ids)
+            if dep.depends_on_work_item_id is not None
+            and rules.is_third_party_tipo(
+                getattr(dep.depends_on_work_item, "tipo", None)
+            )
+        }
         responses = [
-            self._to_response(t, totals.get(t.id, Decimal("0"))) for t in tasks
+            self._to_response(
+                t,
+                totals.get(t.id, Decimal("0")),
+                depends_on_third_party=t.id in third_party,
+            )
+            for t in tasks
         ]
         self._rollup_estimates(responses)
         self._rollup_progress(responses)
@@ -289,7 +323,10 @@ class TaskService:
 
     @staticmethod
     def _to_response(
-        task: "Task", logged_days: Decimal = Decimal("0")
+        task: "Task",
+        logged_days: Decimal = Decimal("0"),
+        *,
+        depends_on_third_party: bool = False,
     ) -> "TaskResponse":
         # `task.assignee` puede no estar cargado (rutas que no hacen el join):
         # leerlo por `__dict__` no dispara lazy-load (rompería en async).
@@ -327,6 +364,7 @@ class TaskService:
                 task.status or TaskStatus.PENDIENTE_POR_INICIAR,
                 task.requires_approval,
             ),
+            depends_on_third_party=depends_on_third_party,
         )
 
 

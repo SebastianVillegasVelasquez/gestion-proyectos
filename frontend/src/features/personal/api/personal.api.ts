@@ -1,5 +1,9 @@
 import http from "@/lib/http";
-import type { ApiComment, ApiVersion } from "@/features/workspace/api/workspace.api";
+import type {
+  ApiBlockingTask,
+  ApiComment,
+  ApiVersion,
+} from "@/features/workspace/api/workspace.api";
 import type { CommentType, DeliverableStatus, ResourceType } from "@/features/workspace/types";
 import type { TaskPriority, TaskStatus } from "@/features/projects/types/api.types";
 
@@ -23,6 +27,15 @@ export interface ApiMyTask {
   /** Avance 0-100 (backend). Para tareas padre cuyas subtareas no viajan en
    * esta lista es el avance por estado; la cifra fina vive en proyecto/equipo. */
   progress_pct: number;
+  /** Días estimados de trabajo (número serializado como string por Decimal). */
+  estimated_days: number | string | null;
+  /** Motivo por el que aún no se puede entregar (mismo texto que el 422 del
+   * servidor), o null si se puede. La UI desactiva "Entregar" con él. */
+  delivery_blocked_reason: string | null;
+  /** La tarea depende (FtS) de una «actividad de terceros». */
+  depends_on_third_party: boolean;
+  /** Dependencias FtS ya resueltas a título por el backend. */
+  blocked_by: ApiBlockingTask[];
 }
 
 /** Entregable personal (sin equipo). Superset del entregable de equipo: trae

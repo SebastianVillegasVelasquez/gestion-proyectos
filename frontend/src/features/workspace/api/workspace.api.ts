@@ -115,6 +115,8 @@ export interface ApiTeamTask {
   // Dependencias finish-to-start ya resueltas a título por el backend: la vista
   // pinta "Bloqueada por: …" sin una llamada por fila.
   blocked_by: ApiBlockingTask[];
+  // La tarea depende (FtS) de una «actividad de terceros».
+  depends_on_third_party: boolean;
 }
 
 /** Tarea bloqueante (dependencia FtS), resumida para el indicador de bloqueo. */

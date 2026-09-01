@@ -61,9 +61,10 @@ def _brand_header(logo_url: str) -> str:
         return wordmark
     return (
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="padding-right:12px;">'
+        f'<td style="padding-right:12px;" bgcolor="#ffffff">'
         f'<img src="{logo_url}" width="40" height="40" alt="Bit&aacute;cora OBJ" '
-        f'style="display:block;border:0;border-radius:9px;" /></td>'
+        f'style="display:block;border:0;border-radius:9px;width:40px;max-width:40px;'
+        f'height:auto;background:#ffffff;" /></td>'
         f'<td style="vertical-align:middle;">{wordmark}</td>'
         "</tr></table>"
     )

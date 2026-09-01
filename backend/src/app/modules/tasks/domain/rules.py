@@ -14,6 +14,16 @@ FORWARD_STATUSES = (
 )
 
 
+def is_third_party_tipo(tipo) -> bool:
+    """El tipo de nodo marca una «actividad de terceros» (dependencia externa):
+    por la bandera explícita o por el nombre reservado."""
+    if tipo is None:
+        return False
+    return bool(getattr(tipo, "es_dependencia_externa", False)) or (
+        getattr(tipo, "nombre", "").strip().lower() == "actividad de terceros"
+    )
+
+
 def work_item_is_done(work_item) -> bool:
     """Un elemento del árbol cuenta como "entregado" —y por tanto desbloquea a
     quien depende de él— cuando tiene una fecha REAL de fin o de inicio.
@@ -46,6 +56,32 @@ def incomplete_dependency_ids(dependencies) -> list[UUID]:
         if target is None or target.status != TaskStatus.COMPLETADA:
             blocking.append(dep.depends_on_id)
     return blocking
+
+
+# Mensajes de por qué una entrega está bloqueada. Fuente única: los usa tanto
+# el 422 del servidor al entregar como la vista "Mis tareas" para deshabilitar
+# el botón con el mismo texto.
+DELIVERY_BLOCKED_BY_DEPENDENCY = (
+    "No puedes entregar: una tarea o actividad de la que depende aún no está "
+    "completada."
+)
+DELIVERY_BLOCKED_BY_THIRD_PARTY = (
+    "No puedes entregar: la actividad de terceros de la que depende este "
+    "trabajo aún no fue entregada."
+)
+
+
+def delivery_block_reason(
+    dependencies, has_undelivered_third_party_ancestor: bool
+) -> str | None:
+    """Motivo por el que la tarea no se puede entregar todavía, o None si se
+    puede. El orden importa: primero las dependencias directas incompletas,
+    luego el ancestro «actividad de terceros» sin entregar."""
+    if incomplete_dependency_ids(dependencies):
+        return DELIVERY_BLOCKED_BY_DEPENDENCY
+    if has_undelivered_third_party_ancestor:
+        return DELIVERY_BLOCKED_BY_THIRD_PARTY
+    return None
 
 
 def earlier_phase_blocks(tasks_in_earlier_phases) -> bool:

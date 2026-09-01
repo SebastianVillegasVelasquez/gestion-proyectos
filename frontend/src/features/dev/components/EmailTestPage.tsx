@@ -108,10 +108,34 @@ export function EmailTestPage() {
         </button>
 
         {send.isSuccess && (
-          <p className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-            <CheckCircle2 className="size-4 shrink-0" />
-            Enviado a <strong>{send.data.to}</strong> vía <strong>{send.data.provider}</strong>.
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <CheckCircle2 className="size-4 shrink-0" />
+              Enviado a <strong>{send.data.to}</strong> vía <strong>{send.data.provider}</strong>.
+            </p>
+            <div className="rounded-lg border border-border bg-background px-3 py-2 text-[11px] text-muted-foreground">
+              <p className="mb-1 font-semibold uppercase tracking-wide">Diagnóstico</p>
+              <p>
+                URL pública:{" "}
+                <code>{send.data.resolved_public_url || "— (APP_PUBLIC_URL vacío)"}</code>
+              </p>
+              <p className="break-all">
+                Logo del correo: <code>{send.data.resolved_logo_url || "—"}</code>
+              </p>
+              <p
+                className={
+                  send.data.logo_reachable
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-rose-700 dark:text-rose-300"
+                }
+              >
+                {send.data.logo_reachable
+                  ? "✓ El logo es alcanzable: aparecerá en los correos."
+                  : "✗ El logo NO es alcanzable: los correos saldrán sin logo. Revisa APP_PUBLIC_URL en el .env del servidor."}{" "}
+                <span className="text-muted-foreground">({send.data.logo_check_detail})</span>
+              </p>
+            </div>
+          </div>
         )}
         {send.isError && (
           <p className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">

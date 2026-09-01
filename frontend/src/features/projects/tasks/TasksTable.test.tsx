@@ -49,6 +49,7 @@ function makeTask(overrides: Partial<Task>): Task {
     represents_work_item: false,
     requires_approval: false,
     progress_pct: 0,
+    depends_on_third_party: false,
     assignee_name: null,
     ...overrides,
   };

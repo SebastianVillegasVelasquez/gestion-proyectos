@@ -334,6 +334,117 @@ class TestTaskDependsOnWorkItem:
         assert after["start_date"] == deliver_on
         assert after["due_date"] == (date.today() + timedelta(days=18)).isoformat()
 
+    async def test_completion_cascades_through_a_multi_level_task_chain(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """tercero → t1 → t2 → t3: entregar el tercero y completar t1 empuja la
+        cadena entera; cada eslabón dura sus `estimated_days`."""
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        tercero_tipo = await _dep_tipo(client, admin_headers, pid)
+        tercero = await _create_item(
+            client, admin_headers, pid, tercero_tipo, "Aprobación externa"
+        )
+
+        async def _task_with_est(title, est):
+            r = await client.post(
+                "/api/v1/tasks",
+                headers=admin_headers,
+                json={"title": title, "project_id": pid, "estimated_days": est},
+            )
+            assert r.status_code == 201, r.text
+            return r.json()["id"]
+
+        t1 = await _task_with_est("Tarea 1", 4)
+        t2 = await _task_with_est("Tarea 2", 3)
+        t3 = await _task_with_est("Tarea 3", 2)
+        await client.post(
+            f"/api/v1/tasks/{t1}/dependencies",
+            headers=admin_headers,
+            json={"depends_on_work_item_id": tercero["id"]},
+        )
+        await client.post(
+            f"/api/v1/tasks/{t2}/dependencies",
+            headers=admin_headers,
+            json={"depends_on_id": t1},
+        )
+        await client.post(
+            f"/api/v1/tasks/{t3}/dependencies",
+            headers=admin_headers,
+            json={"depends_on_id": t2},
+        )
+
+        await client.post(
+            f"/api/v1/work-items/{tercero['id']}/deliver",
+            headers=admin_headers,
+            json={"delivered_on": BASE},
+        )
+        # t1 arranca en la entrega y dura sus 4 días estimados.
+        t1_after = (
+            await client.get(f"/api/v1/tasks/{t1}", headers=admin_headers)
+        ).json()
+        assert t1_after["start_date"] == BASE
+        t1_due = (date.today() + timedelta(days=34)).isoformat()
+        assert t1_after["due_date"] == t1_due
+
+        done = await client.patch(
+            f"/api/v1/tasks/{t1}/status",
+            headers=admin_headers,
+            json={"status": "completada"},
+        )
+        assert done.status_code == 200, done.text
+
+        t2_after = (
+            await client.get(f"/api/v1/tasks/{t2}", headers=admin_headers)
+        ).json()
+        t3_after = (
+            await client.get(f"/api/v1/tasks/{t3}", headers=admin_headers)
+        ).json()
+        assert t2_after["start_date"] == t1_due
+        assert t2_after["due_date"] == (date.today() + timedelta(days=37)).isoformat()
+        assert t3_after["start_date"] == t2_after["due_date"]
+        assert t3_after["due_date"] == (date.today() + timedelta(days=39)).isoformat()
+
+    async def test_delivery_recomputes_dependent_due_from_estimate_over_hand_set(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """Si la tarea dependiente tiene fin a mano Y `estimated_days`, al
+        entregar el tercero el fin pasa a ser entrega + estimado (no el desfase
+        del fin viejo)."""
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        tercero_tipo = await _dep_tipo(client, admin_headers, pid)
+        tercero = await _create_item(
+            client, admin_headers, pid, tercero_tipo, "Insumo del proveedor"
+        )
+        r = await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={"title": "Integración", "project_id": pid, "estimated_days": 4},
+        )
+        task = r.json()["id"]
+        # Fin a mano muy lejano (10 días de duración).
+        hand_due = (date.today() + timedelta(days=12)).isoformat()
+        await client.patch(
+            f"/api/v1/tasks/{task}",
+            headers=admin_headers,
+            json={"start_date": date.today().isoformat(), "due_date": hand_due},
+        )
+        await client.post(
+            f"/api/v1/tasks/{task}/dependencies",
+            headers=admin_headers,
+            json={"depends_on_work_item_id": tercero["id"]},
+        )
+
+        await client.post(
+            f"/api/v1/work-items/{tercero['id']}/deliver",
+            headers=admin_headers,
+            json={"delivered_on": BASE},
+        )
+        after = (
+            await client.get(f"/api/v1/tasks/{task}", headers=admin_headers)
+        ).json()
+        assert after["start_date"] == BASE
+        assert after["due_date"] == (date.today() + timedelta(days=34)).isoformat()
+
     async def test_rejects_both_or_neither_target(
         self, client, admin_headers, valid_project_payload
     ):

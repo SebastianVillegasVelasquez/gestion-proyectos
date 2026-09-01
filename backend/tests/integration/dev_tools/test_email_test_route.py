@@ -32,6 +32,18 @@ def spy_sender(monkeypatch):
     return spy
 
 
+@pytest.fixture(autouse=True)
+def _no_logo_network(monkeypatch):
+    """El chequeo de alcance del logo hace un GET real: se anula en tests."""
+
+    async def _fake(logo_url):
+        return (bool(logo_url), f"HTTP 200 · content-type: image/jpeg ({logo_url})")
+
+    monkeypatch.setattr(
+        "app.modules.dev_tools.presentation.routes._check_logo_reachable", _fake
+    )
+
+
 class TestDevEmailTestRoute:
     async def test_requires_authentication(self, client):
         r = await client.post(BASE, json={"to": "x@example.com"})
@@ -61,7 +73,13 @@ class TestDevEmailTestRoute:
         )
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body == {"sent": True, "provider": "spy", "to": "dest@example.com"}
+        assert body["sent"] is True
+        assert body["provider"] == "spy"
+        assert body["to"] == "dest@example.com"
+        # Diagnóstico: las URLs que el servidor resolvió de APP_PUBLIC_URL.
+        assert body["resolved_login_url"].endswith("/login")
+        assert body["resolved_logo_url"].endswith("/logo-email.jpg")
+        assert body["logo_reachable"] is True
         assert len(spy_sender.sent) == 1
         assert spy_sender.sent[0]["to"] == "dest@example.com"
 

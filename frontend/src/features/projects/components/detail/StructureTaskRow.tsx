@@ -258,6 +258,16 @@ function StructureTaskRow({
             {task.title}
           </span>
 
+          {task.depends_on_third_party && (
+            <span
+              className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              title="Depende de una actividad de terceros"
+            >
+              <ExternalLink className="size-2.5" />
+              Depende de terceros
+            </span>
+          )}
+
           {isThirdParty ? (
             /* El elemento es una «actividad de terceros»: el responsable es el
                proveedor externo, no un integrante ni un equipo. */
