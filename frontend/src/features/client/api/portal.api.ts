@@ -34,6 +34,13 @@ export interface PublicScheduleItem {
   due_date: string;
   status: TaskStatus;
   progress_pct: number;
+  // Tipo del elemento: se pinta la barra con el MISMO color que la Estructura y
+  // el cronograma interno. `tipo_id` alimenta la paleta determinista
+  // (`tipoStyle`), `tipo_nombre` rotula el chip y `es_dependencia_externa`
+  // fuerza el naranja de «Actividad de terceros».
+  tipo_id: string | null;
+  tipo_nombre: string | null;
+  es_dependencia_externa: boolean;
 }
 
 export interface PublicProjectSchedule {

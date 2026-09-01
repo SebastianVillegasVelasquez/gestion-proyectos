@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import Project, ProjectMember
-from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
 from app.modules.teams.infrastructure.models import Team, TeamMember
@@ -110,6 +110,13 @@ class ScheduleItem:
     due_date: datetime.date
     status: str  # value del enum de tareas (para el color de la barra)
     progress_pct: int
+    # Tipo del elemento (Curso, Módulo, «Actividad de terceros»…). El portal lo
+    # usa para pintar la barra con EL MISMO color que la Estructura y el
+    # cronograma interno: `tipo_id` alimenta la paleta determinista, `tipo_nombre`
+    # rotula el chip y `es_dependencia_externa` fuerza el naranja de terceros.
+    tipo_id: str | None = None
+    tipo_nombre: str | None = None
+    es_dependencia_externa: bool = False
 
 
 @dataclass
@@ -848,6 +855,22 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             .all()
         )
 
+        # Tipos de nodo del proyecto: nombre + flag de terceros por `tipo_id`, para
+        # que el portal pinte cada elemento con el mismo color que la Estructura.
+        tipo_rows = (
+            (
+                await self._session.execute(
+                    select(TipoNodo).where(
+                        TipoNodo.proyecto_id == project.id,
+                        TipoNodo.deleted_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        tipos_by_id: dict[uuid.UUID, TipoNodo] = {t.id: t for t in tipo_rows}
+
         # Hijos por padre, ordenados por `orden` (igual que el árbol del frontend).
         children: dict[uuid.UUID | None, list[WorkItem]] = {}
         for wi in work_items:
@@ -937,6 +960,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                     progress = 0
                 key = f"n{counter}"
                 counter += 1
+                tipo = tipos_by_id.get(node.tipo_id)
                 items.append(
                     ScheduleItem(
                         key=key,
@@ -948,6 +972,11 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         due_date=max(ends),
                         status=derive_status(progress),
                         progress_pct=progress,
+                        tipo_id=str(node.tipo_id),
+                        tipo_nombre=tipo.nombre if tipo is not None else None,
+                        es_dependencia_externa=(
+                            tipo.es_dependencia_externa if tipo is not None else False
+                        ),
                     )
                 )
                 child_parent = key

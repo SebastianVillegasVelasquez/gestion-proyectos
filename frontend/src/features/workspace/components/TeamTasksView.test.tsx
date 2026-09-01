@@ -12,7 +12,7 @@ import {
   useDeleteTask,
   useChangeTaskStatus,
 } from "@/features/projects/hooks/use-tasks";
-import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useWorkTree, useNodeTypes } from "@/features/projects/hooks/use-structure";
 import type { ApiTeamTask } from "../api/workspace.api";
 
 vi.mock("../hooks/use-workspace", async (importOriginal) => {
@@ -39,6 +39,7 @@ vi.mock("@/features/auth/hooks/use-auth", () => ({
 
 vi.mock("@/features/projects/hooks/use-structure", () => ({
   useWorkTree: vi.fn(),
+  useNodeTypes: vi.fn(),
 }));
 
 function task(over: Partial<ApiTeamTask> = {}): ApiTeamTask {
@@ -80,6 +81,7 @@ function renderView(canReview: boolean, tasks: ApiTeamTask[]) {
     },
   } as never);
   vi.mocked(useWorkTree).mockReturnValue({ data: [] } as never);
+  vi.mocked(useNodeTypes).mockReturnValue({ data: [] } as never);
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Wrapper = ({ children }: { children: ReactNode }) => (

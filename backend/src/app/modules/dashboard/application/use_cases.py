@@ -287,6 +287,9 @@ class GetPublicProjectScheduleUseCase:
                     due_date=item.due_date,
                     status=item.status,
                     progress_pct=item.progress_pct,
+                    tipo_id=item.tipo_id,
+                    tipo_nombre=item.tipo_nombre,
+                    es_dependencia_externa=item.es_dependencia_externa,
                 )
                 for item in schedule.items
             ],

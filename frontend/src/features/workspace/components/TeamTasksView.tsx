@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -24,9 +24,11 @@ import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { useDeleteTask } from "@/features/projects/hooks/use-tasks";
 import { collectItemPaths } from "@/features/projects/utils/work-item-path";
+import { tipoStyle, type TipoStyle } from "@/features/projects/utils/tipo-style";
+import type { WorkItemTree } from "@/features/projects/types/api.types";
 import { buildTeamBoard } from "@/features/projects/utils/team-board";
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
@@ -311,6 +313,7 @@ function TaskRow({
   projectId,
   teamMembers,
   pathOf,
+  color,
   hideAssignee,
   hasChildren,
   collapsed,
@@ -327,6 +330,9 @@ function TaskRow({
   projectId: string;
   teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
+  /** Estilo del tipo del elemento de origen: acento de color para reconocer de
+   *  qué componente viene la tarea (clave con tareas clonadas). */
+  color: TipoStyle | null;
   /** La vista ya está agrupada/filtrada por persona: no repetir el nombre. */
   hideAssignee: boolean;
   /** La tarea tiene subtareas: se muestra el chevron para ocultarlas/verlas. */
@@ -343,7 +349,7 @@ function TaskRow({
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 border-t border-slate-100 py-2.5 pr-4 first:border-t-0 dark:border-slate-800",
+        "group relative flex items-center gap-3 border-t border-slate-100 py-2.5 pr-4 first:border-t-0 dark:border-slate-800",
         // Las subtareas se tiñen para que el bloque padre+hijas se lea como una
         // unidad aunque la indentación sea sutil.
         depth > 0 && "bg-slate-50/60 dark:bg-slate-800/20",
@@ -351,6 +357,11 @@ function TaskRow({
       // Indentación por nivel: la misma lectura que la estructura del proyecto.
       style={{ paddingLeft: `${String(1 + depth * 1.4)}rem` }}
     >
+      {/* Acento de color del elemento de origen (mismo color que la Estructura
+          y el cronograma): distingue las tareas de un clon de las del original. */}
+      {color && (
+        <span aria-hidden className={cn("absolute inset-y-1 left-0 w-1 rounded-r", color.bar)} />
+      )}
       {/* Columna elástica: es la única que cede espacio, por eso lleva min-w-0. */}
       <div className="min-w-0 flex-1">
         <p
@@ -386,15 +397,20 @@ function TaskRow({
           )}
           {isDeliverableReady(task) && <DeliverableReadyBadge />}
         </p>
-        <p className="truncate text-[11px] text-slate-400 dark:text-slate-500">
-          {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
-              esto la subtarea aparecería suelta y sin contexto. */}
-          {detachedParentTitle !== null && (
-            <span className="text-slate-400 dark:text-slate-500">
-              Subtarea de «{detachedParentTitle}» ·{" "}
-            </span>
+        <p className="flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
+          {color && (
+            <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />
           )}
-          <Crumb path={pathOf(task)} /> · {task.project_name}
+          <span className="truncate">
+            {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
+                esto la subtarea aparecería suelta y sin contexto. */}
+            {detachedParentTitle !== null && (
+              <span className="text-slate-400 dark:text-slate-500">
+                Subtarea de «{detachedParentTitle}» ·{" "}
+              </span>
+            )}
+            <Crumb path={pathOf(task)} /> · {task.project_name}
+          </span>
         </p>
         <ThirdPartyDepBadge task={task} />
         <BlockedBy task={task} />
@@ -510,6 +526,7 @@ function ListView({
   projectId,
   teamMembers,
   pathOf,
+  colorOf,
   hideAssignee,
   onAddSubtask,
   onReassigned,
@@ -527,6 +544,7 @@ function ListView({
   projectId: string;
   teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
+  colorOf: (task: ApiTeamTask) => TipoStyle | null;
   hideAssignee: boolean;
   onAddSubtask: (task: ApiTeamTask) => void;
   onReassigned: () => void;
@@ -590,6 +608,7 @@ function ListView({
                     projectId={projectId}
                     teamMembers={teamMembers}
                     pathOf={pathOf}
+                    color={colorOf(row.task)}
                     hideAssignee={hideAssignee}
                     hasChildren={childIds.has(row.task.id)}
                     collapsed={collapsed.has(row.task.id)}
@@ -627,6 +646,7 @@ function TaskCard({
   members,
   today,
   path,
+  color,
   canReview,
   projectId,
   teamMembers,
@@ -642,6 +662,8 @@ function TaskCard({
   members: WorkspaceMember[];
   today: string;
   path: string[];
+  /** Estilo del tipo del elemento de origen (acento de color). */
+  color: TipoStyle | null;
   canReview: boolean;
   projectId: string;
   teamMembers: ApiTeamMember[];
@@ -653,7 +675,10 @@ function TaskCard({
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
-    <article className="group rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+      {/* Acento de color del elemento de origen: de un vistazo, de qué
+          componente viene la tarjeta (distingue clones del original). */}
+      {color && <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", color.bar)} />}
       <div className="flex items-start justify-between gap-2">
         <p
           className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-slate-700 dark:text-slate-200"
@@ -702,8 +727,11 @@ function TaskCard({
           <span className="truncate">{parentTitle}</span>
         </p>
       )}
-      <p className="mt-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
-        <Crumb path={path} />
+      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
+        {color && <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />}
+        <span className="truncate">
+          <Crumb path={path} />
+        </span>
       </p>
 
       {isDeliverableReady(task) && (
@@ -751,6 +779,7 @@ function KanbanView({
   members,
   today,
   pathOf,
+  colorOf,
   canReview,
   projectId,
   teamMembers,
@@ -764,6 +793,7 @@ function KanbanView({
   members: WorkspaceMember[];
   today: string;
   pathOf: (task: ApiTeamTask) => string[];
+  colorOf: (task: ApiTeamTask) => TipoStyle | null;
   canReview: boolean;
   projectId: string;
   teamMembers: ApiTeamMember[];
@@ -830,6 +860,7 @@ function KanbanView({
                   members={members}
                   today={today}
                   path={pathOf(task)}
+                  color={colorOf(task)}
                   canReview={canReview}
                   projectId={projectId}
                   teamMembers={teamMembers}
@@ -933,6 +964,7 @@ export function TeamTasksView({
   const accessQuery = useWorkspaceAccess(teamId);
   const canReview = accessQuery.data?.can_review ?? false;
   const treeQuery = useWorkTree(projectId);
+  const typesQuery = useNodeTypes(projectId);
   const qc = useQueryClient();
   const deleteTask = useDeleteTask(projectId);
 
@@ -950,16 +982,121 @@ export function TeamTasksView({
 
   const today = useMemo(() => todayIso(), []);
   const allTasks = useMemo(() => query.data ?? [], [query.data]);
+
+  // ── Estructura del proyecto: jerarquía + tipo de cada elemento ──────────────
+  const treeData = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
+  const pathById = useMemo(() => collectItemPaths(treeData), [treeData]);
+  const pathOf = (task: ApiTeamTask): string[] =>
+    task.work_item_id ? (pathById.get(task.work_item_id) ?? []) : [];
+
+  // Tipo (nombre + flag de terceros) por `tipo_id`, para el color de origen.
+  const tipoMetaById = useMemo(() => {
+    const map = new Map<string, { nombre: string; esDep: boolean }>();
+    (typesQuery.data ?? []).forEach((tp) => {
+      map.set(tp.id, { nombre: tp.nombre, esDep: tp.es_dependencia_externa });
+    });
+    return map;
+  }, [typesQuery.data]);
+
+  // Por cada elemento: su `tipo_id`, sus ancestros (incluyéndose) y su ruta.
+  // `ancestorsById` alimenta el filtro por rama; `elementInfo`, el color y los
+  // desplegables de "Elemento" / "Rama".
+  const { ancestorsById, elementInfo } = useMemo(() => {
+    const ancestors = new Map<string, Set<string>>();
+    const info = new Map<string, { tipoId: string; name: string }>();
+    const walk = (nodes: WorkItemTree[], trail: string[]) => {
+      for (const node of nodes) {
+        info.set(node.id, { tipoId: node.tipo_id, name: node.nombre });
+        ancestors.set(node.id, new Set([...trail, node.id]));
+        walk(node.children, [...trail, node.id]);
+      }
+    };
+    walk(treeData, []);
+    return { ancestorsById: ancestors, elementInfo: info };
+  }, [treeData]);
+
+  const ancestorsOf = useCallback(
+    (workItemId: string | null): ReadonlySet<string> =>
+      workItemId ? (ancestorsById.get(workItemId) ?? new Set([workItemId])) : new Set(),
+    [ancestorsById],
+  );
+
+  /** Estilo del tipo de un elemento de la estructura (por su id). */
+  const styleForItemId = useCallback(
+    (workItemId: string | null): TipoStyle | null => {
+      if (!workItemId) {
+        return null;
+      }
+      const el = elementInfo.get(workItemId);
+      if (!el) {
+        return null;
+      }
+      const meta = tipoMetaById.get(el.tipoId);
+      return tipoStyle(el.tipoId, meta?.nombre, meta?.esDep);
+    },
+    [elementInfo, tipoMetaById],
+  );
+
+  /** Color de ORIGEN de una tarea: el estilo del tipo de su elemento padre. Deja
+   *  ver de qué componente viene cada tarea aunque dos se llamen igual (clones). */
+  const colorOf = useCallback(
+    (task: ApiTeamTask): TipoStyle | null => styleForItemId(task.work_item_id),
+    [styleForItemId],
+  );
+
+  // Opciones de los filtros por elemento y por rama, tomadas de TODAS las tareas
+  // del equipo (no de las ya filtradas), para que el desplegable no se vacíe.
+  const elementOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tk of allTasks) {
+      if (tk.work_item_id) {
+        ids.add(tk.work_item_id);
+      }
+    }
+    return [...ids]
+      .map((id) => ({
+        id,
+        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Elemento"]).join(" › "),
+        dot: styleForItemId(id)?.dot ?? "bg-slate-400",
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allTasks, pathById, elementInfo, styleForItemId]);
+
+  const branchOptions = useMemo(() => {
+    const leafIds = new Set<string>();
+    for (const tk of allTasks) {
+      if (tk.work_item_id) {
+        leafIds.add(tk.work_item_id);
+      }
+    }
+    // Ancestros ESTRICTOS (el "padre del padre" y más arriba) de esos elementos.
+    const branchIds = new Set<string>();
+    for (const leaf of leafIds) {
+      for (const anc of ancestorsById.get(leaf) ?? []) {
+        if (anc !== leaf) {
+          branchIds.add(anc);
+        }
+      }
+    }
+    return [...branchIds]
+      .map((id) => ({
+        id,
+        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Rama"]).join(" › "),
+        dot: styleForItemId(id)?.dot ?? "bg-slate-400",
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allTasks, ancestorsById, pathById, elementInfo, styleForItemId]);
+
   // Filtramos ANTES de agrupar: Lista, Kanban y Estructura ven el mismo
   // subconjunto. El cronograma y la trazabilidad tienen sus propios filtros.
-  const tasks = useMemo(() => filterTeamTasks(allTasks, filters), [allTasks, filters]);
+  const tasks = useMemo(
+    () => filterTeamTasks(allTasks, filters, ancestorsOf),
+    [allTasks, filters, ancestorsOf],
+  );
   const patchFilters = (patch: Partial<TeamTaskFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
   };
   const showFilterBar = view === "lista" || view === "kanban";
-  const pathById = useMemo(() => collectItemPaths(treeQuery.data ?? []), [treeQuery.data]);
-  const pathOf = (task: ApiTeamTask): string[] =>
-    task.work_item_id ? (pathById.get(task.work_item_id) ?? []) : [];
   const onReassigned = () =>
     void qc.invalidateQueries({ queryKey: ["workspace", "tasks", teamId] });
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
@@ -978,7 +1115,9 @@ export function TeamTasksView({
     filters.assignee === UNASSIGNED &&
     filters.status === "all" &&
     filters.text.trim() === "" &&
-    !filters.onlyBlocked;
+    !filters.onlyBlocked &&
+    filters.elementId === "all" &&
+    filters.branchId === "all";
   const groups = useMemo(
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
@@ -1072,6 +1211,8 @@ export function TeamTasksView({
             setFilters(EMPTY_TEAM_TASK_FILTERS);
           }}
           teamMembers={teamMembers}
+          elementOptions={elementOptions}
+          branchOptions={branchOptions}
           shown={tasks.length}
           totalTasks={allTasks.length}
         />
@@ -1118,6 +1259,7 @@ export function TeamTasksView({
             projectId={projectId}
             teamMembers={teamMembers}
             pathOf={pathOf}
+            colorOf={colorOf}
             hideAssignee={hideAssignee}
             onAddSubtask={setSubtaskParent}
             onReassigned={onReassigned}
@@ -1135,6 +1277,7 @@ export function TeamTasksView({
             members={members}
             today={today}
             pathOf={pathOf}
+            colorOf={colorOf}
             canReview={canReview}
             projectId={projectId}
             teamMembers={teamMembers}
