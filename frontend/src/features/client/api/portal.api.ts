@@ -19,10 +19,11 @@ export interface PublicProjectProgress {
 }
 
 // Fila del cronograma público (espejo de PublicScheduleItemResponse): un ELEMENTO
-// de la estructura con su tiempo, no una tarea. El cliente ve el flujo del
-// proyecto por sus componentes/entregables. `key`/`parent_key` son índices opacos
-// (no ids internos) para reconstruir la jerarquía; `start_date`/`due_date` llegan
-// como YYYY-MM-DD, listas para los helpers del cronograma.
+// de la estructura con su tiempo, nunca una tarea ni una subtarea. El cliente ve
+// el flujo del proyecto por sus componentes/entregables padre. `key`/`parent_key`
+// son índices opacos (no ids internos) para reconstruir la jerarquía;
+// `start_date`/`due_date` llegan como YYYY-MM-DD, listas para los helpers del
+// cronograma.
 export interface PublicScheduleItem {
   key: string;
   parent_key: string | null;
@@ -33,8 +34,6 @@ export interface PublicScheduleItem {
   due_date: string;
   status: TaskStatus;
   progress_pct: number;
-  // True si la fila es una tarea (hoja) y no un componente de la estructura.
-  is_task: boolean;
 }
 
 export interface PublicProjectSchedule {

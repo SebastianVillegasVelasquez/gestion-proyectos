@@ -268,9 +268,11 @@ function StructureTaskRow({
             </span>
           )}
 
-          {isThirdParty ? (
-            /* El elemento es una «actividad de terceros»: el responsable es el
-               proveedor externo, no un integrante ni un equipo. */
+          {isThirdParty && !assigneeName && !team ? (
+            /* Elemento «actividad de terceros» SIN responsable propio: el trabajo
+               lo hace el proveedor externo. En cuanto la tarea se asigna a
+               alguien (o a un equipo), mandan esos chips y esta etiqueta
+               desaparece. */
             <span
               className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
               title="Responsable externo (actividad de terceros)"
