@@ -33,7 +33,7 @@ export function DashboardPage() {
   const deadlines = panels ? panels.upcoming_deadlines.map((d) => toDeadline(d, today)) : [];
 
   return (
-    <div className="flex flex-col gap-3 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
+    <div className="flex flex-col gap-3 px-4 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-8 lg:h-full lg:overflow-hidden">
       <DashboardHeader
         name={user?.name ?? "Usuario"}
         date={TODAY_FORMATTER.format(today)}

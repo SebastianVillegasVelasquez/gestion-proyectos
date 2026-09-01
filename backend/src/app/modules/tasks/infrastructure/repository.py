@@ -14,6 +14,7 @@ from app.modules.tasks.infrastructure.models import (
     TaskHistory,
     TaskTimeEntry,
 )
+from app.modules.tasks.domain import rules
 from app.modules.teams.infrastructure.models import Team
 from app.shared.base_repository import BaseRepository
 
@@ -26,6 +27,7 @@ class TaskRepository(BaseRepository[Task]):
         query = (
             select(Task)
             .where(Task.work_item_id == work_item_id, Task.deleted_at.is_(None))
+            .options(selectinload(Task.assignee))
             .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
@@ -57,6 +59,7 @@ class TaskRepository(BaseRepository[Task]):
         query = (
             select(Task)
             .where(Task.deleted_at.is_(None), Task.project_id == project_id)
+            .options(selectinload(Task.assignee))
             .order_by(Task.orden, Task.created_at)
         )
         return list((await self._session.execute(query)).scalars().all())
@@ -253,6 +256,28 @@ class TaskRepository(BaseRepository[Task]):
         # tuple(row) para exponer filas posicionales (la use case las desempaqueta).
         return [tuple(r) for r in (await self._session.execute(query)).all()]
 
+    async def get_assigned_to_user(self, user_id: UUID) -> list[tuple]:
+        """Todas las tareas VIVAS cuyo responsable es `user_id`, en cualquier
+        proyecto: es "Mis tareas". Trae ya resueltos el nombre del elemento, del
+        proyecto y del equipo (si la tarea es de uno), para la lista sin N+1.
+        """
+        from app.modules.project.infrastructure.models import Project
+
+        query = (
+            select(
+                Task,
+                WorkItem.nombre.label("work_item_name"),
+                Project.name.label("project_name"),
+                Team.name.label("team_name"),
+            )
+            .outerjoin(WorkItem, Task.work_item_id == WorkItem.id)
+            .join(Project, Task.project_id == Project.id)
+            .outerjoin(Team, Task.team_id == Team.id)
+            .where(Task.assignee_id == user_id, Task.deleted_at.is_(None))
+            .order_by(Task.due_date.is_(None), Task.due_date, Task.start_date)
+        )
+        return [tuple(r) for r in (await self._session.execute(query)).all()]
+
     # El predecesor puede ser una tarea o un elemento del árbol; para saber si
     # ese elemento cuenta como "entregado" hay que mirar su tipo (que tiene
     # lazy="raise"), así que se trae por adelantado con la dependencia.
@@ -300,6 +325,21 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list((await self._session.execute(query)).scalars().all())
 
+    async def get_dependencies_by_tasks(
+        self, task_ids: Sequence[UUID]
+    ) -> list[TaskDependency]:
+        """Dependencias FtS de un lote de tareas, en UNA consulta. Igual que
+        `get_dependencies_by_team` pero por ids explícitos: lo usa «Mis tareas»
+        para pintar el bloqueo/etiqueta sin un N+1 por fila."""
+        if not task_ids:
+            return []
+        query = (
+            select(TaskDependency)
+            .where(TaskDependency.task_id.in_(list(task_ids)))
+            .options(*self._DEP_LOADS)
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
     async def get_work_item(self, work_item_id: UUID):
         """El WorkItem (con su tipo) o None. Para validar una dependencia
         tarea→elemento sin arrastrar el repositorio del árbol."""
@@ -325,11 +365,7 @@ class TaskRepository(BaseRepository[Task]):
             item = await self.get_work_item(current)
             if item is None:
                 break
-            tipo = getattr(item, "tipo", None)
-            is_third_party = tipo is not None and (
-                getattr(tipo, "es_dependencia_externa", False)
-                or tipo.nombre.strip().lower() == "actividad de terceros"
-            )
+            is_third_party = rules.is_third_party_tipo(getattr(item, "tipo", None))
             if is_third_party and (
                 item.fecha_fin_real is None and item.fecha_inicio_real is None
             ):

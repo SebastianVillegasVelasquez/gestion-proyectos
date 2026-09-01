@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useUpdateTask } from "@/features/projects/hooks/use-tasks";
+import {
+  useAddTaskDependency,
+  useRemoveTaskDependency,
+  useTaskDependencies,
+  useUpdateTask,
+} from "@/features/projects/hooks/use-tasks";
 import type { UpdateTaskPayload } from "@/features/projects/types/api.types";
 import type { ApiTeamTask, ApiTeamMember } from "../api/workspace.api";
 
@@ -31,14 +36,27 @@ export function EditTeamTaskModal({
   projectId,
   task,
   teamMembers,
+  siblings,
   onClose,
 }: {
   projectId: string;
   task: ApiTeamTask;
   teamMembers: ApiTeamMember[];
+  /** Otras subtareas de la misma tarea padre: candidatas a dependencia FtS.
+   *  Vacío / no aplica cuando la tarea no es una subtarea. */
+  siblings: ApiTeamTask[];
   onClose: () => void;
 }) {
   const updateTask = useUpdateTask(projectId);
+  const isSubtask = task.parent_task_id !== null;
+  const depsQuery = useTaskDependencies(isSubtask ? task.id : undefined);
+  const addDep = useAddTaskDependency();
+  const removeDep = useRemoveTaskDependency();
+  // Solo las dependencias hacia otra tarea (las hermanas); ignoramos las que
+  // apuntan a un elemento del árbol, que aquí no se editan.
+  const taskDeps = (depsQuery.data ?? []).filter((d) => d.depends_on_id !== null);
+  const siblingById = new Map(siblings.map((s) => [s.id, s]));
+  const available = siblings.filter((s) => !taskDeps.some((d) => d.depends_on_id === s.id));
 
   const [title, setTitle] = useState(task.title);
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
@@ -199,6 +217,72 @@ export function EditTeamTaskModal({
               />
             </div>
           </div>
+
+          {isSubtask && (
+            <div>
+              <span className={labelCls}>Depende de (subtareas hermanas)</span>
+              {taskDeps.length > 0 ? (
+                <ul className="mb-2 space-y-1">
+                  {taskDeps.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800/50"
+                    >
+                      <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
+                        {siblingById.get(d.depends_on_id ?? "")?.title ?? "Otra subtarea"}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={removeDep.isPending}
+                        onClick={() => {
+                          removeDep.mutate({
+                            taskId: task.id,
+                            dependsOnId: d.depends_on_id ?? undefined,
+                            projectId,
+                          });
+                        }}
+                        className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/10"
+                        aria-label="Quitar dependencia"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mb-2 text-[11px] text-slate-400 dark:text-slate-500">
+                  Sin dependencias: puede comenzar en cuanto se planifique.
+                </p>
+              )}
+              {available.length > 0 && (
+                <select
+                  value=""
+                  disabled={addDep.isPending}
+                  onChange={(e) => {
+                    if (!e.target.value) {
+                      return;
+                    }
+                    addDep.mutate({
+                      taskId: task.id,
+                      dependsOnId: e.target.value,
+                      projectId,
+                    });
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">+ Añadir dependencia…</option>
+                  {available.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                No podrá pasar a «en progreso» mientras una dependencia siga abierta.
+              </p>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
             <input

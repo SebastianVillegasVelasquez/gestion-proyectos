@@ -125,6 +125,44 @@ SECRET_KEY=your_secret_key
 OPENAI_API_KEY=your_openai_api_key
 ```
 
+## Correo transaccional (Resend)
+
+Los correos (bienvenida, avisos de tarea, entregas…) se envían con **Resend**.
+El dominio `bitacora.objdigital.com.co` está verificado en Resend; **no se toca**
+la configuración del dominio raíz `objdigital.com.co` (Hostinger).
+
+Variables (en `backend/.env`; ver `backend/.env-example`):
+
+| Variable | Descripción |
+|---|---|
+| `EMAIL_PROVIDER` | `resend` (producción) · `smtp` (legado) · `log` (no envía, solo registra). Si al proveedor le faltan credenciales, se degrada a `log` solo. |
+| `RESEND_API_KEY` | API key de Resend. **Nunca se commitea**: va en el `.env` de producción y como *secret* en GitHub Actions (`RESEND_API_KEY`). |
+| `EMAIL_FROM` | Remitente. Debe pertenecer a un dominio verificado en Resend. Prod: `Bitácora OBJ <no-reply@bitacora.objdigital.com.co>`. |
+
+El resto de código nunca depende del SDK de Resend: todo pasa por la interfaz
+`EmailSender` (`app/shared/email/sender.py`, patrón Adapter). Cambiar de
+proveedor = añadir un adaptador y ajustar `build_email_sender`.
+
+### Probar el envío en local
+
+1. Deja `EMAIL_PROVIDER=log` (por defecto sin `RESEND_API_KEY`): los correos no
+   salen, solo se registran en el log — útil para desarrollo sin claves.
+2. Para probar un envío real: pon `RESEND_API_KEY` en `backend/.env` y usa un
+   destinatario de una cuenta tuya.
+   - **Panel del developer** (recomendado): inicia sesión con un usuario de rol
+     `developer`, entra a **«Prueba de correo»** en el menú lateral, escribe el
+     destinatario y pulsa enviar. Límite: 5 envíos por usuario por minuto.
+   - **cURL**:
+     ```bash
+     curl -X POST http://localhost:8000/api/v1/dev/email-test \
+       -H "Authorization: Bearer <token-developer>" \
+       -H "Content-Type: application/json" \
+       -d '{"to":"tu-correo@ejemplo.com"}'
+     ```
+
+> Con Resend, en modo de pruebas los destinatarios `@example.com` se rechazan;
+> usa una dirección real.
+
 ---
 
 # Instalación del Proyecto

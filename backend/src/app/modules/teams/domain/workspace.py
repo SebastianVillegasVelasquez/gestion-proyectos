@@ -178,3 +178,16 @@ class WorkspaceRepository(ABC):
         ni toca `completed_at`. Esto evita que reentregas o clics dobles inflen
         la trazabilidad.
         """
+
+    @abstractmethod
+    async def task_delivery_block_reason(self, task: Task) -> str | None:
+        """Motivo por el que la tarea NO puede entregarse todavía —una
+        dependencia finish-to-start sin completar, o una «actividad de
+        terceros» ancestro que aún no fue entregada—; `None` si puede.
+
+        Entregar mueve el estado de la tarea sin pasar por
+        `ChangeTaskStatusUseCase`, así que la compuerta FtS hay que aplicarla
+        también aquí; si no, se puede entregar trabajo que depende de algo que
+        todavía no está listo.
+        """
+        ...

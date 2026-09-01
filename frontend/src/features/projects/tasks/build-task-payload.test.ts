@@ -109,6 +109,36 @@ describe("buildTaskPayload", () => {
     expect(payload.estimated_days).toBeUndefined();
   });
 
+  it("modo 'member': envía responsable Y equipo juntos", () => {
+    const payload = buildTaskPayload(
+      {
+        ...emptyTaskForm("wi1"),
+        title: "Directo a integrante",
+        assignmentMode: "member",
+        assigneeId: "u1",
+        teamId: "t1",
+      },
+      "p1",
+    );
+    expect(payload.assignee_id).toBe("u1");
+    expect(payload.team_id).toBe("t1");
+  });
+
+  it("modo 'team': solo equipo, sin responsable", () => {
+    const payload = buildTaskPayload(
+      {
+        ...emptyTaskForm("wi1"),
+        title: "Bolsa",
+        assignmentMode: "team",
+        teamId: "t1",
+        assigneeId: "u1",
+      },
+      "p1",
+    );
+    expect(payload.team_id).toBe("t1");
+    expect(payload.assignee_id).toBeNull();
+  });
+
   it("no exige aprobación por defecto", () => {
     const payload = buildTaskPayload({ ...emptyTaskForm("wi1"), title: "Tarea" }, "p1");
     expect(payload.requires_approval).toBe(false);
@@ -171,5 +201,14 @@ describe("validateTaskForm", () => {
         dueDate: "2026-06-01",
       }),
     ).toMatch(/fin/i);
+  });
+
+  it("modo 'member' exige equipo e integrante", () => {
+    expect(
+      validateTaskForm({ ...base, assignmentMode: "member", teamId: "t1", assigneeId: "" }),
+    ).toMatch(/integrante/i);
+    expect(
+      validateTaskForm({ ...base, assignmentMode: "member", teamId: "t1", assigneeId: "u1" }),
+    ).toBeNull();
   });
 });

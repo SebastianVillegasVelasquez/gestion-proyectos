@@ -12,8 +12,38 @@ from app.modules.teams.presentation.schemas import (
 )
 from app.modules.project.infrastructure.repository import ProjectMemberRepository
 from app.shared.base_repository import Repository
-from app.shared.exceptions import ConflictError, NotFoundError
+from app.shared.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.shared.pagination import Pagination
+
+_ADMIN_SYSTEM_ROLES = {"admin", "super_admin", "developer"}
+
+
+async def _authorize_team_member_management(
+    repo: TeamRepository, team_id: UUID, actor, target_user_id: UUID
+) -> None:
+    """Quién puede mover / quitar integrantes de un equipo.
+
+    Administración global puede todo. Fuera de eso, solo el LÍDER del equipo, y
+    únicamente sobre sus integrantes: ni sobre otro líder/supervisor ni sobre sí
+    mismo (evita que el equipo se quede sin quien lo dirija).
+    """
+    system_role = getattr(actor.role, "value", actor.role)
+    if system_role in _ADMIN_SYSTEM_ROLES:
+        return
+    actor_membership = await repo.get_member(team_id, actor.id)
+    if actor_membership is None or actor_membership.team_role != TeamRole.LIDER:
+        raise ForbiddenError(
+            "Solo el líder del equipo puede gestionar a sus integrantes"
+        )
+    if target_user_id == actor.id:
+        raise ForbiddenError(
+            "El líder no puede cambiarse el rol ni quitarse a sí mismo del equipo"
+        )
+    target = await repo.get_member(team_id, target_user_id)
+    if target is not None and target.team_role != TeamRole.INTEGRANTE:
+        raise ForbiddenError(
+            "El líder solo puede gestionar a los integrantes del equipo"
+        )
 
 
 class CreateTeamUseCase:
@@ -122,11 +152,19 @@ class AddTeamMemberUseCase:
 
 class ChangeTeamMemberRoleUseCase:
     def __init__(self, team_repo: TeamRepository):
+        self.repo = team_repo
         self.service = TeamService(team_repo)
 
     async def execute(
-        self, project_id: UUID, team_id: UUID, user_id: UUID, team_role: TeamRole
+        self,
+        project_id: UUID,
+        team_id: UUID,
+        user_id: UUID,
+        team_role: TeamRole,
+        actor=None,
     ) -> TeamMemberResponse:
+        if actor is not None:
+            await _authorize_team_member_management(self.repo, team_id, actor, user_id)
         return await self.service.change_member_role(
             project_id, team_id, user_id, team_role
         )
@@ -134,9 +172,14 @@ class ChangeTeamMemberRoleUseCase:
 
 class RemoveTeamMemberUseCase:
     def __init__(self, team_repo: TeamRepository):
+        self.repo = team_repo
         self.service = TeamService(team_repo)
 
-    async def execute(self, project_id: UUID, team_id: UUID, user_id: UUID) -> None:
+    async def execute(
+        self, project_id: UUID, team_id: UUID, user_id: UUID, actor=None
+    ) -> None:
+        if actor is not None:
+            await _authorize_team_member_management(self.repo, team_id, actor, user_id)
         await self.service.remove_member(project_id, team_id, user_id)
 
 

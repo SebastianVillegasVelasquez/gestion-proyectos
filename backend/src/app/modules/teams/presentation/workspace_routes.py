@@ -5,6 +5,7 @@ from starlette import status
 
 from app.core.dependencies import (
     deliverable_notifier_dependency,
+    event_bus_dependency,
     get_current_user,
     project_members_repo_dependency,
     team_invitation_repo_dependency,
@@ -153,9 +154,10 @@ async def add_version(
     data: AddVersionRequest,
     repo=Depends(workspace_repo_dependency),
     notifier=Depends(deliverable_notifier_dependency),
+    bus=Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await WorkspaceService(repo, notifier).add_version(
+    return await WorkspaceService(repo, notifier, bus).add_version(
         team_id, deliverable_id, data, current_user
     )
 
@@ -204,9 +206,10 @@ async def add_comment(
     deliverable_id: UUID,
     data: AddCommentRequest,
     repo=Depends(workspace_repo_dependency),
+    bus=Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await WorkspaceService(repo).add_comment(
+    return await WorkspaceService(repo, bus=bus).add_comment(
         team_id, deliverable_id, data, current_user
     )
 

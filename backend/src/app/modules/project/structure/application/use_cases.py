@@ -15,6 +15,7 @@ from app.modules.project.structure.presentation.schemas import (
     WorkItemResponse,
     WorkItemTreeResponse,
 )
+from app.modules.tasks.application.use_cases import cascade_reschedule_dependents
 from app.modules.tasks.domain.audit import TaskAuditor, snapshot
 from app.modules.tasks.domain.services import reschedule_task_start
 from app.modules.tasks.infrastructure.enums import TaskStatus
@@ -212,6 +213,7 @@ class DeliverThirdPartyActivityUseCase:
         item_id: UUID,
         delivered_on: datetime.date | None = None,
         actor_id: UUID | None = None,
+        delivered: bool = True,
     ) -> WorkItemResponse:
         item = await self.repo.get_item(item_id)
         if item is None or item.is_deleted:
@@ -222,10 +224,21 @@ class DeliverThirdPartyActivityUseCase:
                 "Solo una «actividad de terceros» se marca como entregada"
             )
 
+        # Reabrir la compuerta: el tercero aún no entregó (o fue un error). Se
+        # limpian las fechas reales; los hijos vuelven a posicionarse sobre la
+        # fecha PLAN al re-derivarse y su subárbol queda gateado otra vez.
+        if not delivered:
+            item.fecha_fin_real = None
+            item.fecha_inicio_real = None
+            await self.repo.save_item(item)
+            return await self.service.get_item(item_id)
+
         fecha = delivered_on or datetime.date.today()
         item.fecha_fin_real = fecha
-        if item.fecha_inicio_real is None:
-            item.fecha_inicio_real = item.fecha_inicio_plan or fecha
+        # La fecha de entrega es también el INICIO real: es cuando el trabajo
+        # que colgaba del tercero puede empezar. (Se re-fija en cada entrega
+        # para que corregir la fecha corrija ambas.)
+        item.fecha_inicio_real = fecha
         await self.repo.save_item(item)
 
         await self._cascade_to_dependent_tasks(item, fecha, actor_id)
@@ -236,14 +249,29 @@ class DeliverThirdPartyActivityUseCase:
     ) -> None:
         dependents = await self.task_repo.get_dependents_of_work_item(item.id)
         changed: list[Task] = []
+        seen: set[UUID] = set()
         for dep in dependents:
             if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
                 continue
             before = snapshot(dep)
-            if reschedule_task_start(dep, fecha):
+            if reschedule_task_start(dep, fecha, recompute_due_from_estimate=True):
                 await self.task_repo.save(dep)
                 await TaskAuditor(self.task_repo, actor_id).diff(before, dep)
                 changed.append(dep)
+                seen.add(dep.id)
+                # En cadena: las tareas que dependen de ESTA tarea (no del
+                # tercero) arrancan tras su nuevo fin y recalculan el suyo.
+                if dep.due_date is not None:
+                    await cascade_reschedule_dependents(
+                        self.task_repo,
+                        self._bus,
+                        source_id=dep.id,
+                        source_title=dep.title,
+                        project_id=item.proyecto_id,
+                        anchor=dep.due_date,
+                        actor_id=actor_id,
+                        _seen=seen,
+                    )
 
         if changed and self._bus is not None:
             recipients = tuple(

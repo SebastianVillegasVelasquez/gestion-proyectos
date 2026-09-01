@@ -221,10 +221,11 @@ async def deliver_third_party_activity(
     bus=Depends(event_bus_dependency),
     current_user=Depends(_admin),
 ):
-    """Marca una «actividad de terceros» como entregada: abre la compuerta de
-    su subárbol y reprograma en cascada las tareas que dependían de ella."""
+    """Marca (o revierte) una «actividad de terceros» como entregada: abre/cierra
+    la compuerta de su subárbol y reprograma en cascada los elementos hijos y las
+    tareas que dependían de ella."""
     return await DeliverThirdPartyActivityUseCase(repo, task_repo, bus).execute(
-        item_id, data.delivered_on, actor_id=current_user.id
+        item_id, data.delivered_on, actor_id=current_user.id, delivered=data.delivered
     )
 
 

@@ -64,7 +64,7 @@ export function UpcomingDeadlinesCard({
 
   return (
     <Card className="flex flex-1 flex-col rounded-2xl">
-      <CardContent className="flex h-full flex-col gap-4 py-5">
+      <CardContent className="flex h-full flex-col gap-4 py-5 sm:pt-5">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
             <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">

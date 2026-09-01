@@ -4,8 +4,9 @@ import {
   FolderPlus,
   Inbox,
   LayoutDashboard,
+  ListTodo,
   LogOut,
-  PackageCheck,
+  MailCheck,
   type LucideIcon,
   Moon,
   PanelLeftClose,
@@ -69,7 +70,7 @@ const SECTIONS: NavSection[] = [
     title: "Colaboradores",
     items: [
       { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
-      { id: "my-deliverables", label: "Mis entregas", icon: PackageCheck, href: "/mis-entregas" },
+      { id: "my-deliverables", label: "Mis tareas", icon: ListTodo, href: "/mis-entregas" },
     ],
   },
   {
@@ -96,7 +97,7 @@ const USER_SECTIONS: NavSection[] = [
     items: [
       { id: "my-projects", label: "Mis proyectos", icon: FolderKanban, href: "/mis-proyectos" },
       { id: "workspace", label: "Espacios de Trabajo", icon: Users2, href: "/workspace" },
-      { id: "my-deliverables", label: "Mis entregas", icon: PackageCheck, href: "/mis-entregas" },
+      { id: "my-deliverables", label: "Mis tareas", icon: ListTodo, href: "/mis-entregas" },
     ],
   },
   {
@@ -113,6 +114,7 @@ const DEVELOPER_SECTIONS: NavSection[] = SECTIONS.map((section) =>
         ...section,
         items: [
           { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
+          { id: "email-test", label: "Prueba de correo", icon: MailCheck, href: "/dev/email-test" },
           ...section.items,
         ],
       }
@@ -128,6 +130,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/mis-entregas": "my-deliverables",
   "/settings": "settings",
   "/feedback": "feedback",
+  "/dev/email-test": "email-test",
 };
 
 const DOT_COLORS: Record<NonNullable<NavItem["dot"]>, string> = {

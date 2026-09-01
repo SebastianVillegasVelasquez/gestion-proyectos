@@ -686,10 +686,17 @@ class WorkTreeService:
                 return DerivedDates(item.fecha_inicio_plan, item.fecha_fin_plan, False)
             visiting.add(node_id)
 
-            # La actividad de terceros no depende de nosotros: su fecha plan (si
-            # la tiene) es un hito, no un tramo de trabajo.
+            # La actividad de terceros no depende de nosotros: su fecha es un
+            # hito, no un tramo de trabajo. Manda la fecha REAL de entrega (la
+            # que el tercero confirmó); mientras no haya entregado, se usa la
+            # fecha PLAN como previsión para posicionar a sus hijos.
             if node_id in third_party_ids:
-                fecha_hito = item.fecha_inicio_plan or item.fecha_fin_plan
+                fecha_hito = (
+                    item.fecha_fin_real
+                    or item.fecha_inicio_real
+                    or item.fecha_inicio_plan
+                    or item.fecha_fin_plan
+                )
                 result = DerivedDates(fecha_hito, fecha_hito, False)
                 visiting.discard(node_id)
                 memo[node_id] = result
@@ -805,11 +812,20 @@ class WorkTreeService:
         no tiene fin propio y solo se sabe dónde acaba tras derivarlo, y así el
         conflicto aparece venga de donde venga —recolocar el hijo, recortar el
         padre o cambiar una duración— y no solo del drag & drop.
+
+        Excepción: si el padre es una «actividad de terceros», NO se marca
+        conflicto. El tercero es un HITO —una sola fecha, la de entrega—, no un
+        tramo que contenga a sus hijos; y los hijos, por definición, terminan
+        después (su fin = fecha de entrega + días estimados). Marcarlo sería un
+        aviso permanente e inútil.
         """
         items_by_id = {item.id: item for item in items}
         conflicts: set[UUID] = set()
         for item in items:
             if item.parent_id is None or item.parent_id not in items_by_id:
+                continue
+            parent = items_by_id[item.parent_id]
+            if WorkTreeService._is_third_party(getattr(parent, "tipo", None)):
                 continue
             fin = derivation[item.id].fecha_fin_plan
             fin_padre = derivation[item.parent_id].fecha_fin_plan

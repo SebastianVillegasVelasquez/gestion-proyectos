@@ -1,17 +1,21 @@
 import { useMemo, useState } from "react";
-import { X, ListPlus, FolderTree } from "lucide-react";
+import { X, ListPlus, FolderTree, Pencil } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
-import { useCreateTask } from "../hooks/use-tasks";
+import { useCreateTask, useUpdateTask } from "../hooks/use-tasks";
 import { useWorkTree, useNodeTypes } from "../hooks/use-structure";
 import { useDirectory } from "../hooks/use-members";
-import { useTeams } from "../hooks/use-teams";
+import { useTeams, useTeamMembers } from "../hooks/use-teams";
+import { fullName } from "../utils/task-assignment";
 import { TASK_PRIORITY_LABELS, USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
 import type { Task, TaskPriority, UserPosition } from "../types/api.types";
 import { workItemPath } from "../utils/flatten-work-tree";
+import { TaskDurationBadge } from "../components/TaskDurationBadge";
 import { WorkItemPickerModal } from "./WorkItemPickerModal";
 import {
   buildTaskPayload,
+  buildTaskUpdatePayload,
   emptyTaskForm,
+  taskToForm,
   validateTaskForm,
   WORK_ITEM_DEP_PREFIX,
   type TaskFormState,
@@ -36,6 +40,7 @@ export function CreateTaskModal({
   tasks,
   initialWorkItemId,
   initialTitle,
+  editTask,
   onClose,
 }: {
   projectId: string;
@@ -46,15 +51,21 @@ export function CreateTaskModal({
    * nombre: normalmente la tarea ES ese elemento ("Video 1", "Guion"), y quien
    * la crea solo tiene que asignarla. Sigue siendo editable. */
   initialTitle?: string;
+  /** Si llega, el modal EDITA esa tarea en vez de crear una (mismos campos y
+   * estilo). Las dependencias se editan aparte (en la ficha de la tarea). */
+  editTask?: Task;
   onClose: () => void;
 }) {
+  const isEdit = editTask != null;
   const treeQuery = useWorkTree(projectId);
   const nodeTypesQuery = useNodeTypes(projectId);
   const createTask = useCreateTask(projectId);
+  const updateTask = useUpdateTask(projectId);
+  const mutation = isEdit ? updateTask : createTask;
   const [pickingLocation, setPickingLocation] = useState(false);
 
   const [form, setForm] = useState<TaskFormState>(() =>
-    emptyTaskForm(initialWorkItemId, initialTitle),
+    editTask ? taskToForm(editTask) : emptyTaskForm(initialWorkItemId, initialTitle),
   );
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
@@ -62,6 +73,11 @@ export function CreateTaskModal({
   const directoryQuery = useDirectory(position || undefined);
   const teamsQuery = useTeams(projectId);
   const teams = teamsQuery.data?.items ?? [];
+  // Integrantes del equipo elegido, para asignar la tarea directo a uno de ellos.
+  const teamMembersQuery = useTeamMembers(
+    projectId,
+    form.assignmentMode === "member" && form.teamId ? form.teamId : undefined,
+  );
 
   const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -112,6 +128,15 @@ export function CreateTaskModal({
       return;
     }
     setClientError(null);
+    if (isEdit) {
+      const payload = buildTaskUpdatePayload(form, editTask);
+      if (Object.keys(payload).length === 0) {
+        onClose();
+        return;
+      }
+      updateTask.mutate({ taskId: editTask.id, payload }, { onSuccess: onClose });
+      return;
+    }
     createTask.mutate(buildTaskPayload(form, projectId), { onSuccess: onClose });
   };
 
@@ -126,7 +151,15 @@ export function CreateTaskModal({
       <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
-            <ListPlus className="size-4 text-brand-teal" /> Nueva tarea
+            {isEdit ? (
+              <>
+                <Pencil className="size-4 text-brand-teal" /> Editar tarea
+              </>
+            ) : (
+              <>
+                <ListPlus className="size-4 text-brand-teal" /> Nueva tarea
+              </>
+            )}
           </h3>
           <button
             type="button"
@@ -193,15 +226,17 @@ export function CreateTaskModal({
             </button>
           </Field>
 
-          {/* Asignación: excluyente. Una tarea se da a una persona O a un equipo
-              (o a nadie por ahora). Si va a un equipo, su líder reparte subtareas. */}
+          {/* Asignación. "Nadie" = suelta; "persona" = individual; "equipo" = va
+              a su bolsa y el líder reparte; "integrante" = directo a alguien del
+              equipo, sin que el líder tenga que repartirla. */}
           <Field label="Asignar a">
-            <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-800/50">
               {(
                 [
                   ["none", "Nadie aún"],
                   ["person", "Una persona"],
                   ["team", "Un equipo"],
+                  ["member", "Integrante"],
                 ] as const
               ).map(([mode, label]) => (
                 <button
@@ -290,6 +325,50 @@ export function CreateTaskModal({
             </Field>
           )}
 
+          {/* Directo a un integrante: se elige el equipo y, dentro, la persona.
+              La tarea queda como "del equipo" pero ya asignada. */}
+          {form.assignmentMode === "member" && (
+            <Field label="Equipo e integrante">
+              <div className="flex gap-2">
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={form.teamId}
+                  onChange={(e) => {
+                    set("teamId", e.target.value);
+                    set("assigneeId", "");
+                  }}
+                >
+                  <option value="">Equipo…</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={`${inputCls} w-1/2`}
+                  value={form.assigneeId}
+                  disabled={!form.teamId || teamMembersQuery.isLoading}
+                  onChange={(e) => {
+                    set("assigneeId", e.target.value);
+                  }}
+                >
+                  <option value="">Integrante…</option>
+                  {(teamMembersQuery.data ?? []).map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {fullName(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {teams.length === 0 && (
+                <span className="text-[11px] text-slate-400">
+                  Este proyecto aún no tiene equipos. Créalos en la sección «Equipos de trabajo».
+                </span>
+              )}
+            </Field>
+          )}
+
           {/* Aprobación: desactivada por defecto (entrega directo, sin
               revisión). Activarla exige que el líder/supervisor del proyecto
               apruebe o devuelva la entrega antes de darla por completada. */}
@@ -307,34 +386,41 @@ export function CreateTaskModal({
             </span>
           </label>
 
-          {/* Dependencia */}
-          <Field label="Depende de (opcional)">
-            <select
-              className={inputCls}
-              value={form.dependsOnId}
-              onChange={(e) => {
-                set("dependsOnId", e.target.value);
-              }}
-            >
-              <option value="">Sin dependencia</option>
-              {depWorkItems.length > 0 && (
-                <optgroup label="Elementos (actividad de terceros)">
-                  {depWorkItems.map((w) => (
-                    <option key={w.id} value={`${WORK_ITEM_DEP_PREFIX}${w.id}`}>
-                      {w.nombre}
+          {/* Dependencia: solo al CREAR. Al editar, las dependencias se
+              gestionan en la ficha de la tarea (pueden ser varias). */}
+          {isEdit ? (
+            <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-[11px] text-slate-400 dark:border-slate-700 dark:text-slate-500">
+              Las dependencias de esta tarea se editan en su ficha.
+            </p>
+          ) : (
+            <Field label="Depende de (opcional)">
+              <select
+                className={inputCls}
+                value={form.dependsOnId}
+                onChange={(e) => {
+                  set("dependsOnId", e.target.value);
+                }}
+              >
+                <option value="">Sin dependencia</option>
+                {depWorkItems.length > 0 && (
+                  <optgroup label="Elementos (actividad de terceros)">
+                    {depWorkItems.map((w) => (
+                      <option key={w.id} value={`${WORK_ITEM_DEP_PREFIX}${w.id}`}>
+                        {w.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Tareas">
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
                     </option>
                   ))}
                 </optgroup>
-              )}
-              <optgroup label="Tareas">
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </Field>
+              </select>
+            </Field>
+          )}
 
           {/* Prioridad */}
           <Field label="Prioridad">
@@ -368,11 +454,12 @@ export function CreateTaskModal({
               />
             </Field>
             <Field label={form.dateMode === "duration" ? "Duración / estimado (días)" : "Fin"}>
-              <div className="flex gap-1">
+              <div className="flex items-center gap-1">
                 {form.dateMode === "duration" ? (
                   <input
                     type="number"
                     min={1}
+                    step="0.25"
                     className={inputCls}
                     value={form.durationDays}
                     onChange={(e) => {
@@ -389,13 +476,14 @@ export function CreateTaskModal({
                     }}
                   />
                 )}
+                {form.dateMode === "duration" && <TaskDurationBadge days={form.durationDays} />}
                 <button
                   type="button"
                   title="Cambiar entre duración y fecha de fin"
                   onClick={() => {
                     set("dateMode", form.dateMode === "duration" ? "end" : "duration");
                   }}
-                  className="shrink-0 rounded-lg border border-slate-200 px-2 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="shrink-0 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
                   {form.dateMode === "duration" ? "📅" : "⏱"}
                 </button>
@@ -403,9 +491,13 @@ export function CreateTaskModal({
             </Field>
           </div>
 
-          {(clientError ?? createTask.isError) && (
+          {(clientError ?? mutation.isError) && (
             <p className="text-xs text-red-600 dark:text-red-400">
-              {clientError ?? getErrorMessage(createTask.error, "No se pudo crear la tarea")}
+              {clientError ??
+                getErrorMessage(
+                  mutation.error,
+                  isEdit ? "No se pudo guardar la tarea" : "No se pudo crear la tarea",
+                )}
             </p>
           )}
         </div>
@@ -421,10 +513,16 @@ export function CreateTaskModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={createTask.isPending}
+            disabled={mutation.isPending}
             className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {createTask.isPending ? "Creando…" : "Crear tarea"}
+            {mutation.isPending
+              ? isEdit
+                ? "Guardando…"
+                : "Creando…"
+              : isEdit
+                ? "Guardar cambios"
+                : "Crear tarea"}
           </button>
         </div>
       </div>

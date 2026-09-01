@@ -416,7 +416,7 @@ export function ProjectChartsCard({
 
   return (
     <Card className="rounded-2xl">
-      <CardContent className="flex h-full flex-col items-center gap-4 py-5">
+      <CardContent className="flex h-full flex-col items-center gap-4 py-5 sm:pt-5">
         {/* Cabecera + selector de gráfico */}
         <div className="flex w-full items-center justify-between gap-3">
           <div className="flex items-center gap-2">

@@ -14,7 +14,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TaskEditForm } from "../../gantt/components/TaskEditForm";
+import { CreateTaskModal } from "../../tasks/CreateTaskModal";
+import { TaskDurationBadge } from "../TaskDurationBadge";
 import { useProjectTasks } from "../../hooks/use-tasks";
 import { useTeamMembers } from "../../hooks/use-teams";
 import { TaskDependencyEditor } from "../TaskDependencyEditor";
@@ -132,10 +133,10 @@ function TeamBlock({
  * Ficha de una tarea vista desde la estructura del proyecto: de qué elemento
  * cuelga, en qué fechas va y quién responde (la persona, el equipo, o ambos).
  *
- * El botón «Editar» abre el mismo formulario que la vista de Tareas
- * (`TaskEditForm`): reutilizarlo evita mantener dos formularios en sincronía y,
- * como su mutación invalida las vistas de tareas, el cambio se refleja al
- * instante en la lista de Tareas y en el Cronograma.
+ * El botón «Editar» abre el MISMO formulario que crear una tarea
+ * (`CreateTaskModal` en modo edición): mismos campos y mismo estilo, un solo
+ * formulario que mantener. Su mutación invalida las vistas de tareas, así que
+ * el cambio se refleja al instante en la lista de Tareas y en el Cronograma.
  */
 export function TaskDetailModal({
   projectId,
@@ -164,12 +165,24 @@ export function TaskDetailModal({
     () => resolveAssignment(task, memberById, teamById),
     [task, memberById, teamById],
   );
-  const members = useMemo(() => [...memberById.values()], [memberById]);
-  const teams = useMemo(() => [...teamById.values()], [teamById]);
   const { person, team } = assignment;
   const late = isOverdue(task);
   const logged = Number(task.logged_days);
   const estimated = task.estimated_days != null ? Number(task.estimated_days) : null;
+
+  // Editar = el mismo formulario que crear (misma vista, mismos campos).
+  if (editing) {
+    return (
+      <CreateTaskModal
+        projectId={projectId}
+        tasks={projectTasks.data ?? []}
+        editTask={task}
+        onClose={() => {
+          setEditing(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -188,17 +201,15 @@ export function TaskDetailModal({
             <h3 className="mt-1.5 text-base font-semibold text-foreground">{task.title}</h3>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {!editing && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(true);
-                }}
-                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
-              >
-                <Pencil className="size-3.5" /> Editar
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(true);
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
+            >
+              <Pencil className="size-3.5" /> Editar
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -211,136 +222,122 @@ export function TaskDetailModal({
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-          {editing ? (
-            <TaskEditForm
-              projectId={projectId}
-              task={task}
-              members={members}
-              teams={teams}
-              onDone={() => {
-                setEditing(false);
-              }}
-            />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-semibold",
-                    TASK_STATUS_COLORS[task.status],
-                  )}
-                >
-                  {TASK_STATUS_LABELS[task.status]}
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-semibold",
+                  TASK_STATUS_COLORS[task.status],
+                )}
+              >
+                {TASK_STATUS_LABELS[task.status]}
+              </span>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-semibold",
+                  TASK_PRIORITY_COLORS[task.priority],
+                )}
+              >
+                Prioridad {TASK_PRIORITY_LABELS[task.priority].toLowerCase()}
+              </span>
+              {late && (
+                <span className="flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                  <AlertTriangle className="size-3" /> Fuera de plazo
                 </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-semibold",
-                    TASK_PRIORITY_COLORS[task.priority],
-                  )}
-                >
-                  Prioridad {TASK_PRIORITY_LABELS[task.priority].toLowerCase()}
-                </span>
-                {late && (
-                  <span className="flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
-                    <AlertTriangle className="size-3" /> Fuera de plazo
+              )}
+            </div>
+
+            {task.description && (
+              <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                {task.description}
+              </p>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field icon={CalendarRange} label="Lapso">
+                {formatDateRange(task.start_date, task.due_date)}
+              </Field>
+              <Field icon={FolderTree} label="Dentro de">
+                {containerName ?? (
+                  <span className="italic text-muted-foreground">
+                    Sin elemento (tarea suelta del proyecto)
                   </span>
                 )}
-              </div>
-
-              {task.description && (
-                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                  {task.description}
-                </p>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field icon={CalendarRange} label="Lapso">
-                  {formatDateRange(task.start_date, task.due_date)}
-                </Field>
-                <Field icon={FolderTree} label="Dentro de">
-                  {containerName ?? (
-                    <span className="italic text-muted-foreground">
-                      Sin elemento (tarea suelta del proyecto)
-                    </span>
-                  )}
-                </Field>
-                <Field icon={Timer} label="Estimado">
-                  {estimated != null ? (
-                    `${estimated} d`
-                  ) : (
-                    <span className="text-muted-foreground">Sin estimar</span>
-                  )}
-                </Field>
-                <Field icon={Clock} label="Dedicado">
-                  {logged > 0 ? (
-                    `${logged} d`
-                  ) : (
-                    <span className="text-muted-foreground">Sin apuntes</span>
-                  )}
-                </Field>
-              </div>
-
-              <Field icon={Link2} label="Dependencia">
-                <TaskDependencyEditor
-                  taskId={task.id}
-                  projectId={projectId}
-                  canEdit
-                  allTasks={projectTasks.data ?? []}
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Mientras la tarea de la que depende no esté completada, esta no puede avanzar de
-                  estado.
-                </p>
               </Field>
-
-              <Field icon={User} label="Responsable">
-                {person ? (
-                  <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-teal/15 text-xs font-bold text-brand-teal-dark dark:text-brand-teal">
-                      {initialsOf(person)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-foreground">
-                        {fullName(person)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {positionLabel(person.position)} · {person.email}
-                      </p>
-                    </div>
-                  </div>
+              <Field icon={Timer} label="Estimado">
+                {estimated != null ? (
+                  <TaskDurationBadge days={estimated} />
                 ) : (
-                  <p className="italic text-muted-foreground">
-                    {team
-                      ? "Delegada al equipo, todavía sin responsable individual."
-                      : assignment.label}
-                  </p>
-                )}
-                {assignableMembers && assignableMembers.length > 0 && (
-                  <div className="mt-2">
-                    <p className="mb-1 text-[11px] text-muted-foreground">
-                      Reasignar a un integrante del equipo:
-                    </p>
-                    <TaskAssigneeSelect
-                      projectId={projectId}
-                      taskId={task.id}
-                      currentAssigneeId={task.assignee_id}
-                      members={assignableMembers}
-                    />
-                  </div>
+                  <span className="text-muted-foreground">Sin estimar</span>
                 )}
               </Field>
+              <Field icon={Clock} label="Dedicado">
+                {logged > 0 ? (
+                  `${logged} d`
+                ) : (
+                  <span className="text-muted-foreground">Sin apuntes</span>
+                )}
+              </Field>
+            </div>
 
-              {team && (
-                <Field icon={UsersRound} label="Equipo asignado">
-                  <TeamBlock
-                    projectId={projectId}
-                    team={team}
-                    highlightUserId={person?.user_id ?? null}
-                  />
-                </Field>
+            <Field icon={Link2} label="Dependencia">
+              <TaskDependencyEditor
+                taskId={task.id}
+                projectId={projectId}
+                canEdit
+                allTasks={projectTasks.data ?? []}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Mientras la tarea de la que depende no esté completada, esta no puede avanzar de
+                estado.
+              </p>
+            </Field>
+
+            <Field icon={User} label="Responsable">
+              {person ? (
+                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-teal/15 text-xs font-bold text-brand-teal-dark dark:text-brand-teal">
+                    {initialsOf(person)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-foreground">{fullName(person)}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {positionLabel(person.position)} · {person.email}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="italic text-muted-foreground">
+                  {team
+                    ? "Delegada al equipo, todavía sin responsable individual."
+                    : assignment.label}
+                </p>
               )}
-            </>
-          )}
+              {assignableMembers && assignableMembers.length > 0 && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[11px] text-muted-foreground">
+                    Reasignar a un integrante del equipo:
+                  </p>
+                  <TaskAssigneeSelect
+                    projectId={projectId}
+                    taskId={task.id}
+                    currentAssigneeId={task.assignee_id}
+                    members={assignableMembers}
+                  />
+                </div>
+              )}
+            </Field>
+
+            {team && (
+              <Field icon={UsersRound} label="Equipo asignado">
+                <TeamBlock
+                  projectId={projectId}
+                  team={team}
+                  highlightUserId={person?.user_id ?? null}
+                />
+              </Field>
+            )}
+          </>
         </div>
       </div>
     </div>

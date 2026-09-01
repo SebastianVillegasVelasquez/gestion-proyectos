@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Package, ShieldCheck, X } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, ListTodo, Package, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useMyDashboardPanels } from "@/features/dashboard/hooks/use-dashboard-summary";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
@@ -17,17 +17,19 @@ import type {
   DeliverableVersion,
   WorkspaceMember,
 } from "@/features/workspace/types";
-import type { ApiPersonalDeliverable } from "../api/personal.api";
+import type { ApiMyTask, ApiPersonalDeliverable } from "../api/personal.api";
 import {
   useAddPersonalComment,
   useAddPersonalVersion,
   useCreatePersonalDeliverable,
   useDeletePersonalDeliverable,
   useMyPersonalDeliverables,
+  useMyTasks,
   usePersonalReviewQueue,
   useSetPersonalApproval,
   useUpdatePersonalVersion,
 } from "../hooks/use-personal-deliverables";
+import { MyTasksView } from "./MyTasksView";
 
 const AVATAR_COLORS = [
   "bg-violet-600",
@@ -209,19 +211,20 @@ function NewPersonalDeliverableModal({
 
 // ── Página ─────────────────────────────────────────────────────────────────
 
-type Tab = "mias" | "revisar";
+type Tab = "tareas" | "mias" | "revisar";
 
 export function PersonalDeliverablesPage() {
   const { user } = useAuth();
   const meId = user?.id ?? "";
   const meName = user?.name ?? "Yo";
 
-  const [tab, setTab] = useState<Tab>("mias");
+  const [tab, setTab] = useState<Tab>("tareas");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
 
   const mineQuery = useMyPersonalDeliverables();
   const reviewQuery = usePersonalReviewQueue();
+  const myTasksQuery = useMyTasks();
   const panelsQuery = useMyDashboardPanels();
 
   const createDeliverable = useCreatePersonalDeliverable();
@@ -259,6 +262,39 @@ export function PersonalDeliverablesPage() {
         .map((t) => ({ id: t.id, title: t.title, project_name: t.project_name })),
     [panelsQuery.data],
   );
+
+  // ids de tareas que ya tienen una entrega personal.
+  const deliverableTaskIds = useMemo(
+    () =>
+      new Set(
+        (mineQuery.data ?? []).map((d) => d.task_id).filter((id): id is string => id != null),
+      ),
+    [mineQuery.data],
+  );
+
+  // Desde «Mis tareas»: abrir (o crear) la entrega personal de una tarea
+  // individual y saltar a la pestaña de entregas con ella seleccionada.
+  const openIndividual = (task: ApiMyTask) => {
+    const existing = (mineQuery.data ?? []).find((d) => d.task_id === task.id);
+    if (existing) {
+      setTab("mias");
+      setSelectedId(existing.id);
+      return;
+    }
+    createDeliverable.mutate(
+      {
+        task_title: task.title,
+        task_id: task.id,
+        requires_approval: task.requires_approval,
+      },
+      {
+        onSuccess: (d) => {
+          setTab("mias");
+          setSelectedId(d.id);
+        },
+      },
+    );
+  };
 
   const handleCreate = (title: string, taskId: string | null, requiresApproval: boolean) => {
     createDeliverable.mutate(
@@ -335,9 +371,9 @@ export function PersonalDeliverablesPage() {
             <Package className="size-5" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Mis entregas</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Mis tareas</h1>
             <p className="text-xs text-muted-foreground">
-              Entregas de tus tareas individuales (sin equipo).
+              Todo lo que tienes asignado, con avisos de vencimiento y su entrega.
             </p>
           </div>
         </div>
@@ -353,6 +389,20 @@ export function PersonalDeliverablesPage() {
       </header>
 
       <div className="flex shrink-0 gap-1 border-b border-border">
+        <button
+          type="button"
+          onClick={() => {
+            setTab("tareas");
+            setSelectedId(null);
+          }}
+          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            tab === "tareas"
+              ? "border-brand-gold text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ListTodo className="size-4" /> Mis tareas
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -388,7 +438,14 @@ export function PersonalDeliverablesPage() {
         </button>
       </div>
 
-      {loading ? (
+      {tab === "tareas" ? (
+        <MyTasksView
+          tasks={myTasksQuery.data ?? []}
+          loading={myTasksQuery.isLoading}
+          deliverableTaskIds={deliverableTaskIds}
+          onOpenIndividual={openIndividual}
+        />
+      ) : loading ? (
         <div className="flex-1">
           <LoadingSkeleton rows={4} />
         </div>
@@ -405,7 +462,7 @@ export function PersonalDeliverablesPage() {
           />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden rounded-2xl border border-border">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card">
           <div className="w-72 shrink-0 overflow-hidden border-r border-border">
             <DeliverableList
               deliverables={deliverables}

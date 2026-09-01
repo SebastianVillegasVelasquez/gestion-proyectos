@@ -19,7 +19,7 @@ import asyncio
 from app.core.config import Settings
 from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger
-from app.shared.email.sender import SmtpEmailSender
+from app.shared.email.sender import build_email_sender
 
 logger = get_logger(__name__)
 
@@ -36,7 +36,7 @@ async def _overdue_loop(settings: Settings) -> None:
             async with AsyncSessionLocal() as session:
                 await scan_overdue_tasks(
                     session,
-                    email_sender=SmtpEmailSender(settings),
+                    email_sender=build_email_sender(settings),
                     public_url=settings.APP_PUBLIC_URL,
                 )
                 await session.commit()
@@ -56,7 +56,7 @@ async def _reminders_loop(settings: Settings) -> None:
         try:
             async with AsyncSessionLocal() as session:
                 await dispatch_due_reminders(
-                    session, email_sender=SmtpEmailSender(settings)
+                    session, email_sender=build_email_sender(settings)
                 )
                 await session.commit()
         except asyncio.CancelledError:

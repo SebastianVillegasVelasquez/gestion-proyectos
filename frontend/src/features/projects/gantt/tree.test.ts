@@ -48,6 +48,9 @@ function task(over: Partial<DatedTask> & { id: string; work_item_id: string }): 
     orden: 0,
     represents_work_item: false,
     requires_approval: false,
+    progress_pct: 0,
+    depends_on_third_party: false,
+    assignee_name: null,
     ...over,
   };
 }

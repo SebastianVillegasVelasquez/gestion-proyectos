@@ -36,7 +36,7 @@ export function ProjectSectionShell({
 
   return (
     <div
-      className={`mx-auto flex h-full w-full flex-col gap-5 overflow-hidden p-4 sm:p-6 lg:px-12 ${
+      className={`mx-auto flex h-full w-full flex-col gap-5 overflow-hidden px-4 pb-4 pt-6 sm:px-6 sm:pb-6 sm:pt-8 lg:px-12 ${
         wide ? "max-w-[1600px]" : "max-w-6xl"
       }`}
     >

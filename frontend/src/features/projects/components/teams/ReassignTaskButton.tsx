@@ -25,16 +25,21 @@ export function ReassignTaskButton({
   currentAssigneeId,
   members,
   onDone,
+  compact = false,
 }: {
   projectId: string;
   taskId: string;
   currentAssigneeId: string | null;
   members: Person[];
   onDone?: () => void;
+  /** Solo el icono, sin el nombre del responsable: para cuando la vista ya está
+   *  agrupada/filtrada por persona y repetir el nombre en cada fila es ruido. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const update = useUpdateTask(projectId);
   const current = members.find((m) => m.user_id === currentAssigneeId) ?? null;
+  const currentLabel = current ? fullName(current) : "Asignar responsable";
 
   function choose(nextId: string | null) {
     setOpen(false);
@@ -52,18 +57,22 @@ export function ReassignTaskButton({
         onClick={() => {
           setOpen(true);
         }}
-        aria-label="Reasignar responsable"
+        aria-label={`Reasignar responsable (actual: ${currentLabel})`}
+        title={compact ? `Reasignar — actual: ${currentLabel}` : undefined}
         className={cn(
-          "flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold transition hover:opacity-90 disabled:opacity-50",
+          "flex max-w-full items-center rounded-full font-semibold transition hover:opacity-90 disabled:opacity-50",
+          compact ? "size-6 justify-center p-0" : "gap-1.5 px-2 py-1 text-[11px]",
           current
             ? colorForName(fullName(current))
             : "border border-dashed border-border text-muted-foreground hover:border-brand-gold hover:text-brand-gold-dark",
         )}
       >
-        <UserCog className="size-3 shrink-0 opacity-70" />
-        <span className="max-w-[130px] truncate">
-          {update.isPending ? "Guardando…" : current ? fullName(current) : "Asignar"}
-        </span>
+        <UserCog className={cn("shrink-0 opacity-70", compact ? "size-3.5" : "size-3")} />
+        {!compact && (
+          <span className="max-w-[130px] truncate">
+            {update.isPending ? "Guardando…" : current ? fullName(current) : "Asignar"}
+          </span>
+        )}
       </button>
 
       {update.isError && (

@@ -88,7 +88,7 @@ export function DeliverableList({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-card">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">

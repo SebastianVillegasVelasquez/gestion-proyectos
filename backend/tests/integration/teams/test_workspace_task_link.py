@@ -247,6 +247,130 @@ class TestDeliverableLinkedToTask:
         assert created.json()["task_id"] is None
 
 
+class TestDeliveryBlockedByDependency:
+    """Entregar mueve el estado de la tarea sin pasar por
+    `ChangeTaskStatusUseCase`; la compuerta finish-to-start tiene que aplicarse
+    también en la entrega, si no se puede entregar trabajo que depende de algo
+    que aún no está listo."""
+
+    async def test_cannot_deliver_while_a_task_dependency_is_open(
+        self, client, scenario, db_session
+    ):
+        from app.modules.tasks.infrastructure.models import TaskDependency
+
+        s = scenario
+        pred = await _make_task(db_session, s.team.id, s.integrante.id)
+        succ = await _make_task(db_session, s.team.id, s.integrante.id)
+        db_session.add(TaskDependency(task_id=succ.id, depends_on_id=pred.id))
+        await db_session.commit()
+
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": succ.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(succ.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        blocked = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert blocked.status_code == 422, blocked.text
+
+        # Completada la predecesora, la entrega ya pasa.
+        pred.status = TaskStatus.COMPLETADA
+        await db_session.commit()
+        ok = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert ok.status_code == 201, ok.text
+
+    async def test_cannot_deliver_under_an_undelivered_third_party_activity(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        project = Project(
+            name=f"Proj {uuid4()}",
+            description="tercero",
+            client_name="Test",
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=60),
+        )
+        db_session.add(project)
+        await db_session.flush()
+        tercero_tipo = TipoNodo(proyecto_id=project.id, nombre="Actividad de terceros")
+        modulo_tipo = TipoNodo(proyecto_id=project.id, nombre="Módulo")
+        db_session.add_all([tercero_tipo, modulo_tipo])
+        await db_session.flush()
+        tercero = WorkItem(
+            proyecto_id=project.id,
+            tipo_id=tercero_tipo.id,
+            nombre="Entrega del proveedor",
+            orden=0,
+        )
+        db_session.add(tercero)
+        await db_session.flush()
+        hijo = WorkItem(
+            proyecto_id=project.id,
+            tipo_id=modulo_tipo.id,
+            nombre="Depende del proveedor",
+            orden=0,
+            parent_id=tercero.id,
+        )
+        db_session.add(hijo)
+        await db_session.flush()
+        task = Task(
+            title="Trabajo que cuelga del tercero",
+            project_id=project.id,
+            work_item_id=hijo.id,
+            team_id=s.team.id,
+            assignee_id=s.integrante.id,
+            status=TaskStatus.PENDIENTE_POR_INICIAR,
+            requires_approval=False,
+        )
+        db_session.add(task)
+        await db_session.commit()
+
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        blocked = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert blocked.status_code == 422, blocked.text
+
+        # El tercero entrega (fecha real) → ya no bloquea.
+        tercero.fecha_fin_real = date.today()
+        await db_session.commit()
+        ok = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert ok.status_code == 201, ok.text
+
+
 class TestDeliverableWithoutApprovalAutoCompletes:
     """`requires_approval=False` (el default): entregar completa la tarea
     directo, sin pasar por el líder — ni notificación de revisión pendiente."""

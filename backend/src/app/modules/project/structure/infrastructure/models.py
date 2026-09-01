@@ -10,11 +10,13 @@ from sqlalchemy import (
     Date,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     UUID,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -58,7 +60,17 @@ class TipoNodo(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     __table_args__ = (
-        UniqueConstraint("proyecto_id", "nombre", name="uq_tipo_nodo_proyecto_nombre"),
+        # Uniqueness solo entre tipos VIVOS: un tipo borrado (soft delete) deja
+        # su fila, y sin este `where` volver a crear un tipo con ese nombre
+        # chocaba con la constraint → IntegrityError 500 (y el pre-check, que sí
+        # ignora los borrados, no lo veía venir).
+        Index(
+            "uq_tipo_nodo_proyecto_nombre",
+            "proyecto_id",
+            "nombre",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
 

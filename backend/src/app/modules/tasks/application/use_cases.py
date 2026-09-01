@@ -10,6 +10,7 @@ from app.modules.tasks.domain.services import (
     TaskDependencyService,
     TaskService,
     TaskStatusService,
+    progress_by_id,
     reschedule_task_start,
 )
 from app.modules.tasks.infrastructure.enums import TaskStatus
@@ -29,6 +30,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     CreateTeamTaskRequest,
     CreateTimeEntryRequest,
+    MyTaskItemResponse,
     SkippedElementResponse,
     TaskEffortResponse,
     TimeEntryResponse,
@@ -595,6 +597,38 @@ class GetTasksByProjectUseCase:
         return await self.service.get_tasks_by_project(project_id)
 
 
+def _blocking_by_task(deps) -> dict[UUID, list[BlockingTaskResponse]]:
+    """Agrupa dependencias FtS por `task_id` en `BlockingTaskResponse` (id +
+    título + estado), resolviendo tanto tarea→tarea como tarea→elemento. Fuente
+    única del `blocked_by` del workspace y de «Mis tareas»."""
+    blocking: dict[UUID, list[BlockingTaskResponse]] = {}
+    for dep in deps:
+        if dep.depends_on_work_item_id is not None:
+            wi = dep.depends_on_work_item
+            blocking.setdefault(dep.task_id, []).append(
+                BlockingTaskResponse(
+                    id=dep.depends_on_work_item_id,
+                    title=(wi.nombre if wi is not None else "Elemento"),
+                    status=(
+                        TaskStatus.COMPLETADA
+                        if rules.work_item_is_done(wi)
+                        else TaskStatus.PENDIENTE_POR_INICIAR
+                    ),
+                )
+            )
+            continue
+        if dep.depends_on is None:
+            continue
+        blocking.setdefault(dep.task_id, []).append(
+            BlockingTaskResponse(
+                id=dep.depends_on.id,
+                title=dep.depends_on.title,
+                status=dep.depends_on.status or TaskStatus.PENDIENTE_POR_INICIAR,
+            )
+        )
+    return blocking
+
+
 class GetTasksByTeamUseCase:
     """Tareas delegadas a un equipo (read model del espacio de trabajo).
 
@@ -607,34 +641,19 @@ class GetTasksByTeamUseCase:
 
     async def execute(self, team_id: UUID) -> list[TeamTaskItemResponse]:
         rows = await self.task_repo.get_by_team(team_id)
+        progress = progress_by_id([row[0] for row in rows])
 
-        # Dos consultas en total (tareas + dependencias), no una por tarea:
-        # agrupamos las bloqueantes por task_id antes de armar la respuesta.
-        blocking: dict[UUID, list[BlockingTaskResponse]] = {}
-        for dep in await self.task_repo.get_dependencies_by_team(team_id):
-            if dep.depends_on_work_item_id is not None:
-                wi = dep.depends_on_work_item
-                blocking.setdefault(dep.task_id, []).append(
-                    BlockingTaskResponse(
-                        id=dep.depends_on_work_item_id,
-                        title=(wi.nombre if wi is not None else "Elemento"),
-                        status=(
-                            TaskStatus.COMPLETADA
-                            if rules.work_item_is_done(wi)
-                            else TaskStatus.PENDIENTE_POR_INICIAR
-                        ),
-                    )
-                )
-                continue
-            if dep.depends_on is None:
-                continue
-            blocking.setdefault(dep.task_id, []).append(
-                BlockingTaskResponse(
-                    id=dep.depends_on.id,
-                    title=dep.depends_on.title,
-                    status=dep.depends_on.status or TaskStatus.PENDIENTE_POR_INICIAR,
-                )
+        # Dos consultas en total (tareas + dependencias), no una por tarea.
+        deps = await self.task_repo.get_dependencies_by_team(team_id)
+        blocking = _blocking_by_task(deps)
+        third_party = {
+            dep.task_id
+            for dep in deps
+            if dep.depends_on_work_item_id is not None
+            and rules.is_third_party_tipo(
+                getattr(dep.depends_on_work_item, "tipo", None)
             )
+        }
 
         return [
             TeamTaskItemResponse(
@@ -652,10 +671,91 @@ class GetTasksByTeamUseCase:
                 start_date=task.start_date,
                 due_date=task.due_date,
                 requires_approval=task.requires_approval,
+                progress_pct=progress.get(task.id, 0),
                 blocked_by=blocking.get(task.id, []),
+                depends_on_third_party=task.id in third_party,
             )
             for task, work_item_name, project_id, project_name, assignee_name in rows
         ]
+
+
+class GetMyTasksUseCase:
+    """«Mis tareas»: todo lo asignado al usuario, de cualquier proyecto, con el
+    proyecto / elemento / equipo ya resueltos para la lista."""
+
+    def __init__(self, task_repo: TaskRepository):
+        self.task_repo = task_repo
+
+    async def execute(self, user_id: UUID) -> list[MyTaskItemResponse]:
+        rows = await self.task_repo.get_assigned_to_user(user_id)
+        tasks = [row[0] for row in rows]
+        # `progress_by_id` haría el rollup si tuviéramos padre e hijas juntas,
+        # pero «Mis tareas» solo trae lo asignado a la persona. Para las padre
+        # cuyas subtareas no están en la lista se usa el avance por estado; la
+        # cifra fina del entregable vive en la vista de proyecto / equipo.
+        rollup = progress_by_id(tasks)
+
+        # Dependencias FtS de todas mis tareas en UNA consulta.
+        deps = await self.task_repo.get_dependencies_by_tasks([t.id for t in tasks])
+        deps_by_task: dict[UUID, list] = {}
+        for dep in deps:
+            deps_by_task.setdefault(dep.task_id, []).append(dep)
+        blocking = _blocking_by_task(deps)
+        third_party = {
+            dep.task_id
+            for dep in deps
+            if dep.depends_on_work_item_id is not None
+            and rules.is_third_party_tipo(
+                getattr(dep.depends_on_work_item, "tipo", None)
+            )
+        }
+
+        # Compuerta «actividad de terceros» ancestro: se camina por work_item
+        # DISTINTO, memoizado. Los árboles son poco profundos → coste acotado
+        # (K caminatas, no un N+1 sobre el nº de tareas).
+        tp_ancestor: dict[UUID, bool] = {}
+        for wi_id in {t.work_item_id for t in tasks if t.work_item_id is not None}:
+            tp_ancestor[
+                wi_id
+            ] = await self.task_repo.has_undelivered_third_party_ancestor(wi_id)
+
+        _terminal = (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
+        out: list[MyTaskItemResponse] = []
+        for task, work_item_name, project_name, team_name in rows:
+            task_deps = deps_by_task.get(task.id, [])
+            has_tp_ancestor = task.work_item_id is not None and tp_ancestor.get(
+                task.work_item_id, False
+            )
+            # El motivo de bloqueo solo tiene sentido para algo aún entregable.
+            blocked_reason = (
+                None
+                if task.status in _terminal
+                else rules.delivery_block_reason(task_deps, has_tp_ancestor)
+            )
+            out.append(
+                MyTaskItemResponse(
+                    id=task.id,
+                    title=task.title,
+                    status=task.status or TaskStatus.PENDIENTE_POR_INICIAR,
+                    priority=task.priority,
+                    project_id=task.project_id,
+                    project_name=project_name,
+                    work_item_id=task.work_item_id,
+                    work_item_name=work_item_name,
+                    team_id=task.team_id,
+                    team_name=team_name,
+                    parent_task_id=task.parent_task_id,
+                    start_date=task.start_date,
+                    due_date=task.due_date,
+                    requires_approval=task.requires_approval,
+                    progress_pct=rollup.get(task.id, 0),
+                    estimated_days=task.estimated_days,
+                    delivery_blocked_reason=blocked_reason,
+                    depends_on_third_party=task.id in third_party,
+                    blocked_by=blocking.get(task.id, []),
+                )
+            )
+        return out
 
 
 class GetTasksByWorkItemUseCase:
@@ -728,6 +828,22 @@ class UpdateTaskUseCase:
         before = snapshot(task)
         updated = await self.service.update_task(task_id, data)
         await TaskAuditor(self.task_repo, actor_id).diff(before, task)
+
+        # Movida la fecha de entrega → «la fecha fin de la dependencia es el
+        # inicio de la que depende»: empujamos en cadena a las dependientes.
+        if (
+            "due_date" in data.model_dump(exclude_unset=True)
+            and updated.due_date is not None
+        ):
+            await cascade_reschedule_dependents(
+                self.task_repo,
+                self._bus,
+                source_id=updated.id,
+                source_title=updated.title,
+                project_id=project_id or updated.project_id,
+                anchor=updated.due_date,
+                actor_id=actor_id,
+            )
 
         # Reasignación efectiva → avisar a la persona (salvo que se asigne a sí
         # misma). Cubre el hueco de `TaskCreated`, que solo dispara al crear.
@@ -1033,6 +1149,80 @@ class GetProjectTaskDependenciesUseCase:
         return await self.service.list_dependencies_by_project(project_id)
 
 
+async def cascade_reschedule_dependents(
+    task_repo: TaskRepository,
+    bus: EventBus | None,
+    *,
+    source_id: UUID,
+    source_title: str,
+    project_id: UUID,
+    anchor,
+    actor_id: UUID | None,
+    _seen: set[UUID] | None = None,
+) -> None:
+    """Cascada de fechas finish-to-start: empuja el inicio de todo lo que
+    depende de `source_id` a `anchor` (su fecha de fin), en cadena, y avisa a
+    los responsables afectados. Se dispara cuando el predecesor se completa
+    (`ChangeTaskStatusUseCase`, entrega/aprobación en el módulo de equipos) y
+    cuando le mueven la fecha de entrega (`UpdateTaskUseCase`): en todos los
+    casos «la fecha fin de la dependencia pasa a ser el inicio de la que
+    depende» y el fin de esta se recalcula con sus días estimados.
+
+    `_seen` corta ciclos de dependencias: cada tarea se reprograma una sola vez
+    por cascada.
+    """
+    if anchor is None:
+        return
+    if _seen is None:
+        _seen = set()
+    dependents = await task_repo.get_dependents(source_id)
+    if not dependents:
+        return
+
+    changed: list = []
+    for dep in dependents:
+        if dep.id in _seen:
+            continue
+        if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
+            continue
+        _seen.add(dep.id)
+        before = snapshot(dep)
+        if reschedule_task_start(dep, anchor, recompute_due_from_estimate=True):
+            await task_repo.save(dep)
+            await TaskAuditor(task_repo, actor_id).diff(before, dep)
+            changed.append(dep)
+            # En cadena: si una dependiente se movió, sus propias dependientes
+            # arrancan tras su nuevo fin.
+            if dep.due_date is not None:
+                await cascade_reschedule_dependents(
+                    task_repo,
+                    bus,
+                    source_id=dep.id,
+                    source_title=dep.title,
+                    project_id=project_id,
+                    anchor=dep.due_date,
+                    actor_id=actor_id,
+                    _seen=_seen,
+                )
+
+    if changed and bus is not None:
+        recipients = tuple(
+            {d.assignee_id for d in changed if d.assignee_id is not None}
+        )
+        await bus.publish(
+            TaskChainRescheduled(
+                project_id=project_id,
+                trigger_kind="task",
+                trigger_name=source_title,
+                new_start=anchor,
+                task_ids=tuple(d.id for d in changed),
+                recipient_ids=recipients,
+                actor_id=actor_id,
+                occurred_at=datetime.now(timezone.utc),
+            )
+        )
+
+
 class ChangeTaskStatusUseCase:
     """Cambia el estado de una tarea con el flujo:
 
@@ -1109,41 +1299,18 @@ class ChangeTaskStatusUseCase:
     async def _cascade_reschedule_dependents(
         self, completed: TaskResponse, actor_id: UUID | None
     ) -> None:
-        dependents = await self.task_repo.get_dependents(completed.id)
-        if not dependents:
-            return
         anchor = completed.due_date or (
             completed.completed_at.date() if completed.completed_at else None
         )
-        if anchor is None:
-            return
-
-        changed: list = []
-        for dep in dependents:
-            if dep.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
-                continue
-            before = snapshot(dep)
-            if reschedule_task_start(dep, anchor):
-                await self.task_repo.save(dep)
-                await TaskAuditor(self.task_repo, actor_id).diff(before, dep)
-                changed.append(dep)
-
-        if changed and self._bus is not None:
-            recipients = tuple(
-                {d.assignee_id for d in changed if d.assignee_id is not None}
-            )
-            await self._bus.publish(
-                TaskChainRescheduled(
-                    project_id=completed.project_id,
-                    trigger_kind="task",
-                    trigger_name=completed.title,
-                    new_start=anchor,
-                    task_ids=tuple(d.id for d in changed),
-                    recipient_ids=recipients,
-                    actor_id=actor_id,
-                    occurred_at=datetime.now(timezone.utc),
-                )
-            )
+        await cascade_reschedule_dependents(
+            self.task_repo,
+            self._bus,
+            source_id=completed.id,
+            source_title=completed.title,
+            project_id=completed.project_id,
+            anchor=anchor,
+            actor_id=actor_id,
+        )
 
     async def _authorize(
         self,

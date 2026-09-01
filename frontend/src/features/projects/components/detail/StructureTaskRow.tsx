@@ -7,6 +7,7 @@ import {
   ChevronUp,
   ClipboardList,
   CornerDownRight,
+  ExternalLink,
   GripVertical,
   Trash2,
   User,
@@ -14,7 +15,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_COLORS, TASK_STATUS_LABELS } from "../../types/labels";
-import { fullName, initialsOf, resolveAssignment } from "../../utils/task-assignment";
+import { TaskDurationBadge } from "../TaskDurationBadge";
+import { initialsOf, resolveAssignment } from "../../utils/task-assignment";
 import { formatDateRange, isOverdue } from "../../utils/task-dates";
 import {
   dropAfterId,
@@ -40,6 +42,9 @@ interface StructureTaskTreeProps extends TaskRowCallbacks {
   allTasks: Task[];
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
+  /** El elemento del que cuelgan estas tareas es una «actividad de terceros»:
+   * el responsable del trabajo es el tercero, no un integrante ni un equipo. */
+  isThirdParty?: boolean;
   depth?: number;
 }
 
@@ -57,6 +62,7 @@ export function StructureTaskTree({
   allTasks,
   memberById,
   teamById,
+  isThirdParty = false,
   depth = 0,
   onOpen,
   onDelete,
@@ -72,6 +78,7 @@ export function StructureTaskTree({
           allTasks={allTasks}
           memberById={memberById}
           teamById={teamById}
+          isThirdParty={isThirdParty}
           onOpen={onOpen}
           onDelete={onDelete}
           onReorder={onReorder}
@@ -87,6 +94,7 @@ function StructureTaskRow({
   allTasks,
   memberById,
   teamById,
+  isThirdParty = false,
   onOpen,
   onDelete,
   onReorder,
@@ -96,9 +104,10 @@ function StructureTaskRow({
   allTasks: Task[];
   memberById: Map<string, ProjectMember>;
   teamById: Map<string, Team>;
+  isThirdParty?: boolean;
 } & TaskRowCallbacks) {
   const { task, children } = node;
-  const { person, team, label } = resolveAssignment(task, memberById, teamById);
+  const { person, assigneeName, team, kind } = resolveAssignment(task, memberById, teamById);
   const late = isOverdue(task);
   const done = task.status === "completada";
   const isSubtask = Boolean(task.parent_task_id);
@@ -249,33 +258,68 @@ function StructureTaskRow({
             {task.title}
           </span>
 
-          {person && (
+          {task.depends_on_third_party && (
             <span
-              className="flex shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal"
-              title={`Responsable: ${fullName(person)}`}
+              className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              title="Depende de una actividad de terceros"
             >
-              <span className="flex size-4 items-center justify-center rounded-full bg-brand-teal/25 text-[8px] font-bold">
-                {initialsOf(person)}
-              </span>
-              <span className="max-w-[120px] truncate">{fullName(person)}</span>
-            </span>
-          )}
-          {team && (
-            <span
-              className="flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
-              title={`Equipo asignado: ${team.name}`}
-            >
-              <UsersRound className="size-2.5" />
-              <span className="max-w-[120px] truncate">{team.name}</span>
-            </span>
-          )}
-          {!person && !team && (
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              <User className="size-2.5" /> {label}
+              <ExternalLink className="size-2.5" />
+              Depende de terceros
             </span>
           )}
 
+          {isThirdParty ? (
+            /* El elemento es una «actividad de terceros»: el responsable es el
+               proveedor externo, no un integrante ni un equipo. */
+            <span
+              className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              title="Responsable externo (actividad de terceros)"
+            >
+              <ExternalLink className="size-2.5" />
+              Responsable externo
+            </span>
+          ) : (
+            <>
+              {assigneeName && (
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal"
+                  title={`Responsable: ${assigneeName}`}
+                >
+                  {person ? (
+                    <span className="flex size-4 items-center justify-center rounded-full bg-brand-teal/25 text-[8px] font-bold">
+                      {initialsOf(person)}
+                    </span>
+                  ) : (
+                    <User className="ml-0.5 size-2.5" />
+                  )}
+                  <span className="max-w-[120px] truncate">{assigneeName}</span>
+                  {/* Persona sin equipo: es una tarea individual suya. */}
+                  {kind === "person" && <span className="opacity-70">· individual</span>}
+                </span>
+              )}
+              {team && (
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                  title={
+                    kind === "member"
+                      ? `Asignada a ${assigneeName ?? "un integrante"} del equipo ${team.name}`
+                      : `Bolsa del equipo ${team.name} (el líder reparte)`
+                  }
+                >
+                  <UsersRound className="size-2.5" />
+                  <span className="max-w-[120px] truncate">{team.name}</span>
+                </span>
+              )}
+              {!assigneeName && !team && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <User className="size-2.5" /> Sin asignar
+                </span>
+              )}
+            </>
+          )}
+
           <span className="ml-auto flex shrink-0 items-center gap-3">
+            <TaskDurationBadge days={task.estimated_days} />
             <span
               className={cn(
                 "hidden items-center gap-1 text-[11px] tabular-nums sm:flex",

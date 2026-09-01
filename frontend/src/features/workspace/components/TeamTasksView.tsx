@@ -2,17 +2,22 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
   CornerDownRight,
+  ExternalLink,
+  Filter,
   FolderKanban,
   History,
   LayoutGrid,
   List,
   ListTodo,
+  PackageCheck,
   Pencil,
   Plus,
   Trash2,
+  UploadCloud,
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +55,7 @@ import { TeamTaskFilterBar } from "./TeamTaskFilterBar";
 import {
   DEFAULT_TEAM_TASK_FILTERS,
   EMPTY_TEAM_TASK_FILTERS,
+  UNASSIGNED,
   filterTeamTasks,
   type TeamTaskFilters,
 } from "../utils/team-task-filters";
@@ -100,7 +106,9 @@ function Avatar({ member, name }: { member?: WorkspaceMember; name: string }) {
 }
 
 function ProgressBar({ task, className }: { task: ApiTeamTask; className?: string }) {
-  const pct = taskProgressPct(task.status);
+  // El backend ya calcula el avance (promedio de subtareas para las tareas
+  // padre); `taskProgressPct` queda como respaldo por si la respuesta es vieja.
+  const pct = task.progress_pct ?? taskProgressPct(task.status);
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -113,6 +121,81 @@ function ProgressBar({ task, className }: { task: ApiTeamTask; className?: strin
         {pct}%
       </span>
     </div>
+  );
+}
+
+/** Una tarea padre es un entregable: cuando su avance llega al 100% (todas las
+ *  subtareas hechas y, si hacía falta, ya aprobada) queda lista para entregarse
+ *  como tal. Las subtareas nunca son entregables. */
+function isDeliverableReady(task: ApiTeamTask): boolean {
+  return (
+    task.parent_task_id === null &&
+    (task.progress_pct ?? 0) >= 100 &&
+    task.status !== "completada" &&
+    task.status !== "cancelada"
+  );
+}
+
+function DeliverableReadyBadge() {
+  return (
+    <span
+      title="Todas las subtareas están hechas: esta tarea ya se puede entregar como entregable."
+      className="flex shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-1.5 py-0.5 text-[10px] font-bold text-brand-teal-dark dark:text-brand-teal"
+    >
+      <PackageCheck className="size-3" />
+      Entregable listo
+    </span>
+  );
+}
+
+interface DeliverCbs {
+  /** Abre "Nuevo entregable" precargado con esta tarea (entrega con adjunto). */
+  onDeliver?: (task: ApiTeamTask) => void;
+  /** Crea el entregable + una versión "sin adjunto" y lo manda a revisión. */
+  onMarkDelivered?: (task: ApiTeamTask) => void;
+  /** La tarea es del usuario y aún no tiene entregable: puede entregarla. */
+  canDeliverTask?: (task: ApiTeamTask) => boolean;
+}
+
+/**
+ * Acciones de entrega de una tarea PADRE ya al 100%: es el entregable, y su
+ * responsable lo entrega aquí mismo. Reusa el flujo de la pestaña Entregables
+ * (mismo modal, misma aprobación). No aparece en subtareas ni para quien no es
+ * el responsable (ese solo ve el badge).
+ */
+function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
+  if (!isDeliverableReady(task) || !(cbs.canDeliverTask?.(task) ?? false)) {
+    return null;
+  }
+  return (
+    <>
+      {cbs.onDeliver && (
+        <button
+          type="button"
+          onClick={() => {
+            cbs.onDeliver?.(task);
+          }}
+          title="Entregar con un adjunto (crea un entregable revisable)"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1 text-[11px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
+        >
+          <UploadCloud className="size-3.5" />
+          Entregar
+        </button>
+      )}
+      {cbs.onMarkDelivered && (
+        <button
+          type="button"
+          onClick={() => {
+            cbs.onMarkDelivered?.(task);
+          }}
+          title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          <Check className="size-3.5" />
+          Sin adjunto
+        </button>
+      )}
+    </>
   );
 }
 
@@ -149,6 +232,22 @@ function UrgencyBadge({ task }: { task: ApiTeamTask }) {
  * así que va en un contenedor `min-w-0` con `truncate` y su texto completo en
  * el `title`: nunca empuja ni se superpone a las columnas vecinas.
  */
+/** Etiqueta "Depende de terceros": solo cuando la tarea tiene una dependencia
+ * FtS hacia una «actividad de terceros». */
+function ThirdPartyDepBadge({ task }: { task: ApiTeamTask }) {
+  if (!task.depends_on_third_party) {
+    return null;
+  }
+  return (
+    <span
+      title="Depende de una actividad de terceros"
+      className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+    >
+      <ExternalLink className="size-2.5" /> Depende de terceros
+    </span>
+  );
+}
+
 function BlockedBy({ task }: { task: ApiTeamTask }) {
   const blockers = activeBlockers(task);
   if (blockers.length === 0) {
@@ -212,6 +311,7 @@ function TaskRow({
   projectId,
   teamMembers,
   pathOf,
+  hideAssignee,
   hasChildren,
   collapsed,
   onToggleCollapse,
@@ -219,6 +319,7 @@ function TaskRow({
   onReassigned,
   onEdit,
   onDelete,
+  deliverCbs,
 }: {
   row: TaskTreeRow;
   today: string;
@@ -226,6 +327,8 @@ function TaskRow({
   projectId: string;
   teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
+  /** La vista ya está agrupada/filtrada por persona: no repetir el nombre. */
+  hideAssignee: boolean;
   /** La tarea tiene subtareas: se muestra el chevron para ocultarlas/verlas. */
   hasChildren: boolean;
   collapsed: boolean;
@@ -234,6 +337,7 @@ function TaskRow({
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
 }) {
   const { task, depth, detachedParentTitle } = row;
   return (
@@ -280,6 +384,7 @@ function TaskRow({
               subtareas ocultas
             </span>
           )}
+          {isDeliverableReady(task) && <DeliverableReadyBadge />}
         </p>
         <p className="truncate text-[11px] text-slate-400 dark:text-slate-500">
           {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
@@ -291,26 +396,44 @@ function TaskRow({
           )}
           <Crumb path={pathOf(task)} /> · {task.project_name}
         </p>
+        <ThirdPartyDepBadge task={task} />
         <BlockedBy task={task} />
       </div>
 
-      {/* Responsable: para el líder/supervisor es un selector (asignar o
-          reasignar la tarea del equipo aquí mismo); para el resto, el nombre. */}
-      <span className="w-[150px] shrink-0">
-        {canReview && teamMembers.length > 0 ? (
-          <ReassignTaskButton
-            projectId={projectId}
-            taskId={task.id}
-            currentAssigneeId={task.assignee_id}
-            members={teamMembers}
-            onDone={onReassigned}
-          />
-        ) : (
-          <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
-            {task.assignee_name ?? "Sin responsable"}
+      {/* Responsable. Cuando la vista ya va agrupada o filtrada por persona el
+          nombre es redundante: se oculta (y para el líder queda solo el icono
+          de reasignar). Si no, líder/supervisor ven el selector; el resto, el
+          nombre. */}
+      {hideAssignee ? (
+        canReview && teamMembers.length > 0 ? (
+          <span className="flex w-[150px] shrink-0 justify-start">
+            <ReassignTaskButton
+              compact
+              projectId={projectId}
+              taskId={task.id}
+              currentAssigneeId={task.assignee_id}
+              members={teamMembers}
+              onDone={onReassigned}
+            />
           </span>
-        )}
-      </span>
+        ) : null
+      ) : (
+        <span className="w-[150px] shrink-0">
+          {canReview && teamMembers.length > 0 ? (
+            <ReassignTaskButton
+              projectId={projectId}
+              taskId={task.id}
+              currentAssigneeId={task.assignee_id}
+              members={teamMembers}
+              onDone={onReassigned}
+            />
+          ) : (
+            <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
+              {task.assignee_name ?? "Sin responsable"}
+            </span>
+          )}
+        </span>
+      )}
 
       {/* Anchos fijos: las columnas quedan alineadas entre filas y grupos. */}
       <ProgressBar task={task} className="w-[120px] shrink-0" />
@@ -326,6 +449,9 @@ function TaskRow({
 
       {/* "Comenzar": solo lo ve el responsable en su propia tarea sin iniciar. */}
       <StartTaskButton task={task} projectId={projectId} />
+
+      {/* "Entregar": tarea padre al 100%, solo para su responsable. */}
+      <DeliverActions task={task} cbs={deliverCbs} />
 
       {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
           eliminar (cualquier nivel — la tarea sigue siendo de SU equipo). */}
@@ -384,10 +510,12 @@ function ListView({
   projectId,
   teamMembers,
   pathOf,
+  hideAssignee,
   onAddSubtask,
   onReassigned,
   onEdit,
   onDelete,
+  deliverCbs,
 }: {
   groups: ReturnType<typeof groupTeamTasks>;
   /** Todas las del equipo: resuelven el título de un padre fuera del grupo. */
@@ -399,10 +527,12 @@ function ListView({
   projectId: string;
   teamMembers: ApiTeamMember[];
   pathOf: (task: ApiTeamTask) => string[];
+  hideAssignee: boolean;
   onAddSubtask: (task: ApiTeamTask) => void;
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
 }) {
   // Subtareas plegables por tarea padre (por defecto visibles). El estado vive
   // aquí: se reinicia al salir de la vista Lista, que es lo esperable.
@@ -460,6 +590,7 @@ function ListView({
                     projectId={projectId}
                     teamMembers={teamMembers}
                     pathOf={pathOf}
+                    hideAssignee={hideAssignee}
                     hasChildren={childIds.has(row.task.id)}
                     collapsed={collapsed.has(row.task.id)}
                     onToggleCollapse={() => {
@@ -477,6 +608,7 @@ function ListView({
                     onReassigned={onReassigned}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    deliverCbs={deliverCbs}
                   />
                 ))}
               </div>
@@ -498,9 +630,11 @@ function TaskCard({
   canReview,
   projectId,
   teamMembers,
+  hideAssignee,
   onReassigned,
   onEdit,
   onDelete,
+  deliverCbs,
 }: {
   task: ApiTeamTask;
   /** Título del padre cuando la tarjeta es una subtarea. */
@@ -511,9 +645,11 @@ function TaskCard({
   canReview: boolean;
   projectId: string;
   teamMembers: ApiTeamMember[];
+  hideAssignee: boolean;
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
@@ -570,22 +706,34 @@ function TaskCard({
         <Crumb path={path} />
       </p>
 
+      {isDeliverableReady(task) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <DeliverableReadyBadge />
+          <DeliverActions task={task} cbs={deliverCbs} />
+        </div>
+      )}
+      <ThirdPartyDepBadge task={task} />
       <BlockedBy task={task} />
       <ProgressBar task={task} className="mt-2.5" />
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Avatar member={member} name={task.assignee_name ?? "Sin responsable"} />
-          <span className="truncate text-[11px] text-slate-400 dark:text-slate-500">
-            {task.assignee_name ?? "Sin responsable"}
-          </span>
-        </div>
+        {hideAssignee ? (
+          <span />
+        ) : (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Avatar member={member} name={task.assignee_name ?? "Sin responsable"} />
+            <span className="truncate text-[11px] text-slate-400 dark:text-slate-500">
+              {task.assignee_name ?? "Sin responsable"}
+            </span>
+          </div>
+        )}
         <DueDate task={task} today={today} />
       </div>
 
       {canReview && teamMembers.length > 0 && (
         <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
           <ReassignTaskButton
+            compact={hideAssignee}
             projectId={projectId}
             taskId={task.id}
             currentAssigneeId={task.assignee_id}
@@ -606,9 +754,11 @@ function KanbanView({
   canReview,
   projectId,
   teamMembers,
+  hideAssignee,
   onReassigned,
   onEdit,
   onDelete,
+  deliverCbs,
 }: {
   allTasks: ApiTeamTask[];
   members: WorkspaceMember[];
@@ -617,9 +767,11 @@ function KanbanView({
   canReview: boolean;
   projectId: string;
   teamMembers: ApiTeamMember[];
+  hideAssignee: boolean;
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
 }) {
   const titleById = new Map(allTasks.map((t) => [t.id, t.title]));
   // Columnas de estado + una lane «En riesgo» (roja) al frente con las abiertas
@@ -681,9 +833,11 @@ function KanbanView({
                   canReview={canReview}
                   projectId={projectId}
                   teamMembers={teamMembers}
+                  hideAssignee={hideAssignee}
                   onReassigned={onReassigned}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  deliverCbs={deliverCbs}
                 />
               ))
             )}
@@ -751,6 +905,12 @@ interface TeamTasksViewProps {
   members: WorkspaceMember[];
   /** Integrantes en crudo (con `user_id`): los usa el líder para reasignar. */
   teamMembers: ApiTeamMember[];
+  /** Entrega de una tarea padre al 100% (reusa el flujo de la pestaña
+   *  Entregables). Sin estas props, solo se muestra el badge "Entregable listo". */
+  onDeliver?: (task: ApiTeamTask) => void;
+  onMarkDelivered?: (task: ApiTeamTask) => void;
+  /** La tarea es del usuario y aún no tiene entregable vinculado. */
+  canDeliverTask?: (task: ApiTeamTask) => boolean;
 }
 
 /**
@@ -759,7 +919,16 @@ interface TeamTasksViewProps {
  * bloqueos— sale del modelo de tareas del proyecto: es la MISMA tarea que ven
  * el cronograma y la trazabilidad, no una copia del equipo.
  */
-export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamTasksViewProps) {
+export function TeamTasksView({
+  teamId,
+  projectId,
+  members,
+  teamMembers,
+  onDeliver,
+  onMarkDelivered,
+  canDeliverTask,
+}: TeamTasksViewProps) {
+  const deliverCbs: DeliverCbs = { onDeliver, onMarkDelivered, canDeliverTask };
   const query = useTeamTasks(teamId);
   const accessQuery = useWorkspaceAccess(teamId);
   const canReview = accessQuery.data?.can_review ?? false;
@@ -796,6 +965,20 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
   // dentro de columnas de estado no tendría dónde ir.
   const effectiveGrouping: TaskGrouping = view === "lista" ? grouping : "estado";
+  // El nombre del responsable sobra cuando la vista ya está acotada a una
+  // persona: agrupada por integrante, o filtrada a un responsable concreto.
+  const hideAssignee =
+    effectiveGrouping === "integrante" ||
+    (filters.assignee !== "all" && filters.assignee !== UNASSIGNED);
+  // Vista recién abierta en la bolsa del equipo (solo «sin asignar») y esa
+  // bolsa está vacía: no dejamos la pantalla en blanco, invitamos a filtrar.
+  const emptyBag =
+    tasks.length === 0 &&
+    allTasks.length > 0 &&
+    filters.assignee === UNASSIGNED &&
+    filters.status === "all" &&
+    filters.text.trim() === "" &&
+    !filters.onlyBlocked;
   const groups = useMemo(
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
@@ -897,7 +1080,34 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
       {/* `relative` + hijos `absolute inset-0`: el scroll interno funciona sin
           depender de que `h-full` en cadena resuelva contra un alto definido. */}
       <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
-        {view === "lista" && (
+        {showFilterBar && emptyBag && (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                <Filter className="size-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  No hay tareas sin asignar
+                </p>
+                <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
+                  Todo el trabajo de este equipo ya está repartido. Usa los filtros de arriba —por
+                  integrante o por estado— para ver las tareas en curso.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters(EMPTY_TEAM_TASK_FILTERS);
+                }}
+                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+              >
+                Ver todas las tareas
+              </button>
+            </div>
+          </div>
+        )}
+        {view === "lista" && !emptyBag && (
           <ListView
             groups={groups}
             allTasks={tasks}
@@ -908,6 +1118,7 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             projectId={projectId}
             teamMembers={teamMembers}
             pathOf={pathOf}
+            hideAssignee={hideAssignee}
             onAddSubtask={setSubtaskParent}
             onReassigned={onReassigned}
             onEdit={setEditingTask}
@@ -915,9 +1126,10 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
               setDeleteError(null);
               setDeletingTask(task);
             }}
+            deliverCbs={deliverCbs}
           />
         )}
-        {view === "kanban" && (
+        {view === "kanban" && !emptyBag && (
           <KanbanView
             allTasks={tasks}
             members={members}
@@ -926,12 +1138,14 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
             canReview={canReview}
             projectId={projectId}
             teamMembers={teamMembers}
+            hideAssignee={hideAssignee}
             onReassigned={onReassigned}
             onEdit={setEditingTask}
             onDelete={(task) => {
               setDeleteError(null);
               setDeletingTask(task);
             }}
+            deliverCbs={deliverCbs}
           />
         )}
         {view === "trazabilidad" && (
@@ -945,6 +1159,7 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
         <NewSubtaskModal
           teamId={teamId}
           parent={subtaskParent}
+          siblings={allTasks.filter((t) => t.parent_task_id === subtaskParent.id)}
           onClose={() => {
             setSubtaskParent(null);
           }}
@@ -966,6 +1181,13 @@ export function TeamTasksView({ teamId, projectId, members, teamMembers }: TeamT
           projectId={projectId}
           task={editingTask}
           teamMembers={teamMembers}
+          siblings={
+            editingTask.parent_task_id === null
+              ? []
+              : allTasks.filter(
+                  (t) => t.parent_task_id === editingTask.parent_task_id && t.id !== editingTask.id,
+                )
+          }
           onClose={() => {
             setEditingTask(null);
           }}

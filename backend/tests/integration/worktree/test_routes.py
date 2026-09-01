@@ -61,6 +61,27 @@ class TestNodeTypeRoutes:
         )
         assert dup.status_code == 409
 
+    async def test_can_reuse_the_name_of_a_deleted_node_type(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """Borrar un tipo es soft delete; su nombre debe quedar libre otra vez
+        (antes el INSERT chocaba con la unique constraint → 500)."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+
+        deleted = await client.delete(
+            f"/api/v1/node-types/{tipo_id}", headers=admin_headers
+        )
+        assert deleted.status_code == 204
+
+        recreated = await client.post(
+            f"/api/v1/projects/{project_id}/node-types",
+            json={"nombre": "Módulo"},
+            headers=admin_headers,
+        )
+        assert recreated.status_code == 201, recreated.text
+        assert recreated.json()["id"] != tipo_id
+
 
 class TestWorkItemTreeRoutes:
     async def test_unicafam_hierarchy(
@@ -292,13 +313,16 @@ class TestDependencyRoutes:
         )
         assert removed.status_code == 204
 
-        # Sin predecesor ni padre, "solo duración" se ancla al inicio del
-        # proyecto (2026-08-01 + 3 días).
+        # Sin predecesor ni padre, "solo duración" (3 días) se ancla al inicio
+        # del proyecto — que `valid_project_payload` fija en `hoy - 30 días`.
+        from datetime import date, timedelta
+
+        project_start = date.today() - timedelta(days=30)
         item = (
             await client.get(f"/api/v1/work-items/{succ['id']}", headers=admin_headers)
         ).json()
-        assert item["fecha_inicio_plan"] == "2026-08-01"
-        assert item["fecha_fin_plan"] == "2026-08-04"
+        assert item["fecha_inicio_plan"] == project_start.isoformat()
+        assert item["fecha_fin_plan"] == (project_start + timedelta(days=3)).isoformat()
 
 
 class TestThirdPartyGate:

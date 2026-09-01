@@ -160,10 +160,10 @@ async def change_team_member_role(
     user_id: UUID,
     data: ChangeTeamRoleRequest,
     repo=Depends(team_repo_dependency),
-    current_user=Depends(_admin),
+    current_user=Depends(_reader),
 ):
     return await ChangeTeamMemberRoleUseCase(repo).execute(
-        project_id, team_id, user_id, data.team_role
+        project_id, team_id, user_id, data.team_role, actor=current_user
     )
 
 
@@ -176,9 +176,11 @@ async def remove_team_member(
     team_id: UUID,
     user_id: UUID,
     repo=Depends(team_repo_dependency),
-    current_user=Depends(_admin),
+    current_user=Depends(_reader),
 ):
-    await RemoveTeamMemberUseCase(repo).execute(project_id, team_id, user_id)
+    await RemoveTeamMemberUseCase(repo).execute(
+        project_id, team_id, user_id, actor=current_user
+    )
 
 
 # ── Invitaciones ─────────────────────────────────────────────────────────────

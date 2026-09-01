@@ -139,13 +139,10 @@ class CreateTaskRequest(TaskBase):
             raise ValueError("Indica el proyecto o el elemento de la estructura")
         return self
 
-    @model_validator(mode="after")
-    def assignee_or_team_exclusive(self) -> "CreateTaskRequest":
-        # Una tarea se delega a UNA persona O a UN equipo, nunca a ambos: si va a
-        # un equipo, es el líder quien reparte subtareas entre sus integrantes.
-        if self.assignee_id is not None and self.team_id is not None:
-            raise ValueError("Asigna la tarea a una persona o a un equipo, no a ambos")
-        return self
+    # `assignee_id` + `team_id` juntos SÍ es válido: es "asignar directamente a un
+    # integrante del equipo" (la tarea es del equipo pero ya tiene responsable,
+    # sin que el líder tenga que repartirla). Solo `team_id` = va a la bolsa del
+    # equipo; solo `assignee_id` = tarea individual; ninguno = sin asignar.
 
 
 class CreateTeamTaskRequest(BaseModelConfig):
@@ -205,9 +202,22 @@ class TaskResponse(TaskBase):
     completed_at: Optional[datetime] = None
     created_at: datetime = datetime.today()
     updated_at: Optional[datetime] = None
+    # Nombre del responsable, resuelto en lectura cuando la consulta lo trae
+    # (listados de proyecto / elemento). La estructura lo usa para el chip del
+    # responsable aunque la persona no figure entre los integrantes DIRECTOS
+    # del proyecto (p. ej. es integrante de un equipo). `None` = sin responsable
+    # o no resuelto en esta ruta.
+    assignee_name: Optional[str] = None
     # Días realmente dedicados (suma de los apuntes). Se calcula en lectura;
     # 0 cuando nadie ha registrado nada todavía.
     logged_days: Decimal = Decimal("0")
+    # Avance 0-100. Sin subtareas: por estado. Con subtareas: promedio del
+    # avance de las subtareas, sin llegar a 100 hasta que el entregable padre
+    # se aprueba. Se calcula en lectura (rollup de las hojas hacia arriba).
+    progress_pct: int = 0
+    # True solo si la tarea depende (FtS) de una «actividad de terceros». La
+    # estructura muestra la etiqueta "Depende de terceros".
+    depends_on_third_party: bool = False
 
 
 class CreateTimeEntryRequest(BaseModelConfig):
@@ -292,12 +302,8 @@ class UpdateTaskRequest(BaseModelConfig):
     estimated_days: Optional[Annotated[Decimal, Field(ge=0, le=9999)]] = None
     requires_approval: Optional[bool] = None
 
-    @model_validator(mode="after")
-    def assignee_or_team_exclusive(self) -> "UpdateTaskRequest":
-        # Coherencia persona/equipo: no se pueden fijar ambos en el mismo cambio.
-        if self.assignee_id is not None and self.team_id is not None:
-            raise ValueError("Asigna la tarea a una persona o a un equipo, no a ambos")
-        return self
+    # Fijar `assignee_id` y `team_id` a la vez es válido: "asignar directamente a
+    # un integrante" (tarea del equipo con responsable, sin repartir del líder).
 
 
 class BlockingTaskResponse(BaseModelConfig):
@@ -333,8 +339,53 @@ class TeamTaskItemResponse(BaseModelConfig):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     requires_approval: bool = False
+    # Avance 0-100. Con subtareas: promedio del avance de sus subtareas (una
+    # tarea padre es un entregable y no llega a 100 hasta aprobarse). Sin
+    # subtareas: por estado.
+    progress_pct: int = 0
     # Dependencias finish-to-start ya resueltas a título: la vista de equipo
     # necesita mostrar el bloqueo sin pedir /tasks/{id}/dependencies por fila.
+    blocked_by: list[BlockingTaskResponse] = []
+    # True solo si la tarea depende (FtS) de una «actividad de terceros».
+    depends_on_third_party: bool = False
+
+
+class MyTaskItemResponse(BaseModelConfig):
+    """Una tarea asignada al usuario autenticado, en cualquier proyecto ("Mis
+    tareas"). Trae proyecto, elemento y equipo ya resueltos; la UI calcula el
+    aviso de vencimiento a partir de `due_date` + `status`.
+
+    `team_id` presente = la tarea es de un equipo (se entrega por el espacio de
+    ese equipo); ausente = tarea individual (se entrega por «Mis entregas»).
+    """
+
+    id: UUID
+    title: str
+    status: TaskStatus
+    priority: TaskPriority
+    project_id: UUID
+    project_name: str
+    work_item_id: Optional[UUID] = None
+    work_item_name: Optional[str] = None
+    team_id: Optional[UUID] = None
+    team_name: Optional[str] = None
+    parent_task_id: Optional[UUID] = None
+    start_date: Optional[date] = None
+    due_date: Optional[date] = None
+    requires_approval: bool = False
+    # Avance 0-100 (mismo cálculo que en el resto de vistas).
+    progress_pct: int = 0
+    # Días estimados de trabajo (los que fijan el fin al resolverse una
+    # dependencia). La UI los pinta como pill de duración.
+    estimated_days: Optional[Decimal] = None
+    # Motivo por el que NO se puede entregar todavía (dependencia FtS incompleta
+    # o actividad de terceros ancestro sin entregar), o None si se puede. Mismo
+    # texto que el 422 del servidor: la UI desactiva el botón "Entregar" con él.
+    delivery_blocked_reason: Optional[str] = None
+    # True solo si la tarea depende (FtS) de una «actividad de terceros»: la UI
+    # muestra la etiqueta "Depende de terceros".
+    depends_on_third_party: bool = False
+    # Dependencias FtS ya resueltas a título (misma forma que la vista de equipo).
     blocked_by: list[BlockingTaskResponse] = []
 
 

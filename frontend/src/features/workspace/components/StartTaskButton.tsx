@@ -24,6 +24,25 @@ export function StartTaskButton({ task, projectId }: { task: ApiTeamTask; projec
     return null;
   }
 
+  // Bloqueada por una dependencia FtS aún abierta: el backend rechazaría el
+  // cambio, así que aquí lo deshabilitamos y explicamos por qué.
+  const blockers = task.blocked_by.filter((b) => b.status !== "completada");
+  const blocked = blockers.length > 0;
+
+  if (blocked) {
+    return (
+      <span
+        title={`No puedes comenzar: falta completar ${blockers
+          .map((b) => `«${b.title}»`)
+          .join(", ")}`}
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300/50 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
+      >
+        <Play className="size-3.5" />
+        Bloqueada
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"

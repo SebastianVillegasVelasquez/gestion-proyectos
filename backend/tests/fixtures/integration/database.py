@@ -30,6 +30,10 @@ async def setup_test_database():
     os.environ["DATABASE_NAME"] = "db_test"
     os.environ["DATABASE_USER"] = "postgres"
     os.environ["DATABASE_PASSWORD"] = "postgres"
+    # Ningún test debe tocar un proveedor de correo real: se fuerza el adaptador
+    # de solo-log (los tests que comprueban el envío ya inyectan su propio espía).
+    os.environ["EMAIL_PROVIDER"] = "log"
+    os.environ.pop("RESEND_API_KEY", None)
 
     get_settings.cache_clear()
 

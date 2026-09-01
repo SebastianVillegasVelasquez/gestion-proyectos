@@ -144,6 +144,55 @@ class TestTeamTasks:
         # La bloqueante no se ve bloqueada a sí misma.
         assert by_id[guion_id]["blocked_by"] == []
 
+    async def test_assign_directly_to_a_team_member_on_create(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """Se puede crear la tarea con equipo Y responsable a la vez: va directa
+        al integrante, sin que el líder tenga que repartirla."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_id = await _create_team(client, admin_headers, project_id)
+        member = (
+            await client.post(
+                "/api/v1/identity/users",
+                headers=admin_headers,
+                json={
+                    "email": "direct-member@test.com",
+                    "password": "password123",
+                    "name": "Dina",
+                    "last_name": "Recta",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+            )
+        ).json()
+        await _add_project_member(client, admin_headers, project_id, member["id"])
+        await client.post(
+            f"/api/v1/projects/{project_id}/teams/{team_id}/members",
+            headers=admin_headers,
+            json={"user_id": member["id"], "team_role": "integrante"},
+        )
+
+        created = await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={
+                "title": "Pieza asignada directa",
+                "project_id": project_id,
+                "team_id": team_id,
+                "assignee_id": member["id"],
+            },
+        )
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["team_id"] == team_id
+        assert body["assignee_id"] == member["id"]
+
+        # Aparece en la bolsa del equipo, ya con responsable.
+        items = (
+            await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+        ).json()
+        assert [(i["assignee_id"]) for i in items] == [member["id"]]
+
     async def test_task_without_team_is_not_listed(
         self, client, admin_headers, valid_project_payload
     ):

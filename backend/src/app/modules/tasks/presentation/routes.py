@@ -33,6 +33,7 @@ from app.modules.tasks.application.use_cases import (
     GetProjectTaskDependenciesUseCase,
     GetTaskByIdUseCase,
     GetTaskDependenciesUseCase,
+    GetMyTasksUseCase,
     GetTasksByProjectUseCase,
     GetTasksByTeamUseCase,
     GetTasksByWorkItemUseCase,
@@ -52,6 +53,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTaskRequest,
     CreateTeamTaskRequest,
     CreateTimeEntryRequest,
+    MyTaskItemResponse,
     TaskEffortResponse,
     TimeEntryResponse,
     TaskDependencyResponse,
@@ -288,6 +290,17 @@ async def get_work_item_tasks(
     return await GetTasksByWorkItemUseCase(task_repo, work_tree_repo).execute(
         work_item_id
     )
+
+
+@router.get("/me/tasks", response_model=list[MyTaskItemResponse])
+async def get_my_tasks(
+    current_user=Depends(get_current_user),
+    task_repo=Depends(task_repo_dependency),
+):
+    """«Mis tareas»: todo lo asignado al usuario autenticado, de cualquier
+    proyecto, con proyecto / elemento / equipo resueltos. La UI marca ahí el
+    aviso de vencimiento y enruta la entrega (equipo o individual)."""
+    return await GetMyTasksUseCase(task_repo).execute(current_user.id)
 
 
 @router.get("/teams/{team_id}/tasks", response_model=list[TeamTaskItemResponse])

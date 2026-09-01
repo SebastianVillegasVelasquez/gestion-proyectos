@@ -56,12 +56,21 @@ class Settings(BaseSettings):
     SEBASTIAN_PASSWORD: str = ""
 
     # ── Email ───────────────────────────────────
+    # Proveedor de envío: "resend" (producción), "smtp" (legado) o "log"
+    # (no envía, solo registra). Si al proveedor elegido le faltan credenciales
+    # se degrada a "log" automáticamente.
+    EMAIL_PROVIDER: str = "resend"
+    # API key de Resend. NUNCA se commitea: va en el .env de producción y como
+    # secret en GitHub Actions. Vacía → el envío se degrada a solo-log.
+    RESEND_API_KEY: str = ""
+    # Remitente. El dominio bitacora.objdigital.com.co está verificado en Resend.
+    EMAIL_FROM: str = "Bitácora OBJ <no-reply@bitacora.objdigital.com.co>"
+    # SMTP directo — LEGADO. Solo se usa si EMAIL_PROVIDER=smtp.
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_TLS: bool = True
-    EMAIL_FROM: str = "OBJ Digital <no-reply@objdigital.com>"
     # URL pública del frontend: se usa para construir los enlaces "abrir tarea",
     # "revisar entrega", etc. y el logo dentro de los correos. Sin barra final.
     # Por defecto apunta a producción: los clientes de correo bloquean/omiten
