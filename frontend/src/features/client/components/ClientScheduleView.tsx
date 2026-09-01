@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, Crosshair, GanttChartSquare, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  Crosshair,
+  Download,
+  GanttChartSquare,
+  Search,
+  Tag,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tipoStyle, type TipoStyle } from "@/features/projects/utils/tipo-style";
+import { downloadScheduleHtml, type ScheduleExportRow } from "../utils/schedule-html-export";
 import {
   computeRange,
   padRange,
@@ -14,12 +24,7 @@ import {
   type TickUnit,
 } from "@/features/projects/gantt/timeline";
 import { isOverdue } from "@/features/projects/gantt/metrics";
-import {
-  STATUS_BAR_COLOR,
-  STATUS_BAR_SOFT,
-  STATUS_DOT,
-  TASK_STATUS_LABELS,
-} from "@/features/projects/gantt/types";
+import { STATUS_DOT, TASK_STATUS_LABELS } from "@/features/projects/gantt/types";
 import type { TaskStatus } from "@/features/projects/types/api.types";
 import type { PublicProjectSchedule, PublicScheduleItem } from "../api/portal.api";
 
@@ -28,15 +33,17 @@ import type { PublicProjectSchedule, PublicScheduleItem } from "../api/portal.ap
 // componente/entregable), nunca una tarea ni una subtarea; no hay columnas de
 // personas.
 const LABEL_W = 260;
-const MIN_TRACK = 480;
+// Pista de tiempo más ancha que el cronograma interno: el portal es una sola
+// pantalla sin barra lateral, así que puede (y debe) respirar horizontalmente.
+const MIN_TRACK = 640;
 const ROW_H = 36;
 // Sangría por nivel de anidación, para que se lea la jerarquía del árbol.
 const INDENT_STEP = 14;
 
 const ZOOM_CFG: Record<"mes" | "semana" | "dia", { px: number; unit: TickUnit; label: string }> = {
-  mes: { px: 6, unit: "month", label: "Mes" },
-  semana: { px: 16, unit: "week", label: "Semana" },
-  dia: { px: 36, unit: "day", label: "Día" },
+  mes: { px: 10, unit: "month", label: "Mes" },
+  semana: { px: 22, unit: "week", label: "Semana" },
+  dia: { px: 48, unit: "day", label: "Día" },
 };
 type Zoom = keyof typeof ZOOM_CFG;
 
@@ -52,6 +59,9 @@ const STATUS_ORDER: TaskStatus[] = [
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+/** Clave estable de un tipo para agrupar/filtrar (id opaco, o el nombre). */
+const tipoKeyOf = (it: PublicScheduleItem) => it.tipo_id ?? it.tipo_nombre ?? "—";
+
 /**
  * Cronograma del proyecto para el portal público del cliente: el mismo diseño
  * que el cronograma interno, pero mostrando ÚNICAMENTE los elementos padre de la
@@ -66,9 +76,19 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
 
   const [zoom, setZoom] = useState<Zoom>("semana");
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(() => new Set(STATUS_ORDER));
+  const [activeTipos, setActiveTipos] = useState<Set<string>>(() => new Set());
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+
+  // Estilo por tipo de elemento: EL MISMO color que la Estructura y el
+  // cronograma interno (paleta determinista sobre `tipo_id`; naranja fijo para
+  // las «Actividades de terceros»).
+  const styleOf = useCallback(
+    (it: PublicScheduleItem): TipoStyle =>
+      tipoStyle(it.tipo_id ?? "", it.tipo_nombre, it.es_dependencia_externa),
+    [],
+  );
 
   // Escala estable sobre TODOS los elementos: filtrar no debe "saltar" el eje.
   const range = useMemo(() => {
@@ -119,12 +139,54 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
     [items],
   );
 
+  // Tipos presentes, en orden de aparición: alimentan el filtro/leyenda de tipos
+  // (espejo del cronograma interno) y la cabecera del HTML exportado.
+  const presentTipos = useMemo(() => {
+    const seen = new Map<string, { key: string; nombre: string; style: TipoStyle }>();
+    for (const it of items) {
+      const key = tipoKeyOf(it);
+      if (!seen.has(key)) {
+        seen.set(key, { key, nombre: it.tipo_nombre ?? "Elemento", style: styleOf(it) });
+      }
+    }
+    return [...seen.values()];
+  }, [items, styleOf]);
+
+  // Con el filtro de tipos activo, se conserva la fila si su propio tipo coincide
+  // o si algún descendiente coincide (para no perder los ancestros del match,
+  // igual que hace el cronograma interno). `null` = sin filtro de tipo.
+  const tipoMatchKeys = useMemo(() => {
+    if (activeTipos.size === 0) {
+      return null;
+    }
+    const match = new Set<string>();
+    for (const it of items) {
+      if (activeTipos.has(tipoKeyOf(it))) {
+        match.add(it.key);
+      }
+    }
+    for (const it of items) {
+      if (!match.has(it.key)) {
+        continue;
+      }
+      let p = parentOf.get(it.key) ?? null;
+      while (p && !match.has(p)) {
+        match.add(p);
+        p = parentOf.get(p) ?? null;
+      }
+    }
+    return match;
+  }, [items, activeTipos, parentOf]);
+
   // Filas visibles tras aplicar los filtros permitidos. Al buscar se ignora el
   // colapso (para que aparezcan las coincidencias aunque su padre esté cerrado).
   const rows = useMemo<PublicScheduleItem[]>(() => {
     const query = search.trim().toLowerCase();
     return items.filter((it) => {
       if (!statuses.has(it.status)) {
+        return false;
+      }
+      if (tipoMatchKeys && !tipoMatchKeys.has(it.key)) {
         return false;
       }
       if (onlyAtRisk && !isOverdue(it, TODAY)) {
@@ -135,7 +197,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
       }
       return !ancestorCollapsed(it.key);
     });
-  }, [items, statuses, onlyAtRisk, search, ancestorCollapsed]);
+  }, [items, statuses, tipoMatchKeys, onlyAtRisk, search, ancestorCollapsed]);
 
   const todayPct = range ? dayOffsetPct(TODAY, range) : null;
   const ticks = useMemo(
@@ -197,11 +259,83 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
     });
   };
 
+  const toggleTipo = (key: string) => {
+    setActiveTipos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Exporta a un HTML autónomo con lo que se ve ahora mismo (filtros incluidos):
+  // mismas barras, mismos colores por tipo, misma banda de meses y línea de hoy.
+  const handleExport = useCallback(() => {
+    if (!range) {
+      return;
+    }
+    const exportRows: ScheduleExportRow[] = rows.map((it) => ({
+      name: it.name,
+      depth: it.depth,
+      start: it.start_date,
+      due: it.due_date,
+      progressPct: it.progress_pct,
+      isParent: hasChildren.has(it.key),
+      overdue: isOverdue(it, TODAY),
+      tipoNombre: it.tipo_nombre,
+      barHex: styleOf(it).barHex,
+    }));
+    downloadScheduleHtml({
+      projectName: schedule.project_name,
+      rows: exportRows,
+      range,
+      pxPerDay,
+      today: TODAY,
+      tipos: presentTipos.map((t) => ({ nombre: t.nombre, barHex: t.style.barHex })),
+    });
+  }, [range, rows, hasChildren, styleOf, schedule.project_name, pxPerDay, presentTipos]);
+
   const inputCls =
     "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-brand-gold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Filtro por tipo de elemento (Curso, Módulo…), espejo del cronograma
+          interno: mismos colores que la Estructura. */}
+      {presentTipos.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <Tag className="size-3" /> Tipos
+          </span>
+          {presentTipos.map((t) => {
+            const active = activeTipos.has(t.key);
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  toggleTipo(t.key);
+                }}
+                aria-pressed={active}
+                title="Filtrar por este tipo de elemento"
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition",
+                  t.style.chip,
+                  active ? "border-current" : "border-transparent",
+                  activeTipos.size > 0 && !active && "opacity-40",
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", t.style.dot)} />
+                {t.nombre}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Barra de filtros permitidos (estado, búsqueda, riesgo, hoy, zoom) */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Leyenda interactiva = filtro por estado (solo estados presentes) */}
@@ -300,6 +434,18 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               </button>
             ))}
           </div>
+
+          {/* Exportar a HTML: una foto autónoma del cronograma, idéntica en
+              diseño (mismas barras, colores por tipo, banda de meses y hoy). */}
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={rows.length === 0 || !range}
+            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            title="Descargar el cronograma como un archivo HTML autónomo"
+          >
+            <Download className="size-3.5" /> Exportar HTML
+          </button>
         </div>
       </div>
 
@@ -431,6 +577,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                   const labelFitsRight = barLeft + barW + 150 <= trackWidth;
                   const isParent = hasChildren.has(item.key);
                   const isCollapsed = collapsed.has(item.key);
+                  const style = styleOf(item);
                   return (
                     <div
                       key={item.key}
@@ -466,10 +613,19 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                           ) : (
                             <span className="w-3.5 shrink-0" aria-hidden />
                           )}
-                          {/* Marcador de estado del elemento. */}
-                          <span
-                            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[item.status])}
-                          />
+                          {/* Marcador + chip del TIPO de elemento: mismo color
+                              que la Estructura y el cronograma interno. */}
+                          <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
+                          {item.tipo_nombre && (
+                            <span
+                              className={cn(
+                                "shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide",
+                                style.chip,
+                              )}
+                            >
+                              {item.tipo_nombre}
+                            </span>
+                          )}
                           <p
                             className={cn(
                               "min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300",
@@ -487,18 +643,23 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                         <div
                           title={[
                             item.name,
+                            item.tipo_nombre ?? "",
                             `${item.start_date} → ${item.due_date}`,
                             `${TASK_STATUS_LABELS[item.status]} · ${progress}%`,
-                          ].join("\n")}
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
                           className={cn(
                             "absolute top-1/2 h-[18px] -translate-y-1/2 overflow-hidden rounded-[5px] shadow-sm transition",
-                            STATUS_BAR_SOFT[item.status],
                             overdue && "ring-1 ring-rose-500",
                           )}
                           style={{ left: barLeft, width: barW }}
                         >
+                          {/* Pista tenue (duración planificada) + relleno de avance,
+                              ambos en el color del tipo (como el cronograma interno). */}
+                          <span className={cn("absolute inset-0 opacity-30", style.bar)} />
                           <span
-                            className={cn("block h-full", STATUS_BAR_COLOR[item.status])}
+                            className={cn("absolute inset-y-0 left-0", style.bar)}
                             style={{ width: `${progress}%` }}
                           />
                         </div>

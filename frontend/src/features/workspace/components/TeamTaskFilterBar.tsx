@@ -21,11 +21,22 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
 const selectClass =
   "rounded-md border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-600 outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
 
+/** Opción de los filtros por elemento / rama: id + ruta legible + color del tipo. */
+export interface ElementFilterOption {
+  id: string;
+  label: string;
+  dot: string;
+}
+
 interface Props {
   filters: TeamTaskFilters;
   onChange: (patch: Partial<TeamTaskFilters>) => void;
   onReset: () => void;
   teamMembers: ApiTeamMember[];
+  /** Elementos (padre directo) de los que cuelga alguna tarea del equipo. */
+  elementOptions?: ElementFilterOption[];
+  /** Ramas (padre del padre y más arriba) que contienen tareas del equipo. */
+  branchOptions?: ElementFilterOption[];
   /** Total tras filtrar / total sin filtrar, para el resumen. */
   shown: number;
   totalTasks: number;
@@ -76,6 +87,8 @@ export function TeamTaskFilterBar({
   onChange,
   onReset,
   teamMembers,
+  elementOptions = [],
+  branchOptions = [],
   shown,
   totalTasks,
 }: Props) {
@@ -113,6 +126,48 @@ export function TeamTaskFilterBar({
             </option>
           ))}
         </select>
+
+        {/* Filtro por ELEMENTO (padre directo): aísla las tareas de un
+            componente concreto cuando hay varios homónimos (p. ej. tras clonar). */}
+        {elementOptions.length > 0 && (
+          <select
+            aria-label="Filtrar por elemento"
+            value={filters.elementId}
+            onChange={(e) => {
+              onChange({ elementId: e.target.value });
+            }}
+            className={cn(selectClass, "max-w-[16rem]")}
+            title="Elemento del que cuelga la tarea"
+          >
+            <option value="all">Todos los elementos</option>
+            {elementOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Filtro por RAMA (el "padre del padre" y más arriba): separa las tareas
+            del original de las del clon cuando el elemento inmediato coincide. */}
+        {branchOptions.length > 0 && (
+          <select
+            aria-label="Filtrar por rama"
+            value={filters.branchId}
+            onChange={(e) => {
+              onChange({ branchId: e.target.value });
+            }}
+            className={cn(selectClass, "max-w-[16rem]")}
+            title="Rama de la estructura que contiene la tarea"
+          >
+            <option value="all">Todas las ramas</option>
+            {branchOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
 
         <button
           type="button"

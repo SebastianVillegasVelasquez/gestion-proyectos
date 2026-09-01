@@ -71,6 +71,37 @@ describe("filterTeamTasks", () => {
     expect(r.map((x) => x.id)).toEqual(["c"]);
   });
 
+  it("filtra por elemento (work_item_id exacto)", () => {
+    const scoped = [
+      t({ id: "x", work_item_id: "wi-1" }),
+      t({ id: "y", work_item_id: "wi-2" }),
+      t({ id: "z", work_item_id: null }),
+    ];
+    const r = filterTeamTasks(scoped, { ...EMPTY_TEAM_TASK_FILTERS, elementId: "wi-1" });
+    expect(r.map((x) => x.id)).toEqual(["x"]);
+  });
+
+  it("filtra por rama: incluye las tareas de cualquier descendiente del ancestro", () => {
+    const scoped = [
+      t({ id: "x", work_item_id: "wi-hijo" }),
+      t({ id: "y", work_item_id: "wi-nieto" }),
+      t({ id: "z", work_item_id: "wi-otra-rama" }),
+    ];
+    // wi-hijo y wi-nieto cuelgan de "rama-A"; wi-otra-rama no.
+    const ancestorsOf = (id: string | null) =>
+      id === "wi-hijo"
+        ? new Set(["wi-hijo", "rama-A"])
+        : id === "wi-nieto"
+          ? new Set(["wi-nieto", "wi-hijo", "rama-A"])
+          : new Set(id ? [id] : []);
+    const r = filterTeamTasks(
+      scoped,
+      { ...EMPTY_TEAM_TASK_FILTERS, branchId: "rama-A" },
+      ancestorsOf,
+    );
+    expect(r.map((x) => x.id)).toEqual(["x", "y"]);
+  });
+
   it("cuenta filtros activos", () => {
     expect(activeTeamTaskFilterCount(EMPTY_TEAM_TASK_FILTERS)).toBe(0);
     expect(
@@ -79,7 +110,9 @@ describe("filterTeamTasks", () => {
         status: "completada",
         assignee: "u1",
         onlyBlocked: true,
+        elementId: "wi-1",
+        branchId: "rama-A",
       }),
-    ).toBe(4);
+    ).toBe(6);
   });
 });

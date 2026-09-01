@@ -147,8 +147,9 @@ export function ClientProjectPortal() {
       </header>
 
       {mutation.data ? (
-        // Con datos: contenedor ancho para que el cronograma respire.
-        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
+        // Con datos: contenedor extra ancho para que el cronograma respire (el
+        // resumen y las pestañas se auto-limitan a un ancho legible más adentro).
+        <main className="mx-auto flex w-full max-w-[110rem] flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
           <Portal data={mutation.data} token={mutation.variables ?? token.trim()} />
           <p className="mt-auto text-center text-xs text-slate-400 dark:text-slate-600">
             Vista de solo lectura · La información se actualiza a medida que el equipo avanza.
