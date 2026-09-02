@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
-import { CalendarClock, ExternalLink, FolderTree, Lock, Users2, ArrowUpRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarClock, ExternalLink, LayoutList, Network, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
 import { TaskDurationBadge } from "@/features/projects/components/TaskDurationBadge";
-import { tipoStyle } from "@/features/projects/utils/tipo-style";
-import type { ApiMyTask, ApiWorkItemCrumb } from "../api/personal.api";
+import type { ApiMyTask } from "../api/personal.api";
 import {
   daysUntil,
   dueStatus,
@@ -14,6 +12,8 @@ import {
   DUE_STATUS_LABELS,
   type DueStatus,
 } from "../utils/due-status";
+import { MyTaskDeliverAction, TaskOriginCrumb } from "./my-task-bits";
+import { PersonalStructureView } from "./PersonalStructureView";
 
 /** «faltan 3 d» / «hoy» / «hace 2 d» a partir de los días restantes. */
 function daysRemainingLabel(n: number): string {
@@ -25,6 +25,7 @@ function daysRemainingLabel(n: number): string {
 
 type Filter = "todas" | "overdue" | "due_soon" | "abiertas" | "done";
 type Scope = "todas" | "individual" | "equipo";
+type ViewMode = "lista" | "estructura";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
@@ -80,140 +81,14 @@ function compareRows(
   return a.task.title.localeCompare(b.task.title);
 }
 
-/** Miga de pan del origen de la tarea: hasta los 3 últimos elementos de su
- *  cadena RAÍZ→elemento, cada chip con el color de su tipo (igual que la
- *  Estructura). */
-function TaskOriginCrumb({ ancestors }: { ancestors: ApiWorkItemCrumb[] }) {
-  if (ancestors.length === 0) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-        <FolderTree className="size-3" /> Individual
-      </span>
-    );
-  }
-  const shown = ancestors.slice(-3);
-  const clipped = shown.length < ancestors.length;
-  return (
-    <span
-      className="flex flex-wrap items-center gap-1 text-[11px]"
-      title={ancestors.map((a) => a.name).join(" › ")}
-    >
-      {clipped && <span className="text-muted-foreground">…</span>}
-      {shown.map((node, i) => {
-        const style = tipoStyle(
-          node.tipo_id ?? node.id,
-          node.tipo_nombre,
-          node.es_dependencia_externa,
-        );
-        return (
-          <span key={node.id} className="flex items-center gap-1">
-            {i > 0 || clipped ? <span className="text-muted-foreground">›</span> : null}
-            <span
-              className={cn(
-                "inline-flex max-w-[160px] items-center gap-1 truncate rounded px-1.5 py-0.5 font-medium",
-                style.chip,
-              )}
-            >
-              <span className={cn("size-1.5 shrink-0 rounded-full", style.dot)} />
-              <span className="truncate">{node.name}</span>
-            </span>
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-/**
- * Etiqueta «Bloqueada» con un panel (hover + clic para fijarlo) que explica por
- * qué no se puede entregar todavía: qué tareas faltan, su estado y quién las
- * tiene.
- */
-function BlockedPopover({ task }: { task: ApiMyTask }) {
-  const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!pinned) {
-      return;
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setPinned(false);
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [pinned]);
-
-  const blockers = task.blocked_by.filter((b) => b.status !== "completada");
-  const show = open || pinned;
-
-  return (
-    <span
-      ref={ref}
-      className="relative shrink-0"
-      onMouseEnter={() => {
-        setOpen(true);
-      }}
-      onMouseLeave={() => {
-        if (!pinned) {
-          setOpen(false);
-        }
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => {
-          setPinned((v) => !v);
-          setOpen(true);
-        }}
-        aria-expanded={show}
-        className="inline-flex cursor-help items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
-      >
-        <Lock className="size-3" /> Bloqueada
-      </button>
-
-      {show && (
-        <div
-          role="tooltip"
-          className="absolute right-0 top-full z-30 mt-1 w-72 rounded-lg border border-border bg-card p-3 text-left shadow-xl"
-        >
-          <p className="mb-2 text-xs font-semibold text-foreground">No puedes entregar todavía</p>
-          {blockers.length > 0 ? (
-            <ul className="flex flex-col gap-1.5">
-              {blockers.map((b) => (
-                <li key={b.id} className="text-[12px] leading-snug">
-                  <span className="font-medium text-foreground">{b.title}</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    {TASK_STATUS_LABELS[b.status]}
-                    {" · "}
-                    {b.assignee_name ? `la tiene ${b.assignee_name}` : "sin responsable"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[12px] text-muted-foreground">
-              {task.delivery_blocked_reason ??
-                "Una dependencia o una actividad de terceros sigue abierta."}
-            </p>
-          )}
-        </div>
-      )}
-    </span>
-  );
-}
-
 /**
  * «Mis tareas»: todo lo asignado al usuario (individual o de equipo), con el
  * aviso de vencimiento y la vía de entrega según el tipo de tarea:
  *  - individual → se entrega aquí mismo (crea/abre su entrega personal)
  *  - de equipo  → se entrega en el espacio de ese equipo (enlace)
+ *
+ * Dos vistas del MISMO conjunto filtrado: Lista (agrupada por proyecto) y
+ * Estructura (el árbol del proyecto, igual que en Equipos, pero de solo lectura).
  */
 export function MyTasksView({
   tasks,
@@ -228,6 +103,7 @@ export function MyTasksView({
   onOpenIndividual: (task: ApiMyTask) => void;
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [view, setView] = useState<ViewMode>("lista");
   const [filter, setFilter] = useState<Filter>("abiertas");
   const [scope, setScope] = useState<Scope>("todas");
   const [query, setQuery] = useState("");
@@ -262,6 +138,8 @@ export function MyTasksView({
           !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
       );
   }, [tasks, filter, scope, query, elementQuery, today]);
+
+  const filteredTasks = useMemo(() => rows.map((r) => r.task), [rows]);
 
   const counts = useMemo(() => {
     let overdue = 0;
@@ -315,6 +193,34 @@ export function MyTasksView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* Lista / Estructura */}
+        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+          {(
+            [
+              { key: "lista", label: "Lista", Icon: LayoutList },
+              { key: "estructura", label: "Estructura", Icon: Network },
+            ] as const
+          ).map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => {
+                setView(v.key);
+              }}
+              aria-pressed={view === v.key}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                view === v.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <v.Icon className="size-3.5" />
+              {v.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
           {FILTERS.map((f) => (
             <button
@@ -383,104 +289,94 @@ export function MyTasksView({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
-        {byProject.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            Nada que coincida con el filtro.
-          </p>
-        ) : (
-          byProject.map((group) => (
-            <section key={group.name}>
-              <h3 className="sticky top-0 z-10 bg-accent/50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
-                {group.name}
-              </h3>
-              <ul className="divide-y divide-border">
-                {group.items.map(({ task, status }) => {
-                  const remaining = status === "done" ? null : daysUntil(task.due_date, today);
-                  const hasDeliverable = deliverableTaskIds.has(task.id);
-                  // Bloqueada = el backend no dejará entregar todavía (dependencia
-                  // FtS incompleta o actividad de terceros sin entregar). Ver la
-                  // entrega ya creada nunca se bloquea.
-                  const deliveryBlocked = !hasDeliverable && Boolean(task.delivery_blocked_reason);
-                  return (
-                    <li key={task.id} className="flex flex-col gap-1.5 px-4 py-2.5">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                        <span className="min-w-[160px] flex-1 truncate text-sm font-medium text-foreground">
-                          {task.title}
-                        </span>
-
-                        {task.depends_on_third_party && (
-                          <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                            title="Depende de una actividad de terceros"
-                          >
-                            <ExternalLink className="size-2.5" /> Depende de terceros
+      {view === "estructura" ? (
+        <PersonalStructureView
+          tasks={filteredTasks}
+          today={today}
+          deliverableTaskIds={deliverableTaskIds}
+          onOpenIndividual={onOpenIndividual}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
+          {byProject.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">
+              Nada que coincida con el filtro.
+            </p>
+          ) : (
+            byProject.map((group) => (
+              <section key={group.name}>
+                <h3 className="sticky top-0 z-10 bg-accent/50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+                  {group.name}
+                </h3>
+                <ul className="divide-y divide-border">
+                  {group.items.map(({ task, status }) => {
+                    const remaining = status === "done" ? null : daysUntil(task.due_date, today);
+                    const hasDeliverable = deliverableTaskIds.has(task.id);
+                    return (
+                      <li key={task.id} className="flex flex-col gap-1.5 px-4 py-2.5">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <span className="min-w-[160px] flex-1 truncate text-sm font-medium text-foreground">
+                            {task.title}
                           </span>
-                        )}
 
-                        <span
-                          className={cn(
-                            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                            DUE_STATUS_CLASSES[status],
+                          {task.depends_on_third_party && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              title="Depende de una actividad de terceros"
+                            >
+                              <ExternalLink className="size-2.5" /> Depende de terceros
+                            </span>
                           )}
-                          title={task.due_date ? `Vence el ${task.due_date}` : undefined}
-                        >
-                          {DUE_STATUS_LABELS[status]}
-                          {task.due_date && status !== "done" && ` · ${task.due_date}`}
-                        </span>
 
-                        {remaining !== null && (
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                            {daysRemainingLabel(remaining)}
-                          </span>
-                        )}
-
-                        <TaskDurationBadge days={task.estimated_days} className="shrink-0" />
-
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          {TASK_STATUS_LABELS[task.status]}
-                        </span>
-
-                        {status === "done" ? null : task.team_id ? (
-                          <Link
-                            to={`/workspace?team=${task.team_id}`}
-                            className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
-                            title={task.delivery_blocked_reason ?? undefined}
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                              DUE_STATUS_CLASSES[status],
+                            )}
+                            title={task.due_date ? `Vence el ${task.due_date}` : undefined}
                           >
-                            Entregar en el equipo <ArrowUpRight className="inline size-3" />
-                          </Link>
-                        ) : deliveryBlocked ? (
-                          <BlockedPopover task={task} />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onOpenIndividual(task);
-                            }}
-                            className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
-                          >
-                            {hasDeliverable ? "Ver entrega" : "Entregar"}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* De dónde viene: miga de pan con los colores de la Estructura. */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {task.team_id && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Users2 className="size-3" /> {task.team_name}
+                            {DUE_STATUS_LABELS[status]}
+                            {task.due_date && status !== "done" && ` · ${task.due_date}`}
                           </span>
-                        )}
-                        <TaskOriginCrumb ancestors={task.work_item_ancestors} />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))
-        )}
-      </div>
+
+                          {remaining !== null && (
+                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                              {daysRemainingLabel(remaining)}
+                            </span>
+                          )}
+
+                          <TaskDurationBadge days={task.estimated_days} className="shrink-0" />
+
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {TASK_STATUS_LABELS[task.status]}
+                          </span>
+
+                          <MyTaskDeliverAction
+                            task={task}
+                            isDone={status === "done"}
+                            hasDeliverable={hasDeliverable}
+                            onOpenIndividual={onOpenIndividual}
+                          />
+                        </div>
+
+                        {/* De dónde viene: miga de pan con los colores de la Estructura. */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {task.team_id && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Users2 className="size-3" /> {task.team_name}
+                            </span>
+                          )}
+                          <TaskOriginCrumb ancestors={task.work_item_ancestors} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
