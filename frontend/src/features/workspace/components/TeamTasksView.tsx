@@ -21,6 +21,7 @@ import {
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
@@ -316,6 +317,7 @@ function TaskRow({
   color,
   hideAssignee,
   hasChildren,
+  isParent,
   collapsed,
   onToggleCollapse,
   onAddSubtask,
@@ -335,8 +337,10 @@ function TaskRow({
   color: TipoStyle | null;
   /** La vista ya está agrupada/filtrada por persona: no repetir el nombre. */
   hideAssignee: boolean;
-  /** La tarea tiene subtareas: se muestra el chevron para ocultarlas/verlas. */
+  /** La tarea tiene subtareas EN ESTA VISTA: chevron para ocultarlas/verlas. */
   hasChildren: boolean;
+  /** La tarea es padre en el conjunto completo: sin botón «Comenzar». */
+  isParent: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onAddSubtask: (task: ApiTeamTask) => void;
@@ -463,8 +467,9 @@ function TaskRow({
         <UrgencyBadge task={task} />
       </span>
 
-      {/* "Comenzar": solo lo ve el responsable en su propia tarea sin iniciar. */}
-      <StartTaskButton task={task} projectId={projectId} />
+      {/* "Comenzar": solo el responsable, en su propia tarea sin iniciar y que
+          no sea padre (las tareas padre avanzan por sus subtareas). */}
+      <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
 
       {/* "Entregar": tarea padre al 100%, solo para su responsable. */}
       <DeliverActions task={task} cbs={deliverCbs} />
@@ -519,6 +524,7 @@ function TaskRow({
 function ListView({
   groups,
   allTasks,
+  parentIds,
   members,
   grouping,
   today,
@@ -537,6 +543,8 @@ function ListView({
   groups: ReturnType<typeof groupTeamTasks>;
   /** Todas las del equipo: resuelven el título de un padre fuera del grupo. */
   allTasks: ApiTeamTask[];
+  /** Ids de tareas padre en el conjunto completo (para suprimir «Comenzar»). */
+  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   grouping: TaskGrouping;
   today: string;
@@ -552,13 +560,15 @@ function ListView({
   onDelete: (task: ApiTeamTask) => void;
   deliverCbs: DeliverCbs;
 }) {
-  // Subtareas plegables por tarea padre (por defecto visibles). El estado vive
-  // aquí: se reinicia al salir de la vista Lista, que es lo esperable.
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const childIds = useMemo(
     () => new Set(allTasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
     [allTasks],
   );
+  // Subtareas plegables por tarea padre. Por defecto TODAS colapsadas: al abrir
+  // la vista se ven solo las tareas raíz y el usuario despliega lo que quiera.
+  // Lazy-init a partir de las tareas presentes al montar; el estado se reinicia
+  // al salir de la vista Lista, que es lo esperable.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(childIds));
 
   return (
     // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
@@ -611,6 +621,7 @@ function ListView({
                     color={colorOf(row.task)}
                     hideAssignee={hideAssignee}
                     hasChildren={childIds.has(row.task.id)}
+                    isParent={parentIds.has(row.task.id)}
                     collapsed={collapsed.has(row.task.id)}
                     onToggleCollapse={() => {
                       setCollapsed((prev) => {
@@ -643,6 +654,7 @@ function ListView({
 function TaskCard({
   task,
   parentTitle,
+  isParent,
   members,
   today,
   path,
@@ -659,6 +671,8 @@ function TaskCard({
   task: ApiTeamTask;
   /** Título del padre cuando la tarjeta es una subtarea. */
   parentTitle: string | null;
+  /** La tarjeta es una tarea padre: sin botón «Comenzar». */
+  isParent: boolean;
   members: WorkspaceMember[];
   today: string;
   path: string[];
@@ -688,7 +702,7 @@ function TaskCard({
         </p>
         <div className="flex shrink-0 items-center gap-1">
           <UrgencyBadge task={task} />
-          <StartTaskButton task={task} projectId={projectId} />
+          <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
           {canReview && (
             <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <button
@@ -776,6 +790,7 @@ function TaskCard({
 
 function KanbanView({
   allTasks,
+  parentIds,
   members,
   today,
   pathOf,
@@ -790,6 +805,8 @@ function KanbanView({
   deliverCbs,
 }: {
   allTasks: ApiTeamTask[];
+  /** Ids de tareas padre en el conjunto completo (para suprimir «Comenzar»). */
+  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   today: string;
   pathOf: (task: ApiTeamTask) => string[];
@@ -857,6 +874,7 @@ function KanbanView({
                       ? null
                       : (titleById.get(task.parent_task_id) ?? "otra tarea")
                   }
+                  isParent={parentIds.has(task.id)}
                   members={members}
                   today={today}
                   path={pathOf(task)}
@@ -960,9 +978,12 @@ export function TeamTasksView({
   canDeliverTask,
 }: TeamTasksViewProps) {
   const deliverCbs: DeliverCbs = { onDeliver, onMarkDelivered, canDeliverTask };
+  const { user } = useAuth();
   const query = useTeamTasks(teamId);
   const accessQuery = useWorkspaceAccess(teamId);
   const canReview = accessQuery.data?.can_review ?? false;
+  // El líder/supervisor puede filtrar por persona; un integrante solo ve lo suyo.
+  const canFilterByPerson = canReview;
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const qc = useQueryClient();
@@ -975,6 +996,15 @@ export function TeamTasksView({
   // Abre mostrando solo la bolsa del equipo (tareas sin asignar); los botones
   // por integrante de la barra de filtros llevan al trabajo de cada persona.
   const [filters, setFilters] = useState<TeamTaskFilters>(DEFAULT_TEAM_TASK_FILTERS);
+
+  // Integrante (sin permiso de revisión): la vista queda fijada a SUS tareas.
+  // No se sincroniza el estado —se deriva aquí—: así el efecto no dispara
+  // renders en cascada y el resto del filtrado (estado, texto…) sigue vivo.
+  const userId = user?.id;
+  const effectiveFilters: TeamTaskFilters = useMemo(
+    () => (canFilterByPerson || !userId ? filters : { ...filters, assignee: userId }),
+    [filters, canFilterByPerson, userId],
+  );
   // Edición/borrado de una tarea (o subtarea) del equipo, solo para el líder.
   const [editingTask, setEditingTask] = useState<ApiTeamTask | null>(null);
   const [deletingTask, setDeletingTask] = useState<ApiTeamTask | null>(null);
@@ -982,6 +1012,13 @@ export function TeamTasksView({
 
   const today = useMemo(() => todayIso(), []);
   const allTasks = useMemo(() => query.data ?? [], [query.data]);
+  // Tareas que SON padre (tienen al menos una subtarea), sobre el conjunto
+  // completo del equipo: una tarea padre no se "comienza" a mano, su avance
+  // sale de las subtareas. Alimenta la supresión del botón «Comenzar».
+  const parentIds = useMemo(
+    () => new Set(allTasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
+    [allTasks],
+  );
 
   // ── Estructura del proyecto: jerarquía + tipo de cada elemento ──────────────
   const treeData = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
@@ -1090,8 +1127,8 @@ export function TeamTasksView({
   // Filtramos ANTES de agrupar: Lista, Kanban y Estructura ven el mismo
   // subconjunto. El cronograma y la trazabilidad tienen sus propios filtros.
   const tasks = useMemo(
-    () => filterTeamTasks(allTasks, filters, ancestorsOf),
-    [allTasks, filters, ancestorsOf],
+    () => filterTeamTasks(allTasks, effectiveFilters, ancestorsOf),
+    [allTasks, effectiveFilters, ancestorsOf],
   );
   const patchFilters = (patch: Partial<TeamTaskFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
@@ -1101,23 +1138,35 @@ export function TeamTasksView({
     void qc.invalidateQueries({ queryKey: ["workspace", "tasks", teamId] });
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
   // dentro de columnas de estado no tendría dónde ir.
-  const effectiveGrouping: TaskGrouping = view === "lista" ? grouping : "estado";
+  const effectiveGrouping: TaskGrouping =
+    view === "lista" && canFilterByPerson ? grouping : "estado";
   // El nombre del responsable sobra cuando la vista ya está acotada a una
   // persona: agrupada por integrante, o filtrada a un responsable concreto.
   const hideAssignee =
     effectiveGrouping === "integrante" ||
-    (filters.assignee !== "all" && filters.assignee !== UNASSIGNED);
+    (effectiveFilters.assignee !== "all" && effectiveFilters.assignee !== UNASSIGNED);
   // Vista recién abierta en la bolsa del equipo (solo «sin asignar») y esa
   // bolsa está vacía: no dejamos la pantalla en blanco, invitamos a filtrar.
   const emptyBag =
     tasks.length === 0 &&
     allTasks.length > 0 &&
-    filters.assignee === UNASSIGNED &&
-    filters.status === "all" &&
-    filters.text.trim() === "" &&
-    !filters.onlyBlocked &&
-    filters.elementId === "all" &&
-    filters.branchId === "all";
+    effectiveFilters.assignee === UNASSIGNED &&
+    effectiveFilters.status === "all" &&
+    effectiveFilters.text.trim() === "" &&
+    !effectiveFilters.onlyBlocked &&
+    effectiveFilters.elementId === "all" &&
+    effectiveFilters.branchId === "all";
+  // Integrante sin ninguna tarea propia en el equipo: la bolsa de arriba es de
+  // líder, así que le damos su propio vacío.
+  const emptyForMember =
+    !canFilterByPerson &&
+    tasks.length === 0 &&
+    allTasks.length > 0 &&
+    effectiveFilters.status === "all" &&
+    effectiveFilters.text.trim() === "" &&
+    !effectiveFilters.onlyBlocked &&
+    effectiveFilters.elementId === "all" &&
+    effectiveFilters.branchId === "all";
   const groups = useMemo(
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
@@ -1169,7 +1218,9 @@ export function TeamTasksView({
           ]}
         />
 
-        {view === "lista" && (
+        {/* Agrupar por integrante solo tiene sentido para quien coordina; un
+            integrante solo se ve a sí mismo. */}
+        {view === "lista" && canFilterByPerson && (
           <Segmented
             label="Agrupar tareas por"
             value={grouping}
@@ -1205,11 +1256,14 @@ export function TeamTasksView({
 
       {showFilterBar && (
         <TeamTaskFilterBar
-          filters={filters}
+          filters={effectiveFilters}
           onChange={patchFilters}
           onReset={() => {
+            // Para el integrante, `effectiveFilters` vuelve a fijar el responsable
+            // a lo suyo, así que basta con vaciar el estado crudo.
             setFilters(EMPTY_TEAM_TASK_FILTERS);
           }}
+          canFilterByPerson={canFilterByPerson}
           teamMembers={teamMembers}
           elementOptions={elementOptions}
           branchOptions={branchOptions}
@@ -1248,10 +1302,20 @@ export function TeamTasksView({
             </div>
           </div>
         )}
-        {view === "lista" && !emptyBag && (
+        {emptyForMember && !emptyBag && (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <EmptyState
+              icon={FolderKanban}
+              title="No tienes tareas en este equipo"
+              hint="Cuando el líder te asigne una tarea de este equipo, aparecerá aquí."
+            />
+          </div>
+        )}
+        {view === "lista" && !emptyBag && !emptyForMember && (
           <ListView
             groups={groups}
             allTasks={tasks}
+            parentIds={parentIds}
             members={members}
             grouping={effectiveGrouping}
             today={today}
@@ -1271,9 +1335,10 @@ export function TeamTasksView({
             deliverCbs={deliverCbs}
           />
         )}
-        {view === "kanban" && !emptyBag && (
+        {view === "kanban" && !emptyBag && !emptyForMember && (
           <KanbanView
             allTasks={tasks}
+            parentIds={parentIds}
             members={members}
             today={today}
             pathOf={pathOf}

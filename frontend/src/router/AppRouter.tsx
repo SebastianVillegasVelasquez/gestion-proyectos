@@ -23,6 +23,11 @@ const PersonalDeliverablesPage = lazy(() =>
   })),
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
+const NotificationsPage = lazy(() =>
+  import("@/features/notifications/components/NotificationsPage.tsx").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
 const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
 const EmailTestPage = lazy(() =>
   import("@/features/dev/components/EmailTestPage.tsx").then((m) => ({
@@ -120,6 +125,7 @@ export const AppRouter = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<WorkspacePage />} />
         <Route path="/mis-entregas" element={<PersonalDeliverablesPage />} />
+        <Route path="/notificaciones" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />

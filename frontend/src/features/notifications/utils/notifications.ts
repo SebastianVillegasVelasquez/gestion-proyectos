@@ -20,6 +20,40 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   mencion: "Te mencionaron",
 };
 
+// Las notificaciones no traen "prioridad" del backend; se deriva del tipo para
+// poder filtrarlas y ordenarlas en la vista completa. alta = necesita acción
+// (atrasos, devoluciones, menciones), media = te involucra, baja = informativo.
+export type NotificationPriority = "alta" | "media" | "baja";
+
+const PRIORITY_BY_TYPE: Record<NotificationType, NotificationPriority> = {
+  tarea_asignada: "media",
+  tarea_iniciada: "baja",
+  tarea_entregada: "media",
+  tarea_rechazada: "alta",
+  tarea_atrasada: "alta",
+  tarea_completada: "media",
+  tarea_devuelta: "alta",
+  dependencia_terceros_fechada: "media",
+  proyecto_miembro_agregado: "media",
+  proyecto_cerrado: "baja",
+  proyecto_iniciado: "baja",
+  proyecto_pausado: "baja",
+  proyecto_finalizado: "baja",
+  comentario_publicado: "media",
+  comentario_respuesta: "media",
+  mencion: "alta",
+};
+
+export function notificationPriority(type: NotificationType): NotificationPriority {
+  return PRIORITY_BY_TYPE[type];
+}
+
+export const NOTIFICATION_PRIORITY_LABELS: Record<NotificationPriority, string> = {
+  alta: "Alta",
+  media: "Media",
+  baja: "Baja",
+};
+
 /** Texto del badge: acota a "9+" para no romper el círculo. */
 export function formatBadgeCount(count: number): string {
   if (count <= 0) {

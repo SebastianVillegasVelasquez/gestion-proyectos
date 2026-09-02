@@ -1,25 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  AlertTriangle,
-  AtSign,
   Bell,
   Check,
   CheckCheck,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
-  FolderKanban,
-  Link2,
-  type LucideIcon,
-  MessageSquare,
-  PlayCircle,
-  Undo2,
+  Maximize2,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { resolveNotificationTarget } from "../utils/notification-target";
 import {
+  useDeleteNotification,
   useMarkAllRead,
   useMarkRead,
   useNotifications,
@@ -30,68 +24,23 @@ import {
   formatBadgeCount,
   formatRelativeTime,
 } from "../utils/notifications";
-import type { AppNotification, NotificationType } from "../types";
-
-// Ícono por tipo (presentación). Partial a propósito: si el backend enviara un
-// tipo nuevo aún no mapeado, caemos a la campana sin romper.
-const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
-  tarea_asignada: ClipboardList,
-  tarea_iniciada: PlayCircle,
-  tarea_entregada: CheckCircle2,
-  tarea_rechazada: Undo2,
-  tarea_atrasada: AlertTriangle,
-  tarea_completada: CheckCircle2,
-  tarea_devuelta: Undo2,
-  dependencia_terceros_fechada: Link2,
-  proyecto_miembro_agregado: FolderKanban,
-  proyecto_cerrado: FolderKanban,
-  proyecto_iniciado: FolderKanban,
-  proyecto_pausado: FolderKanban,
-  proyecto_finalizado: FolderKanban,
-  comentario_publicado: MessageSquare,
-  comentario_respuesta: MessageSquare,
-  mencion: AtSign,
-};
-
-// Tono del ícono por familia de evento: tareas → teal/rose, proyectos →
-// violeta, conversación → azul/ámbar. Ayuda a escanear el panel de un vistazo.
-const TYPE_TONE: Partial<Record<NotificationType, string>> = {
-  tarea_asignada:
-    "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
-  tarea_iniciada:
-    "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
-  tarea_entregada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
-  tarea_rechazada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
-  tarea_atrasada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
-  tarea_completada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
-  tarea_devuelta: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
-  proyecto_miembro_agregado:
-    "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
-  proyecto_cerrado: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
-  proyecto_iniciado: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
-  proyecto_pausado: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
-  proyecto_finalizado: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300",
-  comentario_publicado: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300",
-  comentario_respuesta: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300",
-  mencion: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
-  dependencia_terceros_fechada:
-    "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300",
-};
-
-const DEFAULT_TONE = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";
+import { DEFAULT_TONE, FALLBACK_ICON, TYPE_ICON, TYPE_TONE } from "../utils/notification-visuals";
+import type { AppNotification } from "../types";
 
 function NotificationRow({
   notification,
   onRead,
+  onDelete,
   onActivate,
   hasTarget,
 }: {
   notification: AppNotification;
   onRead: (id: string) => void;
+  onDelete: (id: string) => void;
   onActivate: (notification: AppNotification) => void;
   hasTarget: boolean;
 }) {
-  const Icon = TYPE_ICON[notification.notification_type] ?? Bell;
+  const Icon = TYPE_ICON[notification.notification_type] ?? FALLBACK_ICON;
   const tone = TYPE_TONE[notification.notification_type] ?? DEFAULT_TONE;
   const unread = !notification.is_read;
   return (
@@ -102,7 +51,7 @@ function NotificationRow({
           onActivate(notification);
         }}
         className={cn(
-          "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 pr-10 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
+          "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 pr-16 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
           unread && "bg-brand-teal/[0.06] dark:bg-brand-teal/10",
         )}
       >
@@ -135,13 +84,15 @@ function NotificationRow({
           </span>
         </span>
       </button>
+      {/* Punto "no leída": se oculta al hover para dar paso a los botones */}
       {unread && (
-        <>
-          {/* Punto "no leída": se oculta al hover para dar paso al botón */}
-          <span
-            className="pointer-events-none absolute right-3.5 top-1/2 size-2 -translate-y-1/2 rounded-full bg-brand-teal transition-opacity group-hover/item:opacity-0"
-            aria-hidden
-          />
+        <span
+          className="pointer-events-none absolute right-3.5 top-1/2 size-2 -translate-y-1/2 rounded-full bg-brand-teal transition-opacity group-hover/item:opacity-0"
+          aria-hidden
+        />
+      )}
+      <span className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+        {unread && (
           <button
             type="button"
             aria-label="Marcar como leída"
@@ -149,12 +100,23 @@ function NotificationRow({
             onClick={() => {
               onRead(notification.id);
             }}
-            className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-brand-teal opacity-0 transition-all hover:bg-brand-teal/10 focus-visible:opacity-100 group-hover/item:opacity-100"
+            className="flex size-7 items-center justify-center rounded-full text-brand-teal opacity-0 transition-all hover:bg-brand-teal/10 focus-visible:opacity-100 group-hover/item:opacity-100"
           >
             <Check className="size-4" />
           </button>
-        </>
-      )}
+        )}
+        <button
+          type="button"
+          aria-label="Eliminar notificación"
+          title="Eliminar"
+          onClick={() => {
+            onDelete(notification.id);
+          }}
+          className="flex size-7 items-center justify-center rounded-full text-slate-400 opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/item:opacity-100"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </span>
     </li>
   );
 }
@@ -169,6 +131,12 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
   const listQuery = useNotifications(open && isAuthenticated);
   const markAll = useMarkAllRead();
   const markRead = useMarkRead();
+  const deleteOne = useDeleteNotification();
+
+  const openFullView = () => {
+    setOpen(false);
+    void navigate("/notificaciones");
+  };
 
   // Clic en una notificación: la marca leída y, si su tipo + payload permiten
   // deducir un destino, navega ahí y cierra el panel.
@@ -317,6 +285,9 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                       onRead={(id) => {
                         markRead.mutate(id);
                       }}
+                      onDelete={(id) => {
+                        deleteOne.mutate(id);
+                      }}
                       onActivate={activate}
                       hasTarget={resolveNotificationTarget(n, user?.role) !== null}
                     />
@@ -325,11 +296,19 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
               )}
             </div>
 
-            {total > items.length && (
-              <div className="shrink-0 border-t border-slate-100 px-4 py-2 text-center text-[11px] text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                Mostrando {items.length} de {total}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={openFullView}
+              className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand-teal transition-colors hover:bg-brand-teal/5 hover:text-brand-teal-dark dark:border-slate-800"
+            >
+              <Maximize2 className="size-3.5" />
+              Ver todas
+              {total > items.length && (
+                <span className="text-slate-400 dark:text-slate-500">
+                  · {items.length} de {total}
+                </span>
+              )}
+            </button>
           </div>
         </>
       )}

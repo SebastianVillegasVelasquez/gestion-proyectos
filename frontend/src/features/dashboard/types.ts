@@ -20,6 +20,9 @@ export interface DashboardSummary {
   completed_tasks: number;
   in_review_tasks: number;
   overdue_tasks: number;
+  /** Entregas propias (tareas + subtareas) en los últimos 7 días. Solo lo puebla
+   *  el resumen del rol User; el global lo devuelve en 0. */
+  delivered_last_7d?: number;
 }
 
 // ─── Dashboard panels (API contract) ──────────────────────────────────────────
@@ -109,6 +112,8 @@ export interface MyProjectProgress {
   tasks_overdue: number;
   tasks_pending: number;
   progress_pct: number;
+  start_date: string | null;
+  end_date: string | null;
   my_tasks: DashboardTaskItem[];
 }
 

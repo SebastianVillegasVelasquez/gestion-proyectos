@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { Task, TaskStatus } from "../types";
@@ -88,7 +89,22 @@ function TaskCard({ task }: { task: Task }) {
   );
 }
 
-function Column({ config, tasks }: { config: ColumnConfig; tasks: Task[] }) {
+/** Tamaño de página inicial cuando el tablero recibe `pageSize`: se muestran
+ *  las primeras N tareas de la columna y un botón carga N más cada vez. Evita
+ *  el scroll interminable en columnas con decenas de tareas. */
+function Column({
+  config,
+  tasks,
+  pageSize,
+}: {
+  config: ColumnConfig;
+  tasks: Task[];
+  pageSize?: number;
+}) {
+  const [visibleCount, setVisibleCount] = useState(pageSize ?? Infinity);
+  const shown = pageSize ? tasks.slice(0, visibleCount) : tasks;
+  const remaining = tasks.length - shown.length;
+
   return (
     /* Each column fills the grid row height and scrolls its task list independently */
     <div className="flex min-h-0 flex-col gap-2 lg:h-full">
@@ -108,15 +124,30 @@ function Column({ config, tasks }: { config: ColumnConfig; tasks: Task[] }) {
         </span>
       </div>
 
-      {/* Task list — scrollable on desktop */}
-      <div className="flex flex-col gap-2 overflow-y-auto lg:flex-1 lg:min-h-0">
-        {tasks.map((task) => (
+      {/* Task list — scrollable on desktop. Vacío: el texto se centra en la
+          columna en vez de quedar pegado arriba. */}
+      <div
+        className={cn(
+          "flex flex-col gap-2 overflow-y-auto lg:flex-1 lg:min-h-0",
+          tasks.length === 0 && "items-center justify-center",
+        )}
+      >
+        {shown.map((task) => (
           <TaskCard key={task.id} task={task} />
         ))}
         {tasks.length === 0 && (
-          <p className="py-4 text-center text-[12px] text-slate-400 dark:text-slate-600">
-            Sin tareas
-          </p>
+          <p className="text-[12px] text-slate-400 dark:text-slate-600">Sin tareas</p>
+        )}
+        {remaining > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setVisibleCount((n) => n + (pageSize ?? 0));
+            }}
+            className="mt-1 shrink-0 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+          >
+            Ver {Math.min(remaining, pageSize ?? 0)} más
+          </button>
         )}
       </div>
     </div>
@@ -125,9 +156,12 @@ function Column({ config, tasks }: { config: ColumnConfig; tasks: Task[] }) {
 
 interface TaskBoardProps {
   tasks: Task[];
+  /** Si se indica, cada columna muestra como máximo esta cantidad y un botón
+   *  carga otras tantas por clic (en vez de un scroll largo). */
+  pageSize?: number;
 }
 
-export function TaskBoard({ tasks }: TaskBoardProps) {
+export function TaskBoard({ tasks, pageSize }: TaskBoardProps) {
   const byStatus = (status: TaskStatus) => tasks.filter((t) => t.status === status);
 
   return (
@@ -139,7 +173,12 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
       <CardContent className="flex flex-1 min-h-0 flex-col overflow-hidden pt-0">
         <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-3 lg:h-full lg:gap-3">
           {columns.map((col) => (
-            <Column key={col.status} config={col} tasks={byStatus(col.status)} />
+            <Column
+              key={col.status}
+              config={col}
+              tasks={byStatus(col.status)}
+              pageSize={pageSize}
+            />
           ))}
         </div>
       </CardContent>

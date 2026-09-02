@@ -1294,7 +1294,37 @@ class ChangeTaskStatusUseCase:
         # en la fecha de fin de esta y se avisa a sus responsables.
         if data.status == TaskStatus.COMPLETADA:
             await self._cascade_reschedule_dependents(new_status, current_user_id)
+
+        # La tarea padre ya no se "comienza" a mano: cuando arranca su primera
+        # subtarea, sube ella sola a EN_PROGRESO para que su estado no siga
+        # diciendo "pendiente" mientras el trabajo ya empezó.
+        if data.status == TaskStatus.EN_PROGRESO and task.parent_task_id is not None:
+            await self._advance_parent_to_in_progress(
+                task.parent_task_id, current_user_id
+            )
         return new_status
+
+    async def _advance_parent_to_in_progress(
+        self, parent_id: UUID, actor_id: UUID | None
+    ) -> None:
+        parent = await self.task_repo.get_by_id(parent_id)
+        if parent is None or parent.is_deleted:
+            return
+        if parent.status != TaskStatus.PENDIENTE_POR_INICIAR:
+            return
+        previous = parent.status
+        try:
+            await self.service.change_status(
+                parent_id, UpdateTaskStatusRequest(status=TaskStatus.EN_PROGRESO)
+            )
+        except (ValidationError, NotFoundError):
+            # El padre no puede avanzar todavía (p. ej. cuelga de una actividad
+            # de terceros sin entregar): no es motivo para tumbar el arranque de
+            # la subtarea.
+            return
+        await TaskAuditor(self.task_repo, actor_id).status_changed(
+            parent_id, previous, TaskStatus.EN_PROGRESO, reason="Subtarea iniciada"
+        )
 
     async def _cascade_reschedule_dependents(
         self, completed: TaskResponse, actor_id: UUID | None
