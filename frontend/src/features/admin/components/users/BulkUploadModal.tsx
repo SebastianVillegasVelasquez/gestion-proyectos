@@ -355,7 +355,7 @@ export function BulkUploadModal({ onClose }: { onClose: () => void }) {
                               <th className="px-3 py-2 font-medium">Nombre</th>
                               <th className="px-3 py-2 font-medium">Apellido</th>
                               <th className="px-3 py-2 font-medium">Email</th>
-                              <th className="px-3 py-2 font-medium">Contraseña temporal</th>
+                              <th className="px-3 py-2 font-medium">Acceso</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -364,8 +364,9 @@ export function BulkUploadModal({ onClose }: { onClose: () => void }) {
                                 <td className="px-3 py-1.5 text-foreground">{u.name}</td>
                                 <td className="px-3 py-1.5 text-foreground">{u.last_name}</td>
                                 <td className="px-3 py-1.5 text-foreground">{u.email}</td>
-                                <td className="px-3 py-1.5 text-foreground">
-                                  {u.temporary_password ?? "—"}
+                                <td className="px-3 py-1.5 text-muted-foreground">
+                                  {u.temporary_password ??
+                                    "Enlace de activación enviado por correo"}
                                 </td>
                               </tr>
                             ))}

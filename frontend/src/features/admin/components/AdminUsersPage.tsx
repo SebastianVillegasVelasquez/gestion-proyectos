@@ -59,9 +59,12 @@ export function AdminUsersPage() {
   });
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [creds, setCreds] = useState<{ title: string; email: string; password: string } | null>(
-    null,
-  );
+  const [creds, setCreds] = useState<{
+    title: string;
+    email: string;
+    password?: string;
+    activationUrl?: string | null;
+  } | null>(null);
 
   const total = query.data?.total ?? 0;
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
@@ -243,9 +246,9 @@ export function AdminUsersPage() {
           onClose={() => {
             setShowCreate(false);
           }}
-          onCreated={(email, password) => {
+          onCreated={(email, _password, activationUrl) => {
             setShowCreate(false);
-            setCreds({ title: "Usuario creado", email, password });
+            setCreds({ title: "Usuario creado", email, activationUrl });
           }}
         />
       )}
@@ -255,6 +258,7 @@ export function AdminUsersPage() {
           title={creds.title}
           email={creds.email}
           password={creds.password}
+          activationUrl={creds.activationUrl}
           onClose={() => {
             setCreds(null);
           }}

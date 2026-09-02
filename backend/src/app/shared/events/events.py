@@ -165,10 +165,13 @@ class UserCreated(DomainEvent):
     user_id: uuid.UUID
     email: str
     name: str
-    # Contraseña temporal generada por el sistema, solo cuando el alta no trajo
-    # una definida. Viaja en el evento porque el correo de bienvenida la incluye
-    # para que la persona pueda entrar. None si el admin definió la contraseña.
+    # Contraseña temporal generada por el sistema. Camino heredado: se mantiene
+    # por compatibilidad, pero el alta ya no la usa (ver `activation_token`).
     temporary_password: str | None = None
+    # Token de activación en claro (un solo uso). Viaja en el evento para que el
+    # correo de bienvenida arme el enlace "Activar mi cuenta". None si el admin
+    # definió la contraseña en el alta.
+    activation_token: str | None = None
 
 
 @dataclass(frozen=True)

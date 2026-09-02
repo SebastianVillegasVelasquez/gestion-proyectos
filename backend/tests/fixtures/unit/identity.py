@@ -23,12 +23,16 @@ class FakeUser:
     # Espeja `TimestampMixin` del modelo real: las respuestas de usuario
     # incluyen la fecha de alta.
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Espeja las columnas del token de activación (alta sin contraseña).
+    activation_token_hash: str | None = None
+    activation_token_expires_at: datetime | None = None
 
 
 class FakeIdentityRepository:
     def __init__(self, users: list[CreateUserRequest] | None = None):
         self.users = users or []
         self.saved_users: list[CreateUserRequest] = []
+        self._by_id: dict = {}
 
     async def get_user_by_email(self, email: str) -> CreateUserRequest | None:
         return next((u for u in self.users if u.email == email), None)
@@ -43,8 +47,8 @@ class FakeIdentityRepository:
 
     async def add(self, user: CreateUserRequest) -> FakeUser:
         self.saved_users.append(user)
-        return FakeUser(
-            id=UUID(int=1),
+        created = FakeUser(
+            id=UUID(int=len(self.saved_users)),
             email=user.email,
             name=user.name,
             last_name=user.last_name,
@@ -54,6 +58,24 @@ class FakeIdentityRepository:
             document_type=(user.document_type.value if user.document_type else None),
             document_number=user.document_number,
         )
+        self._by_id[created.id] = created
+        return created
+
+    # ── Soporte del flujo de activación por token ──────────────────────────────
+    async def get_by_id(self, user_id: UUID):
+        return self._by_id.get(user_id)
+
+    async def get_by_activation_token_hash(self, token_hash: str):
+        return next(
+            (u for u in self._by_id.values() if u.activation_token_hash == token_hash),
+            None,
+        )
+
+    async def save(self, user) -> None:
+        self._by_id[user.id] = user
+
+    async def rollback(self) -> None:  # red de seguridad del caso de uso masivo
+        return None
 
 
 @pytest.fixture

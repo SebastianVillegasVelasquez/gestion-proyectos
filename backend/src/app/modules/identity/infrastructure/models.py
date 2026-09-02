@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import datetime
 import uuid
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import UUID, Boolean, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_database import Base
@@ -75,6 +84,17 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # esto sea True.
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
+    )
+
+    # Activación de cuenta por enlace: en vez de mandar una contraseña por correo,
+    # el alta genera un token de un solo uso. Se guarda su SHA-256 (nunca el token
+    # en claro) y su caducidad; ambos se limpian al activar. Null = ya activada o
+    # cuenta anterior a este flujo.
+    activation_token_hash: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    activation_token_expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     # Relaciones

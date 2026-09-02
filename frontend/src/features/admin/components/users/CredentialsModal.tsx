@@ -1,18 +1,25 @@
 import { Copy } from "lucide-react";
 
-// ── Modal: credenciales generadas (crear / reset) ───────────────────────────
+// ── Modal: credenciales / enlace generados (crear / reset) ──────────────────
+// - reset  → `password`: contraseña temporal para entregar.
+// - alta   → `activationUrl`: enlace de activación (también enviado por correo).
 export function CredentialsModal({
   title,
   email,
   password,
+  activationUrl,
   onClose,
 }: {
   title: string;
   email: string;
-  password: string;
+  password?: string;
+  activationUrl?: string | null;
   onClose: () => void;
 }) {
-  const text = `Usuario: ${email}\nContraseña temporal: ${password}`;
+  const isLink = Boolean(activationUrl);
+  const text = isLink
+    ? `Usuario: ${email}\nEnlace de activación: ${activationUrl ?? ""}`
+    : `Usuario: ${email}\nContraseña temporal: ${password ?? ""}`;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -29,7 +36,9 @@ export function CredentialsModal({
       <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-base font-semibold text-foreground">{title}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Cópialas y entrégaselas al usuario. No se volverán a mostrar.
+          {isLink
+            ? "Ya se envió por correo. Este enlace es de un solo uso; cópialo solo si necesitas reenviarlo por otro canal."
+            : "Cópialas y entrégaselas al usuario. No se volverán a mostrar."}
         </p>
         <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-sm text-foreground">
           {text}

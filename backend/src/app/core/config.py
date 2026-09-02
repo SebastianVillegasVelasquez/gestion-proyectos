@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Vida del enlace de activación de cuenta (alta sin contraseña por correo).
+    ACTIVATION_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── Super admin sembrado al iniciar ─────────
     SUPERADMIN_EMAIL: str = "superadmin@objdigital.com"
