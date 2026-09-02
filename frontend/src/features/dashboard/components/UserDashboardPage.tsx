@@ -74,7 +74,10 @@ export function UserDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:shrink-0">
-        <UpcomingDeadlines deadlines={deadlines} />
+        <UpcomingDeadlines
+          deadlines={deadlines}
+          deliveredLast7d={summaryQuery.data?.delivered_last_7d}
+        />
       </div>
     </div>
   );

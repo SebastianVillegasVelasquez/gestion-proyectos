@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, ClipboardList, UsersRound } from "lucide-react";
+import { CalendarRange, ChevronRight, ClipboardList, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,15 @@ import { StatusBadge } from "./StatusBadge";
 import { TaskBoard } from "./TaskBoard";
 import { useMyProjectProgress } from "../hooks/use-dashboard-summary";
 import { toTask } from "../utils/transform-panels";
+
+/** `2026-09-01` → `01/09/2026`; nulo → `—`. */
+function formatDate(iso: string | null): string {
+  if (!iso) {
+    return "—";
+  }
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 function barColor(pct: number): string {
   if (pct >= 70) {
@@ -63,10 +72,16 @@ export function ProjectProgressPage() {
           <Card accent="gold">
             <CardContent className="flex flex-col gap-4 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <StatusBadge variant={data.status} />
                   {data.client_name && (
                     <span className="text-sm text-muted-foreground">{data.client_name}</span>
+                  )}
+                  {(data.start_date != null || data.end_date != null) && (
+                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <CalendarRange className="size-4" />
+                      {formatDate(data.start_date)} → {formatDate(data.end_date)}
+                    </span>
                   )}
                 </div>
                 <span className="text-3xl font-bold tabular-nums text-foreground">
@@ -124,7 +139,7 @@ export function ProjectProgressPage() {
               Mis tareas en este proyecto
             </h2>
             {data.my_tasks.length > 0 ? (
-              <TaskBoard tasks={data.my_tasks.map(toTask)} />
+              <TaskBoard tasks={data.my_tasks.map(toTask)} pageSize={10} />
             ) : (
               <EmptyState
                 icon={ClipboardList}

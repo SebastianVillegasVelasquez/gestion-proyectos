@@ -197,7 +197,9 @@ def event_bus_dependency(
     bus.subscribe(
         UserCreated,
         NotifyUserCreatedByEmail(
-            build_email_sender(settings), public_url=settings.APP_PUBLIC_URL
+            build_email_sender(settings),
+            public_url=settings.APP_PUBLIC_URL,
+            activation_expire_days=settings.ACTIVATION_TOKEN_EXPIRE_DAYS,
         ),
     )
     return bus

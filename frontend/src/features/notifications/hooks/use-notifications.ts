@@ -36,6 +36,21 @@ export function useNotifications(enabled: boolean) {
   });
 }
 
+/**
+ * Lista paginada para la vista completa `/notificaciones`. El backend solo
+ * pagina y filtra por leídas/no leídas; el resto de filtros (tipo, prioridad,
+ * texto, rango de fechas) se aplican en cliente sobre esta ventana, que crece
+ * con el botón "Cargar más".
+ */
+export function useNotificationsList(pageSize: number) {
+  return useQuery({
+    queryKey: [...notificationKeys.list(), pageSize],
+    queryFn: () => notificationsApi.list({ page: 1, pageSize }),
+    retry: false,
+    staleTime: 15_000,
+  });
+}
+
 // Snapshot del cache antes de una mutación optimista, para poder revertir
 // si el servidor falla (patrón "optimistic update" de React Query).
 interface CacheSnapshot {
@@ -120,6 +135,55 @@ export function useMarkRead() {
     },
     onError: (_err, _id, snap) => {
       restore(qc, snap);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+  });
+}
+
+/**
+ * Borra una notificación de forma optimista: desaparece de todas las listas en
+ * caché (panel y vista completa) al instante y, si estaba sin leer, baja el
+ * contador. Se revierte si el servidor falla.
+ */
+export function useDeleteNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => notificationsApi.remove(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: notificationKeys.all });
+      const lists = qc.getQueriesData<PaginatedNotifications>({
+        queryKey: notificationKeys.list(),
+      });
+      const unread = qc.getQueryData<UnreadCount>(notificationKeys.unread());
+      const wasUnread = lists.some(([, data]) =>
+        data?.items.some((n) => n.id === id && !n.is_read),
+      );
+      for (const [key, data] of lists) {
+        if (!data) {
+          continue;
+        }
+        qc.setQueryData<PaginatedNotifications>(key, {
+          ...data,
+          items: data.items.filter((n) => n.id !== id),
+          total: Math.max(0, data.total - 1),
+          unread_count: wasUnread ? Math.max(0, data.unread_count - 1) : data.unread_count,
+        });
+      }
+      if (wasUnread) {
+        qc.setQueryData<UnreadCount>(
+          notificationKeys.unread(),
+          (old) => old && { unread_count: Math.max(0, old.unread_count - 1) },
+        );
+      }
+      return { lists, unread };
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.lists.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
+      if (ctx?.unread) {
+        qc.setQueryData(notificationKeys.unread(), ctx.unread);
+      }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
   });

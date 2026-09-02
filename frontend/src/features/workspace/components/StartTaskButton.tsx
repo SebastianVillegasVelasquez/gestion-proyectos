@@ -10,17 +10,27 @@ import type { ApiTeamTask } from "../api/workspace.api";
  * moverla, avisa a quien coordina (líder/supervisor del equipo) — así se
  * enteran de que el trabajo arrancó sin tener que preguntar.
  *
- * Se dibuja solo, y solo cuando corresponde: si la tarea no es de quien mira o
- * ya está iniciada, no renderiza nada. Así se puede soltar en cualquier fila
- * sin condicionar desde fuera.
+ * Se dibuja solo, y solo cuando corresponde: si la tarea no es de quien mira,
+ * ya está iniciada, o ES una tarea padre (su avance sale de las subtareas: no
+ * se "comienza" a mano), no renderiza nada. Así se puede soltar en cualquier
+ * fila sin condicionar desde fuera.
  */
-export function StartTaskButton({ task, projectId }: { task: ApiTeamTask; projectId: string }) {
+export function StartTaskButton({
+  task,
+  projectId,
+  isParent = false,
+}: {
+  task: ApiTeamTask;
+  projectId: string;
+  /** La tarea tiene subtareas: son ellas las que se comienzan, no el padre. */
+  isParent?: boolean;
+}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const changeStatus = useChangeTaskStatus(projectId);
 
   const isMine = task.assignee_id != null && task.assignee_id === user?.id;
-  if (!isMine || task.status !== "pendiente_por_iniciar") {
+  if (isParent || !isMine || task.status !== "pendiente_por_iniciar") {
     return null;
   }
 

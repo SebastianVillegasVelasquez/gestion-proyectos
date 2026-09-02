@@ -309,13 +309,27 @@ class UpdateTaskRequest(BaseModelConfig):
 class BlockingTaskResponse(BaseModelConfig):
     """Tarea bloqueante (dependencia FtS) resumida para pintar el indicador.
 
-    Solo id, título y estado: el workspace muestra "Bloqueada por: <título>" y
-    atenúa el aviso cuando la bloqueante ya está completada.
+    id + título + estado + responsable: el workspace muestra "Bloqueada por:
+    <título>" y atenúa el aviso cuando la bloqueante ya está completada; «Mis
+    tareas» además dice quién la tiene. `assignee_name` es None para las
+    dependencias hacia un elemento del árbol (no tienen responsable).
     """
 
     id: UUID
     title: str
     status: TaskStatus
+    assignee_name: Optional[str] = None
+
+
+class WorkItemCrumbResponse(BaseModelConfig):
+    """Un eslabón de la cadena RAÍZ→elemento de una tarea, con su tipo, para
+    pintar la miga de pan con los mismos colores que la Estructura."""
+
+    id: UUID
+    name: str
+    tipo_id: Optional[UUID] = None
+    tipo_nombre: Optional[str] = None
+    es_dependencia_externa: bool = False
 
 
 class TeamTaskItemResponse(BaseModelConfig):
@@ -367,6 +381,8 @@ class MyTaskItemResponse(BaseModelConfig):
     project_name: str
     work_item_id: Optional[UUID] = None
     work_item_name: Optional[str] = None
+    # Cadena RAÍZ→elemento (él incluido) para la miga de pan con colores de tipo.
+    work_item_ancestors: list[WorkItemCrumbResponse] = []
     team_id: Optional[UUID] = None
     team_name: Optional[str] = None
     parent_task_id: Optional[UUID] = None

@@ -23,6 +23,14 @@ class UserRepository(BaseRepository[User]):
 
         return result.scalars().first()
 
+    async def get_by_activation_token_hash(self, token_hash: str) -> User | None:
+        """Usuario cuyo token de activación (SHA-256) coincide, o None. La
+        caducidad y el consumo del token los valida el caso de uso."""
+        result = await self._session.execute(
+            select(User).where(User.activation_token_hash == token_hash)
+        )
+        return result.scalars().first()
+
     async def get_by_document_number(self, document_number: str) -> User | None:
         query = select(User).where(User.document_number == document_number)
         result = await self._session.execute(query)

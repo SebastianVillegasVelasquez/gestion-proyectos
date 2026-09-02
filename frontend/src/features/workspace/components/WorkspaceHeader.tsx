@@ -45,7 +45,9 @@ export function WorkspaceHeader({
               onChange={(e) => {
                 onSwitchTeam(e.target.value);
               }}
-              className="max-w-[60vw] cursor-pointer truncate rounded-md bg-transparent py-0.5 pr-7 text-lg font-bold text-slate-900 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800 dark:focus:bg-slate-800"
+              // `appearance-none`: sin esto el <select> pinta SU flecha nativa
+              // además de la <ChevronDown> de abajo — se veían dos.
+              className="max-w-[60vw] cursor-pointer appearance-none truncate rounded-md bg-transparent py-0.5 pr-7 text-lg font-bold text-slate-900 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800 dark:focus:bg-slate-800"
             >
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>

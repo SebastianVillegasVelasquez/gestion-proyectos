@@ -7,6 +7,16 @@ import type {
 import type { CommentType, DeliverableStatus, ResourceType } from "@/features/workspace/types";
 import type { TaskPriority, TaskStatus } from "@/features/projects/types/api.types";
 
+/** Un eslabón RAÍZ→elemento de la estructura, con su tipo (para la miga de pan
+ *  con los colores de la Estructura). */
+export interface ApiWorkItemCrumb {
+  id: string;
+  name: string;
+  tipo_id: string | null;
+  tipo_nombre: string | null;
+  es_dependencia_externa: boolean;
+}
+
 /** Una tarea asignada al usuario (cualquier proyecto). `team_id` presente = se
  * entrega por el espacio del equipo; ausente = entrega individual. */
 export interface ApiMyTask {
@@ -18,6 +28,8 @@ export interface ApiMyTask {
   project_name: string;
   work_item_id: string | null;
   work_item_name: string | null;
+  /** Cadena RAÍZ→elemento (él incluido). Vacío para tareas sin elemento. */
+  work_item_ancestors: ApiWorkItemCrumb[];
   team_id: string | null;
   team_name: string | null;
   parent_task_id: string | null;

@@ -21,6 +21,7 @@ import {
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
@@ -29,7 +30,7 @@ import { useDeleteTask } from "@/features/projects/hooks/use-tasks";
 import { collectItemPaths } from "@/features/projects/utils/work-item-path";
 import { tipoStyle, type TipoStyle } from "@/features/projects/utils/tipo-style";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
-import { buildTeamBoard } from "@/features/projects/utils/team-board";
+import { buildTeamBoard, type BoardColumn } from "@/features/projects/utils/team-board";
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
@@ -66,18 +67,23 @@ import {
 // del espacio (WorkspaceNav), no dentro de esta vista.
 type ViewMode = "lista" | "kanban" | "trazabilidad";
 
-/** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea. */
-function Crumb({ path }: { path: string[] }) {
+/** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea.
+ *  `max` acota cuántos segmentos finales se muestran (con «…» delante); el
+ *  `title` siempre lleva la ruta completa. */
+function Crumb({ path, max }: { path: string[]; max?: number }) {
   if (path.length === 0) {
     return <>Sin elemento</>;
   }
+  const shown = max && path.length > max ? path.slice(-max) : path;
+  const clipped = shown.length < path.length;
   return (
     <span title={path.join(" › ")}>
-      {path.slice(0, -1).map((name) => (
-        <span key={name}>{name} › </span>
+      {clipped && <span>… › </span>}
+      {shown.slice(0, -1).map((name, i) => (
+        <span key={`${name}-${String(i)}`}>{name} › </span>
       ))}
       <span className="font-semibold text-slate-500 dark:text-slate-400">
-        {path[path.length - 1]}
+        {shown[shown.length - 1]}
       </span>
     </span>
   );
@@ -316,6 +322,7 @@ function TaskRow({
   color,
   hideAssignee,
   hasChildren,
+  isParent,
   collapsed,
   onToggleCollapse,
   onAddSubtask,
@@ -335,8 +342,10 @@ function TaskRow({
   color: TipoStyle | null;
   /** La vista ya está agrupada/filtrada por persona: no repetir el nombre. */
   hideAssignee: boolean;
-  /** La tarea tiene subtareas: se muestra el chevron para ocultarlas/verlas. */
+  /** La tarea tiene subtareas EN ESTA VISTA: chevron para ocultarlas/verlas. */
   hasChildren: boolean;
+  /** La tarea es padre en el conjunto completo: sin botón «Comenzar». */
+  isParent: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onAddSubtask: (task: ApiTeamTask) => void;
@@ -463,8 +472,9 @@ function TaskRow({
         <UrgencyBadge task={task} />
       </span>
 
-      {/* "Comenzar": solo lo ve el responsable en su propia tarea sin iniciar. */}
-      <StartTaskButton task={task} projectId={projectId} />
+      {/* "Comenzar": solo el responsable, en su propia tarea sin iniciar y que
+          no sea padre (las tareas padre avanzan por sus subtareas). */}
+      <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
 
       {/* "Entregar": tarea padre al 100%, solo para su responsable. */}
       <DeliverActions task={task} cbs={deliverCbs} />
@@ -519,6 +529,7 @@ function TaskRow({
 function ListView({
   groups,
   allTasks,
+  parentIds,
   members,
   grouping,
   today,
@@ -537,6 +548,8 @@ function ListView({
   groups: ReturnType<typeof groupTeamTasks>;
   /** Todas las del equipo: resuelven el título de un padre fuera del grupo. */
   allTasks: ApiTeamTask[];
+  /** Ids de tareas padre en el conjunto completo (para suprimir «Comenzar»). */
+  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   grouping: TaskGrouping;
   today: string;
@@ -552,13 +565,15 @@ function ListView({
   onDelete: (task: ApiTeamTask) => void;
   deliverCbs: DeliverCbs;
 }) {
-  // Subtareas plegables por tarea padre (por defecto visibles). El estado vive
-  // aquí: se reinicia al salir de la vista Lista, que es lo esperable.
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const childIds = useMemo(
     () => new Set(allTasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
     [allTasks],
   );
+  // Subtareas plegables por tarea padre. Por defecto TODAS colapsadas: al abrir
+  // la vista se ven solo las tareas raíz y el usuario despliega lo que quiera.
+  // Lazy-init a partir de las tareas presentes al montar; el estado se reinicia
+  // al salir de la vista Lista, que es lo esperable.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(childIds));
 
   return (
     // `absolute inset-0` contra el padre `relative`: scrollea siempre, sin
@@ -611,6 +626,7 @@ function ListView({
                     color={colorOf(row.task)}
                     hideAssignee={hideAssignee}
                     hasChildren={childIds.has(row.task.id)}
+                    isParent={parentIds.has(row.task.id)}
                     collapsed={collapsed.has(row.task.id)}
                     onToggleCollapse={() => {
                       setCollapsed((prev) => {
@@ -675,7 +691,11 @@ function TaskCard({
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    // `shrink-0`: sin esto, en una columna con muchas tarjetas el flex las
+    // aplastaba y su `overflow-hidden` recortaba el contenido (título pisando la
+    // urgencia, "Comenzar" encima…). Ahora cada tarjeta conserva su alto y la
+    // columna scrollea.
+    <article className="group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
       {/* Acento de color del elemento de origen: de un vistazo, de qué
           componente viene la tarjeta (distingue clones del original). */}
       {color && <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", color.bar)} />}
@@ -686,9 +706,9 @@ function TaskCard({
         >
           {task.title}
         </p>
+        {/* Kanban = solo lectura: sin «Comenzar». Se arranca desde la Lista. */}
         <div className="flex shrink-0 items-center gap-1">
           <UrgencyBadge task={task} />
-          <StartTaskButton task={task} projectId={projectId} />
           {canReview && (
             <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <button
@@ -727,10 +747,11 @@ function TaskCard({
           <span className="truncate">{parentTitle}</span>
         </p>
       )}
+      {/* De dónde viene: elemento › padre › padre del padre (3 niveles finales). */}
       <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
         {color && <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />}
         <span className="truncate">
-          <Crumb path={path} />
+          <Crumb path={path} max={3} />
         </span>
       </p>
 
@@ -774,6 +795,122 @@ function TaskCard({
   );
 }
 
+// Cuántas tarjetas muestra una columna del Kanban antes de pedir "ver más".
+const KANBAN_PAGE = 15;
+
+function KanbanColumn({
+  col,
+  titleById,
+  members,
+  today,
+  pathOf,
+  colorOf,
+  canReview,
+  projectId,
+  teamMembers,
+  hideAssignee,
+  onReassigned,
+  onEdit,
+  onDelete,
+  deliverCbs,
+}: {
+  col: BoardColumn<ApiTeamTask>;
+  titleById: Map<string, string>;
+  members: WorkspaceMember[];
+  today: string;
+  pathOf: (task: ApiTeamTask) => string[];
+  colorOf: (task: ApiTeamTask) => TipoStyle | null;
+  canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
+  hideAssignee: boolean;
+  onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
+}) {
+  const [visible, setVisible] = useState(KANBAN_PAGE);
+  const shown = col.tasks.slice(0, visible);
+  const remaining = col.tasks.length - shown.length;
+
+  return (
+    <section className="flex w-[280px] shrink-0 flex-col">
+      <header
+        className={cn(
+          "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
+          col.atRisk
+            ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
+            : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
+        )}
+      >
+        <p
+          className={cn(
+            "flex items-center gap-1 truncate text-[12px] font-semibold",
+            col.atRisk ? "text-rose-700 dark:text-rose-300" : "text-slate-600 dark:text-slate-300",
+          )}
+        >
+          {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
+          {col.label}
+        </p>
+        <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          {col.tasks.length}
+        </span>
+      </header>
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
+          col.atRisk
+            ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
+            : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
+        )}
+      >
+        {col.tasks.length === 0 ? (
+          <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
+            Sin tareas
+          </p>
+        ) : (
+          <>
+            {shown.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                parentTitle={
+                  task.parent_task_id === null
+                    ? null
+                    : (titleById.get(task.parent_task_id) ?? "otra tarea")
+                }
+                members={members}
+                today={today}
+                path={pathOf(task)}
+                color={colorOf(task)}
+                canReview={canReview}
+                projectId={projectId}
+                teamMembers={teamMembers}
+                hideAssignee={hideAssignee}
+                onReassigned={onReassigned}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                deliverCbs={deliverCbs}
+              />
+            ))}
+            {remaining > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setVisible((n) => n + KANBAN_PAGE);
+                }}
+                className="shrink-0 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+              >
+                Ver {Math.min(remaining, KANBAN_PAGE)} más
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function KanbanView({
   allTasks,
   members,
@@ -811,69 +948,23 @@ function KanbanView({
     // Scroll horizontal propio del tablero; `absolute inset-0` para tener alto.
     <div className="absolute inset-0 flex gap-3 overflow-x-auto p-4 sm:p-6">
       {columns.map((col) => (
-        <section key={col.key} className="flex w-[280px] shrink-0 flex-col">
-          <header
-            className={cn(
-              "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
-              col.atRisk
-                ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
-                : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
-            )}
-          >
-            <p
-              className={cn(
-                "flex items-center gap-1 truncate text-[12px] font-semibold",
-                col.atRisk
-                  ? "text-rose-700 dark:text-rose-300"
-                  : "text-slate-600 dark:text-slate-300",
-              )}
-            >
-              {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
-              {col.label}
-            </p>
-            <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              {col.tasks.length}
-            </span>
-          </header>
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
-              col.atRisk
-                ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
-                : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
-            )}
-          >
-            {col.tasks.length === 0 ? (
-              <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
-                Sin tareas
-              </p>
-            ) : (
-              col.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  parentTitle={
-                    task.parent_task_id === null
-                      ? null
-                      : (titleById.get(task.parent_task_id) ?? "otra tarea")
-                  }
-                  members={members}
-                  today={today}
-                  path={pathOf(task)}
-                  color={colorOf(task)}
-                  canReview={canReview}
-                  projectId={projectId}
-                  teamMembers={teamMembers}
-                  hideAssignee={hideAssignee}
-                  onReassigned={onReassigned}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  deliverCbs={deliverCbs}
-                />
-              ))
-            )}
-          </div>
-        </section>
+        <KanbanColumn
+          key={col.key}
+          col={col}
+          titleById={titleById}
+          members={members}
+          today={today}
+          pathOf={pathOf}
+          colorOf={colorOf}
+          canReview={canReview}
+          projectId={projectId}
+          teamMembers={teamMembers}
+          hideAssignee={hideAssignee}
+          onReassigned={onReassigned}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          deliverCbs={deliverCbs}
+        />
       ))}
     </div>
   );
@@ -960,9 +1051,12 @@ export function TeamTasksView({
   canDeliverTask,
 }: TeamTasksViewProps) {
   const deliverCbs: DeliverCbs = { onDeliver, onMarkDelivered, canDeliverTask };
+  const { user } = useAuth();
   const query = useTeamTasks(teamId);
   const accessQuery = useWorkspaceAccess(teamId);
   const canReview = accessQuery.data?.can_review ?? false;
+  // El líder/supervisor puede filtrar por persona; un integrante solo ve lo suyo.
+  const canFilterByPerson = canReview;
   const treeQuery = useWorkTree(projectId);
   const typesQuery = useNodeTypes(projectId);
   const qc = useQueryClient();
@@ -975,6 +1069,15 @@ export function TeamTasksView({
   // Abre mostrando solo la bolsa del equipo (tareas sin asignar); los botones
   // por integrante de la barra de filtros llevan al trabajo de cada persona.
   const [filters, setFilters] = useState<TeamTaskFilters>(DEFAULT_TEAM_TASK_FILTERS);
+
+  // Integrante (sin permiso de revisión): la vista queda fijada a SUS tareas.
+  // No se sincroniza el estado —se deriva aquí—: así el efecto no dispara
+  // renders en cascada y el resto del filtrado (estado, texto…) sigue vivo.
+  const userId = user?.id;
+  const effectiveFilters: TeamTaskFilters = useMemo(
+    () => (canFilterByPerson || !userId ? filters : { ...filters, assignee: userId }),
+    [filters, canFilterByPerson, userId],
+  );
   // Edición/borrado de una tarea (o subtarea) del equipo, solo para el líder.
   const [editingTask, setEditingTask] = useState<ApiTeamTask | null>(null);
   const [deletingTask, setDeletingTask] = useState<ApiTeamTask | null>(null);
@@ -982,6 +1085,13 @@ export function TeamTasksView({
 
   const today = useMemo(() => todayIso(), []);
   const allTasks = useMemo(() => query.data ?? [], [query.data]);
+  // Tareas que SON padre (tienen al menos una subtarea), sobre el conjunto
+  // completo del equipo: una tarea padre no se "comienza" a mano, su avance
+  // sale de las subtareas. Alimenta la supresión del botón «Comenzar».
+  const parentIds = useMemo(
+    () => new Set(allTasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
+    [allTasks],
+  );
 
   // ── Estructura del proyecto: jerarquía + tipo de cada elemento ──────────────
   const treeData = useMemo(() => treeQuery.data ?? [], [treeQuery.data]);
@@ -1090,8 +1200,8 @@ export function TeamTasksView({
   // Filtramos ANTES de agrupar: Lista, Kanban y Estructura ven el mismo
   // subconjunto. El cronograma y la trazabilidad tienen sus propios filtros.
   const tasks = useMemo(
-    () => filterTeamTasks(allTasks, filters, ancestorsOf),
-    [allTasks, filters, ancestorsOf],
+    () => filterTeamTasks(allTasks, effectiveFilters, ancestorsOf),
+    [allTasks, effectiveFilters, ancestorsOf],
   );
   const patchFilters = (patch: Partial<TeamTaskFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
@@ -1101,23 +1211,35 @@ export function TeamTasksView({
     void qc.invalidateQueries({ queryKey: ["workspace", "tasks", teamId] });
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
   // dentro de columnas de estado no tendría dónde ir.
-  const effectiveGrouping: TaskGrouping = view === "lista" ? grouping : "estado";
+  const effectiveGrouping: TaskGrouping =
+    view === "lista" && canFilterByPerson ? grouping : "estado";
   // El nombre del responsable sobra cuando la vista ya está acotada a una
   // persona: agrupada por integrante, o filtrada a un responsable concreto.
   const hideAssignee =
     effectiveGrouping === "integrante" ||
-    (filters.assignee !== "all" && filters.assignee !== UNASSIGNED);
+    (effectiveFilters.assignee !== "all" && effectiveFilters.assignee !== UNASSIGNED);
   // Vista recién abierta en la bolsa del equipo (solo «sin asignar») y esa
   // bolsa está vacía: no dejamos la pantalla en blanco, invitamos a filtrar.
   const emptyBag =
     tasks.length === 0 &&
     allTasks.length > 0 &&
-    filters.assignee === UNASSIGNED &&
-    filters.status === "all" &&
-    filters.text.trim() === "" &&
-    !filters.onlyBlocked &&
-    filters.elementId === "all" &&
-    filters.branchId === "all";
+    effectiveFilters.assignee === UNASSIGNED &&
+    effectiveFilters.status === "all" &&
+    effectiveFilters.text.trim() === "" &&
+    !effectiveFilters.onlyBlocked &&
+    effectiveFilters.elementId === "all" &&
+    effectiveFilters.branchId === "all";
+  // Integrante sin ninguna tarea propia en el equipo: la bolsa de arriba es de
+  // líder, así que le damos su propio vacío.
+  const emptyForMember =
+    !canFilterByPerson &&
+    tasks.length === 0 &&
+    allTasks.length > 0 &&
+    effectiveFilters.status === "all" &&
+    effectiveFilters.text.trim() === "" &&
+    !effectiveFilters.onlyBlocked &&
+    effectiveFilters.elementId === "all" &&
+    effectiveFilters.branchId === "all";
   const groups = useMemo(
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
@@ -1169,7 +1291,9 @@ export function TeamTasksView({
           ]}
         />
 
-        {view === "lista" && (
+        {/* Agrupar por integrante solo tiene sentido para quien coordina; un
+            integrante solo se ve a sí mismo. */}
+        {view === "lista" && canFilterByPerson && (
           <Segmented
             label="Agrupar tareas por"
             value={grouping}
@@ -1205,11 +1329,14 @@ export function TeamTasksView({
 
       {showFilterBar && (
         <TeamTaskFilterBar
-          filters={filters}
+          filters={effectiveFilters}
           onChange={patchFilters}
           onReset={() => {
+            // Para el integrante, `effectiveFilters` vuelve a fijar el responsable
+            // a lo suyo, así que basta con vaciar el estado crudo.
             setFilters(EMPTY_TEAM_TASK_FILTERS);
           }}
+          canFilterByPerson={canFilterByPerson}
           teamMembers={teamMembers}
           elementOptions={elementOptions}
           branchOptions={branchOptions}
@@ -1248,10 +1375,20 @@ export function TeamTasksView({
             </div>
           </div>
         )}
-        {view === "lista" && !emptyBag && (
+        {emptyForMember && !emptyBag && (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <EmptyState
+              icon={FolderKanban}
+              title="No tienes tareas en este equipo"
+              hint="Cuando el líder te asigne una tarea de este equipo, aparecerá aquí."
+            />
+          </div>
+        )}
+        {view === "lista" && !emptyBag && !emptyForMember && (
           <ListView
             groups={groups}
             allTasks={tasks}
+            parentIds={parentIds}
             members={members}
             grouping={effectiveGrouping}
             today={today}
@@ -1271,7 +1408,7 @@ export function TeamTasksView({
             deliverCbs={deliverCbs}
           />
         )}
-        {view === "kanban" && !emptyBag && (
+        {view === "kanban" && !emptyBag && !emptyForMember && (
           <KanbanView
             allTasks={tasks}
             members={members}

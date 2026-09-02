@@ -29,10 +29,12 @@ export interface CreateUserPayload {
   document_number?: string | null;
 }
 
-/** Alta de usuario: el backend devuelve la contraseña temporal generada (una
- * sola vez) para entregarla a la persona. */
+/** Alta de usuario: el backend ya NO devuelve contraseña. Cuando el admin no
+ * define una, devuelve `activation_url` (enlace de un solo uso que también se
+ * envió por correo) por si el correo no llega. */
 export interface CreatedUser extends AdminUser {
   temporary_password: string | null;
+  activation_url: string | null;
 }
 
 export interface BulkUserRowError {

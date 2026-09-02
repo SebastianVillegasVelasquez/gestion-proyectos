@@ -148,6 +148,7 @@ class GetMyDashboardSummaryUseCase:
             completed_tasks=summary.completed_tasks,
             in_review_tasks=summary.in_review_tasks,
             overdue_tasks=summary.overdue_tasks,
+            delivered_last_7d=summary.delivered_last_7d,
         )
 
 
@@ -198,6 +199,8 @@ class GetMyProjectProgressUseCase:
             tasks_overdue=detail.tasks_overdue,
             tasks_pending=detail.tasks_pending,
             progress_pct=detail.progress_pct,
+            start_date=detail.start_date,
+            end_date=detail.end_date,
             my_tasks=[
                 TaskBoardItemResponse(
                     id=item.id,

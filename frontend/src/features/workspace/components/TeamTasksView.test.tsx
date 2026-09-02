@@ -183,11 +183,11 @@ describe("TeamTasksView — botón Comenzar", () => {
 
   it("aparece en la tarea propia sin iniciar y la pasa a en_progreso", async () => {
     const user = userEvent.setup();
-    // task() por defecto: assignee_id "u1" (== usuario mock) y pendiente_por_iniciar
+    // task() por defecto: assignee_id "u1" (== usuario mock) y pendiente_por_iniciar.
+    // El integrante abre la vista ya filtrada a sus tareas: no hay chip "Todas".
     renderView(false, [task({ id: "mine", title: "Lo mío" })]);
 
-    await showAllAssignees(user);
-    await user.click(screen.getByRole("button", { name: /Comenzar/i }));
+    await user.click(await screen.findByRole("button", { name: /Comenzar/i }));
     expect(startMutate).toHaveBeenCalledWith(
       { taskId: "mine", status: "en_progreso" },
       expect.anything(),
@@ -202,5 +202,19 @@ describe("TeamTasksView — botón Comenzar", () => {
   it("no aparece si la tarea ya está en progreso", () => {
     renderView(false, [task({ status: "en_progreso" })]);
     expect(screen.queryByRole("button", { name: /Comenzar/i })).toBeNull();
+  });
+
+  it("no aparece en la tarea padre: solo en sus subtareas", async () => {
+    const user = userEvent.setup();
+    renderView(false, [
+      task({ id: "parent", title: "Tarea padre" }),
+      task({ id: "child", title: "Subtarea", parent_task_id: "parent" }),
+    ]);
+    // Subtareas colapsadas por defecto: el padre no trae "Comenzar".
+    expect(screen.queryByRole("button", { name: /Comenzar/i })).toBeNull();
+    // Al desplegar aparece el "Comenzar" de la subtarea (y solo ese).
+    await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
+    const buttons = await screen.findAllByRole("button", { name: /Comenzar/i });
+    expect(buttons).toHaveLength(1);
   });
 });

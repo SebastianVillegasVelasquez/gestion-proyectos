@@ -10,6 +10,9 @@ class DashboardSummaryResponse(BaseModelConfig):
     completed_tasks: int
     in_review_tasks: int
     overdue_tasks: int
+    # Solo relevante en el resumen del rol User (entregas propias en 7 días); el
+    # resumen global lo devuelve en 0.
+    delivered_last_7d: int = 0
 
 
 class TaskBoardItemResponse(BaseModelConfig):
@@ -83,6 +86,8 @@ class MyProjectProgressResponse(BaseModelConfig):
     tasks_overdue: int
     tasks_pending: int
     progress_pct: int
+    start_date: datetime.date | None = None
+    end_date: datetime.date | None = None
     my_tasks: list[TaskBoardItemResponse]
 
 

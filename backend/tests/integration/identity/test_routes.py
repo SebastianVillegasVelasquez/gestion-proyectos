@@ -118,11 +118,12 @@ class TestCreateUserAdminRoute:
         )
         assert second.status_code == 409
 
-    async def test_missing_password_generates_a_temporary_one(
+    async def test_missing_password_returns_activation_link(
         self, client, admin_headers
     ):
-        # El admin ya no define la contraseña: el sistema genera una temporal y
-        # la devuelve una sola vez para entregarla.
+        # El admin no define la contraseña: no viaja ninguna credencial; se
+        # devuelve un enlace de activación de un solo uso (también enviado por
+        # correo) por si el correo no llega.
         response = await client.post(
             "/api/v1/identity/users",
             json={
@@ -137,8 +138,46 @@ class TestCreateUserAdminRoute:
 
         assert response.status_code == 201, response.text
         body = response.json()
-        assert body["temporary_password"]
+        assert body["temporary_password"] is None
+        assert "/activar?token=" in (body["activation_url"] or "")
         assert body["must_change_password"] is True
+
+    async def test_account_activation_flow(self, client, admin_headers):
+        # Alta sin contraseña → activar con el token → login con la clave elegida.
+        created = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "poractivar@example.com",
+                "name": "Por",
+                "last_name": "Activar",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+        assert created.status_code == 201, created.text
+        token = created.json()["activation_url"].split("token=", 1)[1]
+
+        info = await client.get(f"/api/v1/identity/activation/{token}")
+        assert info.status_code == 200
+        assert info.json()["email"] == "poractivar@example.com"
+
+        done = await client.post(
+            "/api/v1/identity/activation/complete",
+            json={"token": token, "new_password": "elegida123"},
+        )
+        assert done.status_code == 200, done.text
+        assert done.json()["access_token"]
+
+        # El token es de un solo uso: ya no vale.
+        reuse = await client.get(f"/api/v1/identity/activation/{token}")
+        assert reuse.status_code == 401
+
+        login = await client.post(
+            "/api/v1/identity/auth/login",
+            json={"email": "poractivar@example.com", "password": "elegida123"},
+        )
+        assert login.status_code == 200
 
     async def test_should_return_422_when_role_is_invalid(self, client, admin_headers):
         response = await client.post(

@@ -27,21 +27,9 @@ class TestBulkCreateUsers:
         emails = {u["email"] for u in body["created"]}
         assert emails == {"ana@example.com", "carlos@example.com"}
 
-        # Sin password en el CSV: se generó una temporal.
-        assert all(u["temporary_password"] for u in body["created"])
-
-        login = await client.post(
-            "/api/v1/identity/auth/login",
-            json={
-                "email": "ana@example.com",
-                "password": next(
-                    u["temporary_password"]
-                    for u in body["created"]
-                    if u["email"] == "ana@example.com"
-                ),
-            },
-        )
-        assert login.status_code == 200
+        # Sin password en el CSV: NO viaja ninguna credencial en la respuesta;
+        # cada persona recibe por correo un enlace de activación de un solo uso.
+        assert all(u["temporary_password"] is None for u in body["created"])
 
     async def test_unknown_cargo_is_created_on_the_fly(self, client, admin_headers):
         csv_content = (

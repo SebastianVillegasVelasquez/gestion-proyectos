@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router";
 import LoginPage from "@/features/auth/components/Login.tsx";
+import ActivateAccountPage from "@/features/auth/components/ActivateAccountPage.tsx";
 import { AppLayout } from "@/components/layout/AppLayout.tsx";
 import { ProtectedRoute } from "@/router/ProtectedRoute.tsx";
 import { RoleGuard } from "@/router/RoleGuard.tsx";
@@ -23,6 +24,11 @@ const PersonalDeliverablesPage = lazy(() =>
   })),
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
+const NotificationsPage = lazy(() =>
+  import("@/features/notifications/components/NotificationsPage.tsx").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
 const FeedbackInbox = lazy(() => import("@/features/feedback/components/FeedbackInbox.tsx"));
 const EmailTestPage = lazy(() =>
   import("@/features/dev/components/EmailTestPage.tsx").then((m) => ({
@@ -107,6 +113,8 @@ export const AppRouter = () => (
   <Routes>
     {/* Rutas públicas */}
     <Route path="/login" element={<LoginPage />} />
+    {/* Activación de cuenta por enlace del correo (sin sesión). */}
+    <Route path="/activar" element={<ActivateAccountPage />} />
     {/* Portal del cliente: pantalla pública única, sin sesión. El token NO viaja
         en la URL: el cliente lo introduce en la pantalla y se envía por POST
         (validado en el backend). Enlace y token se entregan por separado. */}
@@ -120,6 +128,7 @@ export const AppRouter = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<WorkspacePage />} />
         <Route path="/mis-entregas" element={<PersonalDeliverablesPage />} />
+        <Route path="/notificaciones" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />

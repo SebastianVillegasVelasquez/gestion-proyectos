@@ -39,10 +39,17 @@ class SendTestEmailResponse(BaseModelConfig):
 class ManualEmailKind(str, Enum):
     """Plantillas que el developer puede disparar a mano desde el panel de
     Correos. Usan exactamente el mismo render y envío que los flujos
-    automáticos (alta de usuario / barrido de tareas atrasadas)."""
+    automáticos (alta de usuario / barrido de tareas atrasadas).
+
+    `activation` es distinta: además de enviar, MUTA la cuenta — emite un token
+    de activación nuevo y deja la contraseña "en blanco" (aleatoria irrecuperable
+    + `must_change_password=True`), para notificar a cuentas de producción que se
+    crearon antes del flujo por enlace. El único acceso pasa a ser el enlace.
+    """
 
     WELCOME = "welcome"
     OVERDUE = "overdue"
+    ACTIVATION = "activation"
 
 
 class SendManualEmailsRequest(BaseModelConfig):
@@ -59,6 +66,9 @@ class ManualEmailResult(BaseModelConfig):
     # Correos efectivamente enviados a esta persona (0 si no aplicaba o falló).
     sent: int
     detail: str
+    # Solo para `activation`: si la persona ya había entrado (tenía su propia
+    # contraseña) antes de invalidársela. None para el resto de plantillas.
+    already_entered: Optional[bool] = None
 
 
 class SendManualEmailsResponse(BaseModelConfig):

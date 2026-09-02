@@ -22,6 +22,10 @@ class DashboardSummary:
     completed_tasks: int
     in_review_tasks: int
     overdue_tasks: int
+    # Tareas (y subtareas: son filas de `tasks` como cualquier otra) que el
+    # usuario entregó en los últimos 7 días. Solo se puebla en el resumen del
+    # rol User; el resumen global lo deja en 0.
+    delivered_last_7d: int = 0
 
 
 @dataclass
@@ -146,6 +150,10 @@ class ProjectProgressDetail:
     tasks_overdue: int
     tasks_pending: int
     progress_pct: int
+    # Fechas plan del proyecto (pueden faltar mientras no se fijan). La vista de
+    # progreso del rol User las muestra en el resumen.
+    start_date: datetime.date | None = None
+    end_date: datetime.date | None = None
     my_tasks: list[TaskBoardItem] = field(default_factory=list)
 
 
@@ -613,8 +621,22 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             .where(Project.deleted_at.is_(None))
         )
 
+        # Entregas del usuario en los últimos 7 días: filas de historial escritas
+        # por él que llevan la tarea a "en revisión" o "completada" (una entrega
+        # sin aprobación va directa a completada). `distinct` sobre la tarea para
+        # no contar dos veces si entregó y luego se auto-aprobó.
+        since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            days=7
+        )
+        delivered_query = select(func.count(func.distinct(TaskHistory.task_id))).where(
+            TaskHistory.changed_by_id == user_id,
+            TaskHistory.new_status.in_([TaskStatus.EN_REVISION, TaskStatus.COMPLETADA]),
+            TaskHistory.created_at >= since,
+        )
+
         task_row = (await self._session.execute(tasks_query)).one()
         projects_count = (await self._session.execute(projects_query)).scalar_one()
+        delivered_last_7d = (await self._session.execute(delivered_query)).scalar_one()
 
         return DashboardSummary(
             active_projects=int(projects_count or 0),
@@ -622,6 +644,7 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             completed_tasks=int(task_row.completed or 0),
             in_review_tasks=int(task_row.in_review or 0),
             overdue_tasks=int(task_row.overdue or 0),
+            delivered_last_7d=int(delivered_last_7d or 0),
         )
 
     # Ventana de "Próximos vencimientos" del rol User: lo que vence en la próxima
@@ -738,6 +761,8 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             tasks_overdue=overdue,
             tasks_pending=pending,
             progress_pct=progress,
+            start_date=project.start_date,
+            end_date=project.end_date,
             my_tasks=my_tasks,
         )
 

@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router";
 import {
+  Bell,
   FolderKanban,
   FolderPlus,
   Inbox,
@@ -77,6 +78,7 @@ const SECTIONS: NavSection[] = [
     id: "general",
     title: "General",
     items: [
+      { id: "notifications", label: "Notificaciones", icon: Bell, href: "/notificaciones" },
       { id: "users", label: "Usuarios", icon: UserCog, href: "/admin/users" },
       { id: "settings", label: "Configuración", icon: Settings, href: "/settings" },
     ],
@@ -103,7 +105,10 @@ const USER_SECTIONS: NavSection[] = [
   {
     id: "general",
     title: "General",
-    items: [{ id: "settings", label: "Configuración", icon: Settings, href: "/settings" }],
+    items: [
+      { id: "notifications", label: "Notificaciones", icon: Bell, href: "/notificaciones" },
+      { id: "settings", label: "Configuración", icon: Settings, href: "/settings" },
+    ],
   },
 ];
 
@@ -128,6 +133,7 @@ const ROUTE_TO_ITEM: Record<string, string> = {
   "/mis-proyectos": "my-projects",
   "/workspace": "workspace",
   "/mis-entregas": "my-deliverables",
+  "/notificaciones": "notifications",
   "/settings": "settings",
   "/feedback": "feedback",
   "/dev/email-test": "email-test",

@@ -4,6 +4,8 @@ El adaptador real se sustituye por un espía (no se toca la red). Se comprueba e
 guardado de rol, el contrato y que `welcome` usa la plantilla real de bienvenida.
 """
 
+import re
+
 import pytest
 
 from app.shared.email.sender import LoggingEmailSender
@@ -117,3 +119,58 @@ class TestDevManualEmailsRoute:
         assert body["total_sent"] == 0
         assert body["results"][0]["detail"] == "Sin tareas vencidas"
         assert spy_sender.sent == []
+
+    async def test_activation_reissues_token_blanks_password_and_forces_first_login(
+        self, client, developer_headers, admin_headers, spy_sender
+    ):
+        # La persona ya entró y fijó su propia contraseña (must_change_password
+        # queda en False tras el cambio): es el caso "ya había entrado".
+        user_id = await _make_user(client, admin_headers, "activar-manual@example.com")
+        token = (
+            await client.post(
+                "/api/v1/identity/auth/login",
+                json={"email": "activar-manual@example.com", "password": "password123"},
+            )
+        ).json()["access_token"]
+        changed = await client.patch(
+            "/api/v1/identity/me/password",
+            json={"current_password": "password123", "new_password": "propia12345"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert changed.status_code == 204, changed.text
+
+        r = await client.post(
+            BASE,
+            json={"kind": "activation", "recipient_ids": [user_id]},
+            headers=developer_headers,
+        )
+        assert r.status_code == 200, r.text
+        result = r.json()["results"][0]
+        assert result["sent"] == 1
+        assert result["already_entered"] is True
+
+        # La contraseña que la persona había fijado ya NO sirve.
+        assert (
+            await client.post(
+                "/api/v1/identity/auth/login",
+                json={"email": "activar-manual@example.com", "password": "propia12345"},
+            )
+        ).status_code == 401
+
+        # El correo llevó un enlace /activar?token=...; ese token activa la cuenta.
+        html = spy_sender.sent[-1]["html"]
+        match = re.search(r"/activar\?token=([A-Za-z0-9_-]+)", html)
+        assert match is not None
+        token = match.group(1)
+
+        done = await client.post(
+            "/api/v1/identity/activation/complete",
+            json={"token": token, "new_password": "nueva12345"},
+        )
+        assert done.status_code == 200, done.text
+        assert (
+            await client.post(
+                "/api/v1/identity/auth/login",
+                json={"email": "activar-manual@example.com", "password": "nueva12345"},
+            )
+        ).status_code == 200

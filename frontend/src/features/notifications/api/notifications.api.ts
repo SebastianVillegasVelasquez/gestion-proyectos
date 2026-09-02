@@ -23,4 +23,9 @@ export const notificationsApi = {
 
   markAllAsRead: () =>
     http.patch<{ updated: number }>("/notifications/read-all").then((r) => r.data),
+
+  remove: (id: string) =>
+    http.delete(`/notifications/${id}`).then(() => {
+      /* 204 sin cuerpo */
+    }),
 };

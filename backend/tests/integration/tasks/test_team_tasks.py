@@ -139,6 +139,7 @@ class TestTeamTasks:
                 "id": guion_id,
                 "title": "Guion del Módulo 1",
                 "status": "pendiente_por_iniciar",
+                "assignee_name": None,
             }
         ]
         # La bloqueante no se ve bloqueada a sí misma.

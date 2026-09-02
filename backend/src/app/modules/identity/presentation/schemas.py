@@ -169,12 +169,43 @@ class UserResponse(BaseModelConfig):
 class CreatedUserResponse(UserResponse):
     """Respuesta del alta de un usuario.
 
-    Incluye ``temporary_password`` SOLO cuando la generó el sistema (el admin no
-    definió ninguna): es la única vez que viaja en claro, para que quien da el
-    alta se la entregue a la persona.
+    El alta ya no entrega una contraseña: cuando el admin no define una, se
+    devuelve ``activation_url`` (enlace de un solo uso que el sistema también
+    envió por correo) por si el correo no llega. ``temporary_password`` queda
+    como campo heredado, siempre ``None`` en el flujo actual.
     """
 
     temporary_password: Optional[str] = None
+    activation_url: Optional[str] = None
+
+
+class ActivateAccountRequest(BaseModelConfig):
+    """Activación de cuenta: el token del enlace + la contraseña que elige la
+    persona (misma política de fuerza que el cambio de contraseña)."""
+
+    token: str
+    new_password: Annotated[str, StringConstraints(min_length=8)]
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not any(c.isdigit() for c in v):
+            raise ValueError("La contraseña debe contener al menos un número")
+        return v
+
+
+class ActivationInfoResponse(BaseModelConfig):
+    """A quién pertenece un enlace de activación (para la pantalla de alta)."""
+
+    email: str
+    name: str
+
+
+class ActivationLinkResponse(BaseModelConfig):
+    """Enlace de activación regenerado por un admin."""
+
+    activation_url: Optional[str] = None
+    expires_at: datetime
 
 
 class AdminUserSortField(str, Enum):

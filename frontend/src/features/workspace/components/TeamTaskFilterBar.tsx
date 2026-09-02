@@ -37,6 +37,9 @@ interface Props {
   elementOptions?: ElementFilterOption[];
   /** Ramas (padre del padre y más arriba) que contienen tareas del equipo. */
   branchOptions?: ElementFilterOption[];
+  /** El líder/supervisor filtra por persona; el integrante solo ve lo suyo y no
+   *  ve la fila de responsables ni el botón de limpiar. */
+  canFilterByPerson?: boolean;
   /** Total tras filtrar / total sin filtrar, para el resumen. */
   shown: number;
   totalTasks: number;
@@ -89,6 +92,7 @@ export function TeamTaskFilterBar({
   teamMembers,
   elementOptions = [],
   branchOptions = [],
+  canFilterByPerson = true,
   shown,
   totalTasks,
 }: Props) {
@@ -186,7 +190,7 @@ export function TeamTaskFilterBar({
           Bloqueadas
         </button>
 
-        {active > 0 && (
+        {active > 0 && (canFilterByPerson || active > 1) && (
           <button
             type="button"
             onClick={onReset}
@@ -206,37 +210,44 @@ export function TeamTaskFilterBar({
         </span>
       </div>
 
-      {/* Filtro por integrante: un botón por persona con su color. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <AssigneeChip
-          active={filters.assignee === "all"}
-          onClick={() => {
-            onChange({ assignee: "all" });
-          }}
-        >
-          Todas
-        </AssigneeChip>
-        <AssigneeChip
-          active={filters.assignee === UNASSIGNED}
-          onClick={() => {
-            onChange({ assignee: UNASSIGNED });
-          }}
-        >
-          Sin asignar
-        </AssigneeChip>
-        {members.map((m) => (
+      {/* Filtro por integrante: un botón por persona con su color. Solo para
+          quien coordina; el integrante ve una nota fija de que mira lo suyo. */}
+      {canFilterByPerson ? (
+        <div className="flex flex-wrap items-center gap-1.5">
           <AssigneeChip
-            key={m.id}
-            active={filters.assignee === m.id}
-            color={m.avatarColor}
+            active={filters.assignee === "all"}
             onClick={() => {
-              onChange({ assignee: m.id });
+              onChange({ assignee: "all" });
             }}
           >
-            {m.name}
+            Todas
           </AssigneeChip>
-        ))}
-      </div>
+          <AssigneeChip
+            active={filters.assignee === UNASSIGNED}
+            onClick={() => {
+              onChange({ assignee: UNASSIGNED });
+            }}
+          >
+            Sin asignar
+          </AssigneeChip>
+          {members.map((m) => (
+            <AssigneeChip
+              key={m.id}
+              active={filters.assignee === m.id}
+              color={m.avatarColor}
+              onClick={() => {
+                onChange({ assignee: m.id });
+              }}
+            >
+              {m.name}
+            </AssigneeChip>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          Estás viendo solo tus tareas en este equipo.
+        </p>
+      )}
     </div>
   );
 }

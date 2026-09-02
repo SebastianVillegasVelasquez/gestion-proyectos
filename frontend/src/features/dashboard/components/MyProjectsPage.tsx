@@ -26,7 +26,10 @@ function ProjectCard({ project }: { project: DashboardProjectItem }) {
       className="rounded-xl transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold"
     >
       <Card className="h-full">
-        <CardContent className="flex h-full flex-col gap-3 p-4">
+        {/* `p-4 sm:p-5` explícito: CardContent trae `pt-0` (asume un CardHeader
+            encima que aquí no existe), y sin el override el borde superior de la
+            tarjeta quedaba pegado al título a partir de `sm`. */}
+        <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">
               {project.name}
