@@ -68,17 +68,43 @@ export function MyTasksView({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [filter, setFilter] = useState<Filter>("abiertas");
   const [query, setQuery] = useState("");
+  // Filtro por elemento padre de la estructura: "" = todos, "none" = tareas sin
+  // elemento (individuales), o el id del work_item.
+  const [parentId, setParentId] = useState("");
+
+  // Elementos padre presentes en mis tareas, para poblar el selector.
+  const parents = useMemo(() => {
+    const map = new Map<string, string>();
+    let hasLoose = false;
+    for (const t of tasks) {
+      if (t.work_item_id) {
+        map.set(t.work_item_id, t.work_item_name ?? "Elemento");
+      } else {
+        hasLoose = true;
+      }
+    }
+    const list = [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { list, hasLoose };
+  }, [tasks]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks
       .map((t) => ({ task: t, status: dueStatus(t, today) }))
       .filter(({ status }) => matches(filter, status))
+      .filter(({ task }) => {
+        if (!parentId) {
+          return true;
+        }
+        return parentId === "none" ? !task.work_item_id : task.work_item_id === parentId;
+      })
       .filter(
         ({ task }) =>
           !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
       );
-  }, [tasks, filter, query, today]);
+  }, [tasks, filter, query, parentId, today]);
 
   const counts = useMemo(() => {
     let overdue = 0;
@@ -164,6 +190,24 @@ export function MyTasksView({
           placeholder="Buscar por tarea o proyecto…"
           className="min-w-[180px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
         />
+        {(parents.list.length > 0 || parents.hasLoose) && (
+          <select
+            value={parentId}
+            onChange={(e) => {
+              setParentId(e.target.value);
+            }}
+            aria-label="Filtrar por elemento padre"
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
+          >
+            <option value="">Todos los padres</option>
+            {parents.list.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+            {parents.hasLoose && <option value="none">Sin elemento</option>}
+          </select>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">

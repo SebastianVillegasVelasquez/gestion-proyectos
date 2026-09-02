@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X, ListPlus, FolderTree, Pencil } from "lucide-react";
+import { X, ListPlus, FolderTree, Pencil, Search, CornerDownRight } from "lucide-react";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useCreateTask, useUpdateTask } from "../hooks/use-tasks";
 import { useWorkTree, useNodeTypes } from "../hooks/use-structure";
@@ -11,6 +11,7 @@ import type { Task, TaskPriority, UserPosition } from "../types/api.types";
 import { workItemPath } from "../utils/flatten-work-tree";
 import { TaskDurationBadge } from "../components/TaskDurationBadge";
 import { WorkItemPickerModal } from "./WorkItemPickerModal";
+import { TaskPickerModal } from "./TaskPickerModal";
 import {
   buildTaskPayload,
   buildTaskUpdatePayload,
@@ -40,6 +41,7 @@ export function CreateTaskModal({
   tasks,
   initialWorkItemId,
   initialTitle,
+  parentTask,
   editTask,
   onClose,
 }: {
@@ -51,21 +53,28 @@ export function CreateTaskModal({
    * nombre: normalmente la tarea ES ese elemento ("Video 1", "Guion"), y quien
    * la crea solo tiene que asignarla. Sigue siendo editable. */
   initialTitle?: string;
+  /** Si llega, la nueva tarea es SUBTAREA de esta: hereda su elemento y su
+   * equipo, no se elige ubicación y la dependencia se limita a sus hermanas. */
+  parentTask?: Task;
   /** Si llega, el modal EDITA esa tarea en vez de crear una (mismos campos y
    * estilo). Las dependencias se editan aparte (en la ficha de la tarea). */
   editTask?: Task;
   onClose: () => void;
 }) {
   const isEdit = editTask != null;
+  const isSubtask = parentTask != null && !isEdit;
   const treeQuery = useWorkTree(projectId);
   const nodeTypesQuery = useNodeTypes(projectId);
   const createTask = useCreateTask(projectId);
   const updateTask = useUpdateTask(projectId);
   const mutation = isEdit ? updateTask : createTask;
   const [pickingLocation, setPickingLocation] = useState(false);
+  const [searchingDep, setSearchingDep] = useState(false);
 
   const [form, setForm] = useState<TaskFormState>(() =>
-    editTask ? taskToForm(editTask) : emptyTaskForm(initialWorkItemId, initialTitle),
+    editTask
+      ? taskToForm(editTask)
+      : emptyTaskForm(parentTask?.work_item_id ?? initialWorkItemId, initialTitle, parentTask?.id),
   );
   const [position, setPosition] = useState<UserPosition | "">("");
   const [clientError, setClientError] = useState<string | null>(null);
@@ -121,6 +130,34 @@ export function CreateTaskModal({
     return out;
   }, [nodeTypesQuery.data, treeQuery.data]);
 
+  // Candidatas "cercanas" para la dependencia: si es subtarea, sus hermanas
+  // (mismo padre); si no, las tareas del mismo elemento. Es lo que se ofrece de
+  // entrada — para depender de cualquier otra tarea del proyecto está el
+  // buscador. `tasks` ya viene con todas las del proyecto.
+  const nearbyTasks = useMemo(() => {
+    const list = isSubtask
+      ? tasks.filter((t) => t.parent_task_id === parentTask.id)
+      : form.workItemId
+        ? tasks.filter((t) => t.work_item_id === form.workItemId)
+        : [];
+    return list.sort((a, b) => a.title.localeCompare(b.title));
+  }, [tasks, isSubtask, parentTask, form.workItemId]);
+
+  const taskTitleById = useMemo(() => {
+    const m = new Map<string, string>();
+    tasks.forEach((t) => m.set(t.id, t.title));
+    return m;
+  }, [tasks]);
+
+  // Dependencia elegida por el buscador que no está en la lista cercana: se
+  // añade como opción suelta para que el <select> la muestre.
+  const pickedFarTask =
+    form.dependsOnId &&
+    !form.dependsOnId.startsWith(WORK_ITEM_DEP_PREFIX) &&
+    !nearbyTasks.some((t) => t.id === form.dependsOnId)
+      ? { id: form.dependsOnId, title: taskTitleById.get(form.dependsOnId) ?? "Tarea del proyecto" }
+      : null;
+
   const handleSubmit = () => {
     const error = validateTaskForm(form);
     if (error) {
@@ -154,6 +191,10 @@ export function CreateTaskModal({
             {isEdit ? (
               <>
                 <Pencil className="size-4 text-brand-teal" /> Editar tarea
+              </>
+            ) : isSubtask ? (
+              <>
+                <CornerDownRight className="size-4 text-brand-teal" /> Nueva subtarea
               </>
             ) : (
               <>
@@ -208,23 +249,30 @@ export function CreateTaskModal({
           {/* Un botón que abre el árbol completo, no un desplegable: con cuatro
               niveles de estructura, elegir a ciegas en una lista aplanada es
               justo lo que hacía fallar la ubicación. */}
-          <Field label="Ubicación en la estructura (opcional)">
-            <button
-              type="button"
-              onClick={() => {
-                setPickingLocation(true);
-              }}
-              className={`${inputCls} flex items-center justify-between gap-2 text-left`}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <FolderTree className="size-4 shrink-0 text-brand-teal" />
-                <span className="truncate">
-                  {selectedPath ?? "Sin asignar (tarea independiente)"}
+          {isSubtask ? (
+            <p className="flex items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2 text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <CornerDownRight className="size-3.5 shrink-0 text-brand-teal" />
+              Subtarea de «{parentTask.title}»: hereda su elemento y su equipo.
+            </p>
+          ) : (
+            <Field label="Ubicación en la estructura (opcional)">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickingLocation(true);
+                }}
+                className={`${inputCls} flex items-center justify-between gap-2 text-left`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <FolderTree className="size-4 shrink-0 text-brand-teal" />
+                  <span className="truncate">
+                    {selectedPath ?? "Sin asignar (tarea independiente)"}
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 text-xs font-medium text-brand-teal">Elegir</span>
-            </button>
-          </Field>
+                <span className="shrink-0 text-xs font-medium text-brand-teal">Elegir</span>
+              </button>
+            </Field>
+          )}
 
           {/* Asignación. "Nadie" = suelta; "persona" = individual; "equipo" = va
               a su bolsa y el líder reparte; "integrante" = directo a alguien del
@@ -411,14 +459,31 @@ export function CreateTaskModal({
                     ))}
                   </optgroup>
                 )}
-                <optgroup label="Tareas">
-                  {tasks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
-                    </option>
-                  ))}
-                </optgroup>
+                {nearbyTasks.length > 0 && (
+                  <optgroup label={isSubtask ? "Subtareas hermanas" : "Tareas del mismo elemento"}>
+                    {nearbyTasks.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {pickedFarTask && (
+                  <optgroup label="Otra tarea del proyecto">
+                    <option value={pickedFarTask.id}>{pickedFarTask.title}</option>
+                  </optgroup>
+                )}
               </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchingDep(true);
+                }}
+                className="mt-1 flex items-center gap-1.5 self-start rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <Search className="size-3" />
+                Buscar en todas las tareas del proyecto
+              </button>
             </Field>
           )}
 
@@ -537,6 +602,19 @@ export function CreateTaskModal({
           }}
           onClose={() => {
             setPickingLocation(false);
+          }}
+        />
+      )}
+
+      {searchingDep && (
+        <TaskPickerModal
+          tasks={tasks}
+          selectedId={form.dependsOnId.startsWith(WORK_ITEM_DEP_PREFIX) ? "" : form.dependsOnId}
+          onSelect={(taskId) => {
+            set("dependsOnId", taskId);
+          }}
+          onClose={() => {
+            setSearchingDep(false);
           }}
         />
       )}

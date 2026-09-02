@@ -4,6 +4,7 @@ import {
   CalendarRange,
   ClipboardList,
   Clock,
+  CornerDownRight,
   FolderTree,
   Link2,
   Pencil,
@@ -160,6 +161,7 @@ export function TaskDetailModal({
   onClose: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [creatingSubtask, setCreatingSubtask] = useState(false);
   const projectTasks = useProjectTasks(projectId);
   const assignment = useMemo(
     () => resolveAssignment(task, memberById, teamById),
@@ -184,6 +186,21 @@ export function TaskDetailModal({
     );
   }
 
+  // Nueva subtarea: mismo formulario, en modo subtarea (hereda elemento y
+  // equipo del padre, se puede asignar aquí mismo).
+  if (creatingSubtask) {
+    return (
+      <CreateTaskModal
+        projectId={projectId}
+        tasks={projectTasks.data ?? []}
+        parentTask={task}
+        onClose={() => {
+          setCreatingSubtask(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
@@ -201,6 +218,15 @@ export function TaskDetailModal({
             <h3 className="mt-1.5 text-base font-semibold text-foreground">{task.title}</h3>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingSubtask(true);
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-accent"
+            >
+              <CornerDownRight className="size-3.5" /> Subtarea
+            </button>
             <button
               type="button"
               onClick={() => {

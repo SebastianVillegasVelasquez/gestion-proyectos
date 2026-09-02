@@ -114,7 +114,7 @@ const DEVELOPER_SECTIONS: NavSection[] = SECTIONS.map((section) =>
         ...section,
         items: [
           { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
-          { id: "email-test", label: "Prueba de correo", icon: MailCheck, href: "/dev/email-test" },
+          { id: "email-test", label: "Correos", icon: MailCheck, href: "/dev/email-test" },
           ...section.items,
         ],
       }
