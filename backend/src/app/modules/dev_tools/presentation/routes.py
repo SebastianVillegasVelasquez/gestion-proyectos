@@ -4,6 +4,7 @@ Hoy: un endpoint para probar el envío de correo en PRODUCCIÓN sin tener que
 disparar un flujo real (alta de usuario, entrega, etc.).
 """
 
+import secrets
 from datetime import date
 
 import httpx
@@ -15,6 +16,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.core.logger import get_logger
+from app.core.security import hash_password
 from app.modules.dev_tools.presentation.schemas import (
     ManualEmailKind,
     ManualEmailResult,
@@ -23,8 +25,13 @@ from app.modules.dev_tools.presentation.schemas import (
     SendTestEmailRequest,
     SendTestEmailResponse,
 )
+from app.modules.identity.application.use_cases import (
+    build_activation_url,
+    issue_activation_token,
+)
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.infrastructure.models import User
+from app.modules.identity.infrastructure.repository import UserRepository
 from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.notifications.application.overdue_scan import _CLOSED, _task_url
 from app.modules.project.infrastructure.models import Project
@@ -200,6 +207,55 @@ async def _send_overdue_emails(
     return len(rows), f"{len(rows)} {plural}"
 
 
+async def _send_activation_email(
+    db: AsyncSession,
+    sender,
+    user: User,
+    public_url: str,
+    login_url: str,
+    logo_url: str,
+    ttl_days: int,
+) -> tuple[int, str, bool]:
+    """Notifica a `user` con un enlace de activación NUEVO y le deja la cuenta
+    lista para un primer ingreso:
+
+    - Emite un token de activación de un solo uso (reemplaza cualquiera previo).
+    - Deja la contraseña "en blanco": una aleatoria irrecuperable + fuerza el
+      cambio. Ni la temporal nunca entregada ni una que la persona hubiera fijado
+      sigue sirviendo — el único acceso es el enlace del correo.
+
+    Devuelve (correos_enviados, detalle, ya_había_entrado). `ya_había_entrado` se
+    calcula ANTES de tocar nada: `must_change_password=False` ⇒ la persona ya
+    tenía su propia clave (entró en algún momento).
+    """
+    already_entered = not user.must_change_password
+
+    repo = UserRepository(db)
+    raw = await issue_activation_token(repo, user.id, ttl_days)
+    user.password = hash_password(secrets.token_urlsafe(24))
+    user.must_change_password = True
+    db.add(user)
+
+    mail = welcome_email(
+        name=user.name,
+        email=user.email,
+        login_url=login_url,
+        logo_url=logo_url,
+        activation_url=build_activation_url(public_url, raw),
+        activation_expire_days=ttl_days,
+    )
+    await sender.send(
+        to=user.email, subject=mail.subject, body=mail.text, html=mail.html
+    )
+
+    note = (
+        " · la persona ya había entrado: su contraseña anterior queda invalidada"
+        if already_entered
+        else ""
+    )
+    return 1, f"Enlace de activación enviado{note}", already_entered
+
+
 @router.post("/emails", response_model=SendManualEmailsResponse)
 async def send_manual_emails(
     data: SendManualEmailsRequest,
@@ -208,8 +264,13 @@ async def send_manual_emails(
 ) -> SendManualEmailsResponse:
     """Dispara a mano una plantilla real a una o varias personas.
 
-    - `welcome`: la misma bienvenida que recibe una cuenta nueva.
+    - `welcome`: la misma bienvenida que recibe una cuenta nueva (plantilla, sin
+      enlace de activación real — sirve para revisar el render).
     - `overdue`: un correo por cada tarea vencida real del destinatario.
+    - `activation`: emite un token de activación NUEVO, deja la contraseña "en
+      blanco" (aleatoria + `must_change_password`) y envía el enlace. Para
+      notificar cuentas de producción creadas antes del flujo por enlace: quedan
+      como primer ingreso y solo entran por el enlace del correo.
 
     Solo developer; rate limit de 3 envíos por minuto. Cada envío queda en los
     logs (quién lo disparó, plantilla y total).
@@ -228,6 +289,16 @@ async def send_manual_emails(
     public_url = (settings.APP_PUBLIC_URL or "").rstrip("/")
     login_url = f"{public_url}/login" if public_url else ""
     logo_url = f"{public_url}/logo-email.jpg" if public_url else ""
+    ttl_days = settings.ACTIVATION_TOKEN_EXPIRE_DAYS
+
+    if data.kind == ManualEmailKind.ACTIVATION and not public_url:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "APP_PUBLIC_URL no está configurado en el servidor: sin él no se "
+                "puede armar el enlace de activación."
+            ),
+        )
 
     users = list(
         (
@@ -244,6 +315,20 @@ async def send_manual_emails(
     results: list[ManualEmailResult] = []
     total_sent = 0
     for user in users:
+        already_entered: bool | None = None
+        # No te reenvíes a ti mismo un `activation`: te dejaría fuera (tu clave
+        # quedaría invalidada). El resto de plantillas sí (son solo lectura).
+        if data.kind == ManualEmailKind.ACTIVATION and user.id == current_user.id:
+            results.append(
+                ManualEmailResult(
+                    user_id=user.id,
+                    email=user.email,
+                    name=f"{user.name} {user.last_name}".strip(),
+                    sent=0,
+                    detail="Omitido: eres tú (no invalidamos tu propia contraseña).",
+                )
+            )
+            continue
         try:
             if data.kind == ManualEmailKind.WELCOME:
                 mail = welcome_email(
@@ -259,6 +344,10 @@ async def send_manual_emails(
                     html=mail.html,
                 )
                 sent, detail = 1, "Correo de bienvenida enviado"
+            elif data.kind == ManualEmailKind.ACTIVATION:
+                sent, detail, already_entered = await _send_activation_email(
+                    db, sender, user, public_url, login_url, logo_url, ttl_days
+                )
             else:
                 sent, detail = await _send_overdue_emails(db, sender, user, public_url)
         except Exception as exc:  # noqa: BLE001 - un correo caído no aborta el lote
@@ -287,6 +376,7 @@ async def send_manual_emails(
                 name=f"{user.name} {user.last_name}".strip(),
                 sent=sent,
                 detail=detail,
+                already_entered=already_entered,
             )
         )
 

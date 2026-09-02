@@ -138,6 +138,8 @@ def welcome_email(
     login_url: str = "",
     logo_url: str = "",
     temporary_password: str | None = None,
+    activation_url: str | None = None,
+    activation_expire_days: int = 7,
 ) -> RenderedEmail:
     """Bienvenida al crear la cuenta.
 
@@ -159,6 +161,40 @@ def welcome_email(
         "la plataforma con la que damos seguimiento a los proyectos, tareas y "
         "entregables del equipo de OBJ Digital."
     )
+
+    text = (
+        f"Hola, {name}\n\n"
+        f"Se creó una cuenta para ti en Bitácora OBJ con el usuario {email}.\n"
+    )
+
+    if activation_url:
+        # Flujo por enlace: no viaja ninguna contraseña. La persona abre el
+        # enlace y define su clave ahí mismo.
+        body += _facts([("Usuario", email)]) + _p(
+            "Para entrar, primero activa tu cuenta y define tu contrase&ntilde;a. "
+            f'<span style="color:{RED};font-weight:bold;">El enlace caduca en '
+            f"{activation_expire_days} d&iacute;as.</span> Si expira, pide a quien te "
+            "dio de alta que te reenv&iacute;e uno nuevo."
+        )
+        body += _button("Activar mi cuenta", activation_url) + _p(
+            f'<span style="color:{MUTED};font-size:13px;">Si el bot&oacute;n no funciona, '
+            "copia y pega esta direcci&oacute;n en tu navegador:"
+            f'<br /><span style="color:{TEAL};">{activation_url}</span></span>'
+        )
+        text += (
+            f"\nActiva tu cuenta y define tu contraseña aquí (el enlace caduca en "
+            f"{activation_expire_days} días):\n{activation_url}\n"
+        )
+        return RenderedEmail(
+            subject=subject,
+            html=_shell(
+                title=subject,
+                preheader="Activa tu cuenta para empezar.",
+                body_html=body,
+                logo_url=logo_url,
+            ),
+            text=text,
+        )
 
     if temporary_password:
         body += _facts(
@@ -189,10 +225,6 @@ def welcome_email(
         f'<br /><span style="color:{TEAL};">{login_url or "—"}</span></span>'
     )
 
-    text = (
-        f"Hola, {name}\n\n"
-        f"Se creó una cuenta para ti en Bitácora OBJ con el usuario {email}.\n"
-    )
     if temporary_password:
         text += (
             f"\nContraseña temporal: {temporary_password}\n"

@@ -16,7 +16,7 @@ export function CreateUserModal({
   assignableRoles,
 }: {
   onClose: () => void;
-  onCreated: (email: string, password: string) => void;
+  onCreated: (email: string, password: string, activationUrl: string | null) => void;
   assignableRoles: { value: Role; label: string }[];
 }) {
   const [form, setForm] = useState({
@@ -57,8 +57,9 @@ export function CreateUserModal({
       },
       {
         onSuccess: (created) => {
-          // El backend genera la contraseña temporal y la devuelve una vez.
-          onCreated(form.email.trim(), created.temporary_password ?? "");
+          // El backend ya no entrega contraseña: envía por correo un enlace de
+          // activación y lo devuelve también aquí por si el correo no llega.
+          onCreated(form.email.trim(), "", created.activation_url);
         },
       },
     );

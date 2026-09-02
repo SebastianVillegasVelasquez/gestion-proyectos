@@ -30,7 +30,7 @@ import { useDeleteTask } from "@/features/projects/hooks/use-tasks";
 import { collectItemPaths } from "@/features/projects/utils/work-item-path";
 import { tipoStyle, type TipoStyle } from "@/features/projects/utils/tipo-style";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
-import { buildTeamBoard } from "@/features/projects/utils/team-board";
+import { buildTeamBoard, type BoardColumn } from "@/features/projects/utils/team-board";
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import { TraceabilityPanel } from "@/features/projects/components/detail/TraceabilityPanel";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
@@ -67,18 +67,23 @@ import {
 // del espacio (WorkspaceNav), no dentro de esta vista.
 type ViewMode = "lista" | "kanban" | "trazabilidad";
 
-/** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea. */
-function Crumb({ path }: { path: string[] }) {
+/** Ruta «padre › módulo › **unidad**» del elemento del que cuelga una tarea.
+ *  `max` acota cuántos segmentos finales se muestran (con «…» delante); el
+ *  `title` siempre lleva la ruta completa. */
+function Crumb({ path, max }: { path: string[]; max?: number }) {
   if (path.length === 0) {
     return <>Sin elemento</>;
   }
+  const shown = max && path.length > max ? path.slice(-max) : path;
+  const clipped = shown.length < path.length;
   return (
     <span title={path.join(" › ")}>
-      {path.slice(0, -1).map((name) => (
-        <span key={name}>{name} › </span>
+      {clipped && <span>… › </span>}
+      {shown.slice(0, -1).map((name, i) => (
+        <span key={`${name}-${String(i)}`}>{name} › </span>
       ))}
       <span className="font-semibold text-slate-500 dark:text-slate-400">
-        {path[path.length - 1]}
+        {shown[shown.length - 1]}
       </span>
     </span>
   );
@@ -654,7 +659,6 @@ function ListView({
 function TaskCard({
   task,
   parentTitle,
-  isParent,
   members,
   today,
   path,
@@ -671,8 +675,6 @@ function TaskCard({
   task: ApiTeamTask;
   /** Título del padre cuando la tarjeta es una subtarea. */
   parentTitle: string | null;
-  /** La tarjeta es una tarea padre: sin botón «Comenzar». */
-  isParent: boolean;
   members: WorkspaceMember[];
   today: string;
   path: string[];
@@ -689,7 +691,11 @@ function TaskCard({
 }) {
   const member = members.find((m) => m.id === task.assignee_id);
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    // `shrink-0`: sin esto, en una columna con muchas tarjetas el flex las
+    // aplastaba y su `overflow-hidden` recortaba el contenido (título pisando la
+    // urgencia, "Comenzar" encima…). Ahora cada tarjeta conserva su alto y la
+    // columna scrollea.
+    <article className="group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
       {/* Acento de color del elemento de origen: de un vistazo, de qué
           componente viene la tarjeta (distingue clones del original). */}
       {color && <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", color.bar)} />}
@@ -700,9 +706,9 @@ function TaskCard({
         >
           {task.title}
         </p>
+        {/* Kanban = solo lectura: sin «Comenzar». Se arranca desde la Lista. */}
         <div className="flex shrink-0 items-center gap-1">
           <UrgencyBadge task={task} />
-          <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
           {canReview && (
             <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <button
@@ -741,10 +747,11 @@ function TaskCard({
           <span className="truncate">{parentTitle}</span>
         </p>
       )}
+      {/* De dónde viene: elemento › padre › padre del padre (3 niveles finales). */}
       <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
         {color && <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />}
         <span className="truncate">
-          <Crumb path={path} />
+          <Crumb path={path} max={3} />
         </span>
       </p>
 
@@ -788,9 +795,124 @@ function TaskCard({
   );
 }
 
+// Cuántas tarjetas muestra una columna del Kanban antes de pedir "ver más".
+const KANBAN_PAGE = 15;
+
+function KanbanColumn({
+  col,
+  titleById,
+  members,
+  today,
+  pathOf,
+  colorOf,
+  canReview,
+  projectId,
+  teamMembers,
+  hideAssignee,
+  onReassigned,
+  onEdit,
+  onDelete,
+  deliverCbs,
+}: {
+  col: BoardColumn<ApiTeamTask>;
+  titleById: Map<string, string>;
+  members: WorkspaceMember[];
+  today: string;
+  pathOf: (task: ApiTeamTask) => string[];
+  colorOf: (task: ApiTeamTask) => TipoStyle | null;
+  canReview: boolean;
+  projectId: string;
+  teamMembers: ApiTeamMember[];
+  hideAssignee: boolean;
+  onReassigned: () => void;
+  onEdit: (task: ApiTeamTask) => void;
+  onDelete: (task: ApiTeamTask) => void;
+  deliverCbs: DeliverCbs;
+}) {
+  const [visible, setVisible] = useState(KANBAN_PAGE);
+  const shown = col.tasks.slice(0, visible);
+  const remaining = col.tasks.length - shown.length;
+
+  return (
+    <section className="flex w-[280px] shrink-0 flex-col">
+      <header
+        className={cn(
+          "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
+          col.atRisk
+            ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
+            : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
+        )}
+      >
+        <p
+          className={cn(
+            "flex items-center gap-1 truncate text-[12px] font-semibold",
+            col.atRisk ? "text-rose-700 dark:text-rose-300" : "text-slate-600 dark:text-slate-300",
+          )}
+        >
+          {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
+          {col.label}
+        </p>
+        <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          {col.tasks.length}
+        </span>
+      </header>
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
+          col.atRisk
+            ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
+            : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
+        )}
+      >
+        {col.tasks.length === 0 ? (
+          <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
+            Sin tareas
+          </p>
+        ) : (
+          <>
+            {shown.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                parentTitle={
+                  task.parent_task_id === null
+                    ? null
+                    : (titleById.get(task.parent_task_id) ?? "otra tarea")
+                }
+                members={members}
+                today={today}
+                path={pathOf(task)}
+                color={colorOf(task)}
+                canReview={canReview}
+                projectId={projectId}
+                teamMembers={teamMembers}
+                hideAssignee={hideAssignee}
+                onReassigned={onReassigned}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                deliverCbs={deliverCbs}
+              />
+            ))}
+            {remaining > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setVisible((n) => n + KANBAN_PAGE);
+                }}
+                className="shrink-0 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+              >
+                Ver {Math.min(remaining, KANBAN_PAGE)} más
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function KanbanView({
   allTasks,
-  parentIds,
   members,
   today,
   pathOf,
@@ -805,8 +927,6 @@ function KanbanView({
   deliverCbs,
 }: {
   allTasks: ApiTeamTask[];
-  /** Ids de tareas padre en el conjunto completo (para suprimir «Comenzar»). */
-  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   today: string;
   pathOf: (task: ApiTeamTask) => string[];
@@ -828,70 +948,23 @@ function KanbanView({
     // Scroll horizontal propio del tablero; `absolute inset-0` para tener alto.
     <div className="absolute inset-0 flex gap-3 overflow-x-auto p-4 sm:p-6">
       {columns.map((col) => (
-        <section key={col.key} className="flex w-[280px] shrink-0 flex-col">
-          <header
-            className={cn(
-              "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
-              col.atRisk
-                ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
-                : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
-            )}
-          >
-            <p
-              className={cn(
-                "flex items-center gap-1 truncate text-[12px] font-semibold",
-                col.atRisk
-                  ? "text-rose-700 dark:text-rose-300"
-                  : "text-slate-600 dark:text-slate-300",
-              )}
-            >
-              {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
-              {col.label}
-            </p>
-            <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              {col.tasks.length}
-            </span>
-          </header>
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
-              col.atRisk
-                ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
-                : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
-            )}
-          >
-            {col.tasks.length === 0 ? (
-              <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
-                Sin tareas
-              </p>
-            ) : (
-              col.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  parentTitle={
-                    task.parent_task_id === null
-                      ? null
-                      : (titleById.get(task.parent_task_id) ?? "otra tarea")
-                  }
-                  isParent={parentIds.has(task.id)}
-                  members={members}
-                  today={today}
-                  path={pathOf(task)}
-                  color={colorOf(task)}
-                  canReview={canReview}
-                  projectId={projectId}
-                  teamMembers={teamMembers}
-                  hideAssignee={hideAssignee}
-                  onReassigned={onReassigned}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  deliverCbs={deliverCbs}
-                />
-              ))
-            )}
-          </div>
-        </section>
+        <KanbanColumn
+          key={col.key}
+          col={col}
+          titleById={titleById}
+          members={members}
+          today={today}
+          pathOf={pathOf}
+          colorOf={colorOf}
+          canReview={canReview}
+          projectId={projectId}
+          teamMembers={teamMembers}
+          hideAssignee={hideAssignee}
+          onReassigned={onReassigned}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          deliverCbs={deliverCbs}
+        />
       ))}
     </div>
   );
@@ -1338,7 +1411,6 @@ export function TeamTasksView({
         {view === "kanban" && !emptyBag && !emptyForMember && (
           <KanbanView
             allTasks={tasks}
-            parentIds={parentIds}
             members={members}
             today={today}
             pathOf={pathOf}

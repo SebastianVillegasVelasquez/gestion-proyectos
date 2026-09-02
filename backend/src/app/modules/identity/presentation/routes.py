@@ -12,17 +12,21 @@ from app.core.dependencies import (
     user_repo_dependency,
     require_role,
 )
+from app.core.config import get_settings
 from app.shared.authz import can_assign_role
 from app.shared.exceptions import ForbiddenError
 from app.modules.identity.application.use_cases import (
+    ActivateAccountUseCase,
     BulkCreateUsersUseCase,
     ChangeMyPasswordUseCase,
     CreatePositionUseCase,
     CreateUserUseCase,
+    GetActivationInfoUseCase,
     GetUserByIdUseCase,
     ListPositionsUseCase,
     LoginUseCase,
     RefreshTokenUseCase,
+    ResendActivationUseCase,
     ResetUserPasswordUseCase,
     SearchUsersAdminUseCase,
     SearchUsersUseCase,
@@ -36,6 +40,9 @@ from app.modules.identity.infrastructure.repository import (
     UserRepository,
 )
 from app.modules.identity.presentation.schemas import (
+    ActivateAccountRequest,
+    ActivationInfoResponse,
+    ActivationLinkResponse,
     AdminUserSortField,
     BulkCreateUsersResponse,
     ChangePasswordRequest,
@@ -86,8 +93,13 @@ async def create_user_admin(
     no hay registro público).
     """
     _assert_can_assign_role(current_user.role, data.role)
+    settings = get_settings()
     return await CreateUserUseCase(
-        user_repo=repo, position_repo=position_repo, event_bus=event_bus
+        user_repo=repo,
+        position_repo=position_repo,
+        event_bus=event_bus,
+        public_url=settings.APP_PUBLIC_URL,
+        activation_ttl_days=settings.ACTIVATION_TOKEN_EXPIRE_DAYS,
     ).execute(data)
 
 
@@ -120,7 +132,10 @@ async def create_users_bulk(
 
     rows = [row for row in reader]
     return await BulkCreateUsersUseCase(
-        user_repo=repo, position_repo=position_repo, event_bus=event_bus
+        user_repo=repo,
+        position_repo=position_repo,
+        event_bus=event_bus,
+        activation_ttl_days=get_settings().ACTIVATION_TOKEN_EXPIRE_DAYS,
     ).execute(rows, actor_role=current_user.role)
 
 
@@ -167,6 +182,28 @@ async def refresh(
     repo: UserRepository = Depends(user_repo_dependency),
 ):
     return await RefreshTokenUseCase(repo).execute(data.refresh_token)
+
+
+@router.get("/activation/{token}", response_model=ActivationInfoResponse)
+async def activation_info(
+    token: str,
+    repo: UserRepository = Depends(user_repo_dependency),
+    _: None = rate_limiter(max_hits=20, window_seconds=60, scope="activation"),
+):
+    """Sin sesión: valida el enlace y devuelve a quién pertenece, para que la
+    pantalla de activación muestre el correo antes de pedir la contraseña."""
+    return await GetActivationInfoUseCase(repo).execute(token)
+
+
+@router.post("/activation/complete", response_model=TokenResponse)
+async def activation_complete(
+    data: ActivateAccountRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+    _: None = rate_limiter(max_hits=10, window_seconds=60, scope="activation"),
+):
+    """Sin sesión: consume el token de un solo uso, fija la contraseña elegida
+    por la persona y devuelve sesión iniciada."""
+    return await ActivateAccountUseCase(repo).execute(data.token, data.new_password)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -216,6 +253,24 @@ async def reset_user_password(
 ):
     """Administración genera una contraseña temporal para entregar al usuario."""
     return await ResetUserPasswordUseCase(repo).execute(user_id)
+
+
+@router.post("/users/{user_id}/activation-link", response_model=ActivationLinkResponse)
+async def resend_activation_link(
+    user_id: UUID,
+    repo: UserRepository = Depends(user_repo_dependency),
+    event_bus: EventBus = Depends(event_bus_dependency),
+    current_user=Depends(require_role(*MANAGEMENT_ROLES)),
+):
+    """Regenera y reenvía por correo el enlace de activación de una cuenta que
+    aún no se ha activado (p. ej. el anterior caducó)."""
+    settings = get_settings()
+    return await ResendActivationUseCase(
+        user_repo=repo,
+        event_bus=event_bus,
+        public_url=settings.APP_PUBLIC_URL,
+        activation_ttl_days=settings.ACTIVATION_TOKEN_EXPIRE_DAYS,
+    ).execute(user_id)
 
 
 @router.get("/directory", response_model=list[DirectoryUserResponse])

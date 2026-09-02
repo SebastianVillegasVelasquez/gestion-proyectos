@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router";
 import LoginPage from "@/features/auth/components/Login.tsx";
+import ActivateAccountPage from "@/features/auth/components/ActivateAccountPage.tsx";
 import { AppLayout } from "@/components/layout/AppLayout.tsx";
 import { ProtectedRoute } from "@/router/ProtectedRoute.tsx";
 import { RoleGuard } from "@/router/RoleGuard.tsx";
@@ -112,6 +113,8 @@ export const AppRouter = () => (
   <Routes>
     {/* Rutas públicas */}
     <Route path="/login" element={<LoginPage />} />
+    {/* Activación de cuenta por enlace del correo (sin sesión). */}
+    <Route path="/activar" element={<ActivateAccountPage />} />
     {/* Portal del cliente: pantalla pública única, sin sesión. El token NO viaja
         en la URL: el cliente lo introduce en la pantalla y se envía por POST
         (validado en el backend). Enlace y token se entregan por separado. */}

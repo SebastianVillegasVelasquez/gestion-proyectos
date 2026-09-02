@@ -19,9 +19,10 @@ export interface SendTestEmailResult {
   logo_check_detail: string;
 }
 
-/** Plantillas que el developer puede disparar a mano (mismas que los flujos
- * automáticos: alta de usuario y barrido de tareas atrasadas). */
-export type ManualEmailKind = "welcome" | "overdue";
+/** Plantillas que el developer puede disparar a mano. `welcome`/`overdue` son
+ * solo lectura; `activation` MUTA la cuenta (emite un token nuevo y deja la
+ * contraseña en blanco). */
+export type ManualEmailKind = "welcome" | "overdue" | "activation";
 
 export interface SendManualEmailsPayload {
   kind: ManualEmailKind;
@@ -35,6 +36,9 @@ export interface ManualEmailResult {
   /** Correos efectivamente enviados a esta persona. */
   sent: number;
   detail: string;
+  /** Solo `activation`: si la persona ya había entrado antes de invalidarle la
+   * contraseña. null para el resto de plantillas. */
+  already_entered?: boolean | null;
 }
 
 export interface SendManualEmailsResult {

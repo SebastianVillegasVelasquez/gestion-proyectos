@@ -34,6 +34,25 @@ export function useLogin(redirectTo = "/dashboard") {
   });
 }
 
+/** Activación de cuenta por enlace: fija la contraseña y deja la sesión abierta. */
+export function useActivateAccount(redirectTo = "/") {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  return useMutation({
+    mutationFn: (vars: { token: string; newPassword: string }) =>
+      authApi.activateAccount(vars.token, vars.newPassword),
+    onSuccess: async (res) => {
+      login({
+        accessToken: res.access_token,
+        refreshToken: res.refresh_token,
+        user: res.user,
+      });
+      await navigate(redirectTo, { replace: true });
+    },
+  });
+}
+
 export function useChangePassword() {
   return useMutation({
     mutationFn: (vars: { currentPassword: string; newPassword: string }) =>

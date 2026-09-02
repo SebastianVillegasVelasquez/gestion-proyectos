@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
-import { CalendarClock, FolderTree, Users2, ArrowUpRight, ExternalLink, Lock } from "lucide-react";
+import { CalendarClock, ExternalLink, LayoutList, Network, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
@@ -13,6 +12,8 @@ import {
   DUE_STATUS_LABELS,
   type DueStatus,
 } from "../utils/due-status";
+import { MyTaskDeliverAction, TaskOriginCrumb } from "./my-task-bits";
+import { PersonalStructureView } from "./PersonalStructureView";
 
 /** «faltan 3 d» / «hoy» / «hace 2 d» a partir de los días restantes. */
 function daysRemainingLabel(n: number): string {
@@ -23,6 +24,8 @@ function daysRemainingLabel(n: number): string {
 }
 
 type Filter = "todas" | "overdue" | "due_soon" | "abiertas" | "done";
+type Scope = "todas" | "individual" | "equipo";
+type ViewMode = "lista" | "estructura";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
@@ -30,6 +33,12 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "due_soon", label: "Por vencer" },
   { key: "abiertas", label: "Abiertas" },
   { key: "done", label: "Completadas" },
+];
+
+const SCOPES: { key: Scope; label: string }[] = [
+  { key: "todas", label: "Todas" },
+  { key: "individual", label: "Individuales" },
+  { key: "equipo", label: "En equipo" },
 ];
 
 function matches(filter: Filter, status: DueStatus): boolean {
@@ -47,11 +56,39 @@ function matches(filter: Filter, status: DueStatus): boolean {
   }
 }
 
+// Orden dentro de cada proyecto: primero lo urgente (vencidas, luego por
+// vencer), después por fecha límite (sin fecha al final) y a igualdad, título.
+const DUE_RANK: Record<DueStatus, number> = {
+  overdue: 0,
+  due_soon: 1,
+  on_track: 2,
+  no_date: 3,
+  done: 4,
+};
+
+function compareRows(
+  a: { task: ApiMyTask; status: DueStatus },
+  b: { task: ApiMyTask; status: DueStatus },
+): number {
+  if (DUE_RANK[a.status] !== DUE_RANK[b.status]) {
+    return DUE_RANK[a.status] - DUE_RANK[b.status];
+  }
+  const ad = a.task.due_date ?? "9999-12-31";
+  const bd = b.task.due_date ?? "9999-12-31";
+  if (ad !== bd) {
+    return ad < bd ? -1 : 1;
+  }
+  return a.task.title.localeCompare(b.task.title);
+}
+
 /**
  * «Mis tareas»: todo lo asignado al usuario (individual o de equipo), con el
  * aviso de vencimiento y la vía de entrega según el tipo de tarea:
  *  - individual → se entrega aquí mismo (crea/abre su entrega personal)
  *  - de equipo  → se entrega en el espacio de ese equipo (enlace)
+ *
+ * Dos vistas del MISMO conjunto filtrado: Lista (agrupada por proyecto) y
+ * Estructura (el árbol del proyecto, igual que en Equipos, pero de solo lectura).
  */
 export function MyTasksView({
   tasks,
@@ -66,45 +103,43 @@ export function MyTasksView({
   onOpenIndividual: (task: ApiMyTask) => void;
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [view, setView] = useState<ViewMode>("lista");
   const [filter, setFilter] = useState<Filter>("abiertas");
+  const [scope, setScope] = useState<Scope>("todas");
   const [query, setQuery] = useState("");
-  // Filtro por elemento padre de la estructura: "" = todos, "none" = tareas sin
-  // elemento (individuales), o el id del work_item.
-  const [parentId, setParentId] = useState("");
-
-  // Elementos padre presentes en mis tareas, para poblar el selector.
-  const parents = useMemo(() => {
-    const map = new Map<string, string>();
-    let hasLoose = false;
-    for (const t of tasks) {
-      if (t.work_item_id) {
-        map.set(t.work_item_id, t.work_item_name ?? "Elemento");
-      } else {
-        hasLoose = true;
-      }
-    }
-    const list = [...map.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return { list, hasLoose };
-  }, [tasks]);
+  // Búsqueda por elemento: coincide contra el nombre del elemento o el de
+  // cualquiera de sus ancestros (sustituye al antiguo desplegable de padres).
+  const [elementQuery, setElementQuery] = useState("");
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const eq = elementQuery.trim().toLowerCase();
     return tasks
       .map((t) => ({ task: t, status: dueStatus(t, today) }))
       .filter(({ status }) => matches(filter, status))
       .filter(({ task }) => {
-        if (!parentId) {
+        if (scope === "individual") {
+          return task.team_id === null;
+        }
+        if (scope === "equipo") {
+          return task.team_id !== null;
+        }
+        return true;
+      })
+      .filter(({ task }) => {
+        if (!eq) {
           return true;
         }
-        return parentId === "none" ? !task.work_item_id : task.work_item_id === parentId;
+        const names = [task.work_item_name ?? "", ...task.work_item_ancestors.map((a) => a.name)];
+        return names.some((n) => n.toLowerCase().includes(eq));
       })
       .filter(
         ({ task }) =>
           !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
       );
-  }, [tasks, filter, query, parentId, today]);
+  }, [tasks, filter, scope, query, elementQuery, today]);
+
+  const filteredTasks = useMemo(() => rows.map((r) => r.task), [rows]);
 
   const counts = useMemo(() => {
     let overdue = 0;
@@ -130,7 +165,9 @@ export function MyTasksView({
       g.items.push(row);
       groups.set(row.task.project_id, g);
     }
-    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...groups.values()]
+      .map((g) => ({ ...g, items: [...g.items].sort(compareRows) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [rows]);
 
   if (loading) {
@@ -156,6 +193,34 @@ export function MyTasksView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* Lista / Estructura */}
+        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+          {(
+            [
+              { key: "lista", label: "Lista", Icon: LayoutList },
+              { key: "estructura", label: "Estructura", Icon: Network },
+            ] as const
+          ).map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => {
+                setView(v.key);
+              }}
+              aria-pressed={view === v.key}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                view === v.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <v.Icon className="size-3.5" />
+              {v.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
           {FILTERS.map((f) => (
             <button
@@ -182,141 +247,136 @@ export function MyTasksView({
             </button>
           ))}
         </div>
+
+        {/* Individuales / en equipo */}
+        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+          {SCOPES.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => {
+                setScope(s.key);
+              }}
+              aria-pressed={scope === s.key}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                scope === s.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         <input
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
           }}
           placeholder="Buscar por tarea o proyecto…"
-          className="min-w-[180px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
+          className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
         />
-        {(parents.list.length > 0 || parents.hasLoose) && (
-          <select
-            value={parentId}
-            onChange={(e) => {
-              setParentId(e.target.value);
-            }}
-            aria-label="Filtrar por elemento padre"
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
-          >
-            <option value="">Todos los padres</option>
-            {parents.list.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-            {parents.hasLoose && <option value="none">Sin elemento</option>}
-          </select>
-        )}
+        <input
+          value={elementQuery}
+          onChange={(e) => {
+            setElementQuery(e.target.value);
+          }}
+          placeholder="Buscar por elemento…"
+          aria-label="Buscar por elemento de la estructura"
+          className="min-w-[150px] rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
+        />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
-        {byProject.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            Nada que coincida con el filtro.
-          </p>
-        ) : (
-          byProject.map((group) => (
-            <section key={group.name}>
-              <h3 className="sticky top-0 z-10 bg-accent/50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
-                {group.name}
-              </h3>
-              <ul className="divide-y divide-border">
-                {group.items.map(({ task, status }) => {
-                  const remaining = status === "done" ? null : daysUntil(task.due_date, today);
-                  const hasDeliverable = deliverableTaskIds.has(task.id);
-                  // Bloqueada = el backend no dejará entregar todavía (dependencia
-                  // FtS incompleta o actividad de terceros sin entregar). Ver la
-                  // entrega ya creada nunca se bloquea.
-                  const deliveryBlocked = !hasDeliverable && Boolean(task.delivery_blocked_reason);
-                  return (
-                    <li
-                      key={task.id}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5"
-                    >
-                      <span className="min-w-[160px] flex-1 truncate text-sm font-medium text-foreground">
-                        {task.title}
-                      </span>
+      {view === "estructura" ? (
+        <PersonalStructureView
+          tasks={filteredTasks}
+          today={today}
+          deliverableTaskIds={deliverableTaskIds}
+          onOpenIndividual={onOpenIndividual}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
+          {byProject.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">
+              Nada que coincida con el filtro.
+            </p>
+          ) : (
+            byProject.map((group) => (
+              <section key={group.name}>
+                <h3 className="sticky top-0 z-10 bg-accent/50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+                  {group.name}
+                </h3>
+                <ul className="divide-y divide-border">
+                  {group.items.map(({ task, status }) => {
+                    const remaining = status === "done" ? null : daysUntil(task.due_date, today);
+                    const hasDeliverable = deliverableTaskIds.has(task.id);
+                    return (
+                      <li key={task.id} className="flex flex-col gap-1.5 px-4 py-2.5">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <span className="min-w-[160px] flex-1 truncate text-sm font-medium text-foreground">
+                            {task.title}
+                          </span>
 
-                      {task.depends_on_third_party && (
-                        <span
-                          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                          title="Depende de una actividad de terceros"
-                        >
-                          <ExternalLink className="size-2.5" /> Depende de terceros
-                        </span>
-                      )}
+                          {task.depends_on_third_party && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              title="Depende de una actividad de terceros"
+                            >
+                              <ExternalLink className="size-2.5" /> Depende de terceros
+                            </span>
+                          )}
 
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                          DUE_STATUS_CLASSES[status],
-                        )}
-                        title={task.due_date ? `Vence el ${task.due_date}` : undefined}
-                      >
-                        {DUE_STATUS_LABELS[status]}
-                        {task.due_date && status !== "done" && ` · ${task.due_date}`}
-                      </span>
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                              DUE_STATUS_CLASSES[status],
+                            )}
+                            title={task.due_date ? `Vence el ${task.due_date}` : undefined}
+                          >
+                            {DUE_STATUS_LABELS[status]}
+                            {task.due_date && status !== "done" && ` · ${task.due_date}`}
+                          </span>
 
-                      {remaining !== null && (
-                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                          {daysRemainingLabel(remaining)}
-                        </span>
-                      )}
+                          {remaining !== null && (
+                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                              {daysRemainingLabel(remaining)}
+                            </span>
+                          )}
 
-                      <TaskDurationBadge days={task.estimated_days} className="shrink-0" />
+                          <TaskDurationBadge days={task.estimated_days} className="shrink-0" />
 
-                      <span className="hidden shrink-0 items-center gap-1 text-[11px] text-muted-foreground sm:flex">
-                        {task.team_id ? (
-                          <>
-                            <Users2 className="size-3" /> {task.team_name}
-                          </>
-                        ) : (
-                          <>
-                            <FolderTree className="size-3" /> {task.work_item_name ?? "Individual"}
-                          </>
-                        )}
-                      </span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {TASK_STATUS_LABELS[task.status]}
+                          </span>
 
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {TASK_STATUS_LABELS[task.status]}
-                      </span>
+                          <MyTaskDeliverAction
+                            task={task}
+                            isDone={status === "done"}
+                            hasDeliverable={hasDeliverable}
+                            onOpenIndividual={onOpenIndividual}
+                          />
+                        </div>
 
-                      {status === "done" ? null : task.team_id ? (
-                        <Link
-                          to={`/workspace?team=${task.team_id}`}
-                          className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
-                          title={task.delivery_blocked_reason ?? undefined}
-                        >
-                          Entregar en el equipo <ArrowUpRight className="inline size-3" />
-                        </Link>
-                      ) : deliveryBlocked ? (
-                        <span
-                          aria-disabled="true"
-                          title={task.delivery_blocked_reason ?? undefined}
-                          className="inline-flex shrink-0 cursor-not-allowed items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                        >
-                          <Lock className="size-3" /> Bloqueada
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onOpenIndividual(task);
-                          }}
-                          className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
-                        >
-                          {hasDeliverable ? "Ver entrega" : "Entregar"}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))
-        )}
-      </div>
+                        {/* De dónde viene: miga de pan con los colores de la Estructura. */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {task.team_id && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Users2 className="size-3" /> {task.team_name}
+                            </span>
+                          )}
+                          <TaskOriginCrumb ancestors={task.work_item_ancestors} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

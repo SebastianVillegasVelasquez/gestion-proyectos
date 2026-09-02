@@ -124,6 +124,8 @@ export interface ApiBlockingTask {
   id: string;
   title: string;
   status: ProjectTaskStatus;
+  /** Quién tiene la tarea bloqueante. null para dependencias hacia un elemento. */
+  assignee_name?: string | null;
 }
 
 /** Interruptores de aviso del usuario actual DENTRO de un equipo concreto. */

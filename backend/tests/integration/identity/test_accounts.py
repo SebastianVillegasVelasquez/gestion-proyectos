@@ -112,7 +112,7 @@ class TestAdminCreateUser:
         # Cuenta nueva: entra con clave provisional y debe cambiarla al ingresar.
         assert resp.json()["must_change_password"] is True
 
-    async def test_create_without_password_generates_temporary(
+    async def test_create_without_password_returns_activation_link(
         self, client, super_admin_headers
     ):
         resp = await client.post(
@@ -127,11 +127,19 @@ class TestAdminCreateUser:
         )
         assert resp.status_code == 201, resp.text
         body = resp.json()
-        temp = body["temporary_password"]
-        assert temp and len(temp) >= 8
+        # No viaja ninguna credencial: enlace de activación de un solo uso.
+        assert body["temporary_password"] is None
+        assert "/activar?token=" in (body["activation_url"] or "")
         assert body["must_change_password"] is True
-        # La temporal sirve para iniciar sesión.
-        login = await _login(client, "sin.clave@test.com", temp)
+
+        token = body["activation_url"].split("token=", 1)[1]
+        done = await client.post(
+            "/api/v1/identity/activation/complete",
+            json={"token": token, "new_password": "MiClave123"},
+        )
+        assert done.status_code == 200, done.text
+        # La clave elegida sirve para iniciar sesión.
+        login = await _login(client, "sin.clave@test.com", "MiClave123")
         assert login.status_code == 200, login.text
 
     async def test_create_with_password_omits_temporary(

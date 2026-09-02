@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from jose import JWTError
 
+import hashlib
 import logging
 import re
 import secrets
@@ -21,6 +22,8 @@ from app.modules.identity.domain.services import UserService
 from app.modules.identity.infrastructure.enums import DocumentType, SystemRole
 from app.modules.identity.infrastructure.models import Position
 from app.modules.identity.presentation.schemas import (
+    ActivationInfoResponse,
+    ActivationLinkResponse,
     BulkCreatedUser,
     BulkCreateUsersResponse,
     BulkUserRowError,
@@ -56,6 +59,40 @@ def _generate_temp_password(length: int = 12) -> str:
         pwd = "".join(secrets.choice(alphabet) for _ in range(length))
         if any(c.isdigit() for c in pwd) and any(c.isalpha() for c in pwd):
             return pwd
+
+
+def _hash_activation_token(raw: str) -> str:
+    """SHA-256 hex del token. Se guarda el hash, nunca el token en claro: una
+    fuga de la tabla `users` no entrega tokens usables."""
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _new_activation_token() -> tuple[str, str]:
+    """(token en claro, su hash). El claro viaja por correo; el hash a la BD."""
+    raw = secrets.token_urlsafe(32)
+    return raw, _hash_activation_token(raw)
+
+
+async def issue_activation_token(
+    user_repo: UserRepository, user_id: UUID, ttl_days: int
+) -> str:
+    """Genera y persiste un token de activación para `user_id`, devolviendo el
+    token en claro (para el correo). Reemplaza cualquier token anterior."""
+    raw, token_hash = _new_activation_token()
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise NotFoundError("Usuario no encontrado")
+    user.activation_token_hash = token_hash
+    user.activation_token_expires_at = datetime.now(timezone.utc) + timedelta(
+        days=ttl_days
+    )
+    await user_repo.save(user)
+    return raw
+
+
+def build_activation_url(public_url: str, raw_token: str) -> str | None:
+    base = (public_url or "").rstrip("/")
+    return f"{base}/activar?token={raw_token}" if base else None
 
 
 # Solo mapeamos vocales con tilde/diéresis: la ñ NO se toca porque en español
@@ -103,11 +140,15 @@ class CreateUserUseCase:
         user_repo: UserRepository,
         position_repo: PositionRepository,
         event_bus: EventBus | None = None,
+        public_url: str = "",
+        activation_ttl_days: int = 7,
     ):
         self.user_repo = user_repo
         self.position_repo = position_repo
         self.user_service = UserService(user_repo)
         self.event_bus = event_bus
+        self._public_url = public_url
+        self._ttl_days = activation_ttl_days
 
     async def execute(self, data: CreateUserRequest) -> CreatedUserResponse:
         if not await self.user_repo.is_email_available(data.email):
@@ -121,16 +162,20 @@ class CreateUserUseCase:
         if not await self.position_repo.key_exists(data.position):
             raise NotFoundError(f"El cargo '{data.position}' no existe")
 
-        # Sin contraseña definida por el admin: el sistema genera una temporal y
-        # la devuelve una sola vez para entregarla. La persona la cambia en su
-        # primer ingreso (must_change_password lo pone `create_user`).
-        generated = not data.password
-        if generated:
+        # Sin contraseña definida por el admin: la cuenta se crea SIN clave
+        # utilizable (una aleatoria de relleno) y se emite un token de activación
+        # de un solo uso. El correo lleva el enlace; nunca viaja una credencial.
+        activate = not data.password
+        if activate:
             data = data.model_copy(update={"password": _generate_temp_password()})
 
         result = await self.user_service.create_user(data)
 
-        temp = data.password if generated else None
+        activation_token: str | None = None
+        if activate:
+            activation_token = await issue_activation_token(
+                self.user_repo, result.id, self._ttl_days
+            )
 
         if self.event_bus is not None:
             await self.event_bus.publish(
@@ -139,11 +184,102 @@ class CreateUserUseCase:
                     user_id=result.id,
                     email=result.email,
                     name=result.name,
-                    temporary_password=temp,
+                    activation_token=activation_token,
                 )
             )
 
-        return CreatedUserResponse(**result.model_dump(), temporary_password=temp)
+        return CreatedUserResponse(
+            **result.model_dump(),
+            temporary_password=None,
+            activation_url=(
+                build_activation_url(self._public_url, activation_token)
+                if activation_token
+                else None
+            ),
+        )
+
+
+class ActivateAccountUseCase:
+    """Activa una cuenta a partir de su token de un solo uso: valida el token,
+    fija la contraseña que elige la persona, limpia el token y devuelve sesión
+    iniciada (mismo TokenResponse que el login)."""
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(self, token: str, new_password: str) -> TokenResponse:
+        user = await self.user_repo.get_by_activation_token_hash(
+            _hash_activation_token(token)
+        )
+        expires = getattr(user, "activation_token_expires_at", None) if user else None
+        if user is None or expires is None:
+            raise UnauthorizedError("El enlace de activación no es válido")
+        if expires < datetime.now(timezone.utc):
+            raise UnauthorizedError(
+                "El enlace de activación caducó. Pide uno nuevo a quien te dio de alta."
+            )
+        user.password = hash_password(new_password)
+        user.must_change_password = False
+        user.is_active = True
+        user.activation_token_hash = None
+        user.activation_token_expires_at = None
+        await self.user_repo.save(user)
+        return _token_response(user)
+
+
+class GetActivationInfoUseCase:
+    """Datos mínimos para la pantalla de activación (a quién pertenece el enlace)."""
+
+    def __init__(self, user_repo: UserRepository):
+        self.user_repo = user_repo
+
+    async def execute(self, token: str) -> ActivationInfoResponse:
+        user = await self.user_repo.get_by_activation_token_hash(
+            _hash_activation_token(token)
+        )
+        expires = getattr(user, "activation_token_expires_at", None) if user else None
+        expired = expires is not None and expires < datetime.now(timezone.utc)
+        if user is None or expires is None or expired:
+            raise UnauthorizedError("El enlace de activación no es válido o caducó")
+        return ActivationInfoResponse(email=user.email, name=user.name)
+
+
+class ResendActivationUseCase:
+    """Un admin regenera y reenvía el enlace de activación de una cuenta que aún
+    no se ha activado (p. ej. el anterior caducó)."""
+
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        event_bus: EventBus | None = None,
+        public_url: str = "",
+        activation_ttl_days: int = 7,
+    ):
+        self.user_repo = user_repo
+        self.event_bus = event_bus
+        self._public_url = public_url
+        self._ttl_days = activation_ttl_days
+
+    async def execute(self, user_id: UUID) -> ActivationLinkResponse:
+        user = await self.user_repo.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Usuario no encontrado")
+        raw = await issue_activation_token(self.user_repo, user_id, self._ttl_days)
+        if self.event_bus is not None:
+            await self.event_bus.publish(
+                UserCreated(
+                    occurred_at=datetime.now(timezone.utc),
+                    user_id=user.id,
+                    email=user.email,
+                    name=user.name,
+                    activation_token=raw,
+                )
+            )
+        expires = datetime.now(timezone.utc) + timedelta(days=self._ttl_days)
+        return ActivationLinkResponse(
+            activation_url=build_activation_url(self._public_url, raw),
+            expires_at=expires,
+        )
 
 
 class LoginUseCase:
@@ -362,11 +498,13 @@ class BulkCreateUsersUseCase:
         user_repo: UserRepository,
         position_repo: PositionRepository,
         event_bus: EventBus | None = None,
+        activation_ttl_days: int = 7,
     ):
         self.user_repo = user_repo
         self.position_repo = position_repo
         self.user_service = UserService(user_repo)
         self.event_bus = event_bus
+        self._ttl_days = activation_ttl_days
 
     async def _resolve_position_key(self, cargo_raw: str) -> str:
         """Devuelve la clave de un cargo existente, creándolo si hace falta."""
@@ -405,7 +543,7 @@ class BulkCreateUsersUseCase:
                 )
 
                 raw_password = (row.get("password") or "").strip()
-                generated_password = not raw_password
+                activate = not raw_password
                 password = raw_password or _generate_temp_password()
 
                 data = CreateUserRequest(
@@ -420,6 +558,15 @@ class BulkCreateUsersUseCase:
                 )
                 user = await self.user_service.create_user(data)
 
+                # Sin contraseña en el CSV → enlace de activación (no viaja clave).
+                activation_token = (
+                    await issue_activation_token(
+                        self.user_repo, user.id, self._ttl_days
+                    )
+                    if activate
+                    else None
+                )
+
                 if self.event_bus is not None:
                     await self.event_bus.publish(
                         UserCreated(
@@ -427,9 +574,7 @@ class BulkCreateUsersUseCase:
                             user_id=user.id,
                             email=user.email,
                             name=user.name,
-                            temporary_password=(
-                                password if generated_password else None
-                            ),
+                            activation_token=activation_token,
                         )
                     )
 
@@ -439,7 +584,7 @@ class BulkCreateUsersUseCase:
                         email=user.email,
                         name=user.name,
                         last_name=user.last_name,
-                        temporary_password=(password if generated_password else None),
+                        temporary_password=None,
                     )
                 )
             except ValidationError as exc:
