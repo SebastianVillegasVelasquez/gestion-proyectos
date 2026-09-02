@@ -282,7 +282,7 @@ class TaskRepository(BaseRepository[Task]):
     # ese elemento cuenta como "entregado" hay que mirar su tipo (que tiene
     # lazy="raise"), así que se trae por adelantado con la dependencia.
     _DEP_LOADS = (
-        selectinload(TaskDependency.depends_on),
+        selectinload(TaskDependency.depends_on).selectinload(Task.assignee),
         selectinload(TaskDependency.depends_on_work_item).selectinload(WorkItem.tipo),
     )
 
@@ -349,6 +349,24 @@ class TaskRepository(BaseRepository[Task]):
             .options(selectinload(WorkItem.tipo))
         )
         return (await self._session.execute(query)).scalars().first()
+
+    async def get_work_item_ancestry(self, work_item_id: UUID) -> list["WorkItem"]:
+        """Cadena de elementos desde la RAÍZ hasta `work_item_id` (él incluido),
+        cada uno con su `tipo` cargado. Para pintar la miga de pan «rama › módulo
+        › unidad» de una tarea con los colores de la estructura. Sube por
+        `parent_id`; árboles poco profundos, coste acotado."""
+        chain: list[WorkItem] = []
+        seen: set[UUID] = set()
+        current: UUID | None = work_item_id
+        while current is not None and current not in seen:
+            seen.add(current)
+            item = await self.get_work_item(current)
+            if item is None:
+                break
+            chain.append(item)
+            current = item.parent_id
+        chain.reverse()
+        return chain
 
     async def has_undelivered_third_party_ancestor(self, work_item_id: UUID) -> bool:
         """¿Algún ancestro de `work_item_id` (él incluido) es una «actividad de

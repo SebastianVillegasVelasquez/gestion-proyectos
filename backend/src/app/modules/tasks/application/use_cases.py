@@ -39,6 +39,7 @@ from app.modules.tasks.presentation.schemas import (
     TeamTaskItemResponse,
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
+    WorkItemCrumbResponse,
 )
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.project.infrastructure.enums import ProjectRole
@@ -619,11 +620,16 @@ def _blocking_by_task(deps) -> dict[UUID, list[BlockingTaskResponse]]:
             continue
         if dep.depends_on is None:
             continue
+        holder = getattr(dep.depends_on, "assignee", None)
+        assignee_name = (
+            f"{holder.name} {holder.last_name}".strip() if holder is not None else None
+        )
         blocking.setdefault(dep.task_id, []).append(
             BlockingTaskResponse(
                 id=dep.depends_on.id,
                 title=dep.depends_on.title,
                 status=dep.depends_on.status or TaskStatus.PENDIENTE_POR_INICIAR,
+                assignee_name=assignee_name or None,
             )
         )
     return blocking
@@ -719,6 +725,28 @@ class GetMyTasksUseCase:
                 wi_id
             ] = await self.task_repo.has_undelivered_third_party_ancestor(wi_id)
 
+        # Miga de pan RAÍZ→elemento por cada work_item presente (memoizado: una
+        # caminata por elemento distinto, no por tarea).
+        ancestry_cache: dict[UUID, list[WorkItemCrumbResponse]] = {}
+        for wi_id in {t.work_item_id for t in tasks if t.work_item_id is not None}:
+            chain = await self.task_repo.get_work_item_ancestry(wi_id)
+            ancestry_cache[wi_id] = [
+                WorkItemCrumbResponse(
+                    id=node.id,
+                    name=node.nombre,
+                    tipo_id=node.tipo_id,
+                    tipo_nombre=getattr(getattr(node, "tipo", None), "nombre", None),
+                    es_dependencia_externa=bool(
+                        getattr(
+                            getattr(node, "tipo", None),
+                            "es_dependencia_externa",
+                            False,
+                        )
+                    ),
+                )
+                for node in chain
+            ]
+
         _terminal = (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
         out: list[MyTaskItemResponse] = []
         for task, work_item_name, project_name, team_name in rows:
@@ -742,6 +770,11 @@ class GetMyTasksUseCase:
                     project_name=project_name,
                     work_item_id=task.work_item_id,
                     work_item_name=work_item_name,
+                    work_item_ancestors=(
+                        ancestry_cache.get(task.work_item_id, [])
+                        if task.work_item_id is not None
+                        else []
+                    ),
                     team_id=task.team_id,
                     team_name=team_name,
                     parent_task_id=task.parent_task_id,
