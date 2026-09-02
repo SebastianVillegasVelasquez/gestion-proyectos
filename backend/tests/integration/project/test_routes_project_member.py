@@ -97,6 +97,70 @@ class TestRoutesProjectMember:
         )
         assert second.status_code == 409, second.text
 
+    async def test_readding_member_after_removal_allows_team_assignment(
+        self,
+        client,
+        admin_headers,
+        valid_project_payload,
+    ):
+        """Regresión: quitar y volver a añadir a alguien dejaba una fila con
+        soft-delete que hacía creer que ya no era integrante del proyecto, y
+        el backend rechazaba añadirlo a un equipo."""
+        project = (
+            await client.post(
+                "/api/v1/projects/",
+                json=valid_project_payload,
+                headers=admin_headers,
+            )
+        ).json()
+        user = (
+            await client.post(
+                "/api/v1/identity/users",
+                json={
+                    "email": "readd@example.com",
+                    "password": "password123",
+                    "name": "Rea",
+                    "last_name": "Dd",
+                    "role": "user",
+                    "position": "desarrollador",
+                },
+                headers=admin_headers,
+            )
+        ).json()
+        payload = {
+            "user_id": user["id"],
+            "project_id": project["id"],
+            "project_role": ProjectRole.INTEGRANTE.value,
+        }
+
+        first = await client.post(
+            "/api/v1/projects/members/", json=payload, headers=admin_headers
+        )
+        assert first.status_code == 201
+        removal = await client.delete(
+            f"/api/v1/projects/members/{first.json()['id']}", headers=admin_headers
+        )
+        assert removal.status_code == 204
+
+        readd = await client.post(
+            "/api/v1/projects/members/", json=payload, headers=admin_headers
+        )
+        assert readd.status_code == 201, readd.text
+
+        team = (
+            await client.post(
+                f"/api/v1/projects/{project['id']}/teams",
+                json={"name": "Equipo"},
+                headers=admin_headers,
+            )
+        ).json()
+        add_to_team = await client.post(
+            f"/api/v1/projects/{project['id']}/teams/{team['id']}/members",
+            json={"user_id": user["id"]},
+            headers=admin_headers,
+        )
+        assert add_to_team.status_code == 201, add_to_team.text
+
     async def test_should_get_all_members_from_project(
         self,
         client,

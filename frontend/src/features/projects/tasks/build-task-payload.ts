@@ -19,6 +19,9 @@ export interface TaskFormState {
   description: string;
   // La tarea cuelga de un elemento del árbol de trabajo (cualquier nivel).
   workItemId: string;
+  // Si viene, la tarea es SUBTAREA de esta otra: hereda elemento y equipo del
+  // padre (el backend lo completa). Vacío = tarea normal.
+  parentTaskId: string;
   assignmentMode: AssignmentMode;
   assigneeId: string;
   // Equipo al que se delega la tarea (opcional).
@@ -34,11 +37,12 @@ export interface TaskFormState {
   requiresApproval: boolean;
 }
 
-export function emptyTaskForm(workItemId = "", title = ""): TaskFormState {
+export function emptyTaskForm(workItemId = "", title = "", parentTaskId = ""): TaskFormState {
   return {
     title,
     description: "",
     workItemId,
+    parentTaskId,
     assignmentMode: "none",
     assigneeId: "",
     teamId: "",
@@ -72,6 +76,7 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
   // formulario arrastrara un valor viejo. "member" es el único que manda ambos.
   const withPerson = form.assignmentMode === "person" || form.assignmentMode === "member";
   const withTeam = form.assignmentMode === "team" || form.assignmentMode === "member";
+  const parentTaskId = nullIfEmpty(form.parentTaskId);
   const payload: CreateTaskPayload = {
     title: form.title.trim(),
     description: nullIfEmpty(form.description),
@@ -81,6 +86,9 @@ export function buildTaskPayload(form: TaskFormState, projectId: string): Create
     depends_on_id: dependsOnWorkItem ? null : dep,
     depends_on_work_item_id: dependsOnWorkItem,
     work_item_id: workItemId,
+    parent_task_id: parentTaskId ?? undefined,
+    // El backend deriva el proyecto del elemento cuando hay `work_item_id`; si
+    // no (tarea o subtarea suelta), hay que mandarlo explícito.
     project_id: workItemId ? undefined : projectId,
     // Las fechas son opcionales: la tarea puede quedar como borrador y
     // planificarse después. Solo enviamos lo que el usuario haya completado.
@@ -149,6 +157,8 @@ export function taskToForm(task: Task): TaskFormState {
     title: task.title,
     description: task.description ?? "",
     workItemId: task.work_item_id ?? "",
+    // La condición de subtarea no se cambia desde este formulario de edición.
+    parentTaskId: task.parent_task_id ?? "",
     assignmentMode,
     assigneeId: task.assignee_id ?? "",
     teamId: task.team_id ?? "",
