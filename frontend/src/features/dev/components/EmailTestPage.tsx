@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, Mail, Send, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronDown, Mail, Send, ShieldAlert, TriangleAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { useDirectory } from "@/features/projects/hooks/use-members";
@@ -13,7 +13,12 @@ const KINDS: { value: ManualEmailKind; label: string; hint: string }[] = [
   {
     value: "welcome",
     label: "Bienvenida",
-    hint: "La misma plantilla que recibe una cuenta nueva (logo, botón de acceso).",
+    hint: "Solo la plantilla (logo, botón de acceso). NO genera un enlace de activación real: úsala para revisar cómo se ve el correo.",
+  },
+  {
+    value: "activation",
+    label: "Activación de cuenta",
+    hint: "Genera un enlace de activación NUEVO y lo envía. Deja la contraseña actual del destinatario en blanco: solo podrá entrar por el enlace y tendrá que crear su contraseña. Para notificar cuentas de producción que aún no han sido activadas.",
   },
   {
     value: "overdue",
@@ -175,6 +180,14 @@ export function EmailTestPage() {
           </div>
         </div>
 
+        {kind === "activation" && (
+          <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+            Invalida la contraseña actual de cada destinatario. Los que ya estuvieran usando el
+            sistema tendrán que volver a entrar por el enlace del correo. No te incluyas a ti.
+          </p>
+        )}
+
         <button
           type="button"
           onClick={submit}
@@ -197,6 +210,12 @@ export function EmailTestPage() {
               {sendManual.data.total_sent} correo
               {sendManual.data.total_sent === 1 ? "" : "s"} enviado
               {sendManual.data.total_sent === 1 ? "" : "s"}.
+              {(() => {
+                const n = sendManual.data.results.filter((r) => r.already_entered).length;
+                return n > 0
+                  ? ` ${String(n)} ${n === 1 ? "cuenta ya había entrado y su" : "cuentas ya habían entrado y su"} contraseña queda invalidada.`
+                  : "";
+              })()}
             </p>
             <ul className="rounded-lg border border-border bg-background text-[12px]">
               {sendManual.data.results.map((r) => (

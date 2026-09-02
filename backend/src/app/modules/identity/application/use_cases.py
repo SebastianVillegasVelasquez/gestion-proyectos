@@ -73,7 +73,7 @@ def _new_activation_token() -> tuple[str, str]:
     return raw, _hash_activation_token(raw)
 
 
-async def _issue_activation_token(
+async def issue_activation_token(
     user_repo: UserRepository, user_id: UUID, ttl_days: int
 ) -> str:
     """Genera y persiste un token de activación para `user_id`, devolviendo el
@@ -90,7 +90,7 @@ async def _issue_activation_token(
     return raw
 
 
-def _activation_url(public_url: str, raw_token: str) -> str | None:
+def build_activation_url(public_url: str, raw_token: str) -> str | None:
     base = (public_url or "").rstrip("/")
     return f"{base}/activar?token={raw_token}" if base else None
 
@@ -173,7 +173,7 @@ class CreateUserUseCase:
 
         activation_token: str | None = None
         if activate:
-            activation_token = await _issue_activation_token(
+            activation_token = await issue_activation_token(
                 self.user_repo, result.id, self._ttl_days
             )
 
@@ -192,7 +192,7 @@ class CreateUserUseCase:
             **result.model_dump(),
             temporary_password=None,
             activation_url=(
-                _activation_url(self._public_url, activation_token)
+                build_activation_url(self._public_url, activation_token)
                 if activation_token
                 else None
             ),
@@ -264,7 +264,7 @@ class ResendActivationUseCase:
         user = await self.user_repo.get_by_id(user_id)
         if user is None:
             raise NotFoundError("Usuario no encontrado")
-        raw = await _issue_activation_token(self.user_repo, user_id, self._ttl_days)
+        raw = await issue_activation_token(self.user_repo, user_id, self._ttl_days)
         if self.event_bus is not None:
             await self.event_bus.publish(
                 UserCreated(
@@ -277,7 +277,7 @@ class ResendActivationUseCase:
             )
         expires = datetime.now(timezone.utc) + timedelta(days=self._ttl_days)
         return ActivationLinkResponse(
-            activation_url=_activation_url(self._public_url, raw),
+            activation_url=build_activation_url(self._public_url, raw),
             expires_at=expires,
         )
 
@@ -560,7 +560,7 @@ class BulkCreateUsersUseCase:
 
                 # Sin contraseña en el CSV → enlace de activación (no viaja clave).
                 activation_token = (
-                    await _issue_activation_token(
+                    await issue_activation_token(
                         self.user_repo, user.id, self._ttl_days
                     )
                     if activate
