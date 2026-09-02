@@ -198,8 +198,15 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
     async def get_member_by_project_id_and_user_id(
         self, project_id: UUID, user_id: UUID
     ) -> Optional[ProjectMember]:
+        # Devuelve la membresía ACTIVA. Una misma pareja (proyecto, usuario)
+        # puede tener filas viejas con soft-delete (el usuario se quitó y se
+        # volvió a añadir): sin filtrar por `deleted_at`, `.first()` podía
+        # devolver la fila borrada y hacer creer que la persona no es
+        # integrante del proyecto (rompía "añadirse a un equipo" en prod).
         query = select(ProjectMember).where(
-            ProjectMember.project_id == project_id, ProjectMember.user_id == user_id
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
+            ProjectMember.deleted_at.is_(None),
         )
         result = await self._session.execute(query)
         return result.scalars().first()

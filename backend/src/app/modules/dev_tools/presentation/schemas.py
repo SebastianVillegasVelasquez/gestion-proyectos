@@ -1,6 +1,8 @@
-from typing import Optional
+from enum import Enum
+from typing import List, Optional
+from uuid import UUID
 
-from pydantic import EmailStr
+from pydantic import EmailStr, Field
 
 from app.shared.base_model import BaseModelConfig
 
@@ -32,3 +34,34 @@ class SendTestEmailResponse(BaseModelConfig):
     resolved_logo_url: str = ""
     logo_reachable: bool = False
     logo_check_detail: str = ""
+
+
+class ManualEmailKind(str, Enum):
+    """Plantillas que el developer puede disparar a mano desde el panel de
+    Correos. Usan exactamente el mismo render y envío que los flujos
+    automáticos (alta de usuario / barrido de tareas atrasadas)."""
+
+    WELCOME = "welcome"
+    OVERDUE = "overdue"
+
+
+class SendManualEmailsRequest(BaseModelConfig):
+    kind: ManualEmailKind
+    # A quién(es). `welcome` no necesita más contexto; `overdue` busca las
+    # tareas vencidas reales de cada persona y manda un correo por tarea.
+    recipient_ids: List[UUID] = Field(min_length=1, max_length=100)
+
+
+class ManualEmailResult(BaseModelConfig):
+    user_id: UUID
+    email: str
+    name: str
+    # Correos efectivamente enviados a esta persona (0 si no aplicaba o falló).
+    sent: int
+    detail: str
+
+
+class SendManualEmailsResponse(BaseModelConfig):
+    kind: ManualEmailKind
+    results: List[ManualEmailResult]
+    total_sent: int

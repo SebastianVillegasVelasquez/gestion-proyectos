@@ -4,20 +4,33 @@ Hoy: un endpoint para probar el envío de correo en PRODUCCIÓN sin tener que
 disparar un flujo real (alta de usuario, entrega, etc.).
 """
 
+from datetime import date
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.core.logger import get_logger
 from app.modules.dev_tools.presentation.schemas import (
+    ManualEmailKind,
+    ManualEmailResult,
+    SendManualEmailsRequest,
+    SendManualEmailsResponse,
     SendTestEmailRequest,
     SendTestEmailResponse,
 )
 from app.modules.identity.infrastructure.enums import SystemRole
+from app.modules.identity.infrastructure.models import User
 from app.modules.identity.presentation.schemas import UserResponse
+from app.modules.notifications.application.overdue_scan import _CLOSED, _task_url
+from app.modules.project.infrastructure.models import Project
+from app.modules.tasks.infrastructure.models import Task
 from app.shared.email.sender import build_email_sender
-from app.shared.email.templates import welcome_email
+from app.shared.email.templates import overdue_task_email, welcome_email
 from app.shared.exceptions import ForbiddenError
 from app.shared.rate_limit import enforce_rate_limit
 
@@ -142,4 +155,162 @@ async def send_test_email(
         resolved_logo_url=logo_url,
         logo_reachable=logo_reachable,
         logo_check_detail=logo_check_detail,
+    )
+
+
+# Máximo de envíos masivos manuales por developer y por minuto.
+_MANUAL_EMAIL_MAX_PER_MINUTE = 3
+
+
+async def _send_overdue_emails(
+    db: AsyncSession, sender, user: User, public_url: str
+) -> tuple[int, str]:
+    """Manda a `user` un correo por cada tarea suya vencida (mismo criterio y
+    plantilla que el barrido automático). Sin anti-spam: es una acción manual."""
+    today = date.today()
+    rows = (
+        await db.execute(
+            select(Task, Project.name)
+            .join(Project, Task.project_id == Project.id)
+            .where(
+                Task.assignee_id == user.id,
+                Task.deleted_at.is_(None),
+                Task.due_date.is_not(None),
+                Task.due_date < today,
+                Task.status.not_in(_CLOSED),
+            )
+        )
+    ).all()
+    if not rows:
+        return 0, "Sin tareas vencidas"
+    for task, project_name in rows:
+        days_overdue = (today - task.due_date).days
+        mail = overdue_task_email(
+            name=user.name,
+            task_title=task.title,
+            project_name=project_name,
+            due_date=task.due_date,
+            days_overdue=days_overdue,
+            task_url=_task_url(public_url, task),
+        )
+        await sender.send(
+            to=user.email, subject=mail.subject, body=mail.text, html=mail.html
+        )
+    plural = "tarea vencida" if len(rows) == 1 else "tareas vencidas"
+    return len(rows), f"{len(rows)} {plural}"
+
+
+@router.post("/emails", response_model=SendManualEmailsResponse)
+async def send_manual_emails(
+    data: SendManualEmailsRequest,
+    current_user: UserResponse = Depends(_developer),
+    db: AsyncSession = Depends(get_db),
+) -> SendManualEmailsResponse:
+    """Dispara a mano una plantilla real a una o varias personas.
+
+    - `welcome`: la misma bienvenida que recibe una cuenta nueva.
+    - `overdue`: un correo por cada tarea vencida real del destinatario.
+
+    Solo developer; rate limit de 3 envíos por minuto. Cada envío queda en los
+    logs (quién lo disparó, plantilla y total).
+    """
+    if current_user.role != SystemRole.DEVELOPER:
+        raise ForbiddenError("Solo el rol developer puede enviar correos")
+
+    enforce_rate_limit(
+        f"manual-emails:{current_user.id}",
+        max_hits=_MANUAL_EMAIL_MAX_PER_MINUTE,
+        window_seconds=60,
+    )
+
+    settings = get_settings()
+    sender = build_email_sender(settings)
+    public_url = (settings.APP_PUBLIC_URL or "").rstrip("/")
+    login_url = f"{public_url}/login" if public_url else ""
+    logo_url = f"{public_url}/logo-email.jpg" if public_url else ""
+
+    users = list(
+        (
+            await db.execute(
+                select(User).where(
+                    User.id.in_(data.recipient_ids), User.deleted_at.is_(None)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    results: list[ManualEmailResult] = []
+    total_sent = 0
+    for user in users:
+        try:
+            if data.kind == ManualEmailKind.WELCOME:
+                mail = welcome_email(
+                    name=user.name,
+                    email=user.email,
+                    login_url=login_url,
+                    logo_url=logo_url,
+                )
+                await sender.send(
+                    to=user.email,
+                    subject=mail.subject,
+                    body=mail.text,
+                    html=mail.html,
+                )
+                sent, detail = 1, "Correo de bienvenida enviado"
+            else:
+                sent, detail = await _send_overdue_emails(db, sender, user, public_url)
+        except Exception as exc:  # noqa: BLE001 - un correo caído no aborta el lote
+            logger.error(
+                "Fallo al enviar correo manual",
+                triggered_by=str(current_user.id),
+                to=user.email,
+                kind=data.kind.value,
+                exc_info=True,
+            )
+            results.append(
+                ManualEmailResult(
+                    user_id=user.id,
+                    email=user.email,
+                    name=f"{user.name} {user.last_name}".strip(),
+                    sent=0,
+                    detail=f"Error: {exc}",
+                )
+            )
+            continue
+        total_sent += sent
+        results.append(
+            ManualEmailResult(
+                user_id=user.id,
+                email=user.email,
+                name=f"{user.name} {user.last_name}".strip(),
+                sent=sent,
+                detail=detail,
+            )
+        )
+
+    found = {u.id for u in users}
+    for missing in data.recipient_ids:
+        if missing not in found:
+            results.append(
+                ManualEmailResult(
+                    user_id=missing,
+                    email="—",
+                    name="—",
+                    sent=0,
+                    detail="Usuario no encontrado",
+                )
+            )
+
+    logger.info(
+        "Correos manuales enviados",
+        triggered_by=str(current_user.id),
+        triggered_by_email=current_user.email,
+        kind=data.kind.value,
+        recipients=len(data.recipient_ids),
+        total_sent=total_sent,
+    )
+    return SendManualEmailsResponse(
+        kind=data.kind, results=results, total_sent=total_sent
     )
