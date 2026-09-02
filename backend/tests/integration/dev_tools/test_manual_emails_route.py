@@ -123,13 +123,21 @@ class TestDevManualEmailsRoute:
     async def test_activation_reissues_token_blanks_password_and_forces_first_login(
         self, client, developer_headers, admin_headers, spy_sender
     ):
-        # Alta CON contraseña definida por el admin → la persona podría entrar ya.
+        # La persona ya entró y fijó su propia contraseña (must_change_password
+        # queda en False tras el cambio): es el caso "ya había entrado".
         user_id = await _make_user(client, admin_headers, "activar-manual@example.com")
-        pre_login = await client.post(
-            "/api/v1/identity/auth/login",
-            json={"email": "activar-manual@example.com", "password": "password123"},
+        token = (
+            await client.post(
+                "/api/v1/identity/auth/login",
+                json={"email": "activar-manual@example.com", "password": "password123"},
+            )
+        ).json()["access_token"]
+        changed = await client.patch(
+            "/api/v1/identity/me/password",
+            json={"current_password": "password123", "new_password": "propia12345"},
+            headers={"Authorization": f"Bearer {token}"},
         )
-        assert pre_login.status_code == 200
+        assert changed.status_code == 204, changed.text
 
         r = await client.post(
             BASE,
@@ -141,11 +149,11 @@ class TestDevManualEmailsRoute:
         assert result["sent"] == 1
         assert result["already_entered"] is True
 
-        # La contraseña anterior ya NO sirve.
+        # La contraseña que la persona había fijado ya NO sirve.
         assert (
             await client.post(
                 "/api/v1/identity/auth/login",
-                json={"email": "activar-manual@example.com", "password": "password123"},
+                json={"email": "activar-manual@example.com", "password": "propia12345"},
             )
         ).status_code == 401
 

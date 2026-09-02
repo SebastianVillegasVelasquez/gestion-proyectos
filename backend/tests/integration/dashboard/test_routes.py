@@ -75,6 +75,8 @@ class TestDashboardSummaryRoute:
             "completed_tasks": 0,
             "in_review_tasks": 0,
             "overdue_tasks": 0,
+            # Solo relevante en el resumen del rol User; el global lo devuelve en 0.
+            "delivered_last_7d": 0,
         }
 
     async def test_should_count_tasks_by_status_and_overdue(
