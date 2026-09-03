@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { daysUntil, dueStatus } from "./due-status";
+import { daysUntil, deliveryStatus, dueStatus } from "./due-status";
 
 const TODAY = "2026-08-31";
 
@@ -36,5 +36,43 @@ describe("daysUntil", () => {
 
   it("sin fecha → null", () => {
     expect(daysUntil(null, TODAY)).toBeNull();
+  });
+});
+
+describe("deliveryStatus", () => {
+  const open = { status: "pendiente_por_iniciar" as const };
+
+  it("marca como entregada lo que ya está cerrado", () => {
+    expect(
+      deliveryStatus(
+        { status: "completada", start_date: "2026-01-01", due_date: "2026-01-02" },
+        "2026-03-01",
+      ),
+    ).toBe("entregada");
+  });
+
+  it("distingue retraso, por vencer y a tiempo por la fecha de fin", () => {
+    expect(deliveryStatus({ ...open, due_date: "2026-02-28" }, "2026-03-01")).toBe("retraso");
+    expect(deliveryStatus({ ...open, due_date: "2026-03-03" }, "2026-03-01")).toBe("por_vencer");
+    expect(deliveryStatus({ ...open, due_date: "2026-03-20" }, "2026-03-01")).toBe("a_tiempo");
+  });
+
+  it("marca en riesgo lo que debió arrancar y sigue sin empezar", () => {
+    expect(
+      deliveryStatus({ ...open, start_date: "2026-02-20", due_date: "2026-03-20" }, "2026-03-01"),
+    ).toBe("en_riesgo");
+  });
+
+  it("no marca en riesgo lo que ya está en progreso", () => {
+    expect(
+      deliveryStatus(
+        { status: "en_progreso", start_date: "2026-02-20", due_date: "2026-03-20" },
+        "2026-03-01",
+      ),
+    ).toBe("a_tiempo");
+  });
+
+  it("sin fecha de fin no se puede juzgar", () => {
+    expect(deliveryStatus({ ...open, due_date: null }, "2026-03-01")).toBe("sin_fecha");
   });
 });

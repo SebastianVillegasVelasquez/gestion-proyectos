@@ -76,7 +76,8 @@ class VersionResponse(BaseModelConfig):
     id: UUID
     version_number: int
     type: ResourceType
-    # Nula cuando `type == sin_adjunto`.
+    # Nula cuando `type == sin_adjunto` o `type == archivo` (ese apunta al
+    # archivador con `file_id`).
     url: Optional[str] = None
     note: Optional[str] = None
     # Solo para la trazabilidad interna del equipo (vista de entregables).
@@ -84,8 +85,22 @@ class VersionResponse(BaseModelConfig):
     uploaded_by: UUID
     uploaded_at: datetime.datetime
 
+    # Archivo entregado (solo `type == archivo`). Se manda el proyecto además
+    # del id porque abrirlo y descargarlo cuelgan de
+    # /projects/{project_id}/files/{file_id}: sin él la UI tendría que
+    # averiguar a qué proyecto pertenece la entrega para construir la URL.
+    file_id: Optional[UUID] = None
+    file_project_id: Optional[UUID] = None
+    file_name: Optional[str] = None
+    file_content_type: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+
     @classmethod
     def of(cls, v) -> "VersionResponse":
+        # `file` puede ser None con `file_id` puesto: el archivo se borró del
+        # archivador y la entrega sobrevive (FK con SET NULL... y mientras la
+        # fila viva pero esté marcada como borrada, la relación no la trae).
+        file = getattr(v, "file", None)
         return cls(
             id=v.id,
             version_number=v.version_number,
@@ -95,6 +110,11 @@ class VersionResponse(BaseModelConfig):
             observations=v.observations,
             uploaded_by=v.uploaded_by,
             uploaded_at=v.created_at,
+            file_id=v.file_id,
+            file_project_id=file.project_id if file is not None else None,
+            file_name=file.name if file is not None else None,
+            file_content_type=file.content_type if file is not None else None,
+            file_size_bytes=file.size_bytes if file is not None else None,
         )
 
 

@@ -1,4 +1,5 @@
-"""POST /api/v1/dev/emails — disparo manual de plantillas reales por el developer.
+"""POST /api/v1/dev/emails — disparo manual de plantillas reales, por el
+developer o el super_admin.
 
 El adaptador real se sustituye por un espía (no se toca la red). Se comprueba el
 guardado de rol, el contrato y que `welcome` usa la plantilla real de bienvenida.
@@ -51,7 +52,9 @@ async def _make_user(client, admin_headers, email: str) -> str:
 
 
 class TestDevManualEmailsRoute:
-    async def test_forbidden_for_non_developer(self, client, admin_headers):
+    async def test_forbidden_for_admin(self, client, admin_headers):
+        # Un `admin` no entra: la plantilla de activación deja la contraseña en
+        # blanco, así que el disparo manual se queda arriba de la jerarquía.
         r = await client.post(
             BASE,
             json={
@@ -61,6 +64,17 @@ class TestDevManualEmailsRoute:
             headers=admin_headers,
         )
         assert r.status_code == 403
+
+    async def test_super_admin_is_allowed(
+        self, client, super_admin_headers, admin_headers, spy_sender
+    ):
+        user_id = await _make_user(client, admin_headers, "sa-manual@example.com")
+        r = await client.post(
+            BASE,
+            json={"kind": "welcome", "recipient_ids": [user_id]},
+            headers=super_admin_headers,
+        )
+        assert r.status_code == 200
 
     async def test_requires_at_least_one_recipient(self, client, developer_headers):
         r = await client.post(

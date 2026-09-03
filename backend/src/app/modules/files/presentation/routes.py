@@ -97,6 +97,33 @@ async def upload_file(
     )
 
 
+async def _serve(project_id, file_id, repo, storage, current_user, *, inline: bool):
+    """Sirve un archivo del proyecto con la sesión comprobada.
+
+    `inline` decide únicamente la cabecera `Content-Disposition`: con `inline`
+    el navegador intenta MOSTRAR el archivo (PDF, imagen, texto, vídeo) en vez
+    de bajarlo. Los formatos que ningún navegador sabe pintar —Word, Excel,
+    PowerPoint— se envían igual: el visor de la UI reconoce el tipo y ofrece la
+    descarga en lugar de un marco en blanco.
+    """
+    file = await _service(repo, storage).get_file_for_download(
+        project_id, file_id, current_user
+    )
+    disposition = "inline" if inline else "attachment"
+    return FileDownloadResponse(
+        path=storage.path(file.storage_key),
+        media_type=file.content_type,
+        filename=file.name,
+        headers={
+            # El nombre puede llevar acentos: `filename*` es la forma que los
+            # navegadores entienden sin destrozarlos.
+            "Content-Disposition": (
+                f"{disposition}; filename*=UTF-8''{quote(file.name)}"
+            )
+        },
+    )
+
+
 @router.get("/{file_id}/download")
 async def download_file(
     project_id: UUID,
@@ -107,18 +134,23 @@ async def download_file(
 ):
     """Descarga autenticada: el archivo de un proyecto no se sirve por una URL
     pública, se pide con la sesión y el servidor comprueba el acceso."""
-    service = _service(repo, storage)
-    file = await service.get_file_for_download(project_id, file_id, current_user)
-    return FileDownloadResponse(
-        path=storage.path(file.storage_key),
-        media_type=file.content_type,
-        filename=file.name,
-        headers={
-            # El nombre puede llevar acentos: `filename*` es la forma que los
-            # navegadores entienden sin destrozarlos.
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file.name)}"
-        },
-    )
+    return await _serve(project_id, file_id, repo, storage, current_user, inline=False)
+
+
+@router.get("/{file_id}/view")
+async def view_file(
+    project_id: UUID,
+    file_id: UUID,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    """El mismo archivo, pero para VERLO en el navegador (PDF, imagen, texto…).
+
+    Mismo control de acceso que la descarga: cambia la cabecera, no la
+    política.
+    """
+    return await _serve(project_id, file_id, repo, storage, current_user, inline=True)
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)

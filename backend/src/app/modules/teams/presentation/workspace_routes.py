@@ -1,17 +1,21 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from starlette import status
 
+from app.core.config import get_settings
 from app.core.dependencies import (
     deliverable_notifier_dependency,
     event_bus_dependency,
+    file_storage_dependency,
     get_current_user,
+    project_files_repo_dependency,
     project_members_repo_dependency,
     team_invitation_repo_dependency,
     team_repo_dependency,
     workspace_repo_dependency,
 )
+from app.modules.files.application.use_cases import ProjectFilesService
 from app.modules.teams.application.invitation_use_cases import (
     ListMyInvitationsUseCase,
     RespondInvitationUseCase,
@@ -33,6 +37,7 @@ from app.modules.teams.presentation.workspace_schemas import (
     UpdateVersionRequest,
     WorkspaceAccessResponse,
 )
+from app.shared.exceptions import ValidationError
 
 router = APIRouter(prefix="/teams", tags=["Teams · Workspace"])
 
@@ -159,6 +164,56 @@ async def add_version(
 ):
     return await WorkspaceService(repo, notifier, bus).add_version(
         team_id, deliverable_id, data, current_user
+    )
+
+
+@router.post(
+    "/{team_id}/deliverables/{deliverable_id}/versions/upload",
+    response_model=DeliverableResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_version_file(
+    team_id: UUID,
+    deliverable_id: UUID,
+    file: UploadFile = File(...),
+    note: str | None = Form(None),
+    observations: str | None = Form(None),
+    repo=Depends(workspace_repo_dependency),
+    files_repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    notifier=Depends(deliverable_notifier_dependency),
+    bus=Depends(event_bus_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Entrega un archivo. Va multipart y no JSON porque lleva el binario; el
+    resto del flujo (compuerta de dependencias, revisión, avisos) es el mismo
+    que el de una entrega por URL.
+
+    El archivo acaba en la carpeta del equipo dentro del archivador del
+    proyecto, que se crea sola la primera vez.
+    """
+    content = await file.read()
+    limit_mb = get_settings().MAX_UPLOAD_MB
+    if not content:
+        raise ValidationError("El archivo está vacío")
+    if len(content) > limit_mb * 1024 * 1024:
+        raise ValidationError(f"El archivo supera el límite de {limit_mb} MB")
+
+    service = WorkspaceService(
+        repo,
+        notifier,
+        bus,
+        files=ProjectFilesService(files_repo, storage),
+    )
+    return await service.add_file_version(
+        team_id,
+        deliverable_id,
+        filename=file.filename or "archivo",
+        content_type=file.content_type or "application/octet-stream",
+        content=content,
+        note=note,
+        observations=observations,
+        current_user=current_user,
     )
 
 

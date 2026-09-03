@@ -20,15 +20,31 @@ jobs:
         working-directory: ./backend
 
     services:
+      # Base de datos desechable, idéntica a la del `compose-test.yaml` local.
+      # Las credenciales van literales y NO por secretos a propósito: la fixture
+      # de tests (tests/fixtures/integration/database.py) fuerza
+      # postgres/postgres/db_test en el entorno antes de migrar, así que un
+      # secreto con otro valor solo consigue que el contenedor y los tests
+      # hablen de bases distintas. No hay nada que proteger: el contenedor vive
+      # en tmpfs y muere con el job.
       db_test:
         image: postgres:17-alpine
         ports:
           - "5433:5432"
         env:
-          POSTGRES_USER: ${{ secrets.DATABASE_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.DATABASE_NAME }}
-        options: --tmpfs /var/lib/postgresql/data
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: db_test
+        # Sin `health-cmd` GitHub arranca el contenedor y sigue de largo sin
+        # esperar a que Postgres acepte conexiones: las migraciones salían
+        # antes de que la base estuviera lista y el job fallaba de forma
+        # intermitente, con pinta de problema de red.
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres -d db_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -64,11 +80,20 @@ jobs:
       - name: Install backend dependencies
         run: poetry install
 
+      # Barato y sin base de datos, pero es lo que atrapa el fallo que más
+      # caro sale: un id de revisión repetido rompe TODOS los tests de
+      # integración a la vez y el error real queda enterrado en el `setup`.
+      - name: Check the migration graph
+        run: poetry run pytest tests/unit/migrations -q
+
       - name: Run backend integration tests
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALGORITHM: ${{ secrets.ALGORITHM }}
           ACCESS_TOKEN_EXPIRE_MINUTES: 60
           REFRESH_TOKEN_EXPIRE_DAYS: 30
-          DATABASE_URL: postgresql+asyncpg://${{ secrets.DATABASE_USER }}:${{ secrets.DATABASE_PASSWORD }}@localhost:5433/${{ secrets.DATABASE_NAME }}
+        # Las migraciones NO se lanzan en un paso aparte: la fixture de sesión
+        # ya corre `alembic upgrade head` con el entorno exacto que usarán los
+        # tests. Hacerlo dos veces desde entornos distintos es justo la forma
+        # de acabar migrando una base y probando contra otra.
         run: poetry run pytest tests/integration

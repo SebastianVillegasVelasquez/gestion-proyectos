@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Lock,
   UploadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,11 @@ function TaskLeaf({
   const risk = taskRisk(task, today);
   const meta = STATUS_META[task.status];
   const blockers = task.blocked_by.filter((b) => b.status !== "completada");
+  // El servidor decide si esta tarea se puede entregar todavía y rechaza la
+  // entrega con este mismo texto. La vista no vuelve a deducirlo: si hay
+  // motivo, enseña "Bloqueada" en vez de un botón que va a fallar.
+  const blockedReason = task.delivery_blocked_reason;
+  const canDeliverNow = blockedReason === null;
 
   const titleBlock = (
     <span className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -112,7 +118,16 @@ function TaskLeaf({
           <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", meta.badge)}>
             {meta.label}
           </span>
-          {onDeliver && (
+          {(onDeliver !== undefined || onMarkDelivered !== undefined) && blockedReason !== null && (
+            <span
+              title={blockedReason}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
+            >
+              <Lock className="size-3" />
+              Bloqueada
+            </span>
+          )}
+          {onDeliver && canDeliverNow && (
             <button
               type="button"
               onClick={onDeliver}
@@ -123,7 +138,7 @@ function TaskLeaf({
               Entregar
             </button>
           )}
-          {onMarkDelivered && (
+          {onMarkDelivered && canDeliverNow && (
             <button
               type="button"
               onClick={onMarkDelivered}

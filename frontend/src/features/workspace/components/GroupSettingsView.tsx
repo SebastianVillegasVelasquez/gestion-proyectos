@@ -214,7 +214,10 @@ function MembersCard({
   return (
     <>
       <Card title={`Integrantes (${String(members.length)})`} Icon={Users2}>
-        <div className="space-y-2">
+        {/* La lista crece con el equipo: se le pone techo y scroll propio para
+            que las acciones de abajo (invitar, zona de peligro) no se vayan
+            fuera de la pantalla en un equipo de veinte personas. */}
+        <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
           {members.map((m) => {
             const load = workload[m.id];
             const lastLeader = isLastLeader(m);
@@ -328,7 +331,7 @@ function MembersCard({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Invitaciones pendientes ({pendingInvites.length})
             </p>
-            <ul className="mt-1 flex flex-col gap-1">
+            <ul className="mt-1 flex max-h-40 flex-col gap-1 overflow-y-auto">
               {pendingInvites.map((inv) => (
                 <li key={inv.id} className="text-[12px] text-slate-600 dark:text-slate-300">
                   {inv.user_name}
@@ -627,7 +630,11 @@ export function GroupSettingsView({
   const canInvite = canManage || isLeader;
 
   return (
-    <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+    // `h-full overflow-y-auto`: la página de configuración es la única sección
+    // del espacio que crece hacia abajo sin límite propio (identidad, equipo,
+    // avisos, actividad). Sin scroll aquí, lo que no cupiera quedaría recortado
+    // por el contenedor del workspace en vez de poder alcanzarse.
+    <div className="grid h-full gap-4 overflow-y-auto p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
         {/* `key`: al cambiar de equipo queremos un formulario NUEVO, no uno
             sincronizado por efecto. Remontar es la forma que React recomienda

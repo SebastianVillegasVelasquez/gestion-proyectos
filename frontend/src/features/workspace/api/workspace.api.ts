@@ -44,6 +44,14 @@ export interface ApiVersion {
   observations: string | null;
   uploaded_by: string;
   uploaded_at: string;
+  /** Archivo entregado (solo `type: "archivo"`). Vive en el archivador del
+   *  proyecto; `file_project_id` es lo que permite construir su URL de
+   *  descarga o de vista sin averiguar a qué proyecto pertenece. */
+  file_id: string | null;
+  file_project_id: string | null;
+  file_name: string | null;
+  file_content_type: string | null;
+  file_size_bytes: number | null;
 }
 
 export interface ApiComment {
@@ -117,6 +125,11 @@ export interface ApiTeamTask {
   blocked_by: ApiBlockingTask[];
   // La tarea depende (FtS) de una «actividad de terceros».
   depends_on_third_party: boolean;
+  /** Motivo por el que NO se puede entregar todavía (`null` = se puede).
+   *  Lo decide el servidor, que es quien también rechaza la entrega: la vista
+   *  muestra "Bloqueada" con este texto en lugar de ofrecer un botón que va a
+   *  fallar. */
+  delivery_blocked_reason: string | null;
 }
 
 /** Tarea bloqueante (dependencia FtS), resumida para el indicador de bloqueo. */
@@ -140,6 +153,13 @@ export interface NewVersionBody {
   type: ResourceType;
   /** Obligatoria salvo `type: "sin_adjunto"`. */
   url?: string;
+  note?: string;
+  observations?: string;
+}
+
+/** Entrega de un ARCHIVO: va multipart, así que no es un `NewVersionBody`. */
+export interface NewFileVersionBody {
+  file: File;
   note?: string;
   observations?: string;
 }
@@ -206,6 +226,27 @@ export const workspaceApi = {
     http
       .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions`, body)
       .then((r) => r.data),
+
+  /** Entrega un archivo: el backend lo guarda en la carpeta del equipo dentro
+   *  del proyecto y crea la versión apuntando a él. */
+  uploadVersionFile: (teamId: string, deliverableId: string, body: NewFileVersionBody) => {
+    const form = new FormData();
+    form.append("file", body.file);
+    if (body.note) {
+      form.append("note", body.note);
+    }
+    if (body.observations) {
+      form.append("observations", body.observations);
+    }
+    return http
+      .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions/upload`, form, {
+        // Subir tarda mucho más que una llamada normal: el timeout global
+        // (10 s) cortaría un archivo grande a media transferencia.
+        timeout: 120_000,
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 
   editVersion: (teamId: string, deliverableId: string, versionId: string, body: EditVersionBody) =>
     http

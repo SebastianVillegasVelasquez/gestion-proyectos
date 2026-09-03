@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   List,
   ListTodo,
+  Lock,
   PackageCheck,
   Pencil,
   Plus,
@@ -174,6 +175,20 @@ interface DeliverCbs {
 function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
   if (!isDeliverableReady(task) || !(cbs.canDeliverTask?.(task) ?? false)) {
     return null;
+  }
+  // Misma regla que en la Estructura: si el servidor dice que todavía no se
+  // puede entregar (una dependencia abierta, un tercero sin entregar), la fila
+  // enseña el candado en vez de un botón que devolvería un 422.
+  if (task.delivery_blocked_reason !== null) {
+    return (
+      <span
+        title={task.delivery_blocked_reason}
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
+      >
+        <Lock className="size-3" />
+        Bloqueada
+      </span>
+    );
   }
   return (
     <>

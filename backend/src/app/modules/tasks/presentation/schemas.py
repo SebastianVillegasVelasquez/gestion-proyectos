@@ -362,6 +362,11 @@ class TeamTaskItemResponse(BaseModelConfig):
     blocked_by: list[BlockingTaskResponse] = []
     # True solo si la tarea depende (FtS) de una «actividad de terceros».
     depends_on_third_party: bool = False
+    # Motivo por el que NO se puede entregar todavía (dependencia FtS incompleta
+    # o actividad de terceros ancestro sin entregar), o None si se puede. Mismo
+    # texto que el 422 del servidor: la UI muestra "Bloqueada" en vez de
+    # "Entregar" con él, en lugar de dejar que la persona choque contra el error.
+    delivery_blocked_reason: Optional[str] = None
 
 
 class MyTaskItemResponse(BaseModelConfig):

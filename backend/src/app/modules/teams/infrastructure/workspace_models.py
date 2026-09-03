@@ -25,6 +25,7 @@ from app.shared.base_database import Base
 from app.shared.base_entity import SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.modules.files.infrastructure.models import ProjectFile
     from app.modules.identity.infrastructure.models import User
 
 
@@ -80,7 +81,15 @@ class Deliverable(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
 
 class DeliverableVersion(Base, UUIDMixin, TimestampMixin):
-    """Una entrega concreta (línea de tiempo): su recurso (URL) + nota."""
+    """Una entrega concreta (línea de tiempo): su recurso + nota.
+
+    El recurso es una URL externa (Figma, un repo, un paquete SCORM), un
+    ARCHIVO subido —que vive en el archivador del proyecto, referenciado por
+    `file_id`— o nada («sin adjunto»). El archivo no se guarda aparte a
+    propósito: el equipo ya tiene su carpeta en el proyecto y una entrega es
+    exactamente el tipo de material que debe quedar ahí, no en un almacén
+    paralelo que nadie sabe navegar.
+    """
 
     __tablename__ = "deliverable_versions"
 
@@ -93,8 +102,18 @@ class DeliverableVersion(Base, UUIDMixin, TimestampMixin):
     resource_type: Mapped[ResourceType] = mapped_column(
         _enum(ResourceType, "resource_type"), nullable=False
     )
-    # Nula para las entregas "sin adjunto" (resource_type == sin_adjunto).
+    # Nula para las entregas "sin adjunto" y para las de tipo `archivo`
+    # (esas apuntan al archivador con `file_id`).
     url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    # Archivo del archivador del proyecto cuando `resource_type == archivo`.
+    # `SET NULL` y no `CASCADE`: si alguien borra el archivo de la carpeta, la
+    # entrega debe seguir en la línea de tiempo (pasó, y su nota y su revisión
+    # siguen siendo historia) aunque el material ya no se pueda abrir.
+    file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_files.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Instrucciones de quien entrega para el siguiente rol de la cadena ("dejé el
     # guion en la carpeta X, falta revisar el minuto 3"). Dato INTERNO del equipo:
@@ -109,6 +128,7 @@ class DeliverableVersion(Base, UUIDMixin, TimestampMixin):
         "Deliverable", back_populates="versions"
     )
     uploader: Mapped["User"] = relationship("User")
+    file: Mapped[Optional["ProjectFile"]] = relationship("ProjectFile", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint(

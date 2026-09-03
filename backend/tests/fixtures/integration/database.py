@@ -50,7 +50,17 @@ async def setup_test_database():
         capture_output=True,
         text=True,
     )
-    result.check_returncode()
+    if result.returncode != 0:
+        # `check_returncode()` a secas levanta un CalledProcessError que solo
+        # enseña la línea de comandos: en CI eso deja "fallaron los 345 tests"
+        # sin ninguna pista de por qué. El motivo real —un id de revisión
+        # repetido, dos cabezas, la base todavía sin aceptar conexiones— lo
+        # escribe alembic en su salida, así que la reproducimos aquí.
+        raise RuntimeError(
+            "No se pudieron aplicar las migraciones sobre la base de tests.\n"
+            f"--- alembic stdout ---\n{result.stdout}\n"
+            f"--- alembic stderr ---\n{result.stderr}"
+        )
 
     yield
 

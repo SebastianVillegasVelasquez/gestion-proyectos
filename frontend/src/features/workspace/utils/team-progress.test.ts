@@ -22,6 +22,7 @@ function task(over: Partial<ApiTeamTask>): ApiTeamTask {
     progress_pct: 0,
     blocked_by: [],
     depends_on_third_party: false,
+    delivery_blocked_reason: null,
     ...over,
   };
 }

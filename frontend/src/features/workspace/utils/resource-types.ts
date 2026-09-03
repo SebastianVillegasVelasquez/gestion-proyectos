@@ -58,9 +58,9 @@ export const RESOURCE_META: Record<ResourceType, ResourceMeta> = {
     Icon: File,
     color: "text-rose-500",
     chip: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800",
-    available: false, // nice-to-have: subida de archivos aún no disponible
+    available: true,
     placeholder: "",
-    hint: "Subida de archivos — próximamente.",
+    hint: "Se guarda en la carpeta del equipo, dentro de los archivos del proyecto.",
   },
   sin_adjunto: {
     label: "Sin adjunto",
@@ -74,8 +74,16 @@ export const RESOURCE_META: Record<ResourceType, ResourceMeta> = {
   },
 };
 
-/** Tipos que el usuario puede entregar ahora mismo (excluye archivo). */
-export const UPLOADABLE_RESOURCE_TYPES: ResourceType[] = ["enlace", "repositorio", "scorm"];
+/** Tipos que el usuario puede entregar ahora mismo. */
+export const UPLOADABLE_RESOURCE_TYPES: ResourceType[] = [
+  "enlace",
+  "repositorio",
+  "scorm",
+  "archivo",
+];
+
+/** Tipos que se entregan pegando una URL (los demás suben un binario). */
+export const URL_RESOURCE_TYPES: ResourceType[] = ["enlace", "repositorio", "scorm"];
 
 /** Heurística para sugerir el tipo de recurso a partir de la URL. */
 export function detectResourceType(url: string): ResourceType {

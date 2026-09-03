@@ -7,6 +7,7 @@ from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
 from app.modules.files.infrastructure.repository import ProjectFilesRepository
 from app.modules.files.presentation.schemas import (
     CreateFolderRequest,
+    FileDelivery,
     FileResponse,
     FolderResponse,
     ProjectFilesResponse,
@@ -38,6 +39,7 @@ class ProjectFilesService:
             is_project_member=await self._repo.is_project_member(
                 project_id, current_user.id
             ),
+            project_role=await self._repo.project_role(project_id, current_user.id),
             team_roles=await self._repo.team_roles_in_project(
                 project_id, current_user.id
             ),
@@ -93,13 +95,49 @@ class ProjectFilesService:
 
         by_id = {f.id: f for f in folders}
         teams = {t.id: t.name for t in await self._repo.list_project_teams(project_id)}
+        deliveries = await self._repo.deliveries_by_file(project_id)
 
+        # El recorte se hace en el PRIMER NIVEL y no archivo por archivo: como
+        # cada carpeta de primer nivel es de un equipo, dejarla fuera se lleva
+        # con ella todo su subárbol. Un integrante de Contenidos no tiene por
+        # qué saber siquiera qué carpetas tiene TI.
         children: dict[UUID | None, list[ProjectFolder]] = {}
         for folder in folders:
+            if folder.parent_id == root.id and not access.can_see_team(folder.team_id):
+                continue
             children.setdefault(folder.parent_id, []).append(folder)
         files_by_folder: dict[UUID, list[ProjectFile]] = {}
         for file in files:
             files_by_folder.setdefault(file.folder_id, []).append(file)
+
+        def to_file(f: ProjectFile) -> FileResponse:
+            entry = deliveries.get(f.id)
+            version, deliverable = entry if entry is not None else (None, None)
+            return FileResponse(
+                id=f.id,
+                folder_id=f.folder_id,
+                name=f.name,
+                content_type=f.content_type,
+                size_bytes=f.size_bytes,
+                uploaded_by=f.uploaded_by,
+                uploaded_by_name=(
+                    f"{f.author.name} {f.author.last_name}"
+                    if f.author is not None
+                    else None
+                ),
+                created_at=f.created_at,
+                delivery=(
+                    FileDelivery(
+                        deliverable_id=deliverable.id,
+                        task_title=deliverable.task_title,
+                        version_number=version.version_number,
+                        note=version.note,
+                        observations=version.observations,
+                    )
+                    if version is not None and deliverable is not None
+                    else None
+                ),
+            )
 
         def to_response(folder: ProjectFolder) -> FolderResponse:
             return FolderResponse(
@@ -112,29 +150,14 @@ class ProjectFilesService:
                 can_write=access.can_write_in(self._owner_team_id(folder, by_id)),
                 created_at=folder.created_at,
                 children=[to_response(c) for c in children.get(folder.id, [])],
-                files=[
-                    FileResponse(
-                        id=f.id,
-                        folder_id=f.folder_id,
-                        name=f.name,
-                        content_type=f.content_type,
-                        size_bytes=f.size_bytes,
-                        uploaded_by=f.uploaded_by,
-                        uploaded_by_name=(
-                            f"{f.author.name} {f.author.last_name}"
-                            if f.author is not None
-                            else None
-                        ),
-                        created_at=f.created_at,
-                    )
-                    for f in files_by_folder.get(folder.id, [])
-                ],
+                files=[to_file(f) for f in files_by_folder.get(folder.id, [])],
             )
 
         claimed = {f.team_id for f in folders if f.team_id is not None}
         return ProjectFilesResponse(
             project_id=project_id,
             root=to_response(root),
+            sees_whole_project=access.sees_whole_project,
             teams_without_folder=[
                 TeamOption(id=tid, name=name)
                 for tid, name in teams.items()
@@ -290,16 +313,97 @@ class ProjectFilesService:
             created_at=file.created_at,
         )
 
+    async def store_team_file(
+        self,
+        project_id: UUID,
+        team_id: UUID,
+        team_name: str,
+        *,
+        filename: str,
+        content_type: str,
+        content: bytes,
+        uploader_id: UUID,
+    ) -> ProjectFile:
+        """Guarda un archivo en la carpeta del equipo, creándola si no existe.
+
+        Es la puerta que usa el espacio de trabajo al entregar un archivo. No
+        comprueba permisos: quien llama ya verificó algo más estricto (que la
+        persona es integrante del equipo Y dueña del entregable). La carpeta se
+        abre sola aquí —y no se le pide al líder que la cree antes— porque una
+        entrega no puede quedar bloqueada por un paso de organización: el
+        archivo tiene que caer en algún sitio con nombre, y el nombre correcto
+        es el del equipo.
+        """
+        root = await self._ensure_root(project_id)
+        folder = next(
+            (
+                f
+                for f in await self._repo.list_folders(project_id)
+                if f.team_id == team_id
+            ),
+            None,
+        )
+        if folder is None:
+            folder = await self._repo.add_folder(
+                ProjectFolder(
+                    project_id=project_id,
+                    parent_id=root.id,
+                    name=team_name,
+                    team_id=team_id,
+                    created_by=uploader_id,
+                )
+            )
+
+        name = await self._free_name(folder.id, sanitize_filename(filename))
+        key = self._storage.save(f"projects/{project_id}", name, content)
+        return await self._repo.add_file(
+            ProjectFile(
+                folder_id=folder.id,
+                project_id=project_id,
+                name=name,
+                content_type=content_type or "application/octet-stream",
+                size_bytes=len(content),
+                storage_key=key,
+                uploaded_by=uploader_id,
+            )
+        )
+
+    async def _free_name(self, folder_id: UUID, name: str) -> str:
+        """`informe.pdf` → `informe (2).pdf` si el nombre ya está ocupado.
+
+        Al subir a mano un choque de nombres es un error que conviene avisar;
+        al entregar NO lo es: la segunda versión de un entregable suele traer
+        el mismo archivo corregido, y fallar ahí obligaría a renombrar en el
+        disco antes de poder entregar.
+        """
+        if not await self._repo.file_name_taken(folder_id, name):
+            return name
+        stem, dot, ext = name.rpartition(".")
+        stem, ext = (stem, f"{dot}{ext}") if dot else (name, "")
+        for n in range(2, 100):
+            candidate = f"{stem} ({n}){ext}"
+            if not await self._repo.file_name_taken(folder_id, candidate):
+                return candidate
+        raise ConflictError("Demasiados archivos con ese nombre en esta carpeta")
+
     async def get_file_for_download(
         self, project_id: UUID, file_id: UUID, current_user
     ) -> ProjectFile:
-        """Descargar es leer: quien ve el archivador ve sus archivos. La
-        descarga pasa por la API (y no por una URL pública) justamente para que
-        esta comprobación exista."""
-        await self._require_view(project_id, current_user)
+        """Descargar (o ver) es leer, y se recorta igual que el árbol.
+
+        Filtrar solo el listado no sería seguridad: bastaría con adivinar un id
+        para bajarse el archivo de otro equipo. La comprobación vive aquí, que
+        es por donde pasan las dos rutas.
+        """
+        access = await self._require_view(project_id, current_user)
         file = await self._repo.get_file(project_id, file_id)
         if file is None:
             raise NotFoundError("Archivo no encontrado")
+        folder = await self._repo.get_folder(project_id, file.folder_id)
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        owner = self._owner_team_id(folder, by_id) if folder is not None else None
+        if not access.can_see_team(owner):
+            raise ForbiddenError("Este archivo pertenece a otro equipo")
         return file
 
     async def delete_file(self, project_id: UUID, file_id: UUID, current_user) -> None:

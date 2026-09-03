@@ -6,6 +6,7 @@ from app.modules.teams.domain.workspace import WorkspaceAccess, WorkspaceReposit
 from app.modules.teams.infrastructure.workspace_enums import (
     CommentType,
     DeliverableStatus,
+    ResourceType,
 )
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
@@ -45,7 +46,7 @@ _TASK_STATUS_ON_DELIVER = TaskStatus.EN_REVISION
 class WorkspaceService:
     """Casos de uso del espacio de trabajo. Exige la política antes de actuar."""
 
-    def __init__(self, repo: WorkspaceRepository, notifier=None, bus=None):
+    def __init__(self, repo: WorkspaceRepository, notifier=None, bus=None, files=None):
         self._repo = repo
         # Colaborador opcional: avisa a líder/supervisor cuando se entrega.
         # Solo la ruta de "subir versión" lo inyecta; el resto crea el
@@ -53,6 +54,10 @@ class WorkspaceService:
         self._notifier = notifier
         # Bus opcional para publicar TaskChainRescheduled tras una cascada.
         self._bus = bus
+        # Archivador del proyecto (`ProjectFilesService`). Solo lo inyecta la
+        # ruta que entrega un archivo: el workspace no gestiona carpetas, se
+        # apoya en el módulo que ya sabe hacerlo.
+        self._files = files
 
     async def _cascade_if_completed(self, task) -> None:
         """Tras dejar una tarea en COMPLETADA por una entrega/aprobación,
@@ -175,9 +180,13 @@ class WorkspaceService:
             await self._require_deliverable(team_id, created.id)
         )
 
-    async def add_version(
-        self, team_id: UUID, deliverable_id: UUID, data: AddVersionRequest, current_user
-    ) -> DeliverableResponse:
+    async def _open_delivery(self, team_id: UUID, deliverable_id: UUID, current_user):
+        """Comprueba que esta persona puede entregar ESTE entregable AHORA.
+
+        Devuelve el entregable y su tarea vinculada (si la hay). Se hace antes
+        de escribir nada —tanto al entregar una URL como un archivo— para no
+        dejar rastro a medias de una entrega que el servidor va a rechazar.
+        """
         if not (await self._access(team_id, current_user)).can_deliver:
             raise ForbiddenError("Solo los integrantes del equipo pueden entregar")
         deliverable = await self._require_deliverable(team_id, deliverable_id)
@@ -189,7 +198,7 @@ class WorkspaceService:
         # Compuerta FtS: entregar mueve el estado de la tarea sin pasar por
         # ChangeTaskStatusUseCase, así que revisamos aquí que la tarea no
         # dependa de algo (otra tarea, o una actividad de terceros) que aún no
-        # está listo. Antes de crear la versión, para no dejar rastro a medias.
+        # está listo.
         task = (
             await self._repo.get_task(deliverable.task_id)
             if deliverable.task_id
@@ -199,14 +208,24 @@ class WorkspaceService:
             blocked = await self._repo.task_delivery_block_reason(task)
             if blocked:
                 raise ValidationError(blocked)
+        return deliverable, task
 
-        next_number = (
+    @staticmethod
+    def _next_version_number(deliverable: Deliverable) -> int:
+        return (
             deliverable.versions[-1].version_number + 1 if deliverable.versions else 1
+        )
+
+    async def add_version(
+        self, team_id: UUID, deliverable_id: UUID, data: AddVersionRequest, current_user
+    ) -> DeliverableResponse:
+        deliverable, task = await self._open_delivery(
+            team_id, deliverable_id, current_user
         )
         await self._repo.add_version(
             DeliverableVersion(
                 deliverable_id=deliverable.id,
-                version_number=next_number,
+                version_number=self._next_version_number(deliverable),
                 resource_type=data.type,
                 url=data.url,
                 note=data.note,
@@ -214,7 +233,65 @@ class WorkspaceService:
                 uploaded_by=current_user.id,
             )
         )
+        return await self._close_delivery(team_id, deliverable, task, current_user)
 
+    async def add_file_version(
+        self,
+        team_id: UUID,
+        deliverable_id: UUID,
+        *,
+        filename: str,
+        content_type: str,
+        content: bytes,
+        note: str | None,
+        observations: str | None,
+        current_user,
+    ) -> DeliverableResponse:
+        """Entrega un ARCHIVO: se guarda en la carpeta del equipo dentro del
+        archivador del proyecto (que se crea sola si aún no existe) y la versión
+        queda apuntando a él.
+
+        Guardarlo ahí y no en un almacén propio del workspace es deliberado: el
+        material entregado es material del proyecto, y el sitio donde el equipo
+        ya lo busca es su carpeta.
+        """
+        if self._files is None:
+            raise ValidationError("La subida de archivos no está disponible")
+        deliverable, task = await self._open_delivery(
+            team_id, deliverable_id, current_user
+        )
+        team = await self._repo.get_team(team_id)
+        if team is None:
+            raise NotFoundError("Equipo no encontrado")
+
+        stored = await self._files.store_team_file(
+            team.project_id,
+            team_id,
+            team.name,
+            filename=filename,
+            content_type=content_type,
+            content=content,
+            uploader_id=current_user.id,
+        )
+        await self._repo.add_version(
+            DeliverableVersion(
+                deliverable_id=deliverable.id,
+                version_number=self._next_version_number(deliverable),
+                resource_type=ResourceType.ARCHIVO,
+                file_id=stored.id,
+                note=note,
+                observations=observations,
+                uploaded_by=current_user.id,
+            )
+        )
+        return await self._close_delivery(team_id, deliverable, task, current_user)
+
+    async def _close_delivery(
+        self, team_id: UUID, deliverable: Deliverable, task, current_user
+    ) -> DeliverableResponse:
+        """Lo que pasa DESPUÉS de registrar una entrega, sea URL o archivo:
+        mover el estado del entregable y el de la tarea, y avisar a quien
+        revisa. Es idéntico en los dos caminos, así que vive una sola vez."""
         # La tarea vinculada (si hay) decide si esto necesita revisión:
         # `requires_approval=False` (el default) — entregar completa directo,
         # sin pasar por el líder. `True` — mantiene el flujo clásico
@@ -264,7 +341,7 @@ class WorkspaceService:
                 )
 
         return DeliverableResponse.of(
-            await self._require_deliverable(team_id, deliverable_id)
+            await self._require_deliverable(team_id, deliverable.id)
         )
 
     async def delete_deliverable(

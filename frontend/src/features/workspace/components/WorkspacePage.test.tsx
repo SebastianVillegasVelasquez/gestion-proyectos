@@ -31,6 +31,7 @@ vi.mock("../hooks/use-workspace", () => ({
   useTeamTasks: () => ({ data: [], isLoading: false }),
   useCreateDeliverable: () => ({ mutate: vi.fn(), isPending: false }),
   useAddVersion: () => ({ mutate: vi.fn() }),
+  useUploadVersionFile: () => ({ mutate: vi.fn(), isPending: false }),
   useEditVersion: () => ({ mutate: vi.fn(), isPending: false }),
   useAddComment: () => ({ mutate: vi.fn() }),
   useDeleteDeliverable: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
