@@ -312,6 +312,10 @@ class ProjectFilesService:
         owner = self._owner_team_id(folder, by_id) if folder else None
         if not access.can_write_in(owner):
             raise ForbiddenError("No puedes borrar este archivo")
+        # Solo borrado lógico, igual que al borrar una carpeta: el byte se queda
+        # en disco. Borrarlo aquí dejaba una incoherencia fea —la fila decía
+        # "recuperable" pero el contenido ya no existía— y además hacía que dos
+        # caminos de borrado se comportaran distinto. Recuperar espacio es tarea
+        # de un barrido posterior sobre lo que lleva tiempo con `deleted_at`.
         file.soft_delete()
         await self._repo.save()
-        self._storage.delete(file.storage_key)

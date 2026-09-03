@@ -17,10 +17,6 @@ class CreateFolderRequest(BaseModelConfig):
     team_id: Optional[UUID] = None
 
 
-class RenameFolderRequest(BaseModelConfig):
-    name: FolderName
-
-
 class FileResponse(BaseModelConfig):
     id: UUID
     folder_id: UUID
@@ -47,6 +43,11 @@ class FolderResponse(BaseModelConfig):
     files: list[FileResponse] = []
 
 
+class TeamOption(BaseModelConfig):
+    id: UUID
+    name: str
+
+
 class ProjectFilesResponse(BaseModelConfig):
     """El archivador completo del proyecto en una sola respuesta.
 
@@ -58,9 +59,4 @@ class ProjectFilesResponse(BaseModelConfig):
     root: FolderResponse
     # Equipos del proyecto que aún no tienen carpeta y que el usuario podría
     # abrir. Vacío para quien no puede crear ninguna.
-    teams_without_folder: list["TeamOption"] = []
-
-
-class TeamOption(BaseModelConfig):
-    id: UUID
-    name: str
+    teams_without_folder: list[TeamOption] = []

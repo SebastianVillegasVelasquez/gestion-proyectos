@@ -93,21 +93,20 @@ class ProjectFilesRepository:
         )
         return list(rows.scalars().all())
 
-    async def sibling_exists(
-        self, parent_id: UUID, name: str, *, exclude_id: UUID | None = None
-    ) -> bool:
-        query = (
-            select(func.count())
-            .select_from(ProjectFolder)
-            .where(
-                ProjectFolder.parent_id == parent_id,
-                func.lower(ProjectFolder.name) == name.lower(),
-                ProjectFolder.deleted_at.is_(None),
+    async def sibling_exists(self, parent_id: UUID, name: str) -> bool:
+        """¿Ya hay una carpeta viva con ese nombre bajo el mismo padre?"""
+        return (
+            await self._session.scalar(
+                select(func.count())
+                .select_from(ProjectFolder)
+                .where(
+                    ProjectFolder.parent_id == parent_id,
+                    func.lower(ProjectFolder.name) == name.lower(),
+                    ProjectFolder.deleted_at.is_(None),
+                )
             )
-        )
-        if exclude_id is not None:
-            query = query.where(ProjectFolder.id != exclude_id)
-        return (await self._session.scalar(query) or 0) > 0
+            or 0
+        ) > 0
 
     async def add_folder(self, folder: ProjectFolder) -> ProjectFolder:
         self._session.add(folder)
