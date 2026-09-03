@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -11,6 +11,13 @@ import type { ProjectTraceability } from "../../types/api.types";
 vi.mock("../../api/traceability.api", () => ({
   traceabilityApi: { get: vi.fn() },
 }));
+
+/** La línea de tiempo, acotada: el panel lateral repite títulos de tarea a
+ *  propósito (tareas con más movimiento), así que las aserciones sobre eventos
+ *  se hacen dentro de la columna del historial. */
+function timeline() {
+  return within(screen.getByRole("region", { name: "Línea de tiempo" }));
+}
 
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -98,39 +105,52 @@ describe("TraceabilityPanel", () => {
     vi.mocked(traceabilityApi.get).mockResolvedValue(data);
     renderPanel();
 
-    expect(await screen.findByText("Guion Unidad 1")).toBeInTheDocument();
-    expect(screen.getByText("Retraso")).toBeInTheDocument();
-    expect(screen.getByText("Entrega")).toBeInTheDocument();
-    expect(screen.getByText("Tarea devuelta")).toBeInTheDocument();
+    await screen.findAllByText("Guion Unidad 1");
+    expect(timeline().getByText("Guion Unidad 1")).toBeInTheDocument();
+    expect(timeline().getByText("Retraso")).toBeInTheDocument();
+    expect(timeline().getByText("Entrega")).toBeInTheDocument();
+    expect(timeline().getByText("Tarea devuelta")).toBeInTheDocument();
   });
 
   it("filters to only delays when toggled", async () => {
     vi.mocked(traceabilityApi.get).mockResolvedValue(data);
     renderPanel();
-    await screen.findByText("Guion Unidad 1");
+    await screen.findAllByText("Guion Unidad 1");
 
     // Por rol y no por texto suelto: la cabecera del resumen y los filtros
     // conviven en la misma pantalla.
     await userEvent.click(screen.getByRole("button", { name: "Solo retrasos" }));
 
     // El evento de retraso permanece; los no-retraso desaparecen.
-    expect(screen.getByText("Guion Unidad 1")).toBeInTheDocument();
-    expect(screen.queryByText("Entrega")).not.toBeInTheDocument();
-    expect(screen.queryByText("Tarea devuelta")).not.toBeInTheDocument();
+    expect(timeline().getByText("Guion Unidad 1")).toBeInTheDocument();
+    expect(timeline().queryByText("Entrega")).not.toBeInTheDocument();
+    expect(timeline().queryByText("Tarea devuelta")).not.toBeInTheDocument();
   });
 
   it("filters the timeline by free-text search", async () => {
     vi.mocked(traceabilityApi.get).mockResolvedValue(data);
     renderPanel();
-    await screen.findByText("Guion Unidad 1");
+    await screen.findAllByText("Guion Unidad 1");
 
     await userEvent.type(
       screen.getByRole("searchbox", { name: "Buscar en la línea de tiempo" }),
       "guion",
     );
 
-    expect(screen.getByText("Guion Unidad 1")).toBeInTheDocument();
-    expect(screen.queryByText("Tarea devuelta")).not.toBeInTheDocument();
+    expect(timeline().getByText("Guion Unidad 1")).toBeInTheDocument();
+    expect(timeline().queryByText("Tarea devuelta")).not.toBeInTheDocument();
+  });
+
+  it("resume la actividad al lado del historial", async () => {
+    vi.mocked(traceabilityApi.get).mockResolvedValue(data);
+    renderPanel();
+    await screen.findAllByText("Guion Unidad 1");
+
+    // El desglose se calcula sobre lo visible: dos actores distintos y la
+    // tarea con dos eventos por delante de la de uno.
+    expect(screen.getByText("Quién mueve el proyecto")).toBeInTheDocument();
+    expect(screen.getAllByText("Ana García").length).toBeGreaterThan(1);
+    expect(screen.getByText("Tareas con más movimiento")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no events", async () => {

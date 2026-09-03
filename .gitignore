@@ -78,3 +78,6 @@ docs/
 design/
 # Root-level node_modules (stray tooling caches, e.g. vitest)
 /node_modules/
+
+# Archivos subidos por los usuarios en desarrollo (STORAGE_DIR)
+backend/var/

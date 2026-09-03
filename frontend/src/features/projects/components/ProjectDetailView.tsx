@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  FolderArchive,
   FolderTree,
   GanttChartSquare,
   FileSpreadsheet,
@@ -75,6 +76,13 @@ const SECTIONS: {
     meta: "Grupos de trabajo y su avance",
     icon: UsersRound,
     accent: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+  {
+    to: "archivos",
+    label: "Archivos",
+    meta: "Carpeta del proyecto y de cada equipo",
+    icon: FolderArchive,
+    accent: "bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold",
   },
   {
     to: "trazabilidad",

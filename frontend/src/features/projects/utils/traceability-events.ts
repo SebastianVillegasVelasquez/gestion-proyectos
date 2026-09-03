@@ -88,6 +88,90 @@ export function filterTraceabilityEvents(
   });
 }
 
+/** Un día de la línea de tiempo: los eventos comparten fecha y se pintan bajo
+ *  una misma cabecera. Los eventos llegan del backend en orden descendente. */
+export interface TraceabilityDay {
+  /** Fecha ISO (YYYY-MM-DD) del grupo. */
+  date: string;
+  events: TraceabilityEvent[];
+}
+
+/**
+ * Agrupa la línea de tiempo por día. Leer un historial largo sin cortes de
+ * fecha obliga a comparar marcas de tiempo evento a evento; con la fecha como
+ * cabecera se ve de un vistazo qué pasó "ese martes".
+ */
+export function groupEventsByDay(events: TraceabilityEvent[]): TraceabilityDay[] {
+  const days: TraceabilityDay[] = [];
+  for (const event of events) {
+    const date = event.created_at.slice(0, 10);
+    const last = days[days.length - 1];
+    if (last?.date === date) {
+      last.events.push(event);
+    } else {
+      days.push({ date, events: [event] });
+    }
+  }
+  return days;
+}
+
+/** Una fila del desglose lateral: qué, cuántas veces y qué parte del total. */
+export interface TraceabilityTally<T extends string = string> {
+  key: T;
+  label: string;
+  count: number;
+  /** 0-100, sobre el más frecuente: es una barra comparativa, no un porcentaje. */
+  share: number;
+}
+
+function tally<T extends string>(pairs: [T, string][]): TraceabilityTally<T>[] {
+  const counts = new Map<T, { label: string; count: number }>();
+  for (const [key, label] of pairs) {
+    const found = counts.get(key);
+    if (found) {
+      found.count += 1;
+    } else {
+      counts.set(key, { label, count: 1 });
+    }
+  }
+  const rows = [...counts.entries()]
+    .map(([key, v]) => ({ key, label: v.label, count: v.count, share: 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const top = rows[0]?.count ?? 0;
+  return rows.map((r) => ({ ...r, share: top > 0 ? Math.round((r.count / top) * 100) : 0 }));
+}
+
+/** Reparto de la línea de tiempo por tipo de evento (qué clase de cosas pasan). */
+export function eventKindTally(events: TraceabilityEvent[]): TraceabilityTally[] {
+  return tally(events.map((e) => [e.kind, TRACE_EVENT_LABELS[e.kind]] as [string, string]));
+}
+
+/** Quién mueve el proyecto: número de eventos por persona que actúa. */
+export function actorTally(events: TraceabilityEvent[]): TraceabilityTally[] {
+  return tally(
+    events.map((e) => [e.actor_name ?? "Sistema", e.actor_name ?? "Sistema"] as [string, string]),
+  );
+}
+
+/** Tareas con más movimiento: dónde se concentra el historial (y los retrasos). */
+export function busiestTasks(
+  events: TraceabilityEvent[],
+): { id: string; title: string; count: number; delays: number }[] {
+  const byTask = new Map<string, { title: string; count: number; delays: number }>();
+  for (const event of events) {
+    const found = byTask.get(event.task_id) ?? { title: event.task_title, count: 0, delays: 0 };
+    found.count += 1;
+    if (event.is_delay) {
+      found.delays += 1;
+    }
+    byTask.set(event.task_id, found);
+  }
+  return [...byTask.entries()]
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.delays - a.delays || b.count - a.count)
+    .slice(0, 6);
+}
+
 /** Equipos presentes en la línea de tiempo, para poblar el selector sin pedir
  * la lista de equipos por separado. */
 export function teamsInTimeline(events: TraceabilityEvent[]): { id: string; name: string }[] {

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -54,7 +55,12 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Ruta de la foto de perfil dentro de la API (no una URL absoluta: el
+    # dominio cambia entre entornos y guardarlo la dejaría rota al mudarse).
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Presentación breve que la persona escribe sobre sí misma. Es lo que
+    # convierte la pantalla de configuración en un perfil y no en un formulario.
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Documento de identidad (opcional). El número es único cuando está presente
     # —así una misma persona no se registra dos veces— pero puede quedar vacío:

@@ -104,6 +104,11 @@ const ProjectTrazabilidadPage = lazy(() =>
     default: m.ProjectTrazabilidadPage,
   })),
 );
+const ProjectFilesPage = lazy(() =>
+  import("@/features/files/components/ProjectFilesPage.tsx").then((m) => ({
+    default: m.ProjectFilesPage,
+  })),
+);
 
 // developer también administra usuarios/cargos (ver MANAGEMENT_ROLES en el
 // backend: admin/super_admin/developer crean cuentas, ya no hay registro público).
@@ -157,6 +162,7 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/integrantes" element={<ProjectIntegrantesPage />} />
           <Route path="/projects/:projectId/equipos" element={<ProjectEquiposPage />} />
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
+          <Route path="/projects/:projectId/archivos" element={<ProjectFilesPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
           <Route path="/projects/:projectId/analiticas" element={<ProjectReportPage />} />

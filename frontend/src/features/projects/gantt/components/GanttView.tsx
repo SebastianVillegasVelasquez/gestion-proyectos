@@ -425,9 +425,17 @@ export function GanttView({
     if (!embed?.teamId) {
       return null;
     }
-    const teamTasks = realTasks.filter((t) => t.team_id === embed.teamId);
+    // Recortado además a una persona (integrante que solo ve lo suyo), el
+    // diagnóstico habla de SUS tareas: decir "el equipo no tiene tareas" cuando
+    // sí las tiene, pero de otros, sería mentir.
+    const mine = embed.assigneeId;
+    const teamTasks = realTasks.filter(
+      (t) => t.team_id === embed.teamId && (!mine || t.assignee_id === mine),
+    );
     if (teamTasks.length === 0) {
-      return "Este equipo todavía no tiene tareas.";
+      return mine
+        ? "Todavía no tienes tareas de este equipo."
+        : "Este equipo todavía no tiene tareas.";
     }
     const dated = teamTasks.filter((t) => t.start_date != null && t.due_date != null);
     if (dated.length === 0) {
@@ -1049,22 +1057,26 @@ export function GanttView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Responsable */}
-          <select
-            className={inputCls}
-            value={assigneeId ?? ""}
-            onChange={(e) => {
-              setAssigneeId(e.target.value || null);
-            }}
-            aria-label="Filtrar por responsable"
-          >
-            <option value="">Todos los responsables</option>
-            {(membersQuery.data ?? []).map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {m.name} {m.last_name}
-              </option>
-            ))}
-          </select>
+          {/* Responsable. Incrustado y ya recortado a una persona no se ofrece:
+              el filtro sería inerte (`embed.assigneeId` manda) y sugeriría que
+              se puede mirar el trabajo de otro. */}
+          {!embed?.assigneeId && (
+            <select
+              className={inputCls}
+              value={assigneeId ?? ""}
+              onChange={(e) => {
+                setAssigneeId(e.target.value || null);
+              }}
+              aria-label="Filtrar por responsable"
+            >
+              <option value="">Todos los responsables</option>
+              {(membersQuery.data ?? []).map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {m.name} {m.last_name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Equipo delegado. Incrustado no se ofrece: el equipo ya es el
               recorte de la pantalla y poder cambiarlo confundiría. */}
