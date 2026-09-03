@@ -21,14 +21,19 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     El archivador es un árbol con una forma deliberadamente rígida en su primer
     nivel:
 
-        raíz del proyecto            (parent_id = NULL, team_id = NULL)
-        └── carpeta de un equipo     (parent_id = raíz, team_id = <equipo>)
-            └── lo que el equipo organice…
+        raíz del proyecto            (parent_id = NULL, sin dueño)
+        ├── carpeta de un equipo     (parent_id = raíz, team_id = <equipo>)
+        │   └── lo que el equipo organice…
+        └── carpeta de una persona   (parent_id = raíz, user_id = <persona>)
+            └── sus entregas individuales
 
-    En la raíz solo puede colgar la carpeta de un equipo, y cada equipo tiene
-    una sola: si cualquiera pudiera crear carpetas sueltas ahí, en dos semanas
-    la raíz sería un cajón de sastre y nadie sabría de quién es qué. Dentro de
-    su carpeta el equipo manda y anida lo que quiera.
+    En la raíz solo cuelgan carpetas CON DUEÑO —un equipo o una persona—, y hay
+    una por dueño: si cualquiera pudiera crear carpetas sueltas ahí, en dos
+    semanas la raíz sería un cajón de sastre y nadie sabría de quién es qué.
+    Dentro de su carpeta el dueño manda y anida lo que quiera.
+
+    La carpeta de persona existe porque una tarea individual no tiene equipo y
+    su entrega necesita igualmente un sitio con nombre dentro del proyecto.
     """
 
     __tablename__ = "project_folders"
@@ -41,6 +46,14 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             "team_id",
             unique=True,
             postgresql_where=("team_id IS NOT NULL AND deleted_at IS NULL"),
+        ),
+        # Una persona, una carpeta. Mismo criterio que el de equipo.
+        Index(
+            "uq_project_folders_user_alive",
+            "project_id",
+            "user_id",
+            unique=True,
+            postgresql_where=("user_id IS NOT NULL AND deleted_at IS NULL"),
         ),
         Index("ix_project_folders_project_parent", "project_id", "parent_id"),
     )
@@ -61,12 +74,19 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
 
-    # Dueño de la carpeta de primer nivel. Se hereda hacia abajo por navegación
-    # (el permiso se resuelve subiendo hasta el ancestro con team_id), no se
-    # copia: copiarlo obligaría a reescribir el subárbol al mover una carpeta.
+    # Dueño de la carpeta de primer nivel: un equipo O una persona, nunca los
+    # dos. Se hereda hacia abajo por navegación (el permiso se resuelve subiendo
+    # hasta el primer ancestro con dueño), no se copia: copiarlo obligaría a
+    # reescribir el subárbol al mover una carpeta.
     team_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=True,
     )
 
@@ -80,7 +100,10 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         "ProjectFolder", remote_side="ProjectFolder.id"
     )
     team: Mapped[Optional["Team"]] = relationship("Team")
-    author: Mapped[Optional["User"]] = relationship("User")
+    # `foreign_keys` explícito: la tabla tiene DOS caminos hacia `users`
+    # (el dueño y quien la creó) y SQLAlchemy no puede adivinar cuál es cuál.
+    owner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
+    author: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
 
 
 class ProjectFile(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):

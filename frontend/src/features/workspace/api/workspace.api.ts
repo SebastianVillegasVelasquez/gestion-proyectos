@@ -1,5 +1,6 @@
 import http from "@/lib/http";
 import type { Task } from "@/features/projects/types/api.types";
+import { postDeliveryFile, type NewFileVersionBody } from "./delivery-upload";
 import type {
   CommentType,
   DeliverableStatus,
@@ -158,12 +159,6 @@ export interface NewVersionBody {
 }
 
 /** Entrega de un ARCHIVO: va multipart, así que no es un `NewVersionBody`. */
-export interface NewFileVersionBody {
-  file: File;
-  note?: string;
-  observations?: string;
-}
-
 /** Corrección de una versión ya subida. Parcial: solo viaja lo que cambia. */
 export interface EditVersionBody {
   type?: ResourceType;
@@ -229,24 +224,11 @@ export const workspaceApi = {
 
   /** Entrega un archivo: el backend lo guarda en la carpeta del equipo dentro
    *  del proyecto y crea la versión apuntando a él. */
-  uploadVersionFile: (teamId: string, deliverableId: string, body: NewFileVersionBody) => {
-    const form = new FormData();
-    form.append("file", body.file);
-    if (body.note) {
-      form.append("note", body.note);
-    }
-    if (body.observations) {
-      form.append("observations", body.observations);
-    }
-    return http
-      .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions/upload`, form, {
-        // Subir tarda mucho más que una llamada normal: el timeout global
-        // (10 s) cortaría un archivo grande a media transferencia.
-        timeout: 120_000,
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      .then((r) => r.data);
-  },
+  uploadVersionFile: (teamId: string, deliverableId: string, body: NewFileVersionBody) =>
+    postDeliveryFile<ApiDeliverable>(
+      `${base(teamId)}/deliverables/${deliverableId}/versions/upload`,
+      body,
+    ),
 
   editVersion: (teamId: string, deliverableId: string, versionId: string, body: EditVersionBody) =>
     http

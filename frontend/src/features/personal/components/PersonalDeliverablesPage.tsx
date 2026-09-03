@@ -28,6 +28,7 @@ import {
   usePersonalReviewQueue,
   useSetPersonalApproval,
   useUpdatePersonalVersion,
+  useUploadPersonalVersionFile,
 } from "../hooks/use-personal-deliverables";
 import { MyTasksView } from "./MyTasksView";
 
@@ -229,6 +230,7 @@ export function PersonalDeliverablesPage() {
 
   const createDeliverable = useCreatePersonalDeliverable();
   const addVersion = useAddPersonalVersion();
+  const uploadVersionFile = useUploadPersonalVersionFile();
   const updateVersion = useUpdatePersonalVersion();
   const deleteDeliverable = useDeletePersonalDeliverable();
   const addComment = useAddPersonalComment();
@@ -321,6 +323,16 @@ export function PersonalDeliverablesPage() {
         note: v.note,
         observations: v.observations || undefined,
       },
+    });
+  };
+
+  const handleUploadFile = (file: File, note: string, observations: string) => {
+    if (!selected) {
+      return;
+    }
+    uploadVersionFile.mutate({
+      id: selected.id,
+      body: { file, note, observations: observations || undefined },
     });
   };
 
@@ -513,6 +525,8 @@ export function PersonalDeliverablesPage() {
                       : null
                   }
                   onAddVersion={handleAddVersion}
+                  onUploadFile={handleUploadFile}
+                  uploadPending={uploadVersionFile.isPending}
                   onEditVersion={handleEditVersion}
                   onReview={handleReview}
                   onDelete={handleDelete}

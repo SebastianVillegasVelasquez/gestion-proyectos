@@ -3,8 +3,10 @@ cualquier proyecto, con proyecto / elemento / equipo resueltos.
 """
 
 from datetime import date, timedelta
+from uuid import UUID
 
 from app.core.security import create_access_token
+from app.modules.project.infrastructure.models import Project
 from tests.integration.tasks.test_team_tasks import (
     _add_project_member,
     _create_team,
@@ -186,6 +188,34 @@ class TestMyTasks:
         assert items["C depende de terceros"]["depends_on_third_party"] is True
         assert items["C depende de terceros"]["delivery_blocked_reason"] is not None
         assert len(items["C depende de terceros"]["blocked_by"]) == 1
+
+    async def test_a_deleted_project_stops_showing_its_tasks(
+        self, client, admin_headers, valid_project_payload, db_session
+    ):
+        """Borrar el proyecto no marca sus tareas, así que sin filtrar por el
+        proyecto seguían apareciendo aquí. Y la vista pedía luego
+        `/projects/{id}` —que sí respeta el borrado— y recibía un 404 en bucle.
+        """
+        pid = await _create_project(client, admin_headers, valid_project_payload)
+        me = await _plain_user(client, admin_headers, "deleted-project@test.com")
+        await _add_project_member(client, admin_headers, pid, me["id"])
+        await client.post(
+            "/api/v1/tasks",
+            headers=admin_headers,
+            json={
+                "title": "Tarea de un proyecto que ya no está",
+                "project_id": pid,
+                "assignee_id": me["id"],
+            },
+        )
+        h = _headers_for(me["id"])
+        assert len((await client.get("/api/v1/me/tasks", headers=h)).json()) == 1
+
+        project = await db_session.get(Project, UUID(pid))
+        project.soft_delete()
+        await db_session.commit()
+
+        assert (await client.get("/api/v1/me/tasks", headers=h)).json() == []
 
     async def test_requires_authentication(self, client):
         r = await client.get("/api/v1/me/tasks")

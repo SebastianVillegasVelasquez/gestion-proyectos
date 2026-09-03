@@ -23,7 +23,7 @@ import { MyTaskDeliverAction, TaskOriginCrumb } from "./my-task-bits";
 import { PersonalStructureView } from "./PersonalStructureView";
 import { PersonalGanttView } from "./PersonalGanttView";
 import { ElementFilterSelect } from "./ElementFilterSelect";
-import { elementOptionsFrom } from "../utils/element-options";
+import { elementOptionsFrom, taskMatchesElement } from "../utils/element-options";
 
 /** «faltan 3 d» / «hoy» / «hace 2 d» a partir de los días restantes. */
 function daysRemainingLabel(n: number): string {
@@ -126,28 +126,7 @@ export function MyTasksView({
   // Filtro por elemento: se elige de la lista de elementos que REALMENTE
   // aparecen en estas tareas (con su color de tipo), no se escribe a ciegas.
   // Filtra por subárbol: elegir una rama trae todo lo que cuelga de ella.
-  const [elementId, setElementId] = useState<string | null>(null);
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tasks
-      .map((t) => ({ task: t, status: dueStatus(t, today) }))
-      .filter(({ status }) => matches(filter, status))
-      .filter(({ task }) => {
-        if (scope === "individual") {
-          return task.team_id === null;
-        }
-        if (scope === "equipo") {
-          return task.team_id !== null;
-        }
-        return true;
-      })
-      .filter(({ task }) => !elementId || task.work_item_ancestors.some((a) => a.id === elementId))
-      .filter(
-        ({ task }) =>
-          !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
-      );
-  }, [tasks, filter, scope, query, elementId, today]);
+  const [elementKey, setElementKey] = useState<string | null>(null);
 
   // Las opciones del filtro salen del conjunto YA acotado por los demás filtros
   // (menos el propio elemento): ofrecer ramas que no traerían nada sería ruido.
@@ -166,6 +145,31 @@ export function MyTasksView({
       ),
     [tasks, filter, scope, today],
   );
+  const element = useMemo(
+    () => elementOptions.find((o) => o.key === elementKey) ?? null,
+    [elementOptions, elementKey],
+  );
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tasks
+      .map((t) => ({ task: t, status: dueStatus(t, today) }))
+      .filter(({ status }) => matches(filter, status))
+      .filter(({ task }) => {
+        if (scope === "individual") {
+          return task.team_id === null;
+        }
+        if (scope === "equipo") {
+          return task.team_id !== null;
+        }
+        return true;
+      })
+      .filter(({ task }) => !element || taskMatchesElement(task, element))
+      .filter(
+        ({ task }) =>
+          !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
+      );
+  }, [tasks, filter, scope, query, element, today]);
 
   const filteredTasks = useMemo(() => rows.map((r) => r.task), [rows]);
 
@@ -301,7 +305,7 @@ export function MyTasksView({
           placeholder="Buscar por tarea o proyecto…"
           className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
         />
-        <ElementFilterSelect options={elementOptions} value={elementId} onChange={setElementId} />
+        <ElementFilterSelect options={elementOptions} value={elementKey} onChange={setElementKey} />
       </div>
 
       {view === "cronograma" ? (

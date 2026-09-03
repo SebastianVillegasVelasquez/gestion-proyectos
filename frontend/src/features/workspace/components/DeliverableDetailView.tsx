@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { type DragEvent, useRef, useState } from "react";
 import {
   Check,
   Clock,
@@ -367,12 +367,13 @@ function DeliveryTimeline({
   );
 }
 
-// ── Register delivery (URL only — file upload is a future nice-to-have) ───────
+// ── Registrar entrega: una URL, o un archivo (elegido o arrastrado) ──────────
 
 interface RegisterDeliveryProps {
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
   /** Entrega un archivo. Va por su propio camino (multipart) y el servidor lo
-   *  guarda en la carpeta del equipo; sin él, el tipo "Archivo" no se ofrece. */
+   *  guarda en la carpeta del equipo —o en la de la persona, si la tarea es
+   *  individual—; sin él, el tipo "Archivo" no se ofrece. */
   onUploadFile?: (file: File, note: string, observations: string) => void;
   /** Hay una subida en vuelo. */
   uploading?: boolean;
@@ -396,12 +397,61 @@ function RegisterDelivery({
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [observations, setObservations] = useState("");
+  const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // `dragenter`/`dragleave` también saltan al cruzar los hijos del recuadro:
+  // sin contar las entradas, el aviso parpadearía al mover el ratón por dentro.
+  const dragDepth = useRef(0);
 
   const isFile = type === "archivo";
-  // Sin manejador de subida (entregas personales, por ahora) el tipo "Archivo"
-  // ni se ofrece: mejor no enseñar una opción que no lleva a ninguna parte.
+  // Sin manejador de subida el tipo "Archivo" ni se ofrece: mejor no enseñar
+  // una opción que no lleva a ninguna parte.
   const types = onUploadFile ? UPLOADABLE_RESOURCE_TYPES : URL_RESOURCE_TYPES;
+
+  /** Soltar un archivo elige el tipo por ti: si has arrastrado algo, lo que
+   *  quieres entregar es eso, no una URL. */
+  const takeFile = (dropped: File) => {
+    setFile(dropped);
+    setType("archivo");
+    setTypeTouchedByUser(true);
+  };
+
+  const acceptsDrop = (e: DragEvent) =>
+    onUploadFile !== undefined && e.dataTransfer.types.includes("Files");
+
+  const dragHandlers = {
+    onDragEnter: (e: DragEvent) => {
+      if (!acceptsDrop(e)) {
+        return;
+      }
+      e.preventDefault();
+      dragDepth.current += 1;
+      setDragging(true);
+    },
+    onDragOver: (e: DragEvent) => {
+      if (acceptsDrop(e)) {
+        e.preventDefault();
+      }
+    },
+    onDragLeave: () => {
+      dragDepth.current = Math.max(0, dragDepth.current - 1);
+      if (dragDepth.current === 0) {
+        setDragging(false);
+      }
+    },
+    onDrop: (e: DragEvent) => {
+      if (!acceptsDrop(e)) {
+        return;
+      }
+      e.preventDefault();
+      dragDepth.current = 0;
+      setDragging(false);
+      const dropped = e.dataTransfer.files[0];
+      if (dropped) {
+        takeFile(dropped);
+      }
+    },
+  };
 
   const handleUrlChange = (value: string) => {
     setUrl(value);
@@ -443,7 +493,13 @@ function RegisterDelivery({
   const ready = isFile ? file !== null : url.trim() !== "";
 
   return (
-    <div className="space-y-3">
+    <div className="relative space-y-3" {...dragHandlers}>
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-gold bg-brand-gold-light/80 text-[13px] font-medium text-brand-gold-dark backdrop-blur-[1px] dark:bg-slate-900/80 dark:text-brand-gold">
+          <Paperclip className="size-4" /> Suelta el archivo para adjuntarlo
+        </div>
+      )}
+
       {/* Resource type selector */}
       <div className="flex flex-wrap gap-2">
         {types.map((rt) => {
@@ -494,7 +550,7 @@ function RegisterDelivery({
             >
               <Paperclip className="size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
-                {file ? file.name : "Elegir un archivo…"}
+                {file ? file.name : "Elegir un archivo o arrastrarlo aquí…"}
               </span>
               {file && (
                 <span className="shrink-0 text-[11px] tabular-nums text-slate-400">

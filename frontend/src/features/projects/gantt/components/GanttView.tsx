@@ -882,7 +882,14 @@ export function GanttView({
     <div
       className={cn(
         "flex flex-col gap-4",
-        embed ? "h-full overflow-y-auto p-3 sm:p-4" : "p-4 sm:p-5 lg:h-full lg:overflow-y-auto",
+        // Incrustado, el cronograma OCUPA el hueco que le den y no scrollea de
+        // arriba abajo: los KPIs y los filtros son alto fijo y el diagrama se
+        // queda con el resto. Con scroll vertical propio, la fila de KPIs
+        // quedaba cortada por la mitad al bajar y había que hacer dos scrolls
+        // (el del panel y el del diagrama) para llegar a la barra horizontal.
+        embed
+          ? "h-full min-h-0 gap-3 overflow-hidden p-3 sm:p-4"
+          : "p-4 sm:p-5 lg:h-full lg:overflow-y-auto",
       )}
     >
       {!embed && (
@@ -945,7 +952,7 @@ export function GanttView({
       )}
 
       {/* Franja de KPIs (se ajusta a los filtros activos) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           icon={TrendingUp}
           label="Avance ponderado"
@@ -995,7 +1002,7 @@ export function GanttView({
 
       {/* Filtro por tipo de elemento (Curso, Módulo…), espejo de la estructura */}
       {types.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             <Tag className="size-3" /> Tipos
           </span>
@@ -1027,7 +1034,7 @@ export function GanttView({
       )}
 
       {/* Barra de filtros y zoom */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
         {/* Leyenda interactiva = filtro por estado */}
         <div className="flex flex-wrap items-center gap-1.5">
           {LEGEND_STATUSES.map((s) => {
@@ -1269,17 +1276,18 @@ export function GanttView({
       ) : (
         // Contenedor con scroll en ambos ejes: el eje de tiempo queda fijo
         // arriba y la columna de etiquetas fija a la izquierda.
-        <div className="flex min-h-0 flex-col">
+        <div className={cn("flex min-h-0 flex-col", embed && "flex-1")}>
           <div
             id="gantt-scroll"
             ref={scrollRef}
             onScroll={handleGridScroll}
             className={cn(
               "scrollbar-none relative overflow-auto overscroll-x-contain rounded-t-xl border border-b-0 border-border bg-card shadow-sm",
-              // Incrustado (cronograma del equipo): ocupa una altura generosa
-              // aunque haya pocas tareas, en vez de encogerse a 3-4 filas y
-              // dejar el panel medio vacío. Suelto: se limita a 65vh.
-              embed ? "min-h-[60vh] max-h-[calc(100vh-15rem)]" : "max-h-[65vh]",
+              // Incrustado (equipo o «Mis tareas»): se estira hasta llenar el
+              // panel que lo contiene, así la barra horizontal queda pegada al
+              // pie del bloque y no hace falta bajar para alcanzarla. Suelto:
+              // se limita a 65vh dentro de una página que sí scrollea.
+              embed ? "min-h-0 flex-1" : "max-h-[65vh]",
               (drag != null || resizing) && "select-none",
             )}
           >
@@ -1539,10 +1547,8 @@ export function GanttView({
             aria-orientation="horizontal"
             className={cn(
               "shrink-0 overflow-x-auto overflow-y-hidden rounded-b-xl border border-t-0 border-border bg-card",
-              // Incrustado, el cronograma vive dentro de un contenedor con
-              // scroll vertical propio: sin `sticky` la barra horizontal se va
-              // por debajo del borde y hay que bajar para alcanzarla —justo
-              // cuando lo que quieres es moverte de LADO.
+              // Incrustado, va pegada al pie del bloque: el área con scroll de
+              // encima se estira hasta dejarle sitio justo, sin hueco muerto.
               embed && "sticky bottom-0 z-40",
             )}
           >

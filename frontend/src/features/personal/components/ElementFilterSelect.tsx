@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, FolderTree } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tipoStyle } from "@/features/projects/utils/tipo-style";
 import type { ElementOption } from "../utils/element-options";
 
+const MENU_WIDTH = 300;
+const MENU_MAX_HEIGHT = 320;
+
 function ElementChip({ option, className }: { option: ElementOption; className?: string }) {
   const style = tipoStyle(
-    option.tipo_id ?? option.id,
+    option.tipo_id ?? option.key,
     option.tipo_nombre,
     option.es_dependencia_externa,
   );
@@ -25,6 +29,46 @@ function ElementChip({ option, className }: { option: ElementOption; className?:
 }
 
 /**
+ * Coloca el menú respecto al botón en coordenadas de VENTANA. Va en un portal
+ * con `position: fixed` porque el filtro vive dentro de un panel con
+ * `overflow-hidden` (el que recorta el cronograma): en flujo normal, el menú se
+ * cortaba contra ese borde y solo se veían las primeras opciones.
+ */
+function useMenuPosition(anchor: HTMLElement | null, open: boolean) {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const place = useCallback(() => {
+    if (!anchor) {
+      return;
+    }
+    const r = anchor.getBoundingClientRect();
+    // Se abre hacia arriba si abajo no cabe, y se mantiene dentro del viewport
+    // por la derecha: el filtro está pegado al borde de la pantalla.
+    const below = window.innerHeight - r.bottom;
+    const top =
+      below < MENU_MAX_HEIGHT && r.top > below ? r.top - MENU_MAX_HEIGHT - 4 : r.bottom + 4;
+    const left = Math.max(8, Math.min(r.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
+    setPos({ top: Math.max(8, top), left });
+  }, [anchor]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+    place();
+    window.addEventListener("resize", place);
+    // `capture`: el panel que scrollea es un ancestro, no la ventana.
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, place]);
+
+  return pos;
+}
+
+/**
  * Filtro por elemento de la estructura: en vez de escribir el nombre a ciegas,
  * se elige de una lista con LOS MISMOS chips de color que la miga de pan y la
  * vista de estructura. El color es la pista: el usuario reconoce «lo del Módulo
@@ -39,32 +83,43 @@ export function ElementFilterSelect({
   onChange,
 }: {
   options: ElementOption[];
+  /** Clave del grupo elegido (ver `ElementOption.key`), o null. */
   value: string | null;
-  onChange: (id: string | null) => void;
+  onChange: (key: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const selected = useMemo(() => options.find((o) => o.key === value) ?? null, [options, value]);
+  const pos = useMenuPosition(anchor, open);
 
   useEffect(() => {
     if (!open) {
       return;
     }
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (!anchor?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
         setOpen(false);
       }
     };
     document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, anchor]);
 
   // El elemento elegido puede desaparecer al cambiar otros filtros: soltamos el
   // filtro en vez de dejar la lista vacía sin explicación.
   useEffect(() => {
-    if (value && !options.some((o) => o.id === value)) {
+    if (value && !options.some((o) => o.key === value)) {
       onChange(null);
     }
   }, [options, value, onChange]);
@@ -73,9 +128,15 @@ export function ElementFilterSelect({
     return null;
   }
 
+  const pick = (key: string | null) => {
+    onChange(key);
+    setOpen(false);
+  };
+
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={setAnchor}
         type="button"
         onClick={() => {
           setOpen((v) => !v);
@@ -97,45 +158,52 @@ export function ElementFilterSelect({
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
       </button>
 
-      {open && (
-        <div
-          role="listbox"
-          className="absolute left-0 top-full z-30 mt-1 max-h-80 w-[280px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-xl"
-        >
-          <button
-            type="button"
-            role="option"
-            aria-selected={value === null}
-            onClick={() => {
-              onChange(null);
-              setOpen(false);
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              width: MENU_WIDTH,
+              maxHeight: MENU_MAX_HEIGHT,
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent"
+            className="fixed z-[70] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-xl"
           >
-            <Check className={cn("size-3.5 shrink-0", value !== null && "invisible")} />
-            Todos los elementos
-          </button>
-          {options.map((option) => (
             <button
-              key={option.id}
               type="button"
               role="option"
-              aria-selected={option.id === value}
+              aria-selected={value === null}
               onClick={() => {
-                onChange(option.id);
-                setOpen(false);
+                pick(null);
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent"
             >
-              <Check className={cn("size-3.5 shrink-0", option.id !== value && "invisible")} />
-              <ElementChip option={option} className="min-w-0 flex-1" />
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                {option.count}
-              </span>
+              <Check className={cn("size-3.5 shrink-0", value !== null && "invisible")} />
+              Todos los elementos
             </button>
-          ))}
-        </div>
-      )}
-    </div>
+            {options.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                role="option"
+                aria-selected={option.key === value}
+                onClick={() => {
+                  pick(option.key);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+              >
+                <Check className={cn("size-3.5 shrink-0", option.key !== value && "invisible")} />
+                <ElementChip option={option} className="min-w-0 flex-1" />
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                  {option.count}
+                </span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

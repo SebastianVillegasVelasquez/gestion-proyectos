@@ -7,10 +7,10 @@ import {
   type CreateDeliverableBody,
   type EditVersionBody,
   type NewCommentBody,
-  type NewFileVersionBody,
   type NewTeamTaskBody,
   type NewVersionBody,
 } from "../api/workspace.api";
+import type { NewFileVersionBody } from "../api/delivery-upload";
 
 const keys = {
   myTeams: ["workspace", "my-teams"] as const,

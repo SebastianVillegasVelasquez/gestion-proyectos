@@ -5,14 +5,18 @@ revisión del espacio de trabajo, pero con autorización propia
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from starlette import status
 
+from app.core.config import get_settings
 from app.core.dependencies import (
     event_bus_dependency,
+    file_storage_dependency,
     get_current_user,
+    project_files_repo_dependency,
     workspace_repo_dependency,
 )
+from app.modules.files.application.use_cases import ProjectFilesService
 from app.modules.teams.application.personal_use_cases import PersonalDeliverableService
 from app.modules.teams.presentation.workspace_schemas import (
     AddCommentRequest,
@@ -22,6 +26,7 @@ from app.modules.teams.presentation.workspace_schemas import (
     SetApprovalRequest,
     UpdateVersionRequest,
 )
+from app.shared.exceptions import ValidationError
 
 router = APIRouter(prefix="/me/deliverables", tags=["Entregables personales"])
 
@@ -83,6 +88,50 @@ async def add_my_version(
 ):
     return await PersonalDeliverableService(repo, bus).add_version(
         deliverable_id, data, current_user
+    )
+
+
+@router.post(
+    "/{deliverable_id}/versions/upload",
+    response_model=PersonalDeliverableResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_my_version(
+    deliverable_id: UUID,
+    file: UploadFile = File(...),
+    note: str | None = Form(None),
+    observations: str | None = Form(None),
+    repo=Depends(workspace_repo_dependency),
+    files_repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    bus=Depends(event_bus_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Entrega un ARCHIVO en una tarea individual. Va multipart y no JSON
+    porque lleva el binario; el resto del flujo (compuerta de dependencias,
+    revisión, cascada de fechas) es el mismo que el de una entrega por URL.
+
+    El archivo acaba en la carpeta de la persona dentro del archivador del
+    proyecto, que se crea sola la primera vez.
+    """
+    content = await file.read()
+    limit_mb = get_settings().MAX_UPLOAD_MB
+    if not content:
+        raise ValidationError("El archivo está vacío")
+    if len(content) > limit_mb * 1024 * 1024:
+        raise ValidationError(f"El archivo supera el límite de {limit_mb} MB")
+
+    service = PersonalDeliverableService(
+        repo, bus, files=ProjectFilesService(files_repo, storage)
+    )
+    return await service.add_file_version(
+        deliverable_id,
+        filename=file.filename or "archivo",
+        content_type=file.content_type or "application/octet-stream",
+        content=content,
+        note=note,
+        observations=observations,
+        current_user=current_user,
     )
 
 

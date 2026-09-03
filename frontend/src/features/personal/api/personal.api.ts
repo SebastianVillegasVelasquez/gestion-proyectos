@@ -1,4 +1,8 @@
 import http from "@/lib/http";
+import {
+  postDeliveryFile,
+  type NewFileVersionBody,
+} from "@/features/workspace/api/delivery-upload";
 import type {
   ApiBlockingTask,
   ApiComment,
@@ -83,6 +87,8 @@ export interface AddVersionBody {
   observations?: string;
 }
 
+export type { NewFileVersionBody };
+
 export interface UpdateVersionBody {
   type?: ResourceType;
   url?: string;
@@ -120,6 +126,11 @@ export const personalApi = {
     http
       .post<ApiPersonalDeliverable>(`${base}/${deliverableId}/versions`, body)
       .then((r) => r.data),
+
+  /** Entrega un archivo: el backend lo guarda en la carpeta de la persona
+   *  dentro del proyecto de la tarea y crea la versión apuntando a él. */
+  uploadVersionFile: (deliverableId: string, body: NewFileVersionBody) =>
+    postDeliveryFile<ApiPersonalDeliverable>(`${base}/${deliverableId}/versions/upload`, body),
 
   updateVersion: (deliverableId: string, versionId: string, body: UpdateVersionBody) =>
     http
