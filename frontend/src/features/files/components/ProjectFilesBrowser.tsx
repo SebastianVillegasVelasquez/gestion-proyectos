@@ -23,9 +23,11 @@ import {
   useUploadFile,
 } from "../hooks/use-project-files";
 import { formatFileSize } from "../utils/format-size";
+import { FilePreviewModal, type PreviewableFile } from "./FilePreviewModal";
 
 interface FolderActions {
   projectId: string;
+  onPreview: (file: ApiProjectFile) => void;
   onNewFolder: (parent: ApiProjectFolder) => void;
   onUpload: (folder: ApiProjectFolder) => void;
   onDeleteFolder: (folder: ApiProjectFolder) => void;
@@ -34,35 +36,77 @@ interface FolderActions {
 }
 
 function FileRow({ file, actions }: { file: ApiProjectFile; actions: FolderActions }) {
+  const delivery = file.delivery;
   return (
-    <li className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
-      <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{file.name}</span>
-      <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:block">
-        {file.uploaded_by_name ?? "—"}
-      </span>
-      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-        {formatFileSize(file.size_bytes)}
-      </span>
-      <button
-        type="button"
-        onClick={() => void filesApi.download(actions.projectId, file)}
-        title="Descargar"
-        className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        <Download className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          actions.onDeleteFile(file);
-        }}
-        disabled={actions.busy}
-        title="Borrar archivo"
-        className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-950/40"
-      >
-        <Trash2 className="size-3.5" />
-      </button>
+    <li className="group rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
+      <div className="flex items-center gap-2.5">
+        <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+        {/* El nombre ABRE el archivo, como en cualquier gestor de archivos: no
+            hace falta un botón aparte para la acción principal. */}
+        <button
+          type="button"
+          onClick={() => {
+            actions.onPreview(file);
+          }}
+          title="Abrir"
+          className="min-w-0 flex-1 truncate text-left text-[13px] text-foreground transition-colors hover:text-brand-gold-dark hover:underline dark:hover:text-brand-gold"
+        >
+          {file.name}
+        </button>
+        {delivery && (
+          <span
+            title={`Entrega de "${delivery.task_title}"`}
+            className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-bold text-brand-gold-dark dark:text-brand-gold sm:inline-flex"
+          >
+            V{delivery.version_number}
+            <span className="max-w-[160px] truncate font-medium opacity-80">
+              {delivery.task_title}
+            </span>
+          </span>
+        )}
+        <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:block">
+          {file.uploaded_by_name ?? "—"}
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          {formatFileSize(file.size_bytes)}
+        </span>
+        <button
+          type="button"
+          onClick={() => void filesApi.download(actions.projectId, file.id, file.name)}
+          title="Descargar"
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <Download className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            actions.onDeleteFile(file);
+          }}
+          disabled={actions.busy}
+          title="Borrar archivo"
+          className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-950/40"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </div>
+
+      {/* Lo que escribió quien entregó. Es lo que hace revisable el archivador:
+          sin el título y las observaciones, el líder ve un nombre de archivo y
+          tiene que ir al workspace a averiguar qué es. */}
+      {delivery && (delivery.note ?? delivery.observations) && (
+        <div className="ml-6 mt-0.5 flex flex-col gap-0.5">
+          {delivery.note && (
+            <p className="text-[11px] leading-snug text-muted-foreground">{delivery.note}</p>
+          )}
+          {delivery.observations && (
+            <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-500">
+              <span className="font-semibold">Observaciones: </span>
+              {delivery.observations}
+            </p>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -190,6 +234,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   // antes de abrirlo.
   const inputRef = useRef<HTMLInputElement>(null);
   const targetFolder = useRef<string | null>(null);
+  const [preview, setPreview] = useState<PreviewableFile | null>(null);
 
   const busy =
     createFolder.isPending ||
@@ -205,6 +250,15 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const actions: FolderActions = {
     projectId,
     busy,
+    onPreview: (file) => {
+      setPreview({
+        projectId,
+        fileId: file.id,
+        name: file.name,
+        contentType: file.content_type,
+        sizeBytes: file.size_bytes,
+      });
+    },
     onUpload: (folder) => {
       targetFolder.current = folder.id;
       inputRef.current?.click();
@@ -229,6 +283,14 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
 
   return (
     <>
+      {preview && (
+        <FilePreviewModal
+          file={preview}
+          onClose={() => {
+            setPreview(null);
+          }}
+        />
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -260,6 +322,15 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300"
             >
               {error}
+            </p>
+          )}
+
+          {/* Decir el alcance es parte de la respuesta: sin esto, un líder que
+              ve una sola carpeta creería que el proyecto no tiene más. */}
+          {!query.data.sees_whole_project && (
+            <p className="rounded-lg border border-border bg-accent/40 px-3 py-2 text-[12px] text-muted-foreground">
+              Estás viendo las carpetas de tus equipos. La jerarquía completa del proyecto la ve
+              quien lo coordina, lo supervisa o la administración.
             </p>
           )}
 

@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { Check, Clock, ExternalLink, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Check,
+  Clock,
+  ExternalLink,
+  Link2,
+  Paperclip,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type {
@@ -12,8 +22,14 @@ import type {
 import { ReviewActions } from "./ReviewActions";
 import { DELIVERABLE_STATUS_LABELS, DELIVERABLE_STATUS_BADGE } from "../types";
 import {
+  FilePreviewModal,
+  type PreviewableFile,
+} from "@/features/files/components/FilePreviewModal";
+import { formatFileSize } from "@/features/files/utils/format-size";
+import {
   RESOURCE_META,
   UPLOADABLE_RESOURCE_TYPES,
+  URL_RESOURCE_TYPES,
   detectResourceType,
   resourceDisplayName,
 } from "../utils/resource-types";
@@ -169,9 +185,21 @@ function DeliveryTimeline({
 }) {
   const sorted = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // El archivo entregado se abre SIN salir de la aplicación: quien revisa
+  // necesita verlo para decidir, y obligarle a bajarlo y buscarlo en su carpeta
+  // de descargas rompe la revisión por la mitad.
+  const [preview, setPreview] = useState<PreviewableFile | null>(null);
 
   return (
     <div>
+      {preview && (
+        <FilePreviewModal
+          file={preview}
+          onClose={() => {
+            setPreview(null);
+          }}
+        />
+      )}
       <div className="flex items-center gap-1.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
         <Clock className="size-3.5" />
         Línea de tiempo de entregas ({versions.length})
@@ -264,6 +292,23 @@ function DeliveryTimeline({
                                 <Pencil className="size-2.5" /> Editar
                               </button>
                             )}
+                            {v.fileId && v.fileProjectId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPreview({
+                                    projectId: v.fileProjectId!,
+                                    fileId: v.fileId!,
+                                    name: v.fileName ?? "Archivo",
+                                    contentType: v.mimeType,
+                                    sizeBytes: v.fileSizeBytes,
+                                  });
+                                }}
+                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                              >
+                                Abrir
+                              </button>
+                            )}
                             {v.url && v.url !== "#" && (
                               <a
                                 href={v.url}
@@ -326,6 +371,11 @@ function DeliveryTimeline({
 
 interface RegisterDeliveryProps {
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  /** Entrega un archivo. Va por su propio camino (multipart) y el servidor lo
+   *  guarda en la carpeta del equipo; sin él, el tipo "Archivo" no se ofrece. */
+  onUploadFile?: (file: File, note: string, observations: string) => void;
+  /** Hay una subida en vuelo. */
+  uploading?: boolean;
   currentVersion: number;
   uploadedBy: string;
   /** Se llama tras registrar la entrega (para cerrar el modal que lo contiene). */
@@ -334,6 +384,8 @@ interface RegisterDeliveryProps {
 
 function RegisterDelivery({
   onAddVersion,
+  onUploadFile,
+  uploading = false,
   currentVersion,
   uploadedBy,
   onDone,
@@ -341,8 +393,15 @@ function RegisterDelivery({
   const [type, setType] = useState<ResourceType>("enlace");
   const [typeTouchedByUser, setTypeTouchedByUser] = useState(false);
   const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [observations, setObservations] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const isFile = type === "archivo";
+  // Sin manejador de subida (entregas personales, por ahora) el tipo "Archivo"
+  // ni se ofrece: mejor no enseñar una opción que no lleva a ninguna parte.
+  const types = onUploadFile ? UPLOADABLE_RESOURCE_TYPES : URL_RESOURCE_TYPES;
 
   const handleUrlChange = (value: string) => {
     setUrl(value);
@@ -353,18 +412,26 @@ function RegisterDelivery({
   };
 
   const handleAdd = () => {
-    if (!url.trim()) {
-      return;
+    if (isFile) {
+      if (!file) {
+        return;
+      }
+      onUploadFile?.(file, note.trim() || file.name, observations.trim());
+    } else {
+      if (!url.trim()) {
+        return;
+      }
+      onAddVersion({
+        type,
+        url: url.trim(),
+        uploadedBy,
+        uploadedAt: new Date().toISOString(),
+        note: note.trim() || `${RESOURCE_META[type].label} — V${currentVersion + 1}`,
+        observations: observations.trim(),
+      });
     }
-    onAddVersion({
-      type,
-      url: url.trim(),
-      uploadedBy,
-      uploadedAt: new Date().toISOString(),
-      note: note.trim() || `${RESOURCE_META[type].label} — V${currentVersion + 1}`,
-      observations: observations.trim(),
-    });
     setUrl("");
+    setFile(null);
     setNote("");
     setObservations("");
     setTypeTouchedByUser(false);
@@ -373,12 +440,13 @@ function RegisterDelivery({
   };
 
   const meta = RESOURCE_META[type];
+  const ready = isFile ? file !== null : url.trim() !== "";
 
   return (
     <div className="space-y-3">
       {/* Resource type selector */}
       <div className="flex flex-wrap gap-2">
-        {UPLOADABLE_RESOURCE_TYPES.map((rt) => {
+        {types.map((rt) => {
           const m = RESOURCE_META[rt];
           const Icon = m.Icon;
           const selected = type === rt;
@@ -402,30 +470,50 @@ function RegisterDelivery({
             </button>
           );
         })}
-        {/* Archivo — nice-to-have, aún no disponible */}
-        <span
-          title="Subida de archivos — próximamente"
-          className="flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-[12px] font-medium text-slate-300 dark:border-slate-700 dark:text-slate-600"
-        >
-          <RESOURCE_META.archivo.Icon className="size-3.5" />
-          Archivo
-          <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-            Pronto
-          </span>
-        </span>
       </div>
 
-      {/* URL + note */}
+      {/* Recurso + nota */}
       <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => {
-            handleUrlChange(e.target.value);
-          }}
-          placeholder={meta.placeholder}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-        />
+        {isFile ? (
+          <>
+            <input
+              ref={fileInput}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                // Se limpia para que elegir el MISMO archivo dos veces vuelva a
+                // disparar `change`.
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-[13px] text-slate-600 transition-colors hover:border-brand-gold hover:text-brand-gold-dark dark:border-slate-600 dark:text-slate-300"
+            >
+              <Paperclip className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-left">
+                {file ? file.name : "Elegir un archivo…"}
+              </span>
+              {file && (
+                <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
+                  {formatFileSize(file.size)}
+                </span>
+              )}
+            </button>
+          </>
+        ) : (
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => {
+              handleUrlChange(e.target.value);
+            }}
+            placeholder={meta.placeholder}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          />
+        )}
         <input
           type="text"
           value={note}
@@ -449,11 +537,11 @@ function RegisterDelivery({
           <button
             type="button"
             onClick={handleAdd}
-            disabled={!url.trim()}
+            disabled={!ready || uploading}
             className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-40"
           >
             <Plus className="size-3.5" />
-            Registrar entrega
+            {uploading ? "Subiendo…" : "Registrar entrega"}
           </button>
         </div>
       </div>
@@ -480,6 +568,11 @@ interface DeliverableDetailViewProps {
   /** Error al borrar (se muestra en el diálogo de confirmación). */
   deleteError?: string | null;
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  /** Entrega un ARCHIVO (se guarda en la carpeta del equipo). Sin él, el
+   *  formulario solo ofrece los recursos por URL. */
+  onUploadFile?: (file: File, note: string, observations: string) => void;
+  /** Hay una subida de archivo en vuelo. */
+  uploadPending?: boolean;
   /** Corrige una entrega ya subida (no crea versión nueva). Solo si `canDeliver`. */
   onEditVersion?: (versionId: string, patch: EditVersionPatch) => void;
   onReview: (type: CommentType, reason: string) => void;
@@ -498,6 +591,8 @@ export function DeliverableDetailView({
   deletePending = false,
   deleteError = null,
   onAddVersion,
+  onUploadFile,
+  uploadPending = false,
   onEditVersion,
   onReview,
   onDelete,
@@ -617,6 +712,8 @@ export function DeliverableDetailView({
           currentVersion={deliverable.versions.length}
           uploadedBy={currentUserId}
           onAddVersion={onAddVersion}
+          onUploadFile={onUploadFile}
+          uploading={uploadPending}
           onClose={() => {
             setShowRegister(false);
           }}
@@ -649,11 +746,15 @@ function RegisterDeliveryModal({
   currentVersion,
   uploadedBy,
   onAddVersion,
+  onUploadFile,
+  uploading,
   onClose,
 }: {
   currentVersion: number;
   uploadedBy: string;
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  onUploadFile?: (file: File, note: string, observations: string) => void;
+  uploading: boolean;
   onClose: () => void;
 }) {
   return (
@@ -686,6 +787,8 @@ function RegisterDeliveryModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <RegisterDelivery
             onAddVersion={onAddVersion}
+            onUploadFile={onUploadFile}
+            uploading={uploading}
             currentVersion={currentVersion}
             uploadedBy={uploadedBy}
             onDone={onClose}

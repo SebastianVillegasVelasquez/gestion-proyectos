@@ -7,6 +7,7 @@ import {
   type CreateDeliverableBody,
   type EditVersionBody,
   type NewCommentBody,
+  type NewFileVersionBody,
   type NewTeamTaskBody,
   type NewVersionBody,
 } from "../api/workspace.api";
@@ -87,6 +88,16 @@ export function useCreateDeliverable(teamId: string | null) {
 export function useAddVersion(teamId: string | null) {
   return useDeliverableMutation(teamId, (vars: { deliverableId: string; body: NewVersionBody }) =>
     workspaceApi.addVersion(teamId!, vars.deliverableId, vars.body),
+  );
+}
+
+/** Entrega de un archivo (multipart). Invalida lo mismo que `useAddVersion`:
+ *  es la misma operación de negocio con otro tipo de recurso. */
+export function useUploadVersionFile(teamId: string | null) {
+  return useDeliverableMutation(
+    teamId,
+    (vars: { deliverableId: string; body: NewFileVersionBody }) =>
+      workspaceApi.uploadVersionFile(teamId!, vars.deliverableId, vars.body),
   );
 }
 

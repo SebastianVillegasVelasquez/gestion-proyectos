@@ -7,9 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
+from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
+from app.modules.teams.infrastructure.workspace_models import (
+    Deliverable,
+    DeliverableVersion,
+)
 
 
 class ProjectFilesRepository:
@@ -36,6 +41,20 @@ class ProjectFilesRepository:
             )
             or 0
         ) > 0
+
+    async def project_role(self, project_id: UUID, user_id: UUID) -> ProjectRole | None:
+        """Rol del usuario DENTRO del proyecto (coordinador, supervisor…).
+
+        Es lo que separa a quien mira el proyecto entero de quien solo mira su
+        equipo, así que se pregunta aparte de la simple pertenencia.
+        """
+        return await self._session.scalar(
+            select(ProjectMember.project_role).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == user_id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
 
     async def team_roles_in_project(
         self, project_id: UUID, user_id: UUID
@@ -152,6 +171,29 @@ class ProjectFilesRepository:
             )
             or 0
         ) > 0
+
+    async def deliveries_by_file(self, project_id: UUID) -> dict[UUID, tuple]:
+        """De qué ENTREGA salió cada archivo: `file_id → (versión, entregable)`.
+
+        Un archivo del archivador casi siempre llega por una entrega del
+        workspace, y quien revisa necesita ver "esto es la V2 de «Guion módulo
+        1»" sin salir del gestor de archivos. En una sola consulta para todo el
+        proyecto: pedirlo archivo por archivo sería un N+1 sobre la vista que
+        más filas pinta.
+        """
+        rows = await self._session.execute(
+            select(DeliverableVersion, Deliverable)
+            .join(Deliverable, Deliverable.id == DeliverableVersion.deliverable_id)
+            .join(ProjectFile, ProjectFile.id == DeliverableVersion.file_id)
+            .where(
+                ProjectFile.project_id == project_id,
+                Deliverable.deleted_at.is_(None),
+            )
+        )
+        return {
+            version.file_id: (version, deliverable)
+            for version, deliverable in rows.all()
+        }
 
     async def add_file(self, file: ProjectFile) -> ProjectFile:
         self._session.add(file)

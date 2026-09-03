@@ -44,6 +44,14 @@ export interface ApiVersion {
   observations: string | null;
   uploaded_by: string;
   uploaded_at: string;
+  /** Archivo entregado (solo `type: "archivo"`). Vive en el archivador del
+   *  proyecto; `file_project_id` es lo que permite construir su URL de
+   *  descarga o de vista sin averiguar a qué proyecto pertenece. */
+  file_id: string | null;
+  file_project_id: string | null;
+  file_name: string | null;
+  file_content_type: string | null;
+  file_size_bytes: number | null;
 }
 
 export interface ApiComment {
@@ -149,6 +157,13 @@ export interface NewVersionBody {
   observations?: string;
 }
 
+/** Entrega de un ARCHIVO: va multipart, así que no es un `NewVersionBody`. */
+export interface NewFileVersionBody {
+  file: File;
+  note?: string;
+  observations?: string;
+}
+
 /** Corrección de una versión ya subida. Parcial: solo viaja lo que cambia. */
 export interface EditVersionBody {
   type?: ResourceType;
@@ -211,6 +226,27 @@ export const workspaceApi = {
     http
       .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions`, body)
       .then((r) => r.data),
+
+  /** Entrega un archivo: el backend lo guarda en la carpeta del equipo dentro
+   *  del proyecto y crea la versión apuntando a él. */
+  uploadVersionFile: (teamId: string, deliverableId: string, body: NewFileVersionBody) => {
+    const form = new FormData();
+    form.append("file", body.file);
+    if (body.note) {
+      form.append("note", body.note);
+    }
+    if (body.observations) {
+      form.append("observations", body.observations);
+    }
+    return http
+      .post<ApiDeliverable>(`${base(teamId)}/deliverables/${deliverableId}/versions/upload`, form, {
+        // Subir tarda mucho más que una llamada normal: el timeout global
+        // (10 s) cortaría un archivo grande a media transferencia.
+        timeout: 120_000,
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 
   editVersion: (teamId: string, deliverableId: string, versionId: string, body: EditVersionBody) =>
     http

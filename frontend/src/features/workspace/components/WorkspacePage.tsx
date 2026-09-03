@@ -42,6 +42,7 @@ import {
   useMyTeams,
   useTeamMembers,
   useTeamTasks,
+  useUploadVersionFile,
   useWorkspaceAccess,
 } from "../hooks/use-workspace";
 
@@ -266,6 +267,7 @@ function MemberWorkspace() {
 
   const createDeliverable = useCreateDeliverable(activeTeamId);
   const addVersion = useAddVersion(activeTeamId);
+  const uploadVersionFile = useUploadVersionFile(activeTeamId);
   const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
   const deleteDeliverable = useDeleteDeliverable(activeTeamId);
@@ -296,6 +298,17 @@ function MemberWorkspace() {
         note: version.note,
         observations: version.observations || undefined,
       },
+    });
+  };
+
+  /** Entrega un archivo: sube y el servidor lo deja en la carpeta del equipo. */
+  const handleUploadFile = (file: File, note: string, observations: string) => {
+    if (!selectedDeliverable) {
+      return;
+    }
+    uploadVersionFile.mutate({
+      deliverableId: selectedDeliverable.id,
+      body: { file, note, observations: observations || undefined },
     });
   };
 
@@ -579,6 +592,8 @@ function MemberWorkspace() {
                             : null
                         }
                         onAddVersion={handleAddVersion}
+                        onUploadFile={handleUploadFile}
+                        uploadPending={uploadVersionFile.isPending}
                         onEditVersion={handleEditVersion}
                         onReview={handleReview}
                         onDelete={handleDelete}

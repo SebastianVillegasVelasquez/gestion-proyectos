@@ -38,7 +38,8 @@ export const DELIVERABLE_STATUS_BADGE: Record<DeliverableStatus, string> = {
 /**
  * Tipo de recurso entregado. Refleja las necesidades del negocio (virtualización
  * de cursos + TI): enlaces (Figma/Drive), repositorios de código, paquetes SCORM
- * para el LMS y archivos. `archivo` es un nice-to-have aún NO disponible.
+ * para el LMS y archivos subidos (que se guardan en la carpeta del equipo,
+ * dentro del archivador del proyecto).
  */
 export type ResourceType = "enlace" | "repositorio" | "scorm" | "archivo" | "sin_adjunto";
 
@@ -81,10 +82,15 @@ export interface DeliverableVersion {
   id: string;
   versionNumber: number;
   type: ResourceType;
-  /** Nula en las entregas "sin adjunto". */
+  /** Nula en las entregas "sin adjunto" y en las de tipo `archivo`. */
   url: string | null;
+  /** Archivo entregado (solo `type: "archivo"`), en el archivador del proyecto. */
+  fileId?: string | null;
+  /** Proyecto del archivo: sus rutas de vista y descarga cuelgan de él. */
+  fileProjectId?: string | null;
   fileName?: string;
   mimeType?: string;
+  fileSizeBytes?: number;
   uploadedBy: string; // WorkspaceMember.id
   uploadedAt: string; // ISO
   note: string;
