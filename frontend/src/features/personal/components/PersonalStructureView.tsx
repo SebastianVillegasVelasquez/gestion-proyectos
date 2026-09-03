@@ -1,15 +1,20 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
+import { ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { tipoStyle } from "@/features/projects/utils/tipo-style";
-import { formatDateRange, taskRisk } from "@/features/projects/utils/task-dates";
+import { formatDateRange } from "@/features/projects/utils/task-dates";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
 import { STATUS_META } from "@/features/workspace/utils/team-tasks";
 import type { ApiMyTask } from "../api/personal.api";
 import { MyTaskDeliverAction } from "./my-task-bits";
-import { dueStatus } from "../utils/due-status";
+import {
+  DELIVERY_STATUS_CLASSES,
+  DELIVERY_STATUS_LABELS,
+  deliveryStatus,
+  dueStatus,
+} from "../utils/due-status";
 
 interface TipoMeta {
   nombre: string;
@@ -25,9 +30,13 @@ interface LeafCbs {
 // ── Fila de tarea (hoja) — misma lectura que la Estructura de Equipos, pero de
 //    SOLO LECTURA: sin reasignar ni editar fechas. ────────────────────────────
 function TaskLeaf({ task, cbs }: { task: ApiMyTask; cbs: LeafCbs }) {
-  const risk = taskRisk(task, cbs.today);
   const meta = STATUS_META[task.status];
   const isDone = dueStatus(task, cbs.today) === "done";
+  // Aquí interesa CÓMO VA la entrega (a tiempo, en riesgo, por vencer, en
+  // retraso), no el par de fechas: el rango pedía hacer la resta mentalmente y
+  // no decía nada sobre si la tarea va bien. Las fechas siguen a un `title` de
+  // distancia para quien las necesite.
+  const delivery = deliveryStatus(task, cbs.today);
 
   return (
     <div className="relative before:absolute before:left-[-16px] before:top-[20px] before:h-[1.5px] before:w-4 before:bg-border before:content-['']">
@@ -43,15 +52,13 @@ function TaskLeaf({ task, cbs }: { task: ApiMyTask; cbs: LeafCbs }) {
 
         <span className="ml-auto flex shrink-0 items-center gap-2.5">
           <span
+            title={formatDateRange(task.start_date, task.due_date)}
             className={cn(
-              "hidden items-center gap-1 text-[11px] tabular-nums sm:flex",
-              risk === "vencida"
-                ? "font-semibold text-rose-600 dark:text-rose-400"
-                : "text-muted-foreground",
+              "hidden rounded-full px-2 py-0.5 text-[11px] font-semibold sm:inline",
+              DELIVERY_STATUS_CLASSES[delivery],
             )}
           >
-            {risk === "vencida" && <AlertTriangle className="size-3" />}
-            {formatDateRange(task.start_date, task.due_date)}
+            {DELIVERY_STATUS_LABELS[delivery]}
           </span>
           <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", meta.badge)}>
             {meta.label}
