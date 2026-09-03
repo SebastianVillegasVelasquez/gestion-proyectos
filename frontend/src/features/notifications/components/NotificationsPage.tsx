@@ -14,9 +14,9 @@ import {
 import { resolveNotificationTarget } from "../utils/notification-target";
 import {
   NOTIFICATION_PRIORITY_LABELS,
-  NOTIFICATION_TYPE_LABELS,
   formatRelativeTime,
   notificationPriority,
+  notificationTypeLabel,
   type NotificationPriority,
 } from "../utils/notifications";
 import { DEFAULT_TONE, FALLBACK_ICON, TYPE_ICON, TYPE_TONE } from "../utils/notification-visuals";
@@ -38,9 +38,7 @@ function typesInWindow(items: AppNotification[]): NotificationType[] {
   for (const n of items) {
     seen.add(n.notification_type);
   }
-  return [...seen].sort((a, b) =>
-    NOTIFICATION_TYPE_LABELS[a].localeCompare(NOTIFICATION_TYPE_LABELS[b]),
-  );
+  return [...seen].sort((a, b) => notificationTypeLabel(a).localeCompare(notificationTypeLabel(b)));
 }
 
 function Row({
@@ -88,7 +86,7 @@ function Row({
             {NOTIFICATION_PRIORITY_LABELS[priority]}
           </span>
           <span>·</span>
-          <span>{NOTIFICATION_TYPE_LABELS[n.notification_type]}</span>
+          <span>{notificationTypeLabel(n.notification_type)}</span>
           <span>·</span>
           <span>{formatRelativeTime(n.created_at)}</span>
         </span>
@@ -286,7 +284,7 @@ export function NotificationsPage() {
             <option value="all">Todos los tipos</option>
             {typeOptions.map((t) => (
               <option key={t} value={t}>
-                {NOTIFICATION_TYPE_LABELS[t]}
+                {notificationTypeLabel(t)}
               </option>
             ))}
           </select>

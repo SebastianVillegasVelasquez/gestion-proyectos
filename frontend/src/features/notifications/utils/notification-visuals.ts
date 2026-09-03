@@ -1,7 +1,9 @@
 import {
+  AlarmClock,
   AlertTriangle,
   AtSign,
   Bell,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
   FolderKanban,
@@ -23,6 +25,7 @@ export const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   tarea_atrasada: AlertTriangle,
   tarea_completada: CheckCircle2,
   tarea_devuelta: Undo2,
+  tarea_reprogramada: CalendarClock,
   dependencia_terceros_fechada: Link2,
   proyecto_miembro_agregado: FolderKanban,
   proyecto_cerrado: FolderKanban,
@@ -32,6 +35,7 @@ export const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   comentario_publicado: MessageSquare,
   comentario_respuesta: MessageSquare,
   mencion: AtSign,
+  recordatorio: AlarmClock,
 };
 
 // Tono del ícono por familia de evento: tareas → teal/rose, proyectos →
@@ -57,6 +61,8 @@ export const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   mencion: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
   dependencia_terceros_fechada:
     "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300",
+  tarea_reprogramada: "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300",
+  recordatorio: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
 export const DEFAULT_TONE = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";

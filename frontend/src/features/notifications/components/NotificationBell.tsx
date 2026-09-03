@@ -20,9 +20,9 @@ import {
   useUnreadCount,
 } from "../hooks/use-notifications";
 import {
-  NOTIFICATION_TYPE_LABELS,
   formatBadgeCount,
   formatRelativeTime,
+  notificationTypeLabel,
 } from "../utils/notifications";
 import { DEFAULT_TONE, FALLBACK_ICON, TYPE_ICON, TYPE_TONE } from "../utils/notification-visuals";
 import type { AppNotification } from "../types";
@@ -73,7 +73,7 @@ function NotificationRow({
             {notification.message}
           </span>
           <span className="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-            {NOTIFICATION_TYPE_LABELS[notification.notification_type]} ·{" "}
+            {notificationTypeLabel(notification.notification_type)} ·{" "}
             {formatRelativeTime(notification.created_at)}
             {hasTarget && (
               <span className="ml-1 inline-flex items-center gap-0.5 text-brand-teal opacity-0 transition-opacity group-hover/item:opacity-100">
