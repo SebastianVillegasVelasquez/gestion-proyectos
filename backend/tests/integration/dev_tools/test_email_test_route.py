@@ -1,5 +1,5 @@
-"""POST /api/v1/dev/email-test — herramienta del developer para probar el envío
-de correo en producción.
+"""POST /api/v1/dev/email-test — herramienta del developer y del super_admin
+para probar el envío de correo en producción.
 
 El adaptador real se sustituye por un espía (no se toca la red): lo que se
 prueba aquí es el guardado de rol, el rate limit y el contrato de la respuesta.
@@ -49,15 +49,19 @@ class TestDevEmailTestRoute:
         r = await client.post(BASE, json={"to": "x@example.com"})
         assert r.status_code == 401
 
-    async def test_forbidden_for_non_developer(self, client, admin_headers):
+    async def test_forbidden_for_admin(self, client, admin_headers):
+        # La consola manda correos reales desde nuestro dominio: la puerta se
+        # queda en el rol técnico y la administración máxima.
         r = await client.post(BASE, json={"to": "x@example.com"}, headers=admin_headers)
         assert r.status_code == 403
 
-    async def test_forbidden_for_super_admin(self, client, super_admin_headers):
+    async def test_super_admin_is_allowed(
+        self, client, super_admin_headers, spy_sender
+    ):
         r = await client.post(
             BASE, json={"to": "x@example.com"}, headers=super_admin_headers
         )
-        assert r.status_code == 403
+        assert r.status_code == 200
 
     async def test_rejects_invalid_email(self, client, developer_headers):
         r = await client.post(

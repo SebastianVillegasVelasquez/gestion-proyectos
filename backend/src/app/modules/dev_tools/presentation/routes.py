@@ -45,9 +45,24 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/dev", tags=["Dev tools"])
 
-# `require_role("developer")` ya es estricto (solo DEVELOPER lo satisface), pero
-# el envío usa nuestro dominio verificado: se revalida el rol dentro del handler.
-_developer = require_role("developer")
+# La consola de Correos la usan el rol técnico y la administración máxima:
+# `require_role("super_admin")` deja pasar a SUPER_ADMIN y —por la jerarquía de
+# `role_satisfies`— también a DEVELOPER, sin nombrarlo. Un `admin` NO entra: el
+# envío sale de nuestro dominio verificado y activar cuentas por aquí deja la
+# contraseña en blanco, así que la puerta se mantiene estrecha a propósito.
+# El envío se revalida además DENTRO del handler (ver `_require_email_console`):
+# una ruta que manda correos reales no depende de una sola comprobación.
+_email_console = require_role("super_admin")
+
+# Roles que pueden disparar correos de verdad desde la consola.
+_EMAIL_CONSOLE_ROLES = (SystemRole.DEVELOPER, SystemRole.SUPER_ADMIN)
+
+
+def _require_email_console(current_user: UserResponse) -> None:
+    """Segunda comprobación dentro del handler, a propósito redundante."""
+    if current_user.role not in _EMAIL_CONSOLE_ROLES:
+        raise ForbiddenError("Solo el rol developer o super_admin puede enviar correos")
+
 
 # Máximo de correos de prueba por usuario y por minuto.
 _TEST_EMAIL_MAX_PER_MINUTE = 5
@@ -73,16 +88,15 @@ async def _check_logo_reachable(logo_url: str) -> tuple[bool, str]:
 @router.post("/email-test", response_model=SendTestEmailResponse)
 async def send_test_email(
     data: SendTestEmailRequest,
-    current_user: UserResponse = Depends(_developer),
+    current_user: UserResponse = Depends(_email_console),
 ) -> SendTestEmailResponse:
-    """Envía un correo de prueba a la dirección indicada. Solo developer.
+    """Envía un correo de prueba a la dirección indicada.
 
-    - Autenticación + rol `developer` verificados explícitamente.
+    - Autenticación + rol `developer` o `super_admin` verificados explícitamente.
     - Rate limit: 5 envíos por usuario por minuto.
     - Se registra quién lo disparó y a qué dirección.
     """
-    if current_user.role != SystemRole.DEVELOPER:
-        raise ForbiddenError("Solo el rol developer puede enviar correos de prueba")
+    _require_email_console(current_user)
 
     enforce_rate_limit(
         f"email-test:{current_user.id}",
@@ -259,7 +273,7 @@ async def _send_activation_email(
 @router.post("/emails", response_model=SendManualEmailsResponse)
 async def send_manual_emails(
     data: SendManualEmailsRequest,
-    current_user: UserResponse = Depends(_developer),
+    current_user: UserResponse = Depends(_email_console),
     db: AsyncSession = Depends(get_db),
 ) -> SendManualEmailsResponse:
     """Dispara a mano una plantilla real a una o varias personas.
@@ -272,11 +286,10 @@ async def send_manual_emails(
       notificar cuentas de producción creadas antes del flujo por enlace: quedan
       como primer ingreso y solo entran por el enlace del correo.
 
-    Solo developer; rate limit de 3 envíos por minuto. Cada envío queda en los
-    logs (quién lo disparó, plantilla y total).
+    Solo developer o super_admin; rate limit de 3 envíos por minuto. Cada envío
+    queda en los logs (quién lo disparó, plantilla y total).
     """
-    if current_user.role != SystemRole.DEVELOPER:
-        raise ForbiddenError("Solo el rol developer puede enviar correos")
+    _require_email_console(current_user)
 
     enforce_rate_limit(
         f"manual-emails:{current_user.id}",

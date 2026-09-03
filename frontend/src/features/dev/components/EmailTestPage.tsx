@@ -28,7 +28,8 @@ const KINDS: { value: ManualEmailKind; label: string; hint: string }[] = [
 ];
 
 /**
- * Panel de Correos del developer (RoleGuard en el router; el backend revalida).
+ * Panel de Correos del rol técnico y del super_admin (RoleGuard en el router;
+ * el backend revalida el rol dentro del handler).
  *
  * Arriba: disparar a mano una plantilla real (bienvenida o tarea vencida) a una
  * o varias personas — el envío y el render son los mismos que usan los flujos

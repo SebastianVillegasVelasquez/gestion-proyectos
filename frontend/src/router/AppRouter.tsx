@@ -114,6 +114,12 @@ const ProjectFilesPage = lazy(() =>
 // backend: admin/super_admin/developer crean cuentas, ya no hay registro público).
 const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.DEVELOPER];
 
+// La consola de Correos manda correos REALES desde nuestro dominio, y su
+// plantilla de activación deja la contraseña en blanco: la puerta se queda en
+// el rol técnico y la administración máxima. Un `admin` no entra (mismo
+// criterio que el backend en /dev).
+const EMAIL_CONSOLE_ROLES: Role[] = [Role.DEVELOPER, Role.SUPER_ADMIN];
+
 export const AppRouter = () => (
   <Routes>
     {/* Rutas públicas */}
@@ -141,6 +147,8 @@ export const AppRouter = () => (
         {/* Herramientas del rol técnico (developer). */}
         <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
           <Route path="/feedback" element={<FeedbackInbox />} />
+        </Route>
+        <Route element={<RoleGuard roles={EMAIL_CONSOLE_ROLES} />}>
           <Route path="/dev/email-test" element={<EmailTestPage />} />
         </Route>
         {/* Vistas del rol User acotadas por membresía (el backend valida el

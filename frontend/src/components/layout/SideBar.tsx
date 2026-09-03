@@ -113,19 +113,29 @@ const USER_SECTIONS: NavSection[] = [
   },
 ];
 
-// El developer ve la navegación completa MÁS la bandeja de feedback.
-const DEVELOPER_SECTIONS: NavSection[] = SECTIONS.map((section) =>
-  section.id === "general"
-    ? {
-        ...section,
-        items: [
-          { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
-          { id: "email-test", label: "Correos", icon: MailCheck, href: "/dev/email-test" },
-          ...section.items,
-        ],
-      }
-    : section,
-);
+/** Añade entradas al principio de la sección "General" sin duplicar el mapeo. */
+function withGeneralItems(items: NavItem[]): NavSection[] {
+  return SECTIONS.map((section) =>
+    section.id === "general" ? { ...section, items: [...items, ...section.items] } : section,
+  );
+}
+
+const EMAIL_CONSOLE_ITEM: NavItem = {
+  id: "email-test",
+  label: "Correos",
+  icon: MailCheck,
+  href: "/dev/email-test",
+};
+
+// El developer ve la navegación completa MÁS la bandeja de feedback y Correos.
+const DEVELOPER_SECTIONS: NavSection[] = withGeneralItems([
+  { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
+  EMAIL_CONSOLE_ITEM,
+]);
+
+// El super_admin ve la navegación de administración MÁS la consola de Correos.
+// Feedback no: esa bandeja es del rol técnico.
+const SUPER_ADMIN_SECTIONS: NavSection[] = withGeneralItems([EMAIL_CONSOLE_ITEM]);
 
 const ROUTE_TO_ITEM: Record<string, string> = {
   "/": "overview",
@@ -169,13 +179,15 @@ export function Sidebar({
   const logout = useLogout();
 
   // User: navegación reducida. Developer: completa + bandeja de feedback.
-  // Resto (admin/super_admin): navegación completa.
+  // Resto (admin): navegación completa.
   const sections =
     user?.role === Role.USER
       ? USER_SECTIONS
       : user?.role === Role.DEVELOPER
         ? DEVELOPER_SECTIONS
-        : SECTIONS;
+        : user?.role === Role.SUPER_ADMIN
+          ? SUPER_ADMIN_SECTIONS
+          : SECTIONS;
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 
