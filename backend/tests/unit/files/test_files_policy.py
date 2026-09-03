@@ -75,12 +75,16 @@ class TestArchiveVisibility:
         assert access("super_admin").sees_whole_project
         assert access("developer").sees_whole_project
 
-    def test_project_coordinator_and_supervisor_see_every_team_folder(self):
+    def test_project_coordinator_and_supervisor_are_scoped_to_their_own_teams(self):
+        # El espacio de trabajo es un contexto de equipo: aunque coordine o
+        # supervise el proyecto, sin ser administración del sistema solo ve la
+        # carpeta de los equipos donde está. La jerarquía completa es del panel
+        # de administración.
         for role in (ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR):
-            a = access(member=True, project_role=role)
-            assert a.sees_whole_project
+            a = access(member=True, project_role=role, roles={TEAM_A: TeamRole.LIDER})
+            assert not a.sees_whole_project
             assert a.can_see(OWNED_BY_A)
-            assert a.can_see(OWNED_BY_B)
+            assert not a.can_see(OWNED_BY_B)
 
     def test_team_lead_sees_only_their_own_teams_folder(self):
         a = access(roles={TEAM_A: TeamRole.LIDER})
@@ -97,16 +101,21 @@ class TestArchiveVisibility:
         assert a.can_view  # entra y ve la raíz vacía, no un 403
         assert not a.can_see(OWNED_BY_A)
 
-    def test_ownerless_first_level_folder_is_only_for_overseers(self):
+    def test_ownerless_first_level_folder_is_only_for_system_admins(self):
         assert access("admin").can_see(NO_OWNER)
         assert not access(roles={TEAM_A: TeamRole.LIDER}).can_see(NO_OWNER)
+        assert not access(member=True, project_role=ProjectRole.COORDINADOR).can_see(
+            NO_OWNER
+        )
 
     def test_seeing_everything_is_not_writing_everywhere(self):
-        # El coordinador audita el archivador; subir dentro de la carpeta de un
-        # equipo sigue siendo del equipo.
-        a = access(member=True, project_role=ProjectRole.COORDINADOR)
+        # El admin del sistema ve el archivador entero; ver la carpeta de un
+        # equipo no es lo mismo que ser de ese equipo, pero el admin además
+        # escribe en cualquier parte por su rol (ver test aparte).
+        a = access("admin")
+        assert a.sees_whole_project
         assert a.can_see(OWNED_BY_A)
-        assert not a.can_write_in(OWNED_BY_A)
+        assert a.can_see(OWNED_BY_B)
 
 
 class TestPersonalFolder:
@@ -123,12 +132,16 @@ class TestPersonalFolder:
         assert not a.can_see(THEIRS)
         assert not a.can_write_in(THEIRS)
 
-    def test_project_overseer_sees_it_but_does_not_write_in_it(self):
-        # Coordinar el proyecto es auditar el archivador entero; el material
-        # individual de otra persona se mira, no se toca.
+    def test_project_coordinator_does_not_see_someone_elses_personal_folder(self):
+        # Coordinar el proyecto ya no abre el archivador entero: la carpeta
+        # individual de otra persona solo la ve esa persona o la administración
+        # del sistema.
         a = access(member=True, project_role=ProjectRole.COORDINADOR)
-        assert a.can_see(THEIRS)
+        assert not a.can_see(THEIRS)
         assert not a.can_write_in(THEIRS)
+
+    def test_system_admin_sees_someone_elses_personal_folder(self):
+        assert access("admin").can_see(THEIRS)
 
     def test_admin_writes_in_anyones_folder(self):
         assert access("admin").can_write_in(THEIRS)

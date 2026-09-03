@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatRelativeTime } from "@/features/notifications/utils/notifications";
-import { useRecentActivity } from "../hooks/use-dashboard-summary";
+import { useMyTeamActivity, useRecentActivity } from "../hooks/use-dashboard-summary";
 import type { ActivityItem, ActivityKind } from "../types";
 
 // Cuántos eventos se ven plegado / desplegado (el backend trae hasta 10).
@@ -121,25 +121,35 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 }
 
 /**
- * Actividad reciente del sistema: los últimos eventos del historial de tareas
- * (creación, entrega, aprobación, devolución…) de todos los proyectos. Muestra
- * los primeros 5 y despliega hasta 10. Fuente: GET /dashboard/activity.
+ * Cuerpo reutilizable del panel de actividad: recibe los eventos ya cargados y
+ * los pinta (skeleton / error / vacío / lista con "ver más"). Lo comparten el
+ * panel global del dashboard admin y el de "mis equipos" del líder, que solo se
+ * diferencian en la fuente de datos y el texto.
  */
-export function ActivityPanel() {
+function ActivityCard({
+  title,
+  items,
+  isLoading,
+  isError,
+  emptyHint,
+}: {
+  title: string;
+  items: ActivityItem[];
+  isLoading: boolean;
+  isError: boolean;
+  emptyHint: string;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const activityQuery = useRecentActivity(EXPANDED);
-
-  const items = activityQuery.data?.items ?? [];
   const visible = expanded ? items.slice(0, EXPANDED) : items.slice(0, COLLAPSED);
   const hasMore = items.length > COLLAPSED;
 
   return (
     <Card>
       <CardHeader className="pb-1">
-        <CardTitle className="text-sm font-semibold">Actividad reciente</CardTitle>
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-0.5">
-        {activityQuery.isLoading ? (
+        {isLoading ? (
           <div className="flex flex-col gap-2 py-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -148,7 +158,7 @@ export function ActivityPanel() {
               />
             ))}
           </div>
-        ) : activityQuery.isError ? (
+        ) : isError ? (
           <p className="py-3 text-center text-[12px] text-rose-500">
             No se pudo cargar la actividad.
           </p>
@@ -160,9 +170,7 @@ export function ActivityPanel() {
             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
               Aún no hay movimientos
             </p>
-            <p className="max-w-xs text-xs text-slate-400 dark:text-slate-500">
-              Aquí verás las acciones recientes: creación, entrega y aprobación de tareas.
-            </p>
+            <p className="max-w-xs text-xs text-slate-400 dark:text-slate-500">{emptyHint}</p>
           </div>
         ) : (
           <>
@@ -185,5 +193,41 @@ export function ActivityPanel() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Actividad reciente del sistema: los últimos eventos del historial de tareas
+ * (creación, entrega, aprobación, devolución…) de todos los proyectos. Muestra
+ * los primeros 5 y despliega hasta 10. Fuente: GET /dashboard/activity.
+ */
+export function ActivityPanel() {
+  const activityQuery = useRecentActivity(EXPANDED);
+  return (
+    <ActivityCard
+      title="Actividad reciente"
+      items={activityQuery.data?.items ?? []}
+      isLoading={activityQuery.isLoading}
+      isError={activityQuery.isError}
+      emptyHint="Aquí verás las acciones recientes: creación, entrega y aprobación de tareas."
+    />
+  );
+}
+
+/**
+ * Actividad reciente ACOTADA a los equipos que el usuario lidera: el dashboard
+ * del líder (rol User) no ve el pulso global, pero sí el de lo suyo. Fuente:
+ * GET /dashboard/me/activity — vacío si no lidera ningún equipo.
+ */
+export function MyTeamActivityPanel() {
+  const activityQuery = useMyTeamActivity(EXPANDED);
+  return (
+    <ActivityCard
+      title="Actividad de mis equipos"
+      items={activityQuery.data?.items ?? []}
+      isLoading={activityQuery.isLoading}
+      isError={activityQuery.isError}
+      emptyHint="Cuando alguien de tus equipos cree, entregue o avance una tarea, lo verás aquí."
+    />
   );
 }

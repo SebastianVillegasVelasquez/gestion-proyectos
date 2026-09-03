@@ -5,6 +5,7 @@ import { KpiCardsGrid } from "./KpiCardsGrid";
 import { TaskBoard } from "./TaskBoard";
 import { ProjectsPanel } from "./ProjectsPanel";
 import { UpcomingDeadlines } from "./UpcomingDeadlines";
+import { MyTeamActivityPanel } from "./ActivityPanel";
 import { MyTasksByProject } from "./MyTasksByProject";
 import { useMyDashboardPanels, useMyDashboardSummary } from "../hooks/use-dashboard-summary";
 import { buildMyKpiCards } from "../utils/build-kpi-cards";
@@ -91,11 +92,14 @@ export function UserDashboardPage() {
         </div>
       </div>
 
-      <div className="shrink-0">
+      {/* Vencimientos propios + el pulso de los equipos que lidero. Para un
+          integrante sin equipos a cargo, el segundo panel muestra su vacío. */}
+      <div className="grid grid-cols-1 gap-3 lg:shrink-0 xl:grid-cols-2">
         <UpcomingDeadlines
           deadlines={deadlines}
           deliveredLast7d={summaryQuery.data?.delivered_last_7d}
         />
+        <MyTeamActivityPanel />
       </div>
     </div>
   );

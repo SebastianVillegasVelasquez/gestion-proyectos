@@ -169,7 +169,10 @@ class TestPersonalFolderVisibility:
         assert tree.status_code == 200, tree.text
         assert tree.json()["root"]["children"] == []
 
-    async def test_the_project_coordinator_sees_it(self, client, db_session):
+    async def test_the_project_coordinator_no_longer_sees_it(self, client, db_session):
+        # El espacio de trabajo es un contexto de equipo: coordinar el proyecto
+        # ya no abre el archivador entero. La carpeta individual de otra persona
+        # solo la ve esa persona o la administración del sistema.
         owner = await _user(db_session, name="Ana")
         project, task = await _project_with_task(db_session, owner.id)
         coord = await _user(db_session, name="Coord")
@@ -192,7 +195,5 @@ class TestPersonalFolderVisibility:
         tree = await client.get(
             f"/api/v1/projects/{project.id}/files", headers=_headers(coord)
         )
-        folders = tree.json()["root"]["children"]
-        assert [f["name"] for f in folders] == ["Ana Ape"]
-        # Ver no es escribir: audita el archivador, no sube dentro.
-        assert folders[0]["can_write"] is False
+        assert tree.status_code == 200, tree.text
+        assert tree.json()["root"]["children"] == []

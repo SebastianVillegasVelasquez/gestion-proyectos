@@ -172,20 +172,16 @@ function MembersCard({
   members,
   tasks,
   canManage,
-  isLeader,
-  currentUserId,
   canInvite,
 }: {
   projectId: string;
   teamId: string;
   members: WorkspaceMember[];
   tasks: ApiTeamTask[];
-  /** Administración global: gestiona a cualquiera sin restricción. */
+  /** Cambiar el rol de un integrante o quitarlo del equipo es exclusivo de
+   *  administración (admin / super_admin / developer) — mismo criterio que el
+   *  backend. El líder ya no gestiona miembros aquí, solo invita. */
   canManage: boolean;
-  /** Líder del equipo: puede mover el rol y quitar SOLO a integrantes (no a otro
-   *  líder/supervisor ni a sí mismo). Mismo criterio que el backend. */
-  isLeader: boolean;
-  currentUserId: string | null;
   canInvite: boolean;
 }) {
   const [inviting, setInviting] = useState(false);
@@ -221,10 +217,9 @@ function MembersCard({
           {members.map((m) => {
             const load = workload[m.id];
             const lastLeader = isLastLeader(m);
-            // El líder solo gestiona a integrantes distintos de él; el admin, a
-            // todos. Si no aplica ninguno, la fila es de solo lectura.
-            const manageThis =
-              canManage || (isLeader && m.role === "integrante" && m.id !== currentUserId);
+            // Solo administración gestiona miembros; para el resto (líder
+            // incluido) la fila es de solo lectura.
+            const manageThis = canManage;
             return (
               <div
                 key={m.id}
@@ -603,11 +598,11 @@ interface GroupSettingsViewProps {
 }
 
 /**
- * Configuración del Grupo. Renombrar el equipo y archivarlo siguen siendo de
- * administración. El LÍDER del equipo, además, puede mover el rol y quitar a
- * SUS integrantes (no a otro líder ni a sí mismo) — mismo criterio que el
- * backend. Cualquier integrante ajusta sus propios avisos. Son las MISMAS rutas
- * `/projects/{id}/teams/...`, no una copia con permisos propios.
+ * Configuración del Grupo. Renombrar el equipo, archivarlo, y ahora también
+ * cambiar el rol o quitar a un integrante son de administración
+ * (admin / super_admin desde su panel de equipos). El LÍDER del equipo solo
+ * puede invitar. Cualquier integrante ajusta sus propios avisos. Son las MISMAS
+ * rutas `/projects/{id}/teams/...`, no una copia con permisos propios.
  */
 export function GroupSettingsView({
   projectId,
@@ -653,8 +648,6 @@ export function GroupSettingsView({
           members={members}
           tasks={tasks}
           canManage={canManage}
-          isLeader={isLeader}
-          currentUserId={user?.id ?? null}
           canInvite={canInvite}
         />
         {canManage && (

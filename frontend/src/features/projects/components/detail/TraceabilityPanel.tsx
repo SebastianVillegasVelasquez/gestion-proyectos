@@ -301,25 +301,25 @@ function TallyList({
 }) {
   return (
     <Card className="rounded-2xl">
-      <CardContent className="py-4">
-        <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-          <Icon className="size-3.5" /> {title}
+      <CardContent className="px-4 py-3.5">
+        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <Icon className="size-3.5 shrink-0" /> {title}
         </h3>
         {rows.length === 0 ? (
-          <p className="mt-3 text-xs text-muted-foreground">{empty}</p>
+          <p className="mt-2.5 text-[12px] text-muted-foreground">{empty}</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-2.5">
+          <ul className="mt-3 flex flex-col gap-3">
             {rows.slice(0, 6).map((row) => (
               <li key={row.key}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-xs text-foreground" title={row.label}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[12px] text-foreground" title={row.label}>
                     {row.label}
                   </span>
-                  <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                  <span className="shrink-0 text-[12px] font-semibold tabular-nums text-muted-foreground">
                     {row.count}
                   </span>
                 </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn("h-full rounded-full", barClass)}
                     style={{ width: `${String(row.share)}%` }}
@@ -340,26 +340,26 @@ function BusiestTasksCard({ events }: { events: TraceabilityEvent[] }) {
   const rows = useMemo(() => busiestTasks(events), [events]);
   return (
     <Card className="rounded-2xl">
-      <CardContent className="py-4">
-        <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-          <Flag className="size-3.5" /> Tareas con más movimiento
+      <CardContent className="px-4 py-3.5">
+        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <Flag className="size-3.5 shrink-0" /> Tareas con más movimiento
         </h3>
         {rows.length === 0 ? (
-          <p className="mt-3 text-xs text-muted-foreground">Sin actividad todavía.</p>
+          <p className="mt-2.5 text-[12px] text-muted-foreground">Sin actividad todavía.</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-2">
+          <ul className="mt-3 flex flex-col gap-2.5">
             {rows.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs text-foreground" title={row.title}>
+              <li key={row.id} className="flex items-center justify-between gap-3">
+                <span className="truncate text-[12px] text-foreground" title={row.title}>
                   {row.title}
                 </span>
-                <span className="flex shrink-0 items-center gap-1">
+                <span className="flex shrink-0 items-center gap-1.5">
                   {row.delays > 0 && (
                     <span className="rounded-full bg-rose-100 px-1.5 text-[10px] font-semibold tabular-nums text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
                       {row.delays} ⏱
                     </span>
                   )}
-                  <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                  <span className="text-[12px] font-semibold tabular-nums text-muted-foreground">
                     {row.count}
                   </span>
                 </span>
@@ -591,7 +591,7 @@ export function TraceabilityPanel({
             </Card>
           </div>
 
-          <aside className="flex flex-col gap-3 xl:sticky xl:top-0">
+          <aside className="flex flex-col gap-3 pb-1 xl:sticky xl:top-0">
             <TallyList
               title="Qué está pasando"
               icon={History}

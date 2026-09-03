@@ -3,6 +3,7 @@ import uuid
 
 from app.modules.dashboard.application.use_cases import (
     GetDashboardSummaryUseCase,
+    GetMyTeamActivityUseCase,
     GetPublicProjectScheduleUseCase,
     GetRecentActivityUseCase,
 )
@@ -109,6 +110,32 @@ class TestGetRecentActivityUseCase:
     ):
         repo = build_fake_dashboard_repo()
         response = await GetRecentActivityUseCase(repo).execute()
+        assert response.items == []
+
+
+class TestGetMyTeamActivityUseCase:
+    """La actividad del dashboard del líder: mismo mapeo/clasificación que la
+    global, acotada por el repositorio a los equipos que lidera."""
+
+    async def test_should_map_and_classify_the_leads_team_events(self):
+        repo = FakeDashboardRepository(
+            DashboardSummary(0, 0, 0, 0, 0),
+            activity=[
+                _activity_row(HistoryAction.CREACION, None),
+                _activity_row(HistoryAction.CAMBIO_ESTADO, TaskStatus.COMPLETADA),
+            ],
+        )
+
+        response = await GetMyTeamActivityUseCase(repo).execute(uuid.uuid4(), limit=10)
+
+        assert isinstance(response, RecentActivityResponse)
+        assert [item.kind for item in response.items] == ["creacion", "aprobacion"]
+
+    async def test_should_be_empty_when_the_user_leads_nothing(
+        self, build_fake_dashboard_repo
+    ):
+        repo = build_fake_dashboard_repo()
+        response = await GetMyTeamActivityUseCase(repo).execute(uuid.uuid4())
         assert response.items == []
 
 

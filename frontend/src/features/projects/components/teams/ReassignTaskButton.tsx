@@ -26,6 +26,7 @@ export function ReassignTaskButton({
   members,
   onDone,
   compact = false,
+  variant = "button",
 }: {
   projectId: string;
   taskId: string;
@@ -35,11 +36,19 @@ export function ReassignTaskButton({
   /** Solo el icono, sin el nombre del responsable: para cuando la vista ya está
    *  agrupada/filtrada por persona y repetir el nombre en cada fila es ruido. */
   compact?: boolean;
+  /**
+   * `"chip"`: se pinta como la pastilla teal del responsable (mismo color y
+   * nombre que la vista de solo lectura), pero al pulsarla abre el reasignador.
+   * Así la estructura muestra UN solo elemento —quién está asignado— en lugar
+   * de repetir el nombre en un chip estático y otra vez en el botón.
+   */
+  variant?: "button" | "chip";
 }) {
   const [open, setOpen] = useState(false);
   const update = useUpdateTask(projectId);
   const current = members.find((m) => m.user_id === currentAssigneeId) ?? null;
   const currentLabel = current ? fullName(current) : "Asignar responsable";
+  const isChip = variant === "chip";
 
   function choose(nextId: string | null) {
     setOpen(false);
@@ -58,19 +67,41 @@ export function ReassignTaskButton({
           setOpen(true);
         }}
         aria-label={`Reasignar responsable (actual: ${currentLabel})`}
-        title={compact ? `Reasignar — actual: ${currentLabel}` : undefined}
+        title={
+          isChip
+            ? `Reasignar — actual: ${currentLabel}`
+            : compact
+              ? `Reasignar — actual: ${currentLabel}`
+              : undefined
+        }
         className={cn(
           "flex max-w-full items-center rounded-full font-semibold transition hover:opacity-90 disabled:opacity-50",
           compact ? "size-6 justify-center p-0" : "gap-1.5 px-2 py-1 text-[11px]",
-          current
-            ? colorForName(fullName(current))
-            : "border border-dashed border-border text-muted-foreground hover:border-brand-gold hover:text-brand-gold-dark",
+          isChip
+            ? current
+              ? "bg-brand-teal/10 px-2 py-0.5 text-brand-teal-dark dark:text-brand-teal"
+              : "border border-dashed border-border px-2 py-0.5 text-muted-foreground hover:border-brand-gold hover:text-brand-gold-dark"
+            : current
+              ? colorForName(fullName(current))
+              : "border border-dashed border-border text-muted-foreground hover:border-brand-gold hover:text-brand-gold-dark",
         )}
       >
-        <UserCog className={cn("shrink-0 opacity-70", compact ? "size-3.5" : "size-3")} />
+        <UserCog
+          className={cn(
+            "shrink-0",
+            isChip ? "size-3 opacity-60" : "opacity-70",
+            compact ? "size-3.5" : "size-3",
+          )}
+        />
         {!compact && (
           <span className="max-w-[130px] truncate">
-            {update.isPending ? "Guardando…" : current ? fullName(current) : "Asignar"}
+            {update.isPending
+              ? "Guardando…"
+              : current
+                ? fullName(current)
+                : isChip
+                  ? "Sin responsable"
+                  : "Asignar"}
           </span>
         )}
       </button>

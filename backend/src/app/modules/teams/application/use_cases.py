@@ -21,29 +21,21 @@ _ADMIN_SYSTEM_ROLES = {"admin", "super_admin", "developer"}
 async def _authorize_team_member_management(
     repo: TeamRepository, team_id: UUID, actor, target_user_id: UUID
 ) -> None:
-    """Quién puede mover / quitar integrantes de un equipo.
+    """Quién puede mover el rol o quitar a un integrante de un equipo.
 
-    Administración global puede todo. Fuera de eso, solo el LÍDER del equipo, y
-    únicamente sobre sus integrantes: ni sobre otro líder/supervisor ni sobre sí
-    mismo (evita que el equipo se quede sin quien lo dirija).
+    Solo la administración global (admin / super_admin / developer). El líder
+    del equipo ya no gestiona a los integrantes desde el espacio de trabajo:
+    cambiar el rol o dar de baja pasa a hacerse únicamente desde el panel de
+    equipos del super_admin. El líder conserva solo la invitación (ver rutas de
+    invitaciones), que es lo que le permite formar su equipo.
     """
+    del repo, team_id, target_user_id  # la política ya no depende del contexto
     system_role = getattr(actor.role, "value", actor.role)
     if system_role in _ADMIN_SYSTEM_ROLES:
         return
-    actor_membership = await repo.get_member(team_id, actor.id)
-    if actor_membership is None or actor_membership.team_role != TeamRole.LIDER:
-        raise ForbiddenError(
-            "Solo el líder del equipo puede gestionar a sus integrantes"
-        )
-    if target_user_id == actor.id:
-        raise ForbiddenError(
-            "El líder no puede cambiarse el rol ni quitarse a sí mismo del equipo"
-        )
-    target = await repo.get_member(team_id, target_user_id)
-    if target is not None and target.team_role != TeamRole.INTEGRANTE:
-        raise ForbiddenError(
-            "El líder solo puede gestionar a los integrantes del equipo"
-        )
+    raise ForbiddenError(
+        "Solo un administrador puede cambiar el rol o quitar a un integrante del equipo"
+    )
 
 
 class CreateTeamUseCase:

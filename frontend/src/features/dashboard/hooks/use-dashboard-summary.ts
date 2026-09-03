@@ -10,6 +10,7 @@ export const dashboardKeys = {
     [...dashboardKeys.all, "activity", "project", projectId] as const,
   mySummary: () => [...dashboardKeys.all, "me", "summary"] as const,
   myPanels: () => [...dashboardKeys.all, "me", "panels"] as const,
+  myActivity: () => [...dashboardKeys.all, "me", "activity"] as const,
   myProjects: () => [...dashboardKeys.all, "me", "projects"] as const,
   myProject: (projectId: string) => [...dashboardKeys.all, "me", "project", projectId] as const,
 };
@@ -44,6 +45,15 @@ export function useProjectActivity(projectId: string | undefined, limit = 8) {
     queryKey: dashboardKeys.projectActivity(projectId ?? ""),
     queryFn: () => dashboardApi.getActivity(limit, projectId),
     enabled: Boolean(projectId),
+    staleTime: 30_000,
+  });
+}
+
+/** Actividad reciente de los equipos que lidera el usuario (dashboard del líder). */
+export function useMyTeamActivity(limit = 10) {
+  return useQuery({
+    queryKey: dashboardKeys.myActivity(),
+    queryFn: () => dashboardApi.getMyTeamActivity(limit),
     staleTime: 30_000,
   });
 }

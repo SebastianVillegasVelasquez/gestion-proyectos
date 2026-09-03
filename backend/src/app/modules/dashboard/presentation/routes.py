@@ -14,6 +14,7 @@ from app.modules.dashboard.application.use_cases import (
     GetMyDashboardSummaryUseCase,
     GetMyProjectProgressUseCase,
     GetMyProjectsUseCase,
+    GetMyTeamActivityUseCase,
     GetRecentActivityUseCase,
 )
 from app.modules.dashboard.infrastructure.repository import DashboardRepository
@@ -79,6 +80,21 @@ async def get_recent_activity(
 
 
 # ── Dashboard del usuario autenticado (rol User): solo su información ──────────
+
+
+@router.get("/me/activity", response_model=RecentActivityResponse)
+async def get_my_team_activity(
+    limit: int = Query(10, ge=1, le=30),
+    current_user: UserResponse = Depends(get_current_user),
+    repo: DashboardRepository = Depends(dashboard_repo_dependency),
+) -> RecentActivityResponse:
+    """Actividad reciente de los equipos que el usuario LIDERA.
+
+    El dashboard del líder (rol de sistema User) no ve la actividad global
+    —eso es de administración—, pero sí el pulso de sus equipos. Vacío si no
+    lidera ninguno.
+    """
+    return await GetMyTeamActivityUseCase(repo).execute(current_user.id, limit=limit)
 
 
 @router.get("/me/summary", response_model=DashboardSummaryResponse)

@@ -1255,6 +1255,23 @@ export function TeamTasksView({
     !effectiveFilters.onlyBlocked &&
     effectiveFilters.elementId === "all" &&
     effectiveFilters.branchId === "all";
+  // El líder filtró por una persona concreta y esa persona no tiene ninguna
+  // tarea (sin más filtros encima): en vez de una lista vacía, se lo decimos
+  // con su nombre.
+  const selectedPerson =
+    canFilterByPerson &&
+    effectiveFilters.assignee !== "all" &&
+    effectiveFilters.assignee !== UNASSIGNED
+      ? (members.find((m) => m.id === effectiveFilters.assignee) ?? null)
+      : null;
+  const emptyForSelectedPerson =
+    selectedPerson !== null &&
+    tasks.length === 0 &&
+    effectiveFilters.status === "all" &&
+    effectiveFilters.text.trim() === "" &&
+    !effectiveFilters.onlyBlocked &&
+    effectiveFilters.elementId === "all" &&
+    effectiveFilters.branchId === "all";
   const groups = useMemo(
     () => groupTeamTasks(tasks, effectiveGrouping),
     [tasks, effectiveGrouping],
@@ -1399,7 +1416,28 @@ export function TeamTasksView({
             />
           </div>
         )}
-        {view === "lista" && !emptyBag && !emptyForMember && (
+        {showFilterBar && emptyForSelectedPerson && selectedPerson && (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                <ListTodo className="size-6" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {selectedPerson.name} no tiene tareas asignadas actualmente
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  patchFilters({ assignee: "all" });
+                }}
+                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+              >
+                Ver todas las tareas
+              </button>
+            </div>
+          </div>
+        )}
+        {view === "lista" && !emptyBag && !emptyForMember && !emptyForSelectedPerson && (
           <ListView
             groups={groups}
             allTasks={tasks}
@@ -1423,7 +1461,7 @@ export function TeamTasksView({
             deliverCbs={deliverCbs}
           />
         )}
-        {view === "kanban" && !emptyBag && !emptyForMember && (
+        {view === "kanban" && !emptyBag && !emptyForMember && !emptyForSelectedPerson && (
           <KanbanView
             allTasks={tasks}
             members={members}
