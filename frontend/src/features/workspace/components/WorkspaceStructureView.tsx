@@ -51,6 +51,10 @@ function TaskLeaf({
   const risk = taskRisk(task, today);
   const meta = STATUS_META[task.status];
   const blockers = task.blocked_by.filter((b) => b.status !== "completada");
+  // El líder/supervisor ve UN solo elemento para el responsable: la pastilla
+  // teal con su nombre, que ADEMÁS abre el reasignador al pulsarla. Sin permiso
+  // de revisión se queda como etiqueta de solo lectura.
+  const mergedReassign = canReview && teamMembers.length > 0;
   // El servidor decide si esta tarea se puede entregar todavía y rechaza la
   // entrega con este mismo texto. La vista no vuelve a deducirlo: si hay
   // motivo, enseña "Bloqueada" en vez de un botón que va a fallar.
@@ -64,15 +68,18 @@ function TaskLeaf({
         <ClipboardList className="size-2.5" /> tarea
       </span>
       <span className="truncate text-[14px] font-medium text-foreground/85">{task.title}</span>
-      {task.assignee_name ? (
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal">
-          <span className="max-w-[140px] truncate">{task.assignee_name}</span>
-        </span>
-      ) : (
-        <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          Sin responsable
-        </span>
-      )}
+      {/* Con permiso de revisión, quién está asignado se muestra —y se cambia—
+          desde la pastilla de la derecha; aquí no se repite. */}
+      {!mergedReassign &&
+        (task.assignee_name ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-semibold text-brand-teal-dark dark:text-brand-teal">
+            <span className="max-w-[140px] truncate">{task.assignee_name}</span>
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            Sin responsable
+          </span>
+        ))}
     </span>
   );
 
@@ -95,8 +102,9 @@ function TaskLeaf({
         )}
 
         <span className="ml-auto flex shrink-0 items-center gap-2.5">
-          {canReview && teamMembers.length > 0 && (
+          {mergedReassign && (
             <ReassignTaskButton
+              variant="chip"
               projectId={projectId}
               taskId={task.id}
               currentAssigneeId={task.assignee_id}

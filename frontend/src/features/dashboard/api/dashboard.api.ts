@@ -24,6 +24,11 @@ export const dashboardApi = {
   // ── Scope del usuario autenticado (rol User) ──
   getMySummary: () => http.get<DashboardSummary>("/dashboard/me/summary").then((r) => r.data),
 
+  // Actividad reciente de los equipos que el usuario LIDERA (dashboard del
+  // líder). Vacía si no lidera ninguno.
+  getMyTeamActivity: (limit = 10) =>
+    http.get<RecentActivity>("/dashboard/me/activity", { params: { limit } }).then((r) => r.data),
+
   getMyPanels: () => http.get<DashboardPanels>("/dashboard/me/panels").then((r) => r.data),
 
   getMyProjectProgress: (projectId: string) =>

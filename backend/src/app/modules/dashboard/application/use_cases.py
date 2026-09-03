@@ -96,6 +96,31 @@ class GetDashboardPanelsUseCase:
         return _panels_to_response(panels)
 
 
+def _to_activity_item(row) -> ActivityItemResponse:
+    """Fila cruda del historial → ítem de actividad ya clasificado.
+
+    La clasificación semántica ("creó", "entregó", "aprobó"…) reutiliza la
+    regla pura del dominio de trazabilidad, así el dashboard admin y el del
+    líder hablan el mismo idioma.
+    """
+    return ActivityItemResponse(
+        id=row.id,
+        task_id=row.task_id,
+        task_title=row.task_title,
+        project_name=row.project_name,
+        actor_name=row.actor_name,
+        kind=classify_event(
+            action=row.action,
+            new_status=row.new_status,
+            due_date=row.due_date,
+            occurred_on=row.created_at,
+            actor_id=row.actor_id,
+            assignee_id=row.assignee_id,
+        ).kind,
+        created_at=row.created_at,
+    )
+
+
 class GetRecentActivityUseCase:
     """Actividad reciente del sistema para el dashboard admin.
 
@@ -111,27 +136,23 @@ class GetRecentActivityUseCase:
         self, limit: int = 10, project_id: UUID | None = None
     ) -> RecentActivityResponse:
         rows = await self._repo.get_recent_activity(limit, project_id)
-        return RecentActivityResponse(
-            items=[
-                ActivityItemResponse(
-                    id=row.id,
-                    task_id=row.task_id,
-                    task_title=row.task_title,
-                    project_name=row.project_name,
-                    actor_name=row.actor_name,
-                    kind=classify_event(
-                        action=row.action,
-                        new_status=row.new_status,
-                        due_date=row.due_date,
-                        occurred_on=row.created_at,
-                        actor_id=row.actor_id,
-                        assignee_id=row.assignee_id,
-                    ).kind,
-                    created_at=row.created_at,
-                )
-                for row in rows
-            ]
-        )
+        return RecentActivityResponse(items=[_to_activity_item(row) for row in rows])
+
+
+class GetMyTeamActivityUseCase:
+    """Actividad reciente de los equipos que LIDERA el usuario autenticado.
+
+    El dashboard del rol User no muestra el pulso global —eso es de
+    administración— pero un líder sí necesita ver el movimiento de sus equipos.
+    Devuelve lista vacía si la persona no lidera ningún equipo.
+    """
+
+    def __init__(self, repo: DashboardRepository) -> None:
+        self._repo = repo
+
+    async def execute(self, user_id: UUID, limit: int = 10) -> RecentActivityResponse:
+        rows = await self._repo.get_activity_for_team_lead(user_id, limit)
+        return RecentActivityResponse(items=[_to_activity_item(row) for row in rows])
 
 
 class GetMyDashboardSummaryUseCase:

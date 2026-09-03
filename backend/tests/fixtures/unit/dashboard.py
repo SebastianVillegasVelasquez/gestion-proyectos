@@ -43,6 +43,11 @@ class FakeDashboardRepository(DashboardRepository):
     ) -> list[ActivityRow]:
         return self._activity[:limit]
 
+    async def get_activity_for_team_lead(
+        self, user_id: uuid.UUID, limit: int
+    ) -> list[ActivityRow]:
+        return self._activity[:limit]
+
     # Variantes por usuario: el fake ignora el user_id y devuelve lo configurado.
     async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary:
         return self._summary

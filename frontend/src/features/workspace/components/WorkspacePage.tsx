@@ -547,9 +547,11 @@ function MemberWorkspace() {
 
             {activeTab === "archivos" && (
               <div className="flex flex-1 flex-col overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
-                {/* El archivador es del PROYECTO, no del equipo: el equipo ve el
-                    árbol completo y escribe donde le corresponde (su carpeta).
-                    El servidor manda los permisos por carpeta ya resueltos. */}
+                {/* El archivador es del PROYECTO, pero desde el espacio de
+                    trabajo cada quien ve solo la raíz y la carpeta de sus
+                    equipos (la jerarquía completa es del panel de
+                    administración). El servidor manda los permisos y el recorte
+                    por carpeta ya resueltos. */}
                 <ProjectFilesBrowser projectId={activeTeam.project_id} />
               </div>
             )}

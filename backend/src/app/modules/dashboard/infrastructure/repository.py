@@ -12,6 +12,7 @@ from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
 from app.modules.tasks.infrastructure.enums import HistoryAction, TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory
+from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
 
 
@@ -199,6 +200,11 @@ class DashboardRepository(ABC):
         self, limit: int, project_id: uuid.UUID | None = None
     ) -> list[ActivityRow]: ...
 
+    @abstractmethod
+    async def get_activity_for_team_lead(
+        self, user_id: uuid.UUID, limit: int
+    ) -> list[ActivityRow]: ...
+
     # ── Variantes por usuario (dashboard del rol User) ──
     @abstractmethod
     async def get_summary_for_user(self, user_id: uuid.UUID) -> DashboardSummary: ...
@@ -350,6 +356,68 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                 )
             )
         return activity
+
+    async def get_activity_for_team_lead(
+        self, user_id: uuid.UUID, limit: int
+    ) -> list[ActivityRow]:
+        """Actividad reciente ACOTADA a los equipos que el usuario LIDERA.
+
+        Mismo read model que `get_recent_activity`, pero en lugar de ser
+        transversal a todo el sistema se restringe a las tareas cuyo `team_id`
+        es uno de los equipos vivos donde la persona es líder. Es el pulso que
+        el líder sí necesita en su dashboard; el panorama global sigue siendo
+        de administración. Sin equipos liderados devuelve lista vacía.
+        """
+        led_teams = (
+            select(TeamMember.team_id)
+            .join(Team, Team.id == TeamMember.team_id)
+            .where(
+                TeamMember.user_id == user_id,
+                TeamMember.team_role == TeamRole.LIDER,
+                Team.deleted_at.is_(None),
+            )
+            .scalar_subquery()
+        )
+        rows = (
+            await self._session.execute(
+                select(
+                    TaskHistory,
+                    Task.title,
+                    Task.due_date,
+                    Project.name,
+                    User.name,
+                    User.last_name,
+                    Task.assignee_id,
+                )
+                .join(Task, TaskHistory.task_id == Task.id)
+                .join(Project, Task.project_id == Project.id)
+                .outerjoin(User, TaskHistory.changed_by_id == User.id)
+                .where(
+                    Task.deleted_at.is_(None),
+                    Project.deleted_at.is_(None),
+                    Task.team_id.in_(led_teams),
+                )
+                .order_by(TaskHistory.created_at.desc())
+                .limit(limit)
+            )
+        ).all()
+
+        return [
+            ActivityRow(
+                id=hist.id,
+                task_id=hist.task_id,
+                task_title=title,
+                project_name=project_name,
+                actor_name=f"{name} {last_name}".strip() if name else None,
+                action=hist.action,
+                new_status=hist.new_status,
+                due_date=due_date,
+                created_at=hist.created_at,
+                actor_id=hist.changed_by_id,
+                assignee_id=assignee_id,
+            )
+            for hist, title, due_date, project_name, name, last_name, assignee_id in rows
+        ]
 
     def _task_with_project(self):
         """Cada tarea con el nombre de su proyecto, vía el WorkItem del que cuelga."""

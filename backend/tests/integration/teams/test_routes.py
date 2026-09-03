@@ -435,9 +435,10 @@ class TestTeamMemberRoutes:
         assert response.json()["member_count"] == 1
 
 
-class TestLeadManagesOwnMembers:
-    """El líder del equipo puede mover (rol) y quitar a SUS integrantes; nada
-    más. Administración global sigue sin restricciones."""
+class TestLeadCannotManageMembers:
+    """El líder del equipo ya NO cambia el rol ni quita integrantes: eso pasa a
+    ser exclusivo de la administración (super_admin desde su panel de equipos).
+    El líder conserva solo la invitación."""
 
     async def _setup(self, client, admin_headers, valid_project_payload):
         from app.core.security import create_access_token
@@ -462,7 +463,7 @@ class TestLeadManagesOwnMembers:
         }
         return project_id, team["id"], lead, member, lead_headers
 
-    async def test_lead_changes_and_removes_its_integrante(
+    async def test_lead_cannot_change_role_or_remove_its_integrante(
         self, client, admin_headers, valid_project_payload
     ):
         pid, tid, _lead, member, lead_headers = await self._setup(
@@ -474,33 +475,27 @@ class TestLeadManagesOwnMembers:
             json={"team_role": TeamRole.LIDER.value},
             headers=lead_headers,
         )
-        assert promoted.status_code == 200, promoted.text
-        assert promoted.json()["team_role"] == TeamRole.LIDER.value
+        assert promoted.status_code == 403, promoted.text
 
-        # (ya es líder: el propio líder no puede tocar a otro líder → se restaura por admin)
-        await client.patch(
-            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
-            json={"team_role": TeamRole.INTEGRANTE.value},
-            headers=admin_headers,
-        )
         removed = await client.delete(
             f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
             headers=lead_headers,
         )
-        assert removed.status_code == 204, removed.text
+        assert removed.status_code == 403, removed.text
 
-    async def test_lead_cannot_touch_self_or_a_non_member(
+    async def test_admin_still_manages_members(
         self, client, admin_headers, valid_project_payload
     ):
-        pid, tid, lead, _member, lead_headers = await self._setup(
+        pid, tid, _lead, member, _lead_headers = await self._setup(
             client, admin_headers, valid_project_payload
         )
-        # A sí mismo, no.
-        r = await client.delete(
-            f"/api/v1/projects/{pid}/teams/{tid}/members/{lead['id']}",
-            headers=lead_headers,
+        promoted = await client.patch(
+            f"/api/v1/projects/{pid}/teams/{tid}/members/{member['id']}",
+            json={"team_role": TeamRole.SUPERVISOR.value},
+            headers=admin_headers,
         )
-        assert r.status_code == 403, r.text
+        assert promoted.status_code == 200, promoted.text
+        assert promoted.json()["team_role"] == TeamRole.SUPERVISOR.value
 
     async def test_plain_member_cannot_manage(
         self, client, admin_headers, valid_project_payload

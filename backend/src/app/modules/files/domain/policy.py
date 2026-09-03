@@ -7,10 +7,6 @@ from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.teams.infrastructure.enums import TeamRole
 
 _ADMIN_SYSTEM_ROLES = {"admin", "super_admin", "developer"}
-# Quien coordina o audita el PROYECTO ve el archivador entero. No es un permiso
-# de equipo: es su trabajo mirar el proyecto completo, y un coordinador que solo
-# viera las carpetas de los equipos donde está metido no podría hacerlo.
-_OVERSEER_PROJECT_ROLES = {ProjectRole.COORDINADOR, ProjectRole.SUPERVISOR}
 # Quien puede reclamar la carpeta del equipo en la raíz. Crearla es un acto de
 # organización, no de trabajo diario: la abre quien coordina.
 _FOLDER_OWNER_TEAM_ROLES = {TeamRole.LIDER, TeamRole.SUPERVISOR}
@@ -47,9 +43,11 @@ class FilesAccess:
     proyecto, el primer nivel es «una carpeta por dueño» (un equipo, o una
     persona para sus entregas individuales)— porque un archivador plano donde
     todos crean en la raíz deja de ser navegable en cuestión de semanas. Y la
-    VISIBILIDAD sigue esa misma forma: cada dueño ve su carpeta, y solo quien
-    mira el proyecto entero (administración, coordinación, supervisión) ve la
-    jerarquía completa desde la raíz.
+    VISIBILIDAD sigue esa misma forma: cada dueño ve su carpeta y la raíz
+    (vacía), y solo la administración del sistema (admin / super_admin /
+    developer) ve la jerarquía completa. Un líder —aunque además coordine o
+    supervise el proyecto— ve en su espacio de trabajo únicamente la carpeta
+    de su equipo y la raíz, no las de los demás equipos.
     """
 
     is_admin: bool
@@ -81,10 +79,12 @@ class FilesAccess:
     def sees_whole_project(self) -> bool:
         """¿Ve el archivador COMPLETO, carpeta de equipo por carpeta de equipo?
 
-        Administración del sistema y quien coordina o supervisa el proyecto.
-        Para el resto, el archivador se recorta a sus equipos.
+        Solo la administración del sistema (admin / super_admin / developer).
+        Para el resto —integrantes, líderes, y también quien coordina o
+        supervisa el proyecto— el archivador se recorta a sus propios equipos:
+        el espacio de trabajo es un contexto de equipo, no el panel global.
         """
-        return self.is_admin or self.project_role in _OVERSEER_PROJECT_ROLES
+        return self.is_admin
 
     @property
     def can_view(self) -> bool:
