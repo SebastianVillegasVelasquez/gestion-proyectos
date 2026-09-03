@@ -15,12 +15,14 @@ Reutiliza el modelo `Deliverable` con `team_id IS NULL`; el dueño es
 
 from uuid import UUID
 
+from app.modules.files.application.use_cases import ProjectFilesService
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.teams.application._task_sync import cascade_after_completion
 from app.modules.teams.domain.workspace import WorkspaceRepository
 from app.modules.teams.infrastructure.workspace_enums import (
     CommentType,
     DeliverableStatus,
+    ResourceType,
 )
 from app.modules.teams.infrastructure.workspace_models import (
     Deliverable,
@@ -54,9 +56,15 @@ _REVIEW_QUEUE_TASK_STATUSES = [TaskStatus.EN_REVISION]
 
 
 class PersonalDeliverableService:
-    def __init__(self, repo: WorkspaceRepository, bus=None):
+    def __init__(
+        self,
+        repo: WorkspaceRepository,
+        bus=None,
+        files: ProjectFilesService | None = None,
+    ):
         self._repo = repo
         self._bus = bus
+        self._files = files
 
     async def _cascade_if_completed(self, task) -> None:
         """Tras dejar una tarea en COMPLETADA por una entrega/aprobación,
@@ -195,15 +203,19 @@ class PersonalDeliverableService:
         await self._repo.save_task(task)
         return await self._view(deliverable, current_user)
 
-    async def add_version(
-        self, deliverable_id: UUID, data: AddVersionRequest, current_user
-    ) -> PersonalDeliverableResponse:
+    async def _open_delivery(self, deliverable_id: UUID, current_user):
+        """Comprueba que esta persona puede entregar ESTE entregable AHORA.
+
+        Devuelve el entregable y su tarea vinculada (si la hay). Se hace antes
+        de escribir nada —igual da URL que archivo— para no dejar rastro a
+        medias de una entrega que el servidor va a rechazar.
+        """
         deliverable = await self._require_own(deliverable_id, current_user)
 
         # Compuerta FtS también en "Mis tareas": entregar salta
         # ChangeTaskStatusUseCase, así que si la tarea depende de algo (otra
         # tarea o una actividad de terceros) que aún no está listo, no deja
-        # entregar. Antes de crear la versión.
+        # entregar.
         task = (
             await self._repo.get_task(deliverable.task_id)
             if deliverable.task_id
@@ -213,14 +225,22 @@ class PersonalDeliverableService:
             blocked = await self._repo.task_delivery_block_reason(task)
             if blocked:
                 raise ValidationError(blocked)
+        return deliverable, task
 
-        next_number = (
+    @staticmethod
+    def _next_version_number(deliverable: Deliverable) -> int:
+        return (
             deliverable.versions[-1].version_number + 1 if deliverable.versions else 1
         )
+
+    async def add_version(
+        self, deliverable_id: UUID, data: AddVersionRequest, current_user
+    ) -> PersonalDeliverableResponse:
+        deliverable, task = await self._open_delivery(deliverable_id, current_user)
         await self._repo.add_version(
             DeliverableVersion(
                 deliverable_id=deliverable.id,
-                version_number=next_number,
+                version_number=self._next_version_number(deliverable),
                 resource_type=data.type,
                 url=data.url,
                 note=data.note,
@@ -228,7 +248,63 @@ class PersonalDeliverableService:
                 uploaded_by=current_user.id,
             )
         )
+        return await self._close_delivery(deliverable, task, current_user)
 
+    async def add_file_version(
+        self,
+        deliverable_id: UUID,
+        *,
+        filename: str,
+        content_type: str,
+        content: bytes,
+        note: str | None,
+        observations: str | None,
+        current_user,
+    ) -> PersonalDeliverableResponse:
+        """Entrega un ARCHIVO en una tarea individual.
+
+        Va a la carpeta de la persona dentro del archivador del proyecto —el
+        equivalente sin equipo de la carpeta de equipo—, así el material
+        entregado vive donde vive el resto del material del proyecto y no en un
+        enlace externo que mañana puede no existir.
+        """
+        if self._files is None:
+            raise ValidationError("La subida de archivos no está disponible")
+        deliverable, task = await self._open_delivery(deliverable_id, current_user)
+        if task is None:
+            # Sin tarea no hay proyecto, y sin proyecto no hay archivador donde
+            # dejar el archivo. Una entrega suelta sigue admitiendo una URL.
+            raise ValidationError(
+                "Vincula la entrega a una tarea del proyecto para adjuntar archivos"
+            )
+
+        stored = await self._files.store_personal_file(
+            task.project_id,
+            current_user.id,
+            f"{current_user.name} {current_user.last_name}".strip() or "Sin nombre",
+            filename=filename,
+            content_type=content_type,
+            content=content,
+        )
+        await self._repo.add_version(
+            DeliverableVersion(
+                deliverable_id=deliverable.id,
+                version_number=self._next_version_number(deliverable),
+                resource_type=ResourceType.ARCHIVO,
+                file_id=stored.id,
+                note=note,
+                observations=observations,
+                uploaded_by=current_user.id,
+            )
+        )
+        return await self._close_delivery(deliverable, task, current_user)
+
+    async def _close_delivery(
+        self, deliverable: Deliverable, task, current_user
+    ) -> PersonalDeliverableResponse:
+        """Lo que pasa DESPUÉS de registrar una entrega, sea URL o archivo:
+        mover el estado del entregable y el de la tarea. Es idéntico en los dos
+        caminos, así que vive una sola vez."""
         auto_complete = task is not None and not task.requires_approval
         deliverable.status = (
             DeliverableStatus.APROBADO
@@ -252,7 +328,7 @@ class PersonalDeliverableService:
             if not was_completed:
                 await self._cascade_if_completed(task)
         return await self._view(
-            await self._repo.get_personal_deliverable(deliverable_id), current_user
+            await self._repo.get_personal_deliverable(deliverable.id), current_user
         )
 
     async def update_version(

@@ -360,7 +360,9 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             .select_from(Task)
             .join(WorkItem, Task.work_item_id == WorkItem.id)
             .join(Project, WorkItem.proyecto_id == Project.id)
-            .where(Task.deleted_at.is_(None))
+            # Un proyecto borrado no aporta trabajo pendiente: sus tareas no se
+            # marcan al borrarlo, así que hay que descartarlas aquí.
+            .where(Task.deleted_at.is_(None), Project.deleted_at.is_(None))
         )
 
     async def _get_task_board(

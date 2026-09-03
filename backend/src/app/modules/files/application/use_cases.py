@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.modules.files.domain.policy import FilesAccess
+from app.modules.files.domain.policy import FilesAccess, FolderOwner, NO_OWNER
 from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
 from app.modules.files.infrastructure.repository import ProjectFilesRepository
 from app.modules.files.presentation.schemas import (
@@ -43,6 +43,7 @@ class ProjectFilesService:
             team_roles=await self._repo.team_roles_in_project(
                 project_id, current_user.id
             ),
+            user_id=current_user.id,
         )
 
     async def _require_view(self, project_id: UUID, current_user) -> FilesAccess:
@@ -63,24 +64,24 @@ class ProjectFilesService:
         )
 
     @staticmethod
-    def _owner_team_id(
-        folder: ProjectFolder, by_id: dict[UUID, ProjectFolder]
-    ) -> UUID | None:
-        """Equipo dueño del ancestro de primer nivel, subiendo por el árbol.
+    def _owner(
+        folder: ProjectFolder | None, by_id: dict[UUID, ProjectFolder]
+    ) -> FolderOwner:
+        """Dueño del ancestro de primer nivel, subiendo por el árbol.
 
-        El `team_id` no se copia hacia abajo a propósito: se resuelve al leer,
-        y así mover una carpeta no obliga a reescribir todo su subárbol.
+        El dueño no se copia hacia abajo a propósito: se resuelve al leer, y
+        así mover una carpeta no obliga a reescribir todo su subárbol.
         """
-        current: ProjectFolder | None = folder
+        current = folder
         seen: set[UUID] = set()
         while current is not None and current.id not in seen:
-            if current.team_id is not None:
-                return current.team_id
+            if current.team_id is not None or current.user_id is not None:
+                return FolderOwner(current.team_id, current.user_id)
             seen.add(current.id)
             current = (
                 by_id.get(current.parent_id) if current.parent_id is not None else None
             )
-        return None
+        return NO_OWNER
 
     # ── lectura ──────────────────────────────────────────────────────────────
 
@@ -103,7 +104,9 @@ class ProjectFilesService:
         # qué saber siquiera qué carpetas tiene TI.
         children: dict[UUID | None, list[ProjectFolder]] = {}
         for folder in folders:
-            if folder.parent_id == root.id and not access.can_see_team(folder.team_id):
+            if folder.parent_id == root.id and not access.can_see(
+                FolderOwner(folder.team_id, folder.user_id)
+            ):
                 continue
             children.setdefault(folder.parent_id, []).append(folder)
         files_by_folder: dict[UUID, list[ProjectFile]] = {}
@@ -147,7 +150,7 @@ class ProjectFilesService:
                 team_id=folder.team_id,
                 team_name=teams.get(folder.team_id) if folder.team_id else None,
                 is_root=folder.parent_id is None,
-                can_write=access.can_write_in(self._owner_team_id(folder, by_id)),
+                can_write=access.can_write_in(self._owner(folder, by_id)),
                 created_at=folder.created_at,
                 children=[to_response(c) for c in children.get(folder.id, [])],
                 files=[to_file(f) for f in files_by_folder.get(folder.id, [])],
@@ -198,7 +201,7 @@ class ProjectFilesService:
             team_id = data.team_id
         else:
             by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-            if not access.can_write_in(self._owner_team_id(parent, by_id)):
+            if not access.can_write_in(self._owner(parent, by_id)):
                 raise ForbiddenError("No puedes crear carpetas aquí")
             # Dentro de la carpeta de un equipo el dueño ya está definido por el
             # ancestro: marcarlo otra vez crearía dos dueños para un mismo rama.
@@ -239,12 +242,14 @@ class ProjectFilesService:
             raise ForbiddenError("La carpeta raíz del proyecto no se borra")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        owner = self._owner_team_id(folder, by_id)
+        owner = self._owner(folder, by_id)
         # Borrar la carpeta DE un equipo es un acto de organización, como
-        # crearla; borrar algo de dentro basta con pertenecer al equipo.
+        # crearla; borrar algo de dentro basta con pertenecer al equipo. La
+        # carpeta de una persona la borra ella misma (o administración), que es
+        # lo mismo que `can_write_in` ya dice.
         allowed = (
-            access.can_create_team_folder(owner)
-            if folder.team_id is not None and owner is not None
+            access.can_create_team_folder(folder.team_id)
+            if folder.team_id is not None
             else access.can_write_in(owner)
         )
         if not allowed:
@@ -279,7 +284,7 @@ class ProjectFilesService:
             raise NotFoundError("Carpeta no encontrada")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(self._owner_team_id(folder, by_id)):
+        if not access.can_write_in(self._owner(folder, by_id)):
             raise ForbiddenError("No puedes subir archivos aquí")
 
         name = sanitize_filename(filename)
@@ -334,12 +339,60 @@ class ProjectFilesService:
         archivo tiene que caer en algún sitio con nombre, y el nombre correcto
         es el del equipo.
         """
+        return await self._store_for_owner(
+            project_id,
+            FolderOwner(team_id=team_id),
+            folder_name=team_name,
+            filename=filename,
+            content_type=content_type,
+            content=content,
+            uploader_id=uploader_id,
+        )
+
+    async def store_personal_file(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        user_name: str,
+        *,
+        filename: str,
+        content_type: str,
+        content: bytes,
+    ) -> ProjectFile:
+        """Igual que `store_team_file`, para la entrega de una tarea INDIVIDUAL.
+
+        Una tarea sin equipo no tiene carpeta de equipo donde caer, y dejar el
+        archivo fuera del archivador sería volver al problema que este módulo
+        resuelve. Cae en la carpeta de la persona, que solo ven ella y quien
+        mira el proyecto entero.
+        """
+        return await self._store_for_owner(
+            project_id,
+            FolderOwner(user_id=user_id),
+            folder_name=user_name,
+            filename=filename,
+            content_type=content_type,
+            content=content,
+            uploader_id=user_id,
+        )
+
+    async def _store_for_owner(
+        self,
+        project_id: UUID,
+        owner: FolderOwner,
+        *,
+        folder_name: str,
+        filename: str,
+        content_type: str,
+        content: bytes,
+        uploader_id: UUID,
+    ) -> ProjectFile:
         root = await self._ensure_root(project_id)
         folder = next(
             (
                 f
                 for f in await self._repo.list_folders(project_id)
-                if f.team_id == team_id
+                if FolderOwner(f.team_id, f.user_id) == owner
             ),
             None,
         )
@@ -348,8 +401,9 @@ class ProjectFilesService:
                 ProjectFolder(
                     project_id=project_id,
                     parent_id=root.id,
-                    name=team_name,
-                    team_id=team_id,
+                    name=folder_name,
+                    team_id=owner.team_id,
+                    user_id=owner.user_id,
                     created_by=uploader_id,
                 )
             )
@@ -401,9 +455,8 @@ class ProjectFilesService:
             raise NotFoundError("Archivo no encontrado")
         folder = await self._repo.get_folder(project_id, file.folder_id)
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        owner = self._owner_team_id(folder, by_id) if folder is not None else None
-        if not access.can_see_team(owner):
-            raise ForbiddenError("Este archivo pertenece a otro equipo")
+        if not access.can_see(self._owner(folder, by_id)):
+            raise ForbiddenError("Este archivo no es tuyo ni de tus equipos")
         return file
 
     async def delete_file(self, project_id: UUID, file_id: UUID, current_user) -> None:
@@ -413,8 +466,7 @@ class ProjectFilesService:
             raise NotFoundError("Archivo no encontrado")
         folder = await self._repo.get_folder(project_id, file.folder_id)
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        owner = self._owner_team_id(folder, by_id) if folder else None
-        if not access.can_write_in(owner):
+        if not access.can_write_in(self._owner(folder, by_id)):
             raise ForbiddenError("No puedes borrar este archivo")
         # Solo borrado lógico, igual que al borrar una carpeta: el byte se queda
         # en disco. Borrarlo aquí dejaba una incoherencia fea —la fila decía

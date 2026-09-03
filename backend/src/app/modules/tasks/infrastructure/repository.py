@@ -258,8 +258,14 @@ class TaskRepository(BaseRepository[Task]):
 
     async def get_assigned_to_user(self, user_id: UUID) -> list[tuple]:
         """Todas las tareas VIVAS cuyo responsable es `user_id`, en cualquier
-        proyecto: es "Mis tareas". Trae ya resueltos el nombre del elemento, del
-        proyecto y del equipo (si la tarea es de uno), para la lista sin N+1.
+        proyecto VIVO: es "Mis tareas". Trae ya resueltos el nombre del elemento,
+        del proyecto y del equipo (si la tarea es de uno), para la lista sin N+1.
+
+        El proyecto se filtra por `deleted_at` y no solo se une: borrar un
+        proyecto no marca sus tareas, así que sin este filtro seguían saliendo
+        aquí —y la vista pedía después `/projects/{id}`, que sí respeta el
+        borrado, y respondía 404 en bucle. Una tarea de un proyecto borrado no
+        es trabajo pendiente de nadie.
         """
         from app.modules.project.infrastructure.models import Project
 
@@ -273,7 +279,11 @@ class TaskRepository(BaseRepository[Task]):
             .outerjoin(WorkItem, Task.work_item_id == WorkItem.id)
             .join(Project, Task.project_id == Project.id)
             .outerjoin(Team, Task.team_id == Team.id)
-            .where(Task.assignee_id == user_id, Task.deleted_at.is_(None))
+            .where(
+                Task.assignee_id == user_id,
+                Task.deleted_at.is_(None),
+                Project.deleted_at.is_(None),
+            )
             .order_by(Task.due_date.is_(None), Task.due_date, Task.start_date)
         )
         return [tuple(r) for r in (await self._session.execute(query)).all()]

@@ -4,6 +4,7 @@ import {
   type AddCommentBody,
   type AddVersionBody,
   type CreatePersonalDeliverableBody,
+  type NewFileVersionBody,
   type UpdateVersionBody,
 } from "../api/personal.api";
 
@@ -62,6 +63,15 @@ export function useAddPersonalVersion() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: AddVersionBody }) =>
       personalApi.addVersion(id, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUploadPersonalVersionFile() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: NewFileVersionBody }) =>
+      personalApi.uploadVersionFile(id, body),
     onSuccess: invalidate,
   });
 }

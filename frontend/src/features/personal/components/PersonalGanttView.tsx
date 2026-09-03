@@ -32,7 +32,11 @@ function ProjectGanttBlock({ projectId, assigneeId }: { projectId: string; assig
     // Sin una altura que respetar, el bloque crecía sin límite, el `overflow`
     // del padre recortaba el pie y la barra quedaba fuera de la pantalla: el
     // cronograma se veía, pero no se podía mover en el tiempo.
-    <section className="flex h-[72vh] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-border">
+    //
+    // La altura se adapta a la pantalla en vez de fijarse en píxeles: 82vh en
+    // un portátil deja ver una decena larga de filas, y el mínimo evita que en
+    // una ventana baja el diagrama se reduzca a dos filas y la cabecera.
+    <section className="flex h-[82vh] min-h-[460px] max-h-[1000px] flex-col overflow-hidden rounded-2xl border border-border">
       <h3 className="shrink-0 border-b border-border bg-accent/50 px-4 py-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
         {project.name}
       </h3>
