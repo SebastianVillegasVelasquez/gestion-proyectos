@@ -1537,7 +1537,14 @@ export function GanttView({
             aria-label="Desplazar el cronograma horizontalmente"
             aria-controls="gantt-scroll"
             aria-orientation="horizontal"
-            className="shrink-0 overflow-x-auto overflow-y-hidden rounded-b-xl border border-t-0 border-border bg-card"
+            className={cn(
+              "shrink-0 overflow-x-auto overflow-y-hidden rounded-b-xl border border-t-0 border-border bg-card",
+              // Incrustado, el cronograma vive dentro de un contenedor con
+              // scroll vertical propio: sin `sticky` la barra horizontal se va
+              // por debajo del borde y hay que bajar para alcanzarla —justo
+              // cuando lo que quieres es moverte de LADO.
+              embed && "sticky bottom-0 z-40",
+            )}
           >
             <div style={{ width: labelW + trackWidth, height: 1 }} aria-hidden />
           </div>

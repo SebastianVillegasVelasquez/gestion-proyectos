@@ -27,11 +27,18 @@ function ProjectGanttBlock({ projectId, assigneeId }: { projectId: string; assig
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border">
-      <h3 className="border-b border-border bg-accent/50 px-4 py-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+    // Altura DEFINIDA, no automática: el cronograma incrustado se dibuja con
+    // `h-full` y su barra de desplazamiento horizontal vive al pie del bloque.
+    // Sin una altura que respetar, el bloque crecía sin límite, el `overflow`
+    // del padre recortaba el pie y la barra quedaba fuera de la pantalla: el
+    // cronograma se veía, pero no se podía mover en el tiempo.
+    <section className="flex h-[72vh] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-border">
+      <h3 className="shrink-0 border-b border-border bg-accent/50 px-4 py-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
         {project.name}
       </h3>
-      <GanttView project={project} dark={dark} onToggleDark={toggleDark} embed={{ assigneeId }} />
+      <div className="min-h-0 flex-1">
+        <GanttView project={project} dark={dark} onToggleDark={toggleDark} embed={{ assigneeId }} />
+      </div>
     </section>
   );
 }
