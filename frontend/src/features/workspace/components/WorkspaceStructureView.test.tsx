@@ -49,6 +49,7 @@ function task(over: Partial<ApiTeamTask>): ApiTeamTask {
     progress_pct: 0,
     blocked_by: [],
     depends_on_third_party: false,
+    delivery_blocked_reason: null,
     ...over,
   };
 }
@@ -121,5 +122,27 @@ describe("WorkspaceStructureView", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /entregar/i }));
     expect(onDeliverTask).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+  });
+
+  it("una tarea con dependencia abierta se ve bloqueada, sin botón de entregar", () => {
+    renderView(
+      <WorkspaceStructureView
+        {...base}
+        canReview={false}
+        tasks={[
+          task({
+            id: "a",
+            title: "Guion",
+            delivery_blocked_reason: "Una dependencia sigue abierta",
+          }),
+        ]}
+        onDeliverTask={vi.fn()}
+        onMarkDeliveredTask={vi.fn()}
+        canDeliverTask={() => true}
+      />,
+    );
+    expect(screen.getByText("Bloqueada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /entregar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sin adjunto/i })).not.toBeInTheDocument();
   });
 });

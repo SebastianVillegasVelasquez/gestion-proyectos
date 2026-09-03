@@ -117,6 +117,11 @@ export interface ApiTeamTask {
   blocked_by: ApiBlockingTask[];
   // La tarea depende (FtS) de una «actividad de terceros».
   depends_on_third_party: boolean;
+  /** Motivo por el que NO se puede entregar todavía (`null` = se puede).
+   *  Lo decide el servidor, que es quien también rechaza la entrega: la vista
+   *  muestra "Bloqueada" con este texto en lugar de ofrecer un botón que va a
+   *  fallar. */
+  delivery_blocked_reason: string | null;
 }
 
 /** Tarea bloqueante (dependencia FtS), resumida para el indicador de bloqueo. */

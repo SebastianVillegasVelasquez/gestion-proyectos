@@ -647,10 +647,14 @@ class GetTasksByTeamUseCase:
 
     async def execute(self, team_id: UUID) -> list[TeamTaskItemResponse]:
         rows = await self.task_repo.get_by_team(team_id)
-        progress = progress_by_id([row[0] for row in rows])
+        tasks = [row[0] for row in rows]
+        progress = progress_by_id(tasks)
 
         # Dos consultas en total (tareas + dependencias), no una por tarea.
         deps = await self.task_repo.get_dependencies_by_team(team_id)
+        deps_by_task: dict[UUID, list] = {}
+        for dep in deps:
+            deps_by_task.setdefault(dep.task_id, []).append(dep)
         blocking = _blocking_by_task(deps)
         third_party = {
             dep.task_id
@@ -660,6 +664,25 @@ class GetTasksByTeamUseCase:
                 getattr(dep.depends_on_work_item, "tipo", None)
             )
         }
+
+        # Compuerta «actividad de terceros» ancestro, memoizada por elemento
+        # (una caminata por work_item distinto, no una por tarea).
+        tp_ancestor: dict[UUID, bool] = {}
+        for wi_id in {t.work_item_id for t in tasks if t.work_item_id is not None}:
+            tp_ancestor[
+                wi_id
+            ] = await self.task_repo.has_undelivered_third_party_ancestor(wi_id)
+
+        def blocked_reason(task) -> str | None:
+            # El motivo solo tiene sentido para algo todavía entregable: una
+            # tarea cerrada no "está bloqueada", ya pasó.
+            if task.status in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA):
+                return None
+            return rules.delivery_block_reason(
+                deps_by_task.get(task.id, []),
+                task.work_item_id is not None
+                and tp_ancestor.get(task.work_item_id, False),
+            )
 
         return [
             TeamTaskItemResponse(
@@ -680,6 +703,7 @@ class GetTasksByTeamUseCase:
                 progress_pct=progress.get(task.id, 0),
                 blocked_by=blocking.get(task.id, []),
                 depends_on_third_party=task.id in third_party,
+                delivery_blocked_reason=blocked_reason(task),
             )
             for task, work_item_name, project_id, project_name, assignee_name in rows
         ]
