@@ -34,6 +34,9 @@ from app.modules.notifications.infrastructure.models import Notification
 # ── Reminders models ─────────────────────────────────────────────────────────
 from app.modules.reminders.infrastructure.models import PersonalReminder
 
+# ── Files models ──────────────────────────────────────────────────────────────
+from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
+
 # ── Feedback models ───────────────────────────────────────────────────────────
 from app.modules.feedback.infrastructure.models import Feedback
 
@@ -66,6 +69,9 @@ __all__ = [
     "Notification",
     # Reminders
     "PersonalReminder",
+    # Files
+    "ProjectFolder",
+    "ProjectFile",
     # Feedback
     "Feedback",
 ]

@@ -1,12 +1,15 @@
 import csv
 import io
+import re
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, UploadFile
+from fastapi.responses import FileResponse as FileDownloadResponse
 from fastapi.routing import APIRouter
 
 from app.core.dependencies import (
     event_bus_dependency,
+    file_storage_dependency,
     get_current_user,
     position_repo_dependency,
     user_repo_dependency,
@@ -14,7 +17,8 @@ from app.core.dependencies import (
 )
 from app.core.config import get_settings
 from app.shared.authz import can_assign_role
-from app.shared.exceptions import ForbiddenError
+from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.shared.storage import IMAGE_CONTENT_TYPES, IMAGE_EXTENSIONS, extension_of
 from app.modules.identity.application.use_cases import (
     ActivateAccountUseCase,
     BulkCreateUsersUseCase,
@@ -60,6 +64,7 @@ from app.modules.identity.presentation.schemas import (
     SeenReleasesResponse,
     SortDirection,
     TokenResponse,
+    UpdateMyProfileRequest,
     UpdateUserRequest,
     UserResponse,
 )
@@ -71,6 +76,21 @@ from app.modules.identity.presentation.schemas import (
 MANAGEMENT_ROLES = ("admin", "super_admin", "developer")
 
 router = APIRouter(prefix="/identity", tags=["Identity"])
+
+# Ruta pública que sirve las fotos de perfil. Es lo que se guarda en
+# `users.avatar_url` (relativa a la API), así que cambiarla implica migrar el
+# valor de la columna: se declara una sola vez.
+_AVATAR_ROUTE = "/identity/avatars"
+_AVATAR_FILENAME = re.compile(r"[0-9a-f]{32}\.[A-Za-z0-9]{2,5}")
+
+
+def _profile_response(current_user, user) -> UserResponse:
+    """La sesión actual con el perfil recién guardado. Se reconstruye en vez de
+    devolver el ORM: `UserResponse` es el contrato de la sesión y el frontend
+    guarda la respuesta tal cual en su estado de usuario."""
+    return current_user.model_copy(
+        update={"avatar_url": user.avatar_url, "bio": user.bio}
+    )
 
 
 def _assert_can_assign_role(actor_role: str, target_role) -> None:
@@ -231,6 +251,95 @@ async def mark_seen_releases(
     """Marca novedades como vistas (idempotente) y devuelve el set actualizado."""
     updated = await repo.add_seen_releases(current_user.id, data.release_ids)
     return SeenReleasesResponse(release_ids=updated)
+
+
+# ── Perfil de la propia persona ──────────────────────────────────────────────
+
+
+@router.patch("/me/profile", response_model=UserResponse)
+async def update_my_profile(
+    data: UpdateMyProfileRequest,
+    repo: UserRepository = Depends(user_repo_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Edita lo que es de la persona (su presentación). Nombre, correo, rol y
+    cargo los administra la organización, no se tocan desde aquí."""
+    user = await repo.get_by_id(current_user.id)
+    if user is None:
+        raise NotFoundError("Usuario no encontrado")
+    user.bio = (data.bio or "").strip() or None
+    await repo.save(user)
+    return _profile_response(current_user, user)
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_my_avatar(
+    file: UploadFile,
+    repo: UserRepository = Depends(user_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Sube (o reemplaza) la foto de perfil.
+
+    La foto se guarda con una clave opaca y `users.avatar_url` apunta a la ruta
+    de la API que la sirve, RELATIVA: el dominio cambia entre entornos y
+    guardarlo absoluto dejaría las fotos rotas al mudarse de servidor.
+    """
+    settings = get_settings()
+    content = await file.read()
+    if not content:
+        raise ValidationError("La imagen está vacía")
+    if len(content) > settings.MAX_AVATAR_MB * 1024 * 1024:
+        raise ValidationError(
+            f"La imagen supera el límite de {settings.MAX_AVATAR_MB} MB"
+        )
+    if (file.content_type or "") not in IMAGE_CONTENT_TYPES or extension_of(
+        file.filename or ""
+    ) not in IMAGE_EXTENSIONS:
+        raise ValidationError("Formato no admitido: usa PNG, JPG, WEBP o GIF")
+
+    user = await repo.get_by_id(current_user.id)
+    if user is None:
+        raise NotFoundError("Usuario no encontrado")
+
+    previous = user.avatar_url
+    key = storage.save("avatars", file.filename or "avatar.png", content)
+    user.avatar_url = f"{_AVATAR_ROUTE}/{key.split('/')[-1]}"
+    await repo.save(user)
+    # La anterior se borra DESPUÉS de guardar la nueva: si algo falla arriba,
+    # la persona se queda con la foto que ya tenía y no sin ninguna.
+    if previous:
+        storage.delete(f"avatars/{previous.split('/')[-1]}")
+    return _profile_response(current_user, user)
+
+
+@router.delete("/me/avatar", response_model=UserResponse)
+async def delete_my_avatar(
+    repo: UserRepository = Depends(user_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    user = await repo.get_by_id(current_user.id)
+    if user is None:
+        raise NotFoundError("Usuario no encontrado")
+    if user.avatar_url:
+        storage.delete(f"avatars/{user.avatar_url.split('/')[-1]}")
+        user.avatar_url = None
+        await repo.save(user)
+    return _profile_response(current_user, user)
+
+
+@router.get(f"{_AVATAR_ROUTE.removeprefix('/identity')}/{{filename}}")
+async def get_avatar(filename: str, storage=Depends(file_storage_dependency)):
+    """Sirve una foto de perfil.
+
+    Sin sesión a propósito: un `<img src>` del navegador no manda la cabecera
+    de autorización. La protección es la clave opaca (un UUID que no se
+    adivina) y el hecho de que una foto de perfil no es un dato sensible.
+    """
+    if not _AVATAR_FILENAME.fullmatch(filename):
+        raise NotFoundError("Imagen no encontrada")
+    return FileDownloadResponse(path=storage.path(f"avatars/{filename}"))
 
 
 @router.patch("/me/password", status_code=204)

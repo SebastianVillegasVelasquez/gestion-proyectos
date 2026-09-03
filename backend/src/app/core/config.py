@@ -88,6 +88,16 @@ class Settings(BaseSettings):
     REMINDERS_SCAN_ENABLED: bool = True
     REMINDERS_SCAN_INTERVAL_MINUTES: int = 5
 
+    # ── Almacenamiento de archivos ──────────────
+    # Raíz en disco de lo que suben los usuarios (foto de perfil, archivos de
+    # proyecto). En Docker se monta como volumen; en local es una carpeta del
+    # repositorio (ignorada por git).
+    STORAGE_DIR: str = "var/storage"
+    # Tope por archivo. Es una plataforma de gestión, no un repositorio de vídeo:
+    # el límite protege el disco y da un 413 claro en vez de un timeout.
+    MAX_UPLOAD_MB: int = 25
+    MAX_AVATAR_MB: int = 5
+
     # ── OpenAI ──────────────────────────────────
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router";
-import { KeyRound, Mail, Moon, ShieldCheck, Sun, UserCircle2 } from "lucide-react";
+import {
+  CalendarDays,
+  IdCard,
+  KeyRound,
+  Mail,
+  Moon,
+  ShieldCheck,
+  Sun,
+  UserCircle2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
@@ -9,6 +18,8 @@ import { Role } from "@/features/auth/types";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { positionLabel } from "@/features/projects/types/labels";
 import { FeedbackWidget } from "@/features/feedback/components/FeedbackWidget";
+import { ProfileHero } from "./ProfileHero";
+import { BioEditor } from "./BioEditor";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
@@ -151,25 +162,43 @@ export function SettingsPage() {
   const { user } = useAuth();
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-4xl flex-1 overflow-y-auto p-4 sm:p-6">
       <PageHeader
         title="Configuración"
         description="Tu perfil y las preferencias de la aplicación."
       />
 
       <div className="flex flex-col gap-5">
-        <SettingsCard title="Perfil" description="Información de tu cuenta.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoRow icon={UserCircle2} label="Nombre" value={user?.name ?? "—"} />
-            <InfoRow icon={Mail} label="Correo" value={user?.email ?? "—"} />
-            <InfoRow icon={ShieldCheck} label="Rol" value={user ? ROLE_LABELS[user.role] : "—"} />
-            <InfoRow
-              icon={UserCircle2}
-              label="Cargo"
-              value={user?.position ? positionLabel(user.position) : "Sin cargo"}
-            />
-          </div>
-        </SettingsCard>
+        {user && <ProfileHero user={user} />}
+
+        {/* Dos columnas a partir de lg: la ficha (lo que administra la empresa)
+            y la presentación (lo único que edita la persona) se leen juntas. */}
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SettingsCard title="Tu ficha" description="Datos que administra la organización.">
+            <div className="grid gap-3">
+              <InfoRow icon={UserCircle2} label="Nombre" value={user?.name ?? "—"} />
+              <InfoRow icon={Mail} label="Correo" value={user?.email ?? "—"} />
+              <InfoRow icon={ShieldCheck} label="Rol" value={user ? ROLE_LABELS[user.role] : "—"} />
+              <InfoRow
+                icon={IdCard}
+                label="Cargo"
+                value={user?.position ? positionLabel(user.position) : "Sin cargo"}
+              />
+              <InfoRow
+                icon={CalendarDays}
+                label="Estado de la cuenta"
+                value={user?.must_change_password ? "Pendiente de crear contraseña" : "Activa"}
+              />
+            </div>
+          </SettingsCard>
+
+          <SettingsCard
+            title="Sobre mí"
+            description="Lo que tus compañeros verán de ti. Puedes cambiarlo cuando quieras."
+          >
+            <BioEditor initial={user?.bio ?? ""} />
+          </SettingsCard>
+        </div>
 
         <SettingsCard title="Apariencia" description="Elige cómo se ve la aplicación.">
           <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background px-4 py-3">

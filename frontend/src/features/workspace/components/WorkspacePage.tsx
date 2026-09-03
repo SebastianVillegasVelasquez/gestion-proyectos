@@ -4,6 +4,7 @@ import { useOutletContext, useSearchParams } from "react-router";
 import {
   BarChart3,
   CalendarRange,
+  FolderArchive,
   FolderTree,
   ListTodo,
   Package,
@@ -27,6 +28,7 @@ import { TeamGanttPanel } from "./TeamGanttPanel";
 import { TeamProgressView } from "./TeamProgressView";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { WorkspaceStructureView } from "./WorkspaceStructureView";
+import { ProjectFilesBrowser } from "@/features/files/components/ProjectFilesBrowser";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
@@ -48,6 +50,7 @@ type WorkspaceTab =
   | "entregables"
   | "estructura"
   | "cronograma"
+  | "archivos"
   | "progreso"
   | "configuracion";
 
@@ -246,6 +249,17 @@ function MemberWorkspace() {
   const access = accessQuery.data;
   const canDeliver = access?.can_deliver ?? false;
   const canReview = access?.can_review ?? false;
+
+  // La estructura y el cronograma son vistas del MISMO conjunto de tareas, y su
+  // alcance lo decide el rol DENTRO del equipo: el líder/supervisor coordina, así
+  // que ve —y filtra— el trabajo de todos; un integrante solo ve el suyo. Que un
+  // integrante viera las ramas de sus compañeros no le aporta y expone reparto
+  // interno que no le corresponde. Se recorta aquí, una vez, y las dos vistas lo
+  // heredan (el cronograma vía `assigneeId`, que ya sabe recortarse por persona).
+  const scopedTasks = useMemo(() => {
+    const all = tasksQuery.data ?? [];
+    return canReview ? all : all.filter((t) => t.assignee_id === currentUserId);
+  }, [tasksQuery.data, canReview, currentUserId]);
 
   const selectedDeliverable =
     deliverables.find((d) => d.id === selectedDeliverableId) ?? deliverables[0] ?? null;
@@ -482,7 +496,7 @@ function MemberWorkspace() {
               <div className="flex-1 overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
                 <WorkspaceStructureView
                   tree={treeQuery.data ?? []}
-                  tasks={tasksQuery.data ?? []}
+                  tasks={scopedTasks}
                   typeNameById={typeNameById}
                   today={today}
                   projectId={activeTeam.project_id}
@@ -510,7 +524,20 @@ function MemberWorkspace() {
 
             {activeTab === "cronograma" && (
               <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
-                <TeamGanttPanel projectId={activeTeam.project_id} teamId={activeTeam.id} />
+                <TeamGanttPanel
+                  projectId={activeTeam.project_id}
+                  teamId={activeTeam.id}
+                  assigneeId={canReview ? undefined : currentUserId}
+                />
+              </div>
+            )}
+
+            {activeTab === "archivos" && (
+              <div className="flex flex-1 flex-col overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+                {/* El archivador es del PROYECTO, no del equipo: el equipo ve el
+                    árbol completo y escribe donde le corresponde (su carpeta).
+                    El servidor manda los permisos por carpeta ya resueltos. */}
+                <ProjectFilesBrowser projectId={activeTeam.project_id} />
               </div>
             )}
 
@@ -616,6 +643,7 @@ function MemberWorkspace() {
             },
             { id: "estructura", label: "Estructura", Icon: FolderTree },
             { id: "cronograma", label: "Cronograma", Icon: CalendarRange },
+            { id: "archivos", label: "Archivos", Icon: FolderArchive },
             { id: "progreso", label: "Progreso", Icon: BarChart3 },
             { id: "configuracion", label: "Configuración", Icon: Settings },
           ]}

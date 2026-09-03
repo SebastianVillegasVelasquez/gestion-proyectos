@@ -1,3 +1,4 @@
+from functools import lru_cache
 from uuid import UUID
 
 from fastapi import Depends, Path, Query, Request
@@ -144,6 +145,24 @@ def feedback_repo_dependency(
     return SqlAlchemyFeedbackRepository(db)
 
 
+def project_files_repo_dependency(db: AsyncSession = Depends(get_db)):
+    from app.modules.files.infrastructure.repository import ProjectFilesRepository
+
+    return ProjectFilesRepository(db)
+
+
+@lru_cache
+def _file_storage():
+    from app.shared.storage import LocalFileStorage
+
+    return LocalFileStorage(get_settings().STORAGE_DIR)
+
+
+def file_storage_dependency():
+    """Una sola instancia por proceso: no guarda estado, solo la raíz en disco."""
+    return _file_storage()
+
+
 def reminder_repo_dependency(db: AsyncSession = Depends(get_db)):
     from app.modules.reminders.infrastructure.repository import (
         SqlAlchemyReminderRepository,
@@ -238,6 +257,8 @@ async def get_current_user(
         is_active=user.is_active,
         document_type=user.document_type,
         document_number=user.document_number,
+        avatar_url=user.avatar_url,
+        bio=user.bio,
         created_at=user.created_at,
         must_change_password=getattr(user, "must_change_password", False),
     )
