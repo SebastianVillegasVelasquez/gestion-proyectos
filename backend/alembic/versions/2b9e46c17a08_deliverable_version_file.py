@@ -9,15 +9,15 @@ fuera de la herramienta.
 entrega —su nota, su número de versión y su revisión siguen siendo historia—,
 solo deja de haber material que abrir.
 
-Revision ID: c2d3e4f5a6b7
+Revision ID: 2b9e46c17a08
 """
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "c2d3e4f5a6b7"
-down_revision = "b1c2d3e4f5a6"
+revision = "2b9e46c17a08"
+down_revision = "1f7c3ab54d92"
 branch_labels = None
 depends_on = None
 
