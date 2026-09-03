@@ -6,6 +6,7 @@ from starlette import status
 from app.core.dependencies import (
     event_bus_dependency,
     get_current_user,
+    workspace_repo_dependency,
     project_members_repo_dependency,
     project_repo_dependency,
     require_role,
@@ -62,7 +63,9 @@ from app.modules.tasks.presentation.schemas import (
     UpdateTaskRequest,
     UpdateTaskStatusRequest,
 )
+from app.modules.teams.domain.workspace import WorkspaceAccess
 from app.shared.events import EventBus
+from app.shared.exceptions import ForbiddenError
 
 router = APIRouter(tags=["Tasks"])
 
@@ -306,10 +309,20 @@ async def get_my_tasks(
 @router.get("/teams/{team_id}/tasks", response_model=list[TeamTaskItemResponse])
 async def get_team_tasks(
     team_id: UUID,
-    _=Depends(_any_user),
+    current_user=Depends(_any_user),
     task_repo=Depends(task_repo_dependency),
+    workspace_repo=Depends(workspace_repo_dependency),
 ):
-    """Tareas delegadas a un equipo, con módulo y responsable (espacio de trabajo)."""
+    """Tareas delegadas a un equipo, con módulo y responsable (espacio de trabajo).
+
+    Exige pertenecer al equipo (o administrar): el trabajo interno de un equipo
+    no es público entre usuarios autenticados. Se reutiliza `WorkspaceAccess`,
+    la misma política que gobierna el resto del espacio de trabajo, en vez de
+    escribir aquí una segunda regla que acabaría discrepando de ella.
+    """
+    role = await workspace_repo.get_member_role(team_id, current_user.id)
+    if not WorkspaceAccess.resolve(current_user.role.value, role).can_view:
+        raise ForbiddenError("No tienes acceso a las tareas de este equipo")
     return await GetTasksByTeamUseCase(task_repo).execute(team_id)
 
 

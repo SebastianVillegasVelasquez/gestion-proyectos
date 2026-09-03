@@ -128,6 +128,10 @@ def _token_response(user) -> TokenResponse:
             is_active=user.is_active,
             document_type=user.document_type,
             document_number=user.document_number,
+            # Con getattr, como `must_change_password`: esta función también se
+            # alimenta de dobles de prueba que no modelan la tabla entera.
+            avatar_url=getattr(user, "avatar_url", None),
+            bio=getattr(user, "bio", None),
             created_at=user.created_at,
             must_change_password=getattr(user, "must_change_password", False),
         ),

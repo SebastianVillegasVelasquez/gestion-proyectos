@@ -34,7 +34,12 @@ import {
   TRACE_FILTER_LABELS,
   type TraceFilterGroup,
   type TraceabilityFilters,
+  type TraceabilityTally,
+  actorTally,
+  busiestTasks,
+  eventKindTally,
   filterTraceabilityEvents,
+  groupEventsByDay,
   teamsInTimeline,
 } from "../../utils/traceability-events";
 import type { TraceabilityEvent, TraceabilityEventKind } from "../../types/api.types";
@@ -112,11 +117,28 @@ const DELAY_META = {
   badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
 };
 
-function formatDateTime(iso: string): string {
-  const [date, timePart = ""] = iso.split("T");
-  const [year, month, day] = date.split("-");
-  const hhmm = timePart.slice(0, 5);
-  return hhmm ? `${day}/${month}/${year} - ${hhmm}` : `${day}/${month}/${year}`;
+function formatTime(iso: string): string {
+  return iso.split("T")[1]?.slice(0, 5) ?? "";
+}
+
+const DAY_FORMATTER = new Intl.DateTimeFormat("es-CO", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+/** «Hoy» / «Ayer» / «lunes, 4 de agosto de 2025» para la cabecera de cada día. */
+function formatDayHeading(date: string, todayIso: string): string {
+  if (date === todayIso) {
+    return "Hoy";
+  }
+  const yesterday = new Date(`${todayIso}T00:00:00`);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date === yesterday.toISOString().slice(0, 10)) {
+    return "Ayer";
+  }
+  return DAY_FORMATTER.format(new Date(`${date}T00:00:00`));
 }
 
 function SummaryCard({
@@ -173,12 +195,12 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", badge)}>
             {event.is_delay ? "Retraso" : TRACE_EVENT_LABELS[event.kind]}
           </span>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            {formatDateTime(event.created_at)}
+          <span className="text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+            {formatTime(event.created_at)}
           </span>
         </div>
 
-        <p className="mt-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+        <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
           {event.task_title}
         </p>
 
@@ -259,6 +281,97 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
   );
 }
 
+/**
+ * Bloque del panel lateral: un recuento con barra comparativa. La barra se
+ * mide contra el valor más alto (no contra el total): lo que interesa es el
+ * orden de magnitud entre filas, no el porcentaje exacto.
+ */
+function TallyList({
+  title,
+  icon: Icon,
+  rows,
+  barClass,
+  empty,
+}: {
+  title: string;
+  icon: LucideIcon;
+  rows: TraceabilityTally[];
+  barClass: string;
+  empty: string;
+}) {
+  return (
+    <Card className="rounded-2xl">
+      <CardContent className="py-4">
+        <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Icon className="size-3.5" /> {title}
+        </h3>
+        {rows.length === 0 ? (
+          <p className="mt-3 text-xs text-muted-foreground">{empty}</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-2.5">
+            {rows.slice(0, 6).map((row) => (
+              <li key={row.key}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-xs text-foreground" title={row.label}>
+                    {row.label}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                    {row.count}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn("h-full rounded-full", barClass)}
+                    style={{ width: `${String(row.share)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Tareas donde se concentra el historial, con sus retrasos: el atajo a «¿dónde
+ *  se está atascando el proyecto?» sin recorrer toda la línea de tiempo. */
+function BusiestTasksCard({ events }: { events: TraceabilityEvent[] }) {
+  const rows = useMemo(() => busiestTasks(events), [events]);
+  return (
+    <Card className="rounded-2xl">
+      <CardContent className="py-4">
+        <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Flag className="size-3.5" /> Tareas con más movimiento
+        </h3>
+        {rows.length === 0 ? (
+          <p className="mt-3 text-xs text-muted-foreground">Sin actividad todavía.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-2">
+            {rows.map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-2">
+                <span className="truncate text-xs text-foreground" title={row.title}>
+                  {row.title}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  {row.delays > 0 && (
+                    <span className="rounded-full bg-rose-100 px-1.5 text-[10px] font-semibold tabular-nums text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                      {row.delays} ⏱
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                    {row.count}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TraceabilityPanel({
   projectId,
   lockedTeamId,
@@ -293,6 +406,16 @@ export function TraceabilityPanel({
   const teams = useMemo(() => teamsInTimeline(events), [events]);
   const summary = query.data?.summary;
 
+  // Todo lo agregado se calcula sobre lo VISIBLE, no sobre el total: si filtro
+  // por un equipo, el desglose tiene que hablar de ese equipo.
+  const byDay = useMemo(() => groupEventsByDay(visible), [visible]);
+  const kindRows = useMemo(() => eventKindTally(visible), [visible]);
+  const actorRows = useMemo(() => actorTally(visible), [visible]);
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }, []);
+
   const patch = (change: Partial<TraceabilityFilters>) => {
     setFilters((current) => ({ ...current, ...change }));
   };
@@ -316,7 +439,9 @@ export function TraceabilityPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    // Un solo desplazamiento, el de este panel: sirve igual dentro del shell de
+    // proyecto (que recorta el alto) y dentro del espacio de equipo.
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
       <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryCard
           icon={History}
@@ -437,16 +562,52 @@ export function TraceabilityPanel({
           hint="Prueba con otro filtro o limpia la búsqueda."
         />
       ) : (
-        <div className="min-h-0 w-full max-w-3xl flex-1 overflow-y-auto pr-1">
-          <Card className="rounded-2xl">
-            <CardContent className="py-6">
-              <ol>
-                {visible.map((event) => (
-                  <TimelineEvent key={event.id} event={event} />
+        // Dos columnas a partir de xl: la línea de tiempo ocupa el ancho útil y
+        // el resto de la pantalla —que antes quedaba en blanco— se gana con la
+        // lectura agregada del mismo conjunto filtrado. Por debajo de xl los
+        // paneles pasan debajo, no se aprietan.
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0" role="region" aria-label="Línea de tiempo">
+            <Card className="rounded-2xl">
+              <CardContent className="py-5">
+                {byDay.map((day) => (
+                  <section key={day.date}>
+                    <h3 className="sticky top-0 z-20 -mx-2 mb-3 flex items-baseline gap-2 bg-card/95 px-2 py-1.5 backdrop-blur">
+                      <span className="text-[12px] font-semibold capitalize text-foreground">
+                        {formatDayHeading(day.date, todayIso)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {day.events.length} {day.events.length === 1 ? "evento" : "eventos"}
+                      </span>
+                    </h3>
+                    <ol className="mb-4 last:mb-0">
+                      {day.events.map((event) => (
+                        <TimelineEvent key={event.id} event={event} />
+                      ))}
+                    </ol>
+                  </section>
                 ))}
-              </ol>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="flex flex-col gap-3 xl:sticky xl:top-0">
+            <TallyList
+              title="Qué está pasando"
+              icon={History}
+              rows={kindRows}
+              barClass="bg-brand-teal"
+              empty="Sin eventos."
+            />
+            <TallyList
+              title="Quién mueve el proyecto"
+              icon={User}
+              rows={actorRows}
+              barClass="bg-brand-gold"
+              empty="Sin actividad registrada."
+            />
+            <BusiestTasksCard events={visible} />
+          </aside>
         </div>
       )}
     </div>

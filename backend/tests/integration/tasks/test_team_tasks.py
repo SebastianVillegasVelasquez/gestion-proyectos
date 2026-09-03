@@ -709,3 +709,54 @@ class TestCreateTeamTask:
             },
         )
         assert resp.status_code == 422, resp.text
+
+
+class TestTeamTasksAccess:
+    """El trabajo interno de un equipo no es público entre usuarios con sesión.
+
+    Antes bastaba con estar autenticado y saber el id del equipo para leer sus
+    tareas —quién tiene qué, con fechas—, aunque no se tuviera nada que ver con
+    ese equipo. La regla ahora es la misma que gobierna el resto del espacio de
+    trabajo: se es del equipo, o se administra.
+    """
+
+    async def test_outsider_cannot_read_a_teams_tasks(
+        self, client, admin_headers, member_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        resp = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=member_headers
+        )
+
+        assert resp.status_code == 403, resp.text
+
+    async def test_a_member_of_the_team_can_read_them(
+        self, client, admin_headers, member_headers, member_user, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_id = await _create_team(client, admin_headers, project_id)
+        await _add_project_member(client, admin_headers, project_id, member_user.id)
+        added = await client.post(
+            f"/api/v1/projects/{project_id}/teams/{team_id}/members",
+            json={"user_id": str(member_user.id)},
+            headers=admin_headers,
+        )
+        assert added.status_code in (200, 201), added.text
+
+        resp = await client.get(
+            f"/api/v1/teams/{team_id}/tasks", headers=member_headers
+        )
+
+        assert resp.status_code == 200, resp.text
+
+    async def test_admin_can_observe_any_team(
+        self, client, admin_headers, valid_project_payload
+    ):
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        team_id = await _create_team(client, admin_headers, project_id)
+
+        resp = await client.get(f"/api/v1/teams/{team_id}/tasks", headers=admin_headers)
+
+        assert resp.status_code == 200, resp.text

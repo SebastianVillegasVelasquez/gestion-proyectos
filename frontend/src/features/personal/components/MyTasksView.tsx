@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, ExternalLink, LayoutList, Network, Users2 } from "lucide-react";
+import {
+  CalendarClock,
+  CalendarRange,
+  ExternalLink,
+  LayoutList,
+  Network,
+  Users2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
@@ -14,6 +21,9 @@ import {
 } from "../utils/due-status";
 import { MyTaskDeliverAction, TaskOriginCrumb } from "./my-task-bits";
 import { PersonalStructureView } from "./PersonalStructureView";
+import { PersonalGanttView } from "./PersonalGanttView";
+import { ElementFilterSelect } from "./ElementFilterSelect";
+import { elementOptionsFrom } from "../utils/element-options";
 
 /** «faltan 3 d» / «hoy» / «hace 2 d» a partir de los días restantes. */
 function daysRemainingLabel(n: number): string {
@@ -25,7 +35,13 @@ function daysRemainingLabel(n: number): string {
 
 type Filter = "todas" | "overdue" | "due_soon" | "abiertas" | "done";
 type Scope = "todas" | "individual" | "equipo";
-type ViewMode = "lista" | "estructura";
+type ViewMode = "lista" | "estructura" | "cronograma";
+
+const VIEWS = [
+  { key: "lista", label: "Lista", Icon: LayoutList },
+  { key: "estructura", label: "Estructura", Icon: Network },
+  { key: "cronograma", label: "Cronograma", Icon: CalendarRange },
+] as const;
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
@@ -107,13 +123,13 @@ export function MyTasksView({
   const [filter, setFilter] = useState<Filter>("abiertas");
   const [scope, setScope] = useState<Scope>("todas");
   const [query, setQuery] = useState("");
-  // Búsqueda por elemento: coincide contra el nombre del elemento o el de
-  // cualquiera de sus ancestros (sustituye al antiguo desplegable de padres).
-  const [elementQuery, setElementQuery] = useState("");
+  // Filtro por elemento: se elige de la lista de elementos que REALMENTE
+  // aparecen en estas tareas (con su color de tipo), no se escribe a ciegas.
+  // Filtra por subárbol: elegir una rama trae todo lo que cuelga de ella.
+  const [elementId, setElementId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const eq = elementQuery.trim().toLowerCase();
     return tasks
       .map((t) => ({ task: t, status: dueStatus(t, today) }))
       .filter(({ status }) => matches(filter, status))
@@ -126,18 +142,30 @@ export function MyTasksView({
         }
         return true;
       })
-      .filter(({ task }) => {
-        if (!eq) {
-          return true;
-        }
-        const names = [task.work_item_name ?? "", ...task.work_item_ancestors.map((a) => a.name)];
-        return names.some((n) => n.toLowerCase().includes(eq));
-      })
+      .filter(({ task }) => !elementId || task.work_item_ancestors.some((a) => a.id === elementId))
       .filter(
         ({ task }) =>
           !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
       );
-  }, [tasks, filter, scope, query, elementQuery, today]);
+  }, [tasks, filter, scope, query, elementId, today]);
+
+  // Las opciones del filtro salen del conjunto YA acotado por los demás filtros
+  // (menos el propio elemento): ofrecer ramas que no traerían nada sería ruido.
+  const elementOptions = useMemo(
+    () =>
+      elementOptionsFrom(
+        tasks
+          .filter((t) => matches(filter, dueStatus(t, today)))
+          .filter((t) =>
+            scope === "individual"
+              ? t.team_id === null
+              : scope === "equipo"
+                ? t.team_id !== null
+                : true,
+          ),
+      ),
+    [tasks, filter, scope, today],
+  );
 
   const filteredTasks = useMemo(() => rows.map((r) => r.task), [rows]);
 
@@ -193,14 +221,9 @@ export function MyTasksView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {/* Lista / Estructura */}
+        {/* Lista / Estructura / Cronograma */}
         <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {(
-            [
-              { key: "lista", label: "Lista", Icon: LayoutList },
-              { key: "estructura", label: "Estructura", Icon: Network },
-            ] as const
-          ).map((v) => (
+          {VIEWS.map((v) => (
             <button
               key={v.key}
               type="button"
@@ -278,18 +301,12 @@ export function MyTasksView({
           placeholder="Buscar por tarea o proyecto…"
           className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
         />
-        <input
-          value={elementQuery}
-          onChange={(e) => {
-            setElementQuery(e.target.value);
-          }}
-          placeholder="Buscar por elemento…"
-          aria-label="Buscar por elemento de la estructura"
-          className="min-w-[150px] rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
-        />
+        <ElementFilterSelect options={elementOptions} value={elementId} onChange={setElementId} />
       </div>
 
-      {view === "estructura" ? (
+      {view === "cronograma" ? (
+        <PersonalGanttView tasks={filteredTasks} />
+      ) : view === "estructura" ? (
         <PersonalStructureView
           tasks={filteredTasks}
           today={today}

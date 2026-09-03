@@ -164,6 +164,16 @@ class UserResponse(BaseModelConfig):
     # con un modal antes de dejar usar la plataforma. Default False para no
     # romper respuestas armadas a mano de flujos que no lo necesitan.
     must_change_password: bool = False
+    # Perfil: ruta de la foto dentro de la API (relativa) y presentación breve.
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+
+
+class UpdateMyProfileRequest(BaseModelConfig):
+    """Lo que la propia persona edita de su perfil. El nombre, el correo, el rol
+    y el cargo no están aquí a propósito: los administra la organización."""
+
+    bio: Annotated[str, StringConstraints(max_length=500)] | None = None
 
 
 class CreatedUserResponse(UserResponse):

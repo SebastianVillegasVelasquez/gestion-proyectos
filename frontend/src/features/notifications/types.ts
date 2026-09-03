@@ -1,4 +1,8 @@
-// Espejo de NotificationType del backend.
+// Espejo de NotificationType del backend
+// (backend/src/app/modules/notifications/infrastructure/enums.py). Mantener en
+// sincronía: un tipo que el backend envíe y aquí falte NO debe romper la UI
+// (ver `notificationTypeLabel` / `notificationPriority`, que caen a un valor
+// por defecto), pero sí sale sin etiqueta bonita.
 export type NotificationType =
   | "tarea_asignada"
   | "tarea_iniciada"
@@ -7,6 +11,7 @@ export type NotificationType =
   | "tarea_atrasada"
   | "tarea_completada"
   | "tarea_devuelta"
+  | "tarea_reprogramada"
   | "dependencia_terceros_fechada"
   | "proyecto_miembro_agregado"
   | "proyecto_cerrado"
@@ -15,7 +20,8 @@ export type NotificationType =
   | "proyecto_finalizado"
   | "comentario_publicado"
   | "comentario_respuesta"
-  | "mencion";
+  | "mencion"
+  | "recordatorio";
 
 export interface AppNotification {
   id: string;

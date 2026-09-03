@@ -24,9 +24,11 @@ export function DashboardHeader({
   const progressPercent = hasProgress ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-4">
+    // Envuelve: en móvil el saludo, la píldora de progreso y el interruptor de
+    // tema no caben en una línea y se comprimían hasta cortar el nombre.
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
       {/* Greeting */}
-      <div className="min-w-0">
+      <div className="min-w-[180px] flex-1">
         <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
           {greeting}, <span className="text-brand-gold-dark dark:text-brand-gold">{name}</span>
         </h1>
@@ -34,7 +36,7 @@ export function DashboardHeader({
       </div>
 
       {/* Right side: progreso real de tareas + dark toggle */}
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-3">
         {hasProgress && (
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">

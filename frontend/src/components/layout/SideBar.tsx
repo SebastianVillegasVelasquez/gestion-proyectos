@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { avatarSrc } from "@/features/settings/api/profile.api";
 import { useAuth, useLogout } from "@/features/auth/hooks/use-auth";
 import { Role } from "@/features/auth/types";
 import { initialsFromName } from "@/features/dashboard/utils/greeting";
@@ -311,9 +312,20 @@ export function Sidebar({
       {/* Footer: user + dark toggle */}
       <div className={cn("border-t border-sidebar-border py-4", collapsed ? "md:px-2" : "px-4")}>
         <div className={cn("flex items-center gap-3", collapsed && "md:flex-col md:gap-2")}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-gold/15 text-sm font-semibold text-brand-gold">
-            {user ? initialsFromName(user.name) : "?"}
-          </div>
+          {/* La foto de perfil, si la hay; si no, las iniciales de siempre.
+              Subirla en Configuración se ve aquí sin recargar: la sesión local
+              se actualiza al guardar. */}
+          {avatarSrc(user?.avatar_url) ? (
+            <img
+              src={avatarSrc(user?.avatar_url) ?? ""}
+              alt={user?.name ?? ""}
+              className="h-9 w-9 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-gold/15 text-sm font-semibold text-brand-gold">
+              {user ? initialsFromName(user.name) : "?"}
+            </div>
+          )}
           <div className={cn("min-w-0 flex-1 leading-tight", collapsed && "md:hidden")}>
             <p className="truncate text-sm font-medium text-sidebar-foreground">
               {user?.name ?? "Invitado"}

@@ -1,7 +1,10 @@
 import type { NotificationType } from "../types";
 
 // Etiqueta legible por tipo de notificación (para accesibilidad/agrupar).
-export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+// `Partial`: si el backend estrena un tipo antes que el frontend, el acceso
+// devuelve undefined en vez de fallar el tipado — y `notificationTypeLabel`
+// cae al valor crudo. Nunca desreferenciar este mapa directo: usar el helper.
+export const NOTIFICATION_TYPE_LABELS: Partial<Record<NotificationType, string>> = {
   tarea_asignada: "Tarea asignada",
   tarea_iniciada: "Tarea iniciada",
   tarea_entregada: "Tarea entregada",
@@ -9,6 +12,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   tarea_atrasada: "Tarea atrasada",
   tarea_completada: "Tarea aprobada",
   tarea_devuelta: "Entrega con observaciones",
+  tarea_reprogramada: "Tarea reprogramada",
   dependencia_terceros_fechada: "Actividad de terceros con fecha",
   proyecto_miembro_agregado: "Agregado a un proyecto",
   proyecto_cerrado: "Proyecto cerrado",
@@ -18,14 +22,22 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   comentario_publicado: "Nuevo comentario",
   comentario_respuesta: "Respuesta a tu comentario",
   mencion: "Te mencionaron",
+  recordatorio: "Recordatorio",
 };
+
+/** Etiqueta legible de un tipo, resistente a tipos que el backend estrene y
+ *  aquí aún no estén mapeados: cae al valor crudo (que ya es un string) en vez
+ *  de romper. El `?? type` es lo que evita el "undefined.localeCompare(...)". */
+export function notificationTypeLabel(type: NotificationType): string {
+  return NOTIFICATION_TYPE_LABELS[type] ?? type;
+}
 
 // Las notificaciones no traen "prioridad" del backend; se deriva del tipo para
 // poder filtrarlas y ordenarlas en la vista completa. alta = necesita acción
 // (atrasos, devoluciones, menciones), media = te involucra, baja = informativo.
 export type NotificationPriority = "alta" | "media" | "baja";
 
-const PRIORITY_BY_TYPE: Record<NotificationType, NotificationPriority> = {
+const PRIORITY_BY_TYPE: Partial<Record<NotificationType, NotificationPriority>> = {
   tarea_asignada: "media",
   tarea_iniciada: "baja",
   tarea_entregada: "media",
@@ -33,6 +45,7 @@ const PRIORITY_BY_TYPE: Record<NotificationType, NotificationPriority> = {
   tarea_atrasada: "alta",
   tarea_completada: "media",
   tarea_devuelta: "alta",
+  tarea_reprogramada: "media",
   dependencia_terceros_fechada: "media",
   proyecto_miembro_agregado: "media",
   proyecto_cerrado: "baja",
@@ -42,10 +55,11 @@ const PRIORITY_BY_TYPE: Record<NotificationType, NotificationPriority> = {
   comentario_publicado: "media",
   comentario_respuesta: "media",
   mencion: "alta",
+  recordatorio: "media",
 };
 
 export function notificationPriority(type: NotificationType): NotificationPriority {
-  return PRIORITY_BY_TYPE[type];
+  return PRIORITY_BY_TYPE[type] ?? "media";
 }
 
 export const NOTIFICATION_PRIORITY_LABELS: Record<NotificationPriority, string> = {

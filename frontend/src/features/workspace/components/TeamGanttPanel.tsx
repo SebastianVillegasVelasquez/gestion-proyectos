@@ -18,7 +18,17 @@ import { GanttView } from "@/features/projects/gantt/components/GanttView";
  * Un equipo vive dentro de un proyecto, así que `projectId` siempre existe y
  * todas las tareas del equipo pertenecen a ese proyecto.
  */
-export function TeamGanttPanel({ projectId, teamId }: { projectId: string; teamId: string }) {
+export function TeamGanttPanel({
+  projectId,
+  teamId,
+  assigneeId,
+}: {
+  projectId: string;
+  teamId: string;
+  /** Recorta además a una persona: es lo que ve un integrante (solo su trabajo);
+   *  el líder/supervisor lo recibe vacío y ve el equipo entero. */
+  assigneeId?: string;
+}) {
   const { dark, toggleDark } = useOutletContext<AppOutletContext>();
   const { data: project, isLoading, isError } = useProject(projectId);
 
@@ -44,5 +54,12 @@ export function TeamGanttPanel({ projectId, teamId }: { projectId: string; teamI
     );
   }
 
-  return <GanttView project={project} dark={dark} onToggleDark={toggleDark} embed={{ teamId }} />;
+  return (
+    <GanttView
+      project={project}
+      dark={dark}
+      onToggleDark={toggleDark}
+      embed={{ teamId, assigneeId }}
+    />
+  );
 }

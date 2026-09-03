@@ -11,6 +11,7 @@ export function ProjectTrazabilidadPage() {
       title="Trazabilidad"
       icon={History}
       accentClass="bg-slate-500/10 text-slate-600 dark:text-slate-300"
+      wide
     >
       <TraceabilityPanel projectId={projectId!} />
     </ProjectSectionShell>

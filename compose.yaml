@@ -28,6 +28,9 @@ services:
       - ./backend:/app
       - /app/.venv
       - ./backend/entrypoint.sh:/app/entrypoint.sh
+      # Lo que suben los usuarios (fotos de perfil, archivos de proyecto) vive
+      # fuera del contenedor: un `docker compose down` no puede llevárselo.
+      - storage-data:/app/var/storage
     depends_on:
       - db
     networks:
@@ -57,6 +60,7 @@ services:
 
 volumes:
   postgres-data:
+  storage-data:
 
 networks:
   bitacora-network:

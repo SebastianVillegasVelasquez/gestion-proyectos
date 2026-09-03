@@ -13,6 +13,11 @@ export interface AuthUser {
   // admin. Mientras sea true la app bloquea todo con el modal de bienvenida
   // hasta que la persona crea su propia contraseña.
   must_change_password?: boolean;
+  /** Ruta de la foto de perfil RELATIVA a la API (o null si no tiene). Se
+   *  compone con `VITE_API_URL` al pintarla: el dominio cambia por entorno. */
+  avatar_url?: string | null;
+  /** Presentación breve que la persona escribe sobre sí misma. */
+  bio?: string | null;
 }
 
 export interface LoginResponse {
