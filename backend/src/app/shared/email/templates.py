@@ -308,6 +308,62 @@ def overdue_task_email(
     )
 
 
+def due_soon_task_email(
+    *,
+    name: str,
+    task_title: str,
+    project_name: str,
+    due_date: date,
+    days_left: int,
+    task_url: str = "",
+) -> RenderedEmail:
+    """Aviso preventivo: una tarea del responsable está por vencer."""
+    plural = "día" if days_left == 1 else "días"
+    subject = f"Tarea por vencer: {task_title}"
+    body = (
+        _h("Tienes una tarea por vencer")
+        + _p(
+            f"Hola {name}, la siguiente tarea vence pronto y sigue sin marcarse "
+            "como completada:"
+        )
+        + _facts(
+            [
+                ("Tarea", task_title),
+                ("Proyecto", project_name),
+                ("Vence", due_date.strftime("%d/%m/%Y")),
+                (
+                    "Tiempo restante",
+                    f'<span style="color:{GOLD};">{days_left} {plural}</span>',
+                ),
+            ]
+        )
+        + _p(
+            "Si ya la terminaste, m&aacute;rcala como <em>en revisi&oacute;n</em> y sube "
+            "tu entregable. Si necesitas m&aacute;s tiempo, avisa a tu l&iacute;der con "
+            "anticipaci&oacute;n."
+        )
+        + _button("Abrir la tarea", task_url, color=GOLD)
+    )
+    text = (
+        f"Hola {name},\n\n"
+        f'La tarea "{task_title}" del proyecto "{project_name}" vence en '
+        f"{days_left} {plural} ({due_date.strftime('%d/%m/%Y')}).\n\n"
+        "Si ya la terminaste, márcala como en revisión y sube tu entregable. "
+        "Si necesitas más tiempo, avisa a tu líder con anticipación.\n"
+    )
+    if task_url:
+        text += f"\nAbrir la tarea: {task_url}\n"
+    return RenderedEmail(
+        subject=subject,
+        html=_shell(
+            title=subject,
+            preheader=f"{task_title} vence en {days_left} {plural}.",
+            body_html=body,
+        ),
+        text=text,
+    )
+
+
 def deliverable_submitted_email(
     *,
     leader_name: str,

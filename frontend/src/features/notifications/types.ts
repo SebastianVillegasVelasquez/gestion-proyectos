@@ -5,10 +5,12 @@
 // por defecto), pero sí sale sin etiqueta bonita.
 export type NotificationType =
   | "tarea_asignada"
+  | "subtarea_asignada"
   | "tarea_iniciada"
   | "tarea_entregada"
   | "tarea_rechazada"
   | "tarea_atrasada"
+  | "tarea_por_vencer"
   | "tarea_completada"
   | "tarea_devuelta"
   | "tarea_reprogramada"

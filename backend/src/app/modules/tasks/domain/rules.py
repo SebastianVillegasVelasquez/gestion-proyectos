@@ -69,18 +69,38 @@ DELIVERY_BLOCKED_BY_THIRD_PARTY = (
     "No puedes entregar: la actividad de terceros de la que depende este "
     "trabajo aún no fue entregada."
 )
+DELIVERY_BLOCKED_BY_OPEN_SUBTASKS = (
+    "No puedes entregar: todavía hay subtareas sin terminar."
+)
+
+
+def has_open_subtasks(subtasks) -> bool:
+    """True si alguna subtarea sigue sin cerrarse (ni COMPLETADA ni CANCELADA).
+
+    Una tarea padre ES el entregable (su avance es el promedio del de sus
+    subtareas — ver `compute_task_progress`), así que entregarla mientras una
+    subtarea sigue abierta dejaría un entregable que no refleja el trabajo
+    real. Cancelada SÍ cuenta como "cerrada": ya no representa trabajo
+    pendiente.
+    """
+    return any(s.status not in _TERMINAL for s in subtasks)
 
 
 def delivery_block_reason(
-    dependencies, has_undelivered_third_party_ancestor: bool
+    dependencies,
+    has_undelivered_third_party_ancestor: bool,
+    open_subtasks: bool = False,
 ) -> str | None:
     """Motivo por el que la tarea no se puede entregar todavía, o None si se
     puede. El orden importa: primero las dependencias directas incompletas,
-    luego el ancestro «actividad de terceros» sin entregar."""
+    luego el ancestro «actividad de terceros» sin entregar, y por último las
+    subtareas propias sin terminar."""
     if incomplete_dependency_ids(dependencies):
         return DELIVERY_BLOCKED_BY_DEPENDENCY
     if has_undelivered_third_party_ancestor:
         return DELIVERY_BLOCKED_BY_THIRD_PARTY
+    if open_subtasks:
+        return DELIVERY_BLOCKED_BY_OPEN_SUBTASKS
     return None
 
 

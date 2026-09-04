@@ -66,3 +66,61 @@ class TestSelfDependency:
 
     def test_allows_different_ids(self):
         assert rules.is_self_dependency(uuid.uuid4(), uuid.uuid4()) is False
+
+
+class TestHasOpenSubtasks:
+    def test_false_without_subtasks(self):
+        assert rules.has_open_subtasks([]) is False
+
+    def test_false_when_all_completed_or_cancelled(self):
+        subtasks = [
+            SimpleNamespace(status=TaskStatus.COMPLETADA),
+            SimpleNamespace(status=TaskStatus.CANCELADA),
+        ]
+        assert rules.has_open_subtasks(subtasks) is False
+
+    def test_true_when_one_still_open(self):
+        subtasks = [
+            SimpleNamespace(status=TaskStatus.COMPLETADA),
+            SimpleNamespace(status=TaskStatus.EN_PROGRESO),
+        ]
+        assert rules.has_open_subtasks(subtasks) is True
+
+    def test_en_revision_still_counts_as_open(self):
+        # "Entregada" no basta: como con las dependencias, hace falta COMPLETADA.
+        assert (
+            rules.has_open_subtasks([SimpleNamespace(status=TaskStatus.EN_REVISION)])
+            is True
+        )
+
+
+class TestDeliveryBlockReason:
+    """Orden de las tres compuertas: dependencia directa > tercero ancestro >
+    subtareas propias sin terminar. Solo la primera que aplique se reporta."""
+
+    def test_none_when_nothing_blocks(self):
+        assert rules.delivery_block_reason([], False, False) is None
+
+    def test_open_subtasks_block_when_nothing_else_does(self):
+        assert (
+            rules.delivery_block_reason([], False, True)
+            == rules.DELIVERY_BLOCKED_BY_OPEN_SUBTASKS
+        )
+
+    def test_dependency_takes_priority_over_open_subtasks(self):
+        deps = [_dep(uuid.uuid4(), TaskStatus.EN_PROGRESO)]
+        assert (
+            rules.delivery_block_reason(deps, False, True)
+            == rules.DELIVERY_BLOCKED_BY_DEPENDENCY
+        )
+
+    def test_third_party_takes_priority_over_open_subtasks(self):
+        assert (
+            rules.delivery_block_reason([], True, True)
+            == rules.DELIVERY_BLOCKED_BY_THIRD_PARTY
+        )
+
+    def test_open_subtasks_defaults_to_false_for_backward_compatibility(self):
+        # Los llamadores que todavía no pasan el tercer argumento (listados
+        # masivos de tareas) no deben verse afectados por este cambio.
+        assert rules.delivery_block_reason([], False) is None

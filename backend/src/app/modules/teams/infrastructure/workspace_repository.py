@@ -217,7 +217,15 @@ class SqlAlchemyWorkspaceRepository(WorkspaceRepository):
         has_tp_ancestor = task.work_item_id is not None and (
             await task_repo.has_undelivered_third_party_ancestor(task.work_item_id)
         )
-        return rules.delivery_block_reason(deps, has_tp_ancestor)
+        # Una tarea padre ES el entregable: mientras una subtarea suya siga
+        # abierta, entregar dejaría un entregable que no refleja el trabajo
+        # real (el avance del padre tampoco habría llegado al 100%). Las
+        # propias subtareas no tienen subtareas (un solo nivel de anidado), así
+        # que esto nunca bloquea la entrega de una subtarea por sí misma.
+        subtasks = await task_repo.get_subtasks(task.id)
+        return rules.delivery_block_reason(
+            deps, has_tp_ancestor, rules.has_open_subtasks(subtasks)
+        )
 
     async def transition_task(
         self,

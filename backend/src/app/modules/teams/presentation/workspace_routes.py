@@ -261,10 +261,11 @@ async def add_comment(
     deliverable_id: UUID,
     data: AddCommentRequest,
     repo=Depends(workspace_repo_dependency),
+    notifier=Depends(deliverable_notifier_dependency),
     bus=Depends(event_bus_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await WorkspaceService(repo, bus=bus).add_comment(
+    return await WorkspaceService(repo, notifier, bus=bus).add_comment(
         team_id, deliverable_id, data, current_user
     )
 

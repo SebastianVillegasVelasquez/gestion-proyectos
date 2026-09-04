@@ -4,10 +4,17 @@ import enum
 class NotificationType(str, enum.Enum):
     # Notificacion para todos los usuarios acerca de tareas
     TAREA_ASIGNADA = "tarea_asignada"
+    # Igual que TAREA_ASIGNADA pero cuando la tarea es una SUBTAREA (cuelga de
+    # otra tarea vía `parent_task_id`): quien la recibe necesita distinguirla
+    # de una tarea general del elemento, no solo leer el mismo mensaje.
+    SUBTAREA_ASIGNADA = "subtarea_asignada"
     TAREA_INICIADA = "tarea_iniciada"
     TAREA_ENTREGADA = "tarea_entregada"
     TAREA_RECHAZADA = "tarea_rechazada"
     TAREA_ATRASADA = "tarea_atrasada"
+    # Aviso preventivo: la tarea aún no vence, pero está a `DUE_SOON_DAYS` días
+    # o menos de su `due_date` y sigue sin completarse.
+    TAREA_POR_VENCER = "tarea_por_vencer"
     TAREA_COMPLETADA = "tarea_completada"
     TAREA_DEVUELTA = "tarea_devuelta"
 

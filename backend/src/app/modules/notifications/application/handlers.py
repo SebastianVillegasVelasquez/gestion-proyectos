@@ -155,7 +155,7 @@ class NotifyOnMemberAssignedToProject:
             notification_type=NotificationType.PROYECTO_MIEMBRO_AGREGADO,
             message="Fuiste agregado a un proyecto",
             payload={
-                "work_item_id": str(event.project_id),
+                "project_id": str(event.project_id),
                 "project_role": event.project_role.value,
             },
         )
@@ -198,8 +198,16 @@ class NotifyOnTaskCreated:
 
         notification = Notification(
             user_to_id=event.assigned_id,
-            notification_type=NotificationType.TAREA_ASIGNADA,
-            message="Te asignaron una nueva tarea. Revisa los detalles antes de iniciarla.",
+            notification_type=(
+                NotificationType.SUBTAREA_ASIGNADA
+                if event.is_subtask
+                else NotificationType.TAREA_ASIGNADA
+            ),
+            message=(
+                "Te asignaron una nueva subtarea. Revisa los detalles antes de iniciarla."
+                if event.is_subtask
+                else "Te asignaron una nueva tarea. Revisa los detalles antes de iniciarla."
+            ),
             payload={
                 "work_item_id": str(event.work_item_id) if event.work_item_id else None,
                 "task_id": str(event.task_id),
@@ -336,8 +344,16 @@ class NotifyOnTaskAssigned:
             Notification(
                 user_to_id=event.assignee_id,
                 actor_id=event.assigned_by,
-                notification_type=NotificationType.TAREA_ASIGNADA,
-                message="Te asignaron una tarea. Revisa los detalles antes de iniciarla.",
+                notification_type=(
+                    NotificationType.SUBTAREA_ASIGNADA
+                    if event.is_subtask
+                    else NotificationType.TAREA_ASIGNADA
+                ),
+                message=(
+                    "Te asignaron una subtarea. Revisa los detalles antes de iniciarla."
+                    if event.is_subtask
+                    else "Te asignaron una tarea. Revisa los detalles antes de iniciarla."
+                ),
                 payload={
                     "work_item_id": (
                         str(event.work_item_id) if event.work_item_id else None
