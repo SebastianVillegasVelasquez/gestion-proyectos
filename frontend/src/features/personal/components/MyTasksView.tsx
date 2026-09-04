@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   CalendarRange,
   ExternalLink,
+  FolderKanban,
   LayoutList,
   Network,
   Users2,
@@ -128,6 +129,31 @@ export function MyTasksView({
   // Filtra por subárbol: elegir una rama trae todo lo que cuelga de ella.
   const [elementKey, setElementKey] = useState<string | null>(null);
 
+  // Filtro por proyecto: con varios proyectos, Estructura y Cronograma
+  // apilaban un bloque por proyecto uno debajo del otro. Se elige UNO y se
+  // ve por defecto el primero (alfabético), en vez de todo apilado.
+  const projectOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const t of tasks) {
+      byId.set(t.project_id, t.project_name);
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks]);
+  const [projectId, setProjectId] = useState<string | null>(null);
+
+  // Si el proyecto elegido deja de existir en el conjunto (cambia el filtro
+  // de estado/alcance) o todavía no hay ninguno elegido, cae al primero.
+  useEffect(() => {
+    if (projectOptions.length === 0) {
+      return;
+    }
+    if (!projectId || !projectOptions.some((p) => p.id === projectId)) {
+      setProjectId(projectOptions[0].id);
+    }
+  }, [projectOptions, projectId]);
+
   // Las opciones del filtro salen del conjunto YA acotado por los demás filtros
   // (menos el propio elemento): ofrecer ramas que no traerían nada sería ruido.
   const elementOptions = useMemo(
@@ -141,9 +167,10 @@ export function MyTasksView({
               : scope === "equipo"
                 ? t.team_id !== null
                 : true,
-          ),
+          )
+          .filter((t) => !projectId || t.project_id === projectId),
       ),
-    [tasks, filter, scope, today],
+    [tasks, filter, scope, projectId, today],
   );
   const element = useMemo(
     () => elementOptions.find((o) => o.key === elementKey) ?? null,
@@ -164,12 +191,13 @@ export function MyTasksView({
         }
         return true;
       })
+      .filter(({ task }) => !projectId || task.project_id === projectId)
       .filter(({ task }) => !element || taskMatchesElement(task, element))
       .filter(
         ({ task }) =>
           !q || task.title.toLowerCase().includes(q) || task.project_name.toLowerCase().includes(q),
       );
-  }, [tasks, filter, scope, query, element, today]);
+  }, [tasks, filter, scope, projectId, query, element, today]);
 
   const filteredTasks = useMemo(() => rows.map((r) => r.task), [rows]);
 
@@ -297,6 +325,26 @@ export function MyTasksView({
           ))}
         </div>
 
+        {projectOptions.length > 1 && (
+          <label className="flex h-[34px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-sm">
+            <FolderKanban className="size-3.5 shrink-0 text-muted-foreground" />
+            <select
+              value={projectId ?? ""}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+              }}
+              aria-label="Proyecto"
+              className="max-w-[220px] bg-transparent text-sm text-foreground outline-none"
+            >
+              {projectOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <input
           value={query}
           onChange={(e) => {
@@ -318,23 +366,26 @@ export function MyTasksView({
           onOpenIndividual={onOpenIndividual}
         />
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-accent/20 p-3">
           {byProject.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
               Nada que coincida con el filtro.
             </p>
           ) : (
             byProject.map((group) => (
-              <section key={group.name}>
-                <h3 className="sticky top-0 z-10 bg-accent/50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+              <section key={group.name} className="mb-3 last:mb-0">
+                <h3 className="px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {group.name}
                 </h3>
-                <ul className="divide-y divide-border">
+                <ul className="flex flex-col gap-2">
                   {group.items.map(({ task, status }) => {
                     const remaining = status === "done" ? null : daysUntil(task.due_date, today);
                     const hasDeliverable = deliverableTaskIds.has(task.id);
                     return (
-                      <li key={task.id} className="flex flex-col gap-1.5 px-4 py-2.5">
+                      <li
+                        key={task.id}
+                        className="flex flex-col gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-2.5 shadow-sm"
+                      >
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                           <span className="min-w-[160px] flex-1 truncate text-sm font-medium text-foreground">
                             {task.title}

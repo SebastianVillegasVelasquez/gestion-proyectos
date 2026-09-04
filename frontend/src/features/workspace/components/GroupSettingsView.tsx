@@ -411,7 +411,7 @@ function Toggle({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 py-2">
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <span className="text-[13px] text-slate-600 dark:text-slate-300">{label}</span>
       {/* Checkbox real (accesible por teclado y lectores de pantalla) escondido
           bajo un track pintado con `peer-*`. */}
@@ -446,7 +446,7 @@ function NotificationsCard({ teamId, isMember }: { teamId: string; isMember: boo
           <p className="mb-1 text-[11px] text-slate-400 dark:text-slate-500">
             Estas preferencias son tuyas y aplican solo a este equipo.
           </p>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="flex flex-col gap-1.5 rounded-lg bg-slate-50 p-1.5 dark:bg-slate-950/40">
             {NOTIFICATION_ROWS.map((row) => (
               <Toggle
                 key={row.key}

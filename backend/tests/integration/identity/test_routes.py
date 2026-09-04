@@ -179,6 +179,88 @@ class TestCreateUserAdminRoute:
         )
         assert login.status_code == 200
 
+    async def test_resend_activation_link_only_latest_token_works(
+        self, client, admin_headers
+    ):
+        # Reenviar el correo de activación n veces reemplaza el token cada vez:
+        # solo el último enlace emitido debe funcionar, los anteriores quedan
+        # invalidados (no caducados, reemplazados) de inmediato.
+        created = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "reenvios@example.com",
+                "name": "Con",
+                "last_name": "Reenvios",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+        assert created.status_code == 201, created.text
+        user_id = created.json()["id"]
+        first_token = created.json()["activation_url"].split("token=", 1)[1]
+
+        resends = []
+        for _ in range(3):
+            resp = await client.post(
+                f"/api/v1/identity/users/{user_id}/activation-link",
+                headers=admin_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            resends.append(resp.json()["activation_url"].split("token=", 1)[1])
+
+        # El primer token (del alta) y los intermedios ya no valen.
+        stale = await client.get(f"/api/v1/identity/activation/{first_token}")
+        assert stale.status_code == 401
+        for stale_token in resends[:-1]:
+            resp = await client.get(f"/api/v1/identity/activation/{stale_token}")
+            assert resp.status_code == 401
+
+        # El último enlace emitido sigue siendo válido y activa la cuenta.
+        latest_token = resends[-1]
+        info = await client.get(f"/api/v1/identity/activation/{latest_token}")
+        assert info.status_code == 200
+        assert info.json()["email"] == "reenvios@example.com"
+
+        done = await client.post(
+            "/api/v1/identity/activation/complete",
+            json={"token": latest_token, "new_password": "elegida123"},
+        )
+        assert done.status_code == 200, done.text
+
+    async def test_resend_activation_link_rejected_once_account_is_active(
+        self, client, admin_headers
+    ):
+        # El enlace de activación fija la contraseña sin pedir la actual: sobre
+        # una cuenta ya activa equivaldría a un reseteo de contraseña sin rastro
+        # de auditoría, así que reenviar debe rechazarse tras activar.
+        created = await client.post(
+            "/api/v1/identity/users",
+            json={
+                "email": "yaactiva@example.com",
+                "name": "Ya",
+                "last_name": "Activa",
+                "role": "user",
+                "position": "desarrollador",
+            },
+            headers=admin_headers,
+        )
+        assert created.status_code == 201, created.text
+        user_id = created.json()["id"]
+        token = created.json()["activation_url"].split("token=", 1)[1]
+
+        done = await client.post(
+            "/api/v1/identity/activation/complete",
+            json={"token": token, "new_password": "elegida123"},
+        )
+        assert done.status_code == 200, done.text
+
+        resend = await client.post(
+            f"/api/v1/identity/users/{user_id}/activation-link",
+            headers=admin_headers,
+        )
+        assert resend.status_code == 409
+
     async def test_should_return_422_when_role_is_invalid(self, client, admin_headers):
         response = await client.post(
             "/api/v1/identity/users",

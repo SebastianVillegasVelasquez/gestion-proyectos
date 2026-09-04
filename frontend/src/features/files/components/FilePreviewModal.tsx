@@ -61,9 +61,21 @@ function Viewer({ file, url }: { file: PreviewableFile; url: string }) {
   const frame = "h-full w-full rounded-lg border border-border bg-card";
   switch (previewKind(file.contentType)) {
     case "image":
-      return <img src={url} alt={file.name} className="mx-auto max-h-full object-contain" />;
+      return (
+        <div className="inline-block rounded-xl border border-border bg-card p-3 shadow-lg">
+          <img
+            src={url}
+            alt={file.name}
+            className="max-h-[75vh] max-w-full rounded-md object-contain"
+          />
+        </div>
+      );
     case "video":
-      return <video src={url} controls className="mx-auto max-h-full" />;
+      return (
+        <div className="inline-block rounded-xl border border-border bg-card p-3 shadow-lg">
+          <video src={url} controls className="max-h-[75vh] max-w-full rounded-md" />
+        </div>
+      );
     case "audio":
       return <audio src={url} controls className="w-full" />;
     case "pdf":
@@ -143,7 +155,7 @@ export function FilePreviewModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-auto bg-accent/30 p-3">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-black/[0.06] p-4 dark:bg-black/40">
           {!supported || error !== null ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <FileWarning className="size-7 text-amber-500" />
