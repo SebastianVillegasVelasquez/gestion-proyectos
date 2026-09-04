@@ -148,45 +148,36 @@ function TaskLeaf({
               Bloqueada
             </span>
           )}
-          {isSubtask
-            ? onMarkDelivered &&
-              canDeliverNow && (
+          {canDeliverNow && (
+            <>
+              {onDeliver && (
+                <button
+                  type="button"
+                  onClick={onDeliver}
+                  title="Entregar con un adjunto (crea un entregable revisable)"
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1 text-[11px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
+                >
+                  <UploadCloud className="size-3.5" />
+                  Entregar
+                </button>
+              )}
+              {onMarkDelivered && (
                 <button
                   type="button"
                   onClick={onMarkDelivered}
-                  title="Marcar esta subtarea como realizada"
-                  className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-teal/40 px-2 py-1 text-[11px] font-semibold text-brand-teal-dark transition-colors hover:bg-brand-teal/10 dark:text-brand-teal"
+                  title={
+                    isSubtask
+                      ? "Marcar esta subtarea como realizada, sin adjunto"
+                      : "Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
+                  }
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
                 >
                   <Check className="size-3.5" />
-                  Marcar como realizada
+                  {isSubtask ? "Marcar como realizada" : "Sin adjunto"}
                 </button>
-              )
-            : canDeliverNow && (
-                <>
-                  {onDeliver && (
-                    <button
-                      type="button"
-                      onClick={onDeliver}
-                      title="Entregar con un adjunto (crea un entregable revisable)"
-                      className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1 text-[11px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
-                    >
-                      <UploadCloud className="size-3.5" />
-                      Entregar
-                    </button>
-                  )}
-                  {onMarkDelivered && (
-                    <button
-                      type="button"
-                      onClick={onMarkDelivered}
-                      title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
-                      className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
-                    >
-                      <Check className="size-3.5" />
-                      Sin adjunto
-                    </button>
-                  )}
-                </>
               )}
+            </>
+          )}
         </span>
       </div>
 

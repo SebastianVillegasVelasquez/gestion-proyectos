@@ -161,9 +161,12 @@ describe("WorkspaceStructureView", () => {
   //    aquí ejercitadas contra el árbol de la Estructura — donde el bug vivía:
   //    esta vista ofrecía Entregar/Sin adjunto a CUALQUIER tarea (incluidas
   //    subtareas y padres con subtareas abiertas) porque nunca miraba
-  //    `parent_task_id` ni `progress_pct`, solo `canDeliverTask`. ────────────
+  //    `parent_task_id` ni `progress_pct`, solo `canDeliverTask`. Una subtarea
+  //    lista SÍ ofrece Entregar (con adjunto) además de Marcar como
+  //    realizada — el padre con subtareas abiertas, ninguno de los dos. ─────
 
-  it("una tarea padre con subtareas sin terminar no ofrece Entregar", () => {
+  it("una tarea padre con subtareas sin terminar no ofrece Entregar (solo la subtarea lista lo ofrece)", () => {
+    const onDeliverTask = vi.fn();
     renderView(
       <WorkspaceStructureView
         {...base}
@@ -178,17 +181,18 @@ describe("WorkspaceStructureView", () => {
             status: "en_progreso",
           }),
         ]}
-        onDeliverTask={vi.fn()}
+        onDeliverTask={onDeliverTask}
         onMarkDeliveredTask={vi.fn()}
         canDeliverTask={() => true}
       />,
     );
-    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sin adjunto/i })).not.toBeInTheDocument();
+    const entregarButtons = screen.getAllByRole("button", { name: /^entregar$/i });
+    expect(entregarButtons).toHaveLength(1);
   });
 
-  it("una subtarea nunca ofrece Entregar/Sin adjunto: solo Comenzar y luego Marcar como realizada", async () => {
+  it("una subtarea sin iniciar ofrece Comenzar; ya en progreso, Entregar y Marcar como realizada", async () => {
     const user = userEvent.setup();
+    const onDeliverTask = vi.fn();
     const onMarkDeliveredTask = vi.fn();
     const { rerender } = renderView(
       <WorkspaceStructureView
@@ -205,7 +209,7 @@ describe("WorkspaceStructureView", () => {
             assignee_name: "Ana",
           }),
         ]}
-        onDeliverTask={vi.fn()}
+        onDeliverTask={onDeliverTask}
         onMarkDeliveredTask={onMarkDeliveredTask}
         canDeliverTask={() => true}
       />,
@@ -218,7 +222,7 @@ describe("WorkspaceStructureView", () => {
       screen.queryByRole("button", { name: /marcar como realizada/i }),
     ).not.toBeInTheDocument();
 
-    // Ya en progreso: "Marcar como realizada" y solo eso.
+    // Ya en progreso: ambos botones de entrega.
     rerender(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
@@ -237,14 +241,15 @@ describe("WorkspaceStructureView", () => {
               assignee_name: "Ana",
             }),
           ]}
-          onDeliverTask={vi.fn()}
+          onDeliverTask={onDeliverTask}
           onMarkDeliveredTask={onMarkDeliveredTask}
           canDeliverTask={() => true}
         />
       </QueryClientProvider>,
     );
     expect(screen.queryByRole("button", { name: /comenzar/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^entregar$/i }));
+    expect(onDeliverTask).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
     await user.click(screen.getByRole("button", { name: /marcar como realizada/i }));
     expect(onMarkDeliveredTask).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
   });

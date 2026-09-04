@@ -369,7 +369,7 @@ function DeliveryTimeline({
 
 // ── Registrar entrega: una URL, o un archivo (elegido o arrastrado) ──────────
 
-interface RegisterDeliveryProps {
+export interface RegisterDeliveryProps {
   onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
   /** Entrega un archivo. Va por su propio camino (multipart) y el servidor lo
    *  guarda en la carpeta del equipo —o en la de la persona, si la tarea es
@@ -383,7 +383,7 @@ interface RegisterDeliveryProps {
   onDone?: () => void;
 }
 
-function RegisterDelivery({
+export function RegisterDelivery({
   onAddVersion,
   onUploadFile,
   uploading = false,

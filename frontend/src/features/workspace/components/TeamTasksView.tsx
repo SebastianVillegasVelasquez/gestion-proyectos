@@ -172,15 +172,16 @@ function BlockedDeliveryBadge({ reason }: { reason: string }) {
 }
 
 /**
- * Acciones de entrega de una fila que ya está lista:
+ * Acciones de entrega de una fila que ya está lista: tarea PADRE al 100%
+ * (todas sus subtareas hechas) o SUBTAREA ya en progreso. Ninguna de las dos
+ * es un entregable "ajeno" — cada una entrega la SUYA, así que ambas ofrecen
+ * las mismas dos vías:
  *
- * - Tarea PADRE al 100% (todas sus subtareas hechas): ES el entregable, y su
- *   responsable lo entrega aquí mismo con las dos vías de siempre (con
- *   adjunto, o "sin adjunto"). Reusa el flujo de la pestaña Entregables (mismo
- *   modal, misma aprobación).
- * - SUBTAREA en progreso: nunca es un entregable en sí misma, así que ofrece
- *   un único botón, "Marcar como realizada" (mismo camino que "sin adjunto":
- *   crea el entregable interno que sigue el flujo de revisión habitual).
+ * - "Entregar": adjunta evidencia (URL o archivo). Crea el entregable y su
+ *   primera versión en un solo paso (`QuickDeliverModal`), sin salir de la
+ *   vista donde se está trabajando.
+ * - "Marcar como realizada" / "Sin adjunto": entrega sin evidencia — mismo
+ *   entregable interno, sin adjunto.
  *
  * No aparece para quien no es el responsable (ese solo ve el badge de avance).
  */
@@ -190,29 +191,9 @@ function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
     return null;
   }
 
-  if (task.parent_task_id !== null) {
-    if (!isSubtaskReadyToComplete(task) || !cbs.onMarkDelivered) {
-      return null;
-    }
-    if (task.delivery_blocked_reason !== null) {
-      return <BlockedDeliveryBadge reason={task.delivery_blocked_reason} />;
-    }
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          cbs.onMarkDelivered?.(task);
-        }}
-        title="Marcar esta subtarea como realizada"
-        className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-teal/40 px-2 py-1 text-[11px] font-semibold text-brand-teal-dark transition-colors hover:bg-brand-teal/10 dark:text-brand-teal"
-      >
-        <Check className="size-3.5" />
-        Marcar como realizada
-      </button>
-    );
-  }
-
-  if (!isDeliverableReady(task)) {
+  const isSubtask = task.parent_task_id !== null;
+  const ready = isSubtask ? isSubtaskReadyToComplete(task) : isDeliverableReady(task);
+  if (!ready) {
     return null;
   }
   if (task.delivery_blocked_reason !== null) {
@@ -239,11 +220,15 @@ function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
           onClick={() => {
             cbs.onMarkDelivered?.(task);
           }}
-          title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
+          title={
+            isSubtask
+              ? "Marcar esta subtarea como realizada, sin adjunto"
+              : "Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
+          }
           className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           <Check className="size-3.5" />
-          Sin adjunto
+          {isSubtask ? "Marcar como realizada" : "Sin adjunto"}
         </button>
       )}
     </>

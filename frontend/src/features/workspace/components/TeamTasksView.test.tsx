@@ -249,8 +249,9 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
     } as never);
   });
 
-  it("una tarea padre con una subtarea abierta no ofrece Entregar todavía", async () => {
+  it("una tarea padre con una subtarea abierta no ofrece Entregar todavía (solo la subtarea abierta lo ofrece)", async () => {
     const user = userEvent.setup();
+    const onDeliver = vi.fn();
     renderView(
       false,
       [
@@ -270,12 +271,17 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
           status: "en_progreso",
         }),
       ],
-      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+      { onDeliver, onMarkDelivered: vi.fn(), canDeliverTask: () => true },
     );
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
-    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Sin adjunto/i })).toBeNull();
+    // El único "Entregar" en pantalla es el de la subtarea abierta (la que sí
+    // está lista); el padre, con la otra subtarea todavía sin cerrar, no
+    // ofrece ninguno.
+    const entregarButtons = screen.getAllByRole("button", { name: /^Entregar$/i });
+    expect(entregarButtons).toHaveLength(1);
+    await user.click(entregarButtons[0]);
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "open" }));
   });
 
   it("una tarea padre al 100% ofrece Entregar y Sin adjunto", async () => {
@@ -294,8 +300,9 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
     expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "parent" }));
   });
 
-  it("una subtarea en progreso ofrece 'Marcar como realizada' y no 'Entregar'", async () => {
+  it("una subtarea en progreso ofrece 'Entregar' y 'Marcar como realizada'", async () => {
     const user = userEvent.setup();
+    const onDeliver = vi.fn();
     const onMarkDelivered = vi.fn();
     renderView(
       false,
@@ -308,11 +315,12 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
           status: "en_progreso",
         }),
       ],
-      { onDeliver: vi.fn(), onMarkDelivered, canDeliverTask: () => true },
+      { onDeliver, onMarkDelivered, canDeliverTask: () => true },
     );
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
-    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /^Entregar$/i }));
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
     await user.click(screen.getByRole("button", { name: /Marcar como realizada/i }));
     expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
   });
