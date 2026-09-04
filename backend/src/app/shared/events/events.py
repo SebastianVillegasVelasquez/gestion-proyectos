@@ -41,6 +41,9 @@ class TaskCreated(DomainEvent):
     # Equipo de la tarea, si está delegada a uno: deja que el manejador de
     # notificaciones respete las preferencias por-equipo del destinatario.
     team_id: uuid.UUID | None = None
+    # True si cuelga de otra tarea (`parent_task_id`): el manejador de
+    # notificaciones avisa distinto una subtarea de una tarea general.
+    is_subtask: bool = False
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,9 @@ class TaskAssigned(DomainEvent):
     project_id: uuid.UUID | None = None
     team_id: uuid.UUID | None = None
     work_item_id: uuid.UUID | None = None
+    # True si cuelga de otra tarea (`parent_task_id`): mismo motivo que en
+    # `TaskCreated`.
+    is_subtask: bool = False
 
 
 @dataclass(frozen=True)

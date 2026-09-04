@@ -19,10 +19,12 @@ import type { NotificationType } from "../types";
 // tipo nuevo aún no mapeado, caemos a la campana sin romper.
 export const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
   tarea_asignada: ClipboardList,
+  subtarea_asignada: ClipboardList,
   tarea_iniciada: PlayCircle,
   tarea_entregada: CheckCircle2,
   tarea_rechazada: Undo2,
   tarea_atrasada: AlertTriangle,
+  tarea_por_vencer: AlarmClock,
   tarea_completada: CheckCircle2,
   tarea_devuelta: Undo2,
   tarea_reprogramada: CalendarClock,
@@ -43,11 +45,14 @@ export const TYPE_ICON: Partial<Record<NotificationType, LucideIcon>> = {
 export const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   tarea_asignada:
     "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
+  subtarea_asignada:
+    "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
   tarea_iniciada:
     "bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal",
   tarea_entregada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   tarea_rechazada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
   tarea_atrasada: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
+  tarea_por_vencer: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
   tarea_completada: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300",
   tarea_devuelta: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300",
   proyecto_miembro_agregado:

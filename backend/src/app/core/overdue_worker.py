@@ -28,15 +28,22 @@ async def _overdue_loop(settings: Settings) -> None:
     interval = max(1, settings.OVERDUE_SCAN_INTERVAL_HOURS) * 3600
     await asyncio.sleep(30)  # deja terminar el arranque (seed, migraciones)
     from app.modules.notifications.application.overdue_scan import (
+        scan_due_soon_tasks,
         scan_overdue_tasks,
     )
 
     while True:
         try:
             async with AsyncSessionLocal() as session:
+                email_sender = build_email_sender(settings)
                 await scan_overdue_tasks(
                     session,
-                    email_sender=build_email_sender(settings),
+                    email_sender=email_sender,
+                    public_url=settings.APP_PUBLIC_URL,
+                )
+                await scan_due_soon_tasks(
+                    session,
+                    email_sender=email_sender,
                     public_url=settings.APP_PUBLIC_URL,
                 )
                 await session.commit()

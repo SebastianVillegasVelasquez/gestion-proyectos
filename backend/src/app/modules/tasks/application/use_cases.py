@@ -166,6 +166,7 @@ class CreateTaskUseCase:
                     assigned_id=data.assignee_id,  # type: ignore
                     project_id=created.project_id,
                     team_id=data.team_id,
+                    is_subtask=data.parent_task_id is not None,
                     occurred_at=datetime.now(timezone.utc),
                 )
             )
@@ -917,6 +918,7 @@ class UpdateTaskUseCase:
                     project_id=project_id,
                     team_id=team_id,
                     work_item_id=work_item_id,
+                    is_subtask=task.parent_task_id is not None,
                     occurred_at=datetime.now(timezone.utc),
                 )
             )

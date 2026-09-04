@@ -6,10 +6,12 @@ import type { NotificationType } from "../types";
 // cae al valor crudo. Nunca desreferenciar este mapa directo: usar el helper.
 export const NOTIFICATION_TYPE_LABELS: Partial<Record<NotificationType, string>> = {
   tarea_asignada: "Tarea asignada",
+  subtarea_asignada: "Subtarea asignada",
   tarea_iniciada: "Tarea iniciada",
   tarea_entregada: "Tarea entregada",
   tarea_rechazada: "Tarea devuelta",
   tarea_atrasada: "Tarea atrasada",
+  tarea_por_vencer: "Tarea por vencer",
   tarea_completada: "Tarea aprobada",
   tarea_devuelta: "Entrega con observaciones",
   tarea_reprogramada: "Tarea reprogramada",
@@ -39,10 +41,12 @@ export type NotificationPriority = "alta" | "media" | "baja";
 
 const PRIORITY_BY_TYPE: Partial<Record<NotificationType, NotificationPriority>> = {
   tarea_asignada: "media",
+  subtarea_asignada: "media",
   tarea_iniciada: "baja",
   tarea_entregada: "media",
   tarea_rechazada: "alta",
   tarea_atrasada: "alta",
+  tarea_por_vencer: "alta",
   tarea_completada: "media",
   tarea_devuelta: "alta",
   tarea_reprogramada: "media",
