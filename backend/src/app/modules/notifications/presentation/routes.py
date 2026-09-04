@@ -13,7 +13,10 @@ from app.core.dependencies import (
 )
 from app.modules.identity.infrastructure.enums import SystemRole
 from app.modules.identity.presentation.schemas import UserResponse
-from app.modules.notifications.application.overdue_scan import scan_overdue_tasks
+from app.modules.notifications.application.overdue_scan import (
+    scan_due_soon_tasks,
+    scan_overdue_tasks,
+)
 from app.modules.notifications.application.use_cases import (
     DeleteNotificationUseCase,
     GetUnreadCountUseCase,
@@ -86,6 +89,29 @@ async def run_overdue_scan(
     periódico). Útil para pruebas y para forzar los avisos tras un import."""
     settings = get_settings()
     result = await scan_overdue_tasks(
+        db,
+        email_sender=build_email_sender(settings),
+        public_url=settings.APP_PUBLIC_URL,
+    )
+    return {
+        "checked": result.checked,
+        "notified": result.notified,
+        "skipped_cooldown": result.skipped_cooldown,
+        "emails_sent": result.emails_sent,
+    }
+
+
+@router.post("/due-soon-scan")
+async def run_due_soon_scan(
+    db: AsyncSession = Depends(get_db),
+    _admin: UserResponse = Depends(
+        require_role(SystemRole.ADMIN, SystemRole.SUPER_ADMIN, SystemRole.DEVELOPER)
+    ),
+):
+    """Dispara el barrido de tareas por vencer de inmediato (además del bucle
+    periódico). Útil para pruebas."""
+    settings = get_settings()
+    result = await scan_due_soon_tasks(
         db,
         email_sender=build_email_sender(settings),
         public_url=settings.APP_PUBLIC_URL,

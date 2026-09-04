@@ -10,6 +10,7 @@ from starlette import status
 
 from app.core.config import get_settings
 from app.core.dependencies import (
+    deliverable_notifier_dependency,
     event_bus_dependency,
     file_storage_dependency,
     get_current_user,
@@ -170,8 +171,9 @@ async def add_my_comment(
     data: AddCommentRequest,
     repo=Depends(workspace_repo_dependency),
     bus=Depends(event_bus_dependency),
+    notifier=Depends(deliverable_notifier_dependency),
     current_user=Depends(get_current_user),
 ):
-    return await PersonalDeliverableService(repo, bus).add_comment(
+    return await PersonalDeliverableService(repo, bus, notifier=notifier).add_comment(
         deliverable_id, data, current_user
     )

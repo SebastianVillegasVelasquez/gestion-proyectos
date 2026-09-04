@@ -32,6 +32,29 @@ class TestNotificationUseCases:
         assert notification.user_to_id == assigned_id
         assert notification.notification_type == NotificationType.TAREA_ASIGNADA
 
+    async def test_notification_uses_subtarea_type_when_task_is_subtask(
+        self,
+        fake_notification_repo,
+        fake_bus_driven,
+    ):
+        assigned_id = uuid.uuid4()
+
+        event = TaskCreated(
+            assigned_id=assigned_id,
+            work_item_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            is_subtask=True,
+            occurred_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+
+        await fake_bus_driven.publish(event)
+
+        notifications, total = await fake_notification_repo.list_for_user(
+            user_id=assigned_id, only_unread=False, limit=10, offset=0
+        )
+        assert total == 1
+        assert notifications[0].notification_type == NotificationType.SUBTAREA_ASIGNADA
+
     @pytest.mark.xfail(
         reason=(
             "TaskCreated no lleva 'created_by', así que el handler no puede saber "

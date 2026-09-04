@@ -153,6 +153,38 @@ export function activeBlockers(task: ApiTeamTask) {
   return task.blocked_by.filter((b) => b.status !== "completada");
 }
 
+// ── Entrega: cuándo una fila ofrece "Comenzar", "Entregar" o "Marcar como
+//    realizada" ────────────────────────────────────────────────────────────
+//
+// Una tarea PADRE es el entregable: su avance sale del promedio de sus
+// subtareas (ver `compute_task_progress` en el backend), así que solo llega a
+// 100 cuando TODAS están completadas — recién ahí se puede entregar. Una
+// SUBTAREA nunca es un entregable en sí misma: cuando su responsable la da por
+// hecha, basta "Marcar como realizada" (crea un entregable "sin adjunto" que
+// sigue el mismo flujo de revisión que cualquier otra entrega).
+
+/** Una tarea padre es un entregable: cuando su avance llega al 100% (todas las
+ *  subtareas hechas y, si hacía falta, ya aprobada) queda lista para entregarse
+ *  como tal. Las subtareas nunca son entregables. */
+export function isDeliverableReady(
+  task: Pick<ApiTeamTask, "parent_task_id" | "progress_pct" | "status">,
+): boolean {
+  return (
+    task.parent_task_id === null &&
+    (task.progress_pct ?? 0) >= 100 &&
+    task.status !== "completada" &&
+    task.status !== "cancelada"
+  );
+}
+
+/** Una subtarea EN PROGRESO (ya se le dio "Comenzar") que su responsable puede
+ *  dar por hecha. */
+export function isSubtaskReadyToComplete(
+  task: Pick<ApiTeamTask, "parent_task_id" | "status">,
+): boolean {
+  return task.parent_task_id !== null && task.status === "en_progreso";
+}
+
 // ── Jerarquía padre → subtarea ──────────────────────────────────────────────
 
 export interface TaskTreeRow {

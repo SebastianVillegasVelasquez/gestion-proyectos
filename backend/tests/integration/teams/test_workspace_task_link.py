@@ -371,6 +371,162 @@ class TestDeliveryBlockedByDependency:
         assert ok.status_code == 201, ok.text
 
 
+class TestDeliveryBlockedByOpenSubtasks:
+    """Una tarea PADRE es el entregable (su avance sale del promedio de sus
+    subtareas): entregarla mientras una subtarea sigue abierta dejaría un
+    entregable que no refleja el trabajo real. Cubre el flujo pedido por el
+    usuario: Comenzar -> Marcar como realizada en cada subtarea, y solo
+    entonces se desbloquea "Entregar" en el padre."""
+
+    async def test_cannot_deliver_parent_while_a_subtask_is_open(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        parent = await _make_task(db_session, s.team.id, s.integrante.id)
+        subtask = Task(
+            title="Subtarea 1",
+            project_id=parent.project_id,
+            work_item_id=parent.work_item_id,
+            team_id=s.team.id,
+            parent_task_id=parent.id,
+            assignee_id=s.integrante.id,
+            status=TaskStatus.EN_PROGRESO,
+            requires_approval=False,
+        )
+        db_session.add(subtask)
+        await db_session.commit()
+
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": parent.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(parent.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        blocked = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert blocked.status_code == 422, blocked.text
+        assert "subtareas" in blocked.json()["detail"].lower()
+
+        # Terminada la subtarea (vía su propio entregable "sin adjunto", el
+        # mismo camino que "Marcar como realizada" en el frontend), el padre
+        # ya se puede entregar.
+        sub_del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": subtask.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(subtask.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+        mark_done = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{sub_del_id}/versions",
+            json={"type": "sin_adjunto"},
+            headers=integrante_h,
+        )
+        assert mark_done.status_code == 201, mark_done.text
+
+        await db_session.refresh(subtask)
+        assert subtask.status == TaskStatus.COMPLETADA
+
+        ok = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert ok.status_code == 201, ok.text
+
+    async def test_a_cancelled_subtask_does_not_block_the_parent(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        parent = await _make_task(db_session, s.team.id, s.integrante.id)
+        subtask = Task(
+            title="Subtarea descartada",
+            project_id=parent.project_id,
+            work_item_id=parent.work_item_id,
+            team_id=s.team.id,
+            parent_task_id=parent.id,
+            assignee_id=s.integrante.id,
+            status=TaskStatus.CANCELADA,
+            requires_approval=False,
+        )
+        db_session.add(subtask)
+        await db_session.commit()
+
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": parent.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(parent.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        ok = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert ok.status_code == 201, ok.text
+
+    async def test_subtask_itself_is_never_blocked_by_the_open_subtasks_rule(
+        self, client, scenario, db_session
+    ):
+        """Un solo nivel de anidado: una subtarea no tiene subtareas propias,
+        así que esta compuerta nunca aplica a su propia entrega."""
+        s = scenario
+        parent = await _make_task(db_session, s.team.id, s.integrante.id)
+        subtask = Task(
+            title="Subtarea 1",
+            project_id=parent.project_id,
+            work_item_id=parent.work_item_id,
+            team_id=s.team.id,
+            parent_task_id=parent.id,
+            assignee_id=s.integrante.id,
+            status=TaskStatus.EN_PROGRESO,
+            requires_approval=False,
+        )
+        db_session.add(subtask)
+        await db_session.commit()
+
+        integrante_h = await _headers_for(s.integrante)
+        del_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": subtask.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(subtask.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        ok = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{del_id}/versions",
+            json={"type": "sin_adjunto"},
+            headers=integrante_h,
+        )
+        assert ok.status_code == 201, ok.text
+
+
 class TestDeliverableWithoutApprovalAutoCompletes:
     """`requires_approval=False` (el default): entregar completa la tarea
     directo, sin pasar por el líder — ni notificación de revisión pendiente."""
