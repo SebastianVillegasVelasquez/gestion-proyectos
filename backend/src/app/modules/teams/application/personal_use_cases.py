@@ -61,10 +61,14 @@ class PersonalDeliverableService:
         repo: WorkspaceRepository,
         bus=None,
         files: ProjectFilesService | None = None,
+        notifier=None,
     ):
         self._repo = repo
         self._bus = bus
         self._files = files
+        # Colaborador opcional: avisa al dueño del entregable cuando su
+        # revisor decide (aprobar / pedir cambios / rechazar).
+        self._notifier = notifier
 
     async def _cascade_if_completed(self, task) -> None:
         """Tras dejar una tarea en COMPLETADA por una entrega/aprobación,
@@ -415,6 +419,16 @@ class PersonalDeliverableService:
                         current_user.id,
                         data.content,
                     )
+
+            if self._notifier is not None:
+                await self._notifier.review_decided(
+                    owner_id=deliverable.assignee_id,
+                    reviewer_id=current_user.id,
+                    decision=data.type,
+                    team_id=None,
+                    deliverable_id=deliverable.id,
+                    task_id=deliverable.task_id,
+                )
 
         return await self._view(
             await self._repo.get_personal_deliverable(deliverable_id), current_user

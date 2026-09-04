@@ -434,6 +434,16 @@ class WorkspaceService:
                     reason=data.content,
                 )
 
+            if self._notifier is not None:
+                await self._notifier.review_decided(
+                    owner_id=deliverable.assignee_id,
+                    reviewer_id=current_user.id,
+                    decision=data.type,
+                    team_id=deliverable.team_id,
+                    deliverable_id=deliverable.id,
+                    task_id=deliverable.task_id,
+                )
+
         return DeliverableResponse.of(
             await self._require_deliverable(team_id, deliverable_id)
         )

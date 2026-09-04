@@ -9,7 +9,7 @@ export const NOTIFICATION_TYPE_LABELS: Partial<Record<NotificationType, string>>
   subtarea_asignada: "Subtarea asignada",
   tarea_iniciada: "Tarea iniciada",
   tarea_entregada: "Tarea entregada",
-  tarea_rechazada: "Tarea devuelta",
+  tarea_rechazada: "Entrega rechazada",
   tarea_atrasada: "Tarea atrasada",
   tarea_por_vencer: "Tarea por vencer",
   tarea_completada: "Tarea aprobada",
