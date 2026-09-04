@@ -14,7 +14,8 @@ import { formatDateRange, taskRisk } from "@/features/projects/utils/task-dates"
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
-import { STATUS_META } from "../utils/team-tasks";
+import { STATUS_META, isDeliverableReady, isSubtaskReadyToComplete } from "../utils/team-tasks";
+import { StartTaskButton } from "./StartTaskButton";
 import { TeamTaskFilterBar } from "./TeamTaskFilterBar";
 import {
   EMPTY_TEAM_TASK_FILTERS,
@@ -33,6 +34,7 @@ function TaskLeaf({
   projectId,
   teamMembers,
   canReview,
+  isParent,
   onOpen,
   onDeliver,
   onMarkDelivered,
@@ -43,6 +45,8 @@ function TaskLeaf({
   projectId: string;
   teamMembers: ApiTeamMember[];
   canReview: boolean;
+  /** La tarea tiene subtareas: sin botón «Comenzar» (avanza sola con ellas). */
+  isParent: boolean;
   onOpen?: () => void;
   onDeliver?: () => void;
   onMarkDelivered?: () => void;
@@ -55,11 +59,17 @@ function TaskLeaf({
   // teal con su nombre, que ADEMÁS abre el reasignador al pulsarla. Sin permiso
   // de revisión se queda como etiqueta de solo lectura.
   const mergedReassign = canReview && teamMembers.length > 0;
-  // El servidor decide si esta tarea se puede entregar todavía y rechaza la
-  // entrega con este mismo texto. La vista no vuelve a deducirlo: si hay
-  // motivo, enseña "Bloqueada" en vez de un botón que va a fallar.
+  // Misma regla que en Tareas: una SUBTAREA nunca es un entregable en sí misma
+  // (un único botón, "Marcar como realizada"); una tarea PADRE solo se entrega
+  // cuando su avance llegó a 100% (todas sus subtareas hechas). El servidor
+  // decide si además hay un bloqueo real (dependencia, tercero, subtareas
+  // abiertas) y lo rechazaría con el mismo texto: la vista no lo vuelve a
+  // deducir, solo enseña "Bloqueada" en vez de un botón que va a fallar.
+  const isSubtask = task.parent_task_id !== null;
+  const readyToDeliver = isSubtask ? isSubtaskReadyToComplete(task) : isDeliverableReady(task);
   const blockedReason = task.delivery_blocked_reason;
-  const canDeliverNow = blockedReason === null;
+  const canDeliverNow = readyToDeliver && blockedReason === null;
+  const showBlockedBadge = readyToDeliver && blockedReason !== null;
 
   const titleBlock = (
     <span className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -126,37 +136,57 @@ function TaskLeaf({
           <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", meta.badge)}>
             {meta.label}
           </span>
-          {(onDeliver !== undefined || onMarkDelivered !== undefined) && blockedReason !== null && (
+          {(onDeliver !== undefined || onMarkDelivered !== undefined) && (
+            <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
+          )}
+          {(onDeliver !== undefined || onMarkDelivered !== undefined) && showBlockedBadge && (
             <span
-              title={blockedReason}
+              title={blockedReason ?? undefined}
               className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
             >
               <Lock className="size-3" />
               Bloqueada
             </span>
           )}
-          {onDeliver && canDeliverNow && (
-            <button
-              type="button"
-              onClick={onDeliver}
-              title="Entregar con un adjunto (crea un entregable revisable)"
-              className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1 text-[11px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
-            >
-              <UploadCloud className="size-3.5" />
-              Entregar
-            </button>
-          )}
-          {onMarkDelivered && canDeliverNow && (
-            <button
-              type="button"
-              onClick={onMarkDelivered}
-              title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
-              className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
-            >
-              <Check className="size-3.5" />
-              Sin adjunto
-            </button>
-          )}
+          {isSubtask
+            ? onMarkDelivered &&
+              canDeliverNow && (
+                <button
+                  type="button"
+                  onClick={onMarkDelivered}
+                  title="Marcar esta subtarea como realizada"
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-teal/40 px-2 py-1 text-[11px] font-semibold text-brand-teal-dark transition-colors hover:bg-brand-teal/10 dark:text-brand-teal"
+                >
+                  <Check className="size-3.5" />
+                  Marcar como realizada
+                </button>
+              )
+            : canDeliverNow && (
+                <>
+                  {onDeliver && (
+                    <button
+                      type="button"
+                      onClick={onDeliver}
+                      title="Entregar con un adjunto (crea un entregable revisable)"
+                      className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2 py-1 text-[11px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
+                    >
+                      <UploadCloud className="size-3.5" />
+                      Entregar
+                    </button>
+                  )}
+                  {onMarkDelivered && (
+                    <button
+                      type="button"
+                      onClick={onMarkDelivered}
+                      title="Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
+                      className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
+                    >
+                      <Check className="size-3.5" />
+                      Sin adjunto
+                    </button>
+                  )}
+                </>
+              )}
         </span>
       </div>
 
@@ -183,6 +213,9 @@ interface NodeCallbacks {
   typeNameById: Map<string, string>;
   tasksByItem: Map<string, ApiTeamTask[]>;
   countInSubtree: Map<string, number>;
+  /** Ids de tareas que SON padre (tienen al menos una subtarea): sin botón
+   *  «Comenzar», su avance sale de las subtareas. */
+  parentIds: ReadonlySet<string>;
   onOpenTask?: (task: ApiTeamTask) => void;
   onDeliverTask?: (task: ApiTeamTask) => void;
   onMarkDeliveredTask?: (task: ApiTeamTask) => void;
@@ -257,6 +290,7 @@ function Node({ node, depth, cb }: { node: WorkItemTree; depth: number; cb: Node
               projectId={cb.projectId}
               teamMembers={cb.teamMembers}
               canReview={cb.canReview}
+              isParent={cb.parentIds.has(task.id)}
               onOpen={
                 cb.onOpenTask
                   ? () => {
@@ -333,6 +367,15 @@ export function WorkspaceStructureView({
   const [filters, setFilters] = useState<TeamTaskFilters>(EMPTY_TEAM_TASK_FILTERS);
   const visibleTasks = useMemo(() => filterTeamTasks(tasks, filters), [tasks, filters]);
 
+  // Tareas que SON padre (tienen al menos una subtarea), sobre el conjunto
+  // completo del equipo (no el filtrado): igual que en la vista Lista, así una
+  // subtarea oculta por el filtro no le hace perder a su padre el estado de
+  // "tiene subtareas" y mostrar «Comenzar» por error.
+  const parentIds = useMemo(
+    () => new Set(tasks.flatMap((t) => (t.parent_task_id !== null ? [t.parent_task_id] : []))),
+    [tasks],
+  );
+
   const tasksByItem = useMemo(() => {
     const map = new Map<string, ApiTeamTask[]>();
     for (const task of visibleTasks) {
@@ -375,6 +418,7 @@ export function WorkspaceStructureView({
     typeNameById,
     tasksByItem,
     countInSubtree,
+    parentIds,
     onOpenTask,
     onDeliverTask,
     onMarkDeliveredTask,
@@ -435,6 +479,7 @@ export function WorkspaceStructureView({
               projectId={projectId}
               teamMembers={teamMembers}
               canReview={canReview}
+              isParent={parentIds.has(task.id)}
               onOpen={
                 onOpenTask
                   ? () => {

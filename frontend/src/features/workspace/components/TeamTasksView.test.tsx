@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { TeamTasksView } from "./TeamTasksView";
 import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
@@ -66,7 +66,13 @@ function task(over: Partial<ApiTeamTask> = {}): ApiTeamTask {
   };
 }
 
-function renderView(canReview: boolean, tasks: ApiTeamTask[]) {
+function renderView(
+  canReview: boolean,
+  tasks: ApiTeamTask[],
+  deliverProps: Partial<
+    Pick<ComponentProps<typeof TeamTasksView>, "onDeliver" | "onMarkDelivered" | "canDeliverTask">
+  > = {},
+) {
   vi.mocked(useTeamTasks).mockReturnValue({
     data: tasks,
     isLoading: false,
@@ -88,9 +94,10 @@ function renderView(canReview: boolean, tasks: ApiTeamTask[]) {
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return render(<TeamTasksView teamId="team1" projectId="p1" members={[]} teamMembers={[]} />, {
-    wrapper: Wrapper,
-  });
+  return render(
+    <TeamTasksView teamId="team1" projectId="p1" members={[]} teamMembers={[]} {...deliverProps} />,
+    { wrapper: Wrapper },
+  );
 }
 
 /**
@@ -217,5 +224,150 @@ describe("TeamTasksView — botón Comenzar", () => {
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
     const buttons = await screen.findAllByRole("button", { name: /Comenzar/i });
     expect(buttons).toHaveLength(1);
+  });
+});
+
+// ── Flujo de entrega: tarea sin subtareas, padre con subtareas, subtareas ──
+//
+// Reglas ejercitadas (ver `isDeliverableReady` / `isSubtaskReadyToComplete`
+// en `utils/team-tasks.ts`):
+//   1. Una tarea PADRE solo ofrece Entregar/Sin adjunto cuando su avance llegó
+//      a 100% (todas sus subtareas COMPLETADAS) — mientras quede una abierta,
+//      no hay botón de entrega aunque el responsable pueda entregarla.
+//   2. Una SUBTAREA nunca ofrece Entregar/Sin adjunto: solo "Comenzar" (si no
+//      ha arrancado) y luego "Marcar como realizada" (si ya está en curso).
+//   3. Un bloqueo real del servidor (`delivery_blocked_reason`) se enseña como
+//      "Bloqueada" en vez del botón, tanto en padres como en subtareas.
+describe("TeamTasksView — entrega de tareas y subtareas", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDeleteTask).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    vi.mocked(useUpdateTask).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    vi.mocked(useChangeTaskStatus).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as never);
+  });
+
+  it("una tarea padre con una subtarea abierta no ofrece Entregar todavía", async () => {
+    const user = userEvent.setup();
+    renderView(
+      false,
+      [
+        // Avance real: 50% (una subtarea completada, otra pendiente) — el
+        // backend ya hizo el promedio, la vista solo lo lee.
+        task({ id: "parent", title: "Tarea padre", progress_pct: 50 }),
+        task({
+          id: "done",
+          title: "Subtarea hecha",
+          parent_task_id: "parent",
+          status: "completada",
+        }),
+        task({
+          id: "open",
+          title: "Subtarea abierta",
+          parent_task_id: "parent",
+          status: "en_progreso",
+        }),
+      ],
+      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
+    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sin adjunto/i })).toBeNull();
+  });
+
+  it("una tarea padre al 100% ofrece Entregar y Sin adjunto", async () => {
+    const user = userEvent.setup();
+    const onDeliver = vi.fn();
+    const onMarkDelivered = vi.fn();
+    renderView(
+      false,
+      [task({ id: "parent", title: "Tarea padre", status: "en_progreso", progress_pct: 100 })],
+      { onDeliver, onMarkDelivered, canDeliverTask: () => true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Entregar$/i }));
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "parent" }));
+    await user.click(screen.getByRole("button", { name: /Sin adjunto/i }));
+    expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "parent" }));
+  });
+
+  it("una subtarea en progreso ofrece 'Marcar como realizada' y no 'Entregar'", async () => {
+    const user = userEvent.setup();
+    const onMarkDelivered = vi.fn();
+    renderView(
+      false,
+      [
+        task({ id: "parent", title: "Tarea padre", progress_pct: 50 }),
+        task({
+          id: "child",
+          title: "Subtarea",
+          parent_task_id: "parent",
+          status: "en_progreso",
+        }),
+      ],
+      { onDeliver: vi.fn(), onMarkDelivered, canDeliverTask: () => true },
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
+    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Marcar como realizada/i }));
+    expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
+  });
+
+  it("una subtarea sin iniciar ofrece Comenzar, no Marcar como realizada", async () => {
+    const user = userEvent.setup();
+    renderView(
+      false,
+      [
+        task({ id: "parent", title: "Tarea padre", progress_pct: 0 }),
+        task({
+          id: "child",
+          title: "Subtarea",
+          parent_task_id: "parent",
+          status: "pendiente_por_iniciar",
+        }),
+      ],
+      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
+    expect(await screen.findByRole("button", { name: /Comenzar/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Marcar como realizada/i })).toBeNull();
+  });
+
+  it("una subtarea bloqueada por una dependencia muestra 'Bloqueada' en vez del botón", async () => {
+    const user = userEvent.setup();
+    renderView(
+      false,
+      [
+        task({ id: "parent", title: "Tarea padre", progress_pct: 0 }),
+        task({
+          id: "child",
+          title: "Subtarea",
+          parent_task_id: "parent",
+          status: "en_progreso",
+          delivery_blocked_reason: "Falta completar una subtarea hermana",
+        }),
+      ],
+      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
+    expect(screen.getByText("Bloqueada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Marcar como realizada/i })).toBeNull();
+  });
+
+  it("sin canDeliverTask (no es mi entregable) no ofrece ningún botón de entrega", () => {
+    renderView(false, [task({ id: "parent", title: "Tarea padre", progress_pct: 100 })], {
+      onDeliver: vi.fn(),
+      onMarkDelivered: vi.fn(),
+      canDeliverTask: () => false,
+    });
+
+    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sin adjunto/i })).toBeNull();
   });
 });

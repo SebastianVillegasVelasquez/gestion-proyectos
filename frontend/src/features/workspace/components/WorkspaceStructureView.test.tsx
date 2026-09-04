@@ -8,6 +8,15 @@ import { WorkspaceStructureView } from "./WorkspaceStructureView";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
 
+vi.mock("@/features/auth/hooks/use-auth", () => ({
+  useAuth: () => ({ user: { id: "u1", name: "Ana" } }),
+}));
+
+vi.mock("@/features/projects/hooks/use-tasks", () => ({
+  useChangeTaskStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateTask: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 function node(id: string, nombre: string, children: WorkItemTree[] = []): WorkItemTree {
   return {
     id,
@@ -46,7 +55,9 @@ function task(over: Partial<ApiTeamTask>): ApiTeamTask {
     start_date: null,
     due_date: null,
     requires_approval: false,
-    progress_pct: 0,
+    // Por defecto "lista para entregar" (tarea raíz al 100%): los tests que
+    // ejercitan Entregar/Sin adjunto no tienen que repetirlo.
+    progress_pct: 100,
     blocked_by: [],
     depends_on_third_party: false,
     delivery_blocked_reason: null,
@@ -144,5 +155,97 @@ describe("WorkspaceStructureView", () => {
     expect(screen.getByText("Bloqueada")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /entregar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /sin adjunto/i })).not.toBeInTheDocument();
+  });
+
+  // ── Flujo de entrega: mismas reglas que en la vista Lista (TeamTasksView),
+  //    aquí ejercitadas contra el árbol de la Estructura — donde el bug vivía:
+  //    esta vista ofrecía Entregar/Sin adjunto a CUALQUIER tarea (incluidas
+  //    subtareas y padres con subtareas abiertas) porque nunca miraba
+  //    `parent_task_id` ni `progress_pct`, solo `canDeliverTask`. ────────────
+
+  it("una tarea padre con subtareas sin terminar no ofrece Entregar", () => {
+    renderView(
+      <WorkspaceStructureView
+        {...base}
+        canReview={false}
+        tasks={[
+          task({ id: "parent", title: "Tarea padre", progress_pct: 50 }),
+          task({
+            id: "child",
+            title: "Subtarea",
+            parent_task_id: "parent",
+            work_item_id: null,
+            status: "en_progreso",
+          }),
+        ]}
+        onDeliverTask={vi.fn()}
+        onMarkDeliveredTask={vi.fn()}
+        canDeliverTask={() => true}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sin adjunto/i })).not.toBeInTheDocument();
+  });
+
+  it("una subtarea nunca ofrece Entregar/Sin adjunto: solo Comenzar y luego Marcar como realizada", async () => {
+    const user = userEvent.setup();
+    const onMarkDeliveredTask = vi.fn();
+    const { rerender } = renderView(
+      <WorkspaceStructureView
+        {...base}
+        canReview={false}
+        tasks={[
+          task({ id: "parent", title: "Tarea padre", progress_pct: 0 }),
+          task({
+            id: "child",
+            title: "Subtarea",
+            parent_task_id: "parent",
+            status: "pendiente_por_iniciar",
+            assignee_id: "u1",
+            assignee_name: "Ana",
+          }),
+        ]}
+        onDeliverTask={vi.fn()}
+        onMarkDeliveredTask={onMarkDeliveredTask}
+        canDeliverTask={() => true}
+      />,
+    );
+
+    // Sin iniciar: "Comenzar", nunca los botones de entrega.
+    expect(await screen.findByRole("button", { name: /comenzar/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /marcar como realizada/i }),
+    ).not.toBeInTheDocument();
+
+    // Ya en progreso: "Marcar como realizada" y solo eso.
+    rerender(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <WorkspaceStructureView
+          {...base}
+          canReview={false}
+          tasks={[
+            task({ id: "parent", title: "Tarea padre", progress_pct: 0 }),
+            task({
+              id: "child",
+              title: "Subtarea",
+              parent_task_id: "parent",
+              status: "en_progreso",
+              assignee_id: "u1",
+              assignee_name: "Ana",
+            }),
+          ]}
+          onDeliverTask={vi.fn()}
+          onMarkDeliveredTask={onMarkDeliveredTask}
+          canDeliverTask={() => true}
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole("button", { name: /comenzar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /marcar como realizada/i }));
+    expect(onMarkDeliveredTask).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
   });
 });

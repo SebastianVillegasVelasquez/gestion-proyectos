@@ -49,7 +49,9 @@ import {
   daysUntilDue,
   formatDueDate,
   groupTeamTasks,
+  isDeliverableReady,
   isOverdue,
+  isSubtaskReadyToComplete,
   taskProgressPct,
   urgencyMeta,
   type TaskGrouping,
@@ -133,18 +135,6 @@ function ProgressBar({ task, className }: { task: ApiTeamTask; className?: strin
   );
 }
 
-/** Una tarea padre es un entregable: cuando su avance llega al 100% (todas las
- *  subtareas hechas y, si hacía falta, ya aprobada) queda lista para entregarse
- *  como tal. Las subtareas nunca son entregables. */
-function isDeliverableReady(task: ApiTeamTask): boolean {
-  return (
-    task.parent_task_id === null &&
-    (task.progress_pct ?? 0) >= 100 &&
-    task.status !== "completada" &&
-    task.status !== "cancelada"
-  );
-}
-
 function DeliverableReadyBadge() {
   return (
     <span
@@ -166,29 +156,67 @@ interface DeliverCbs {
   canDeliverTask?: (task: ApiTeamTask) => boolean;
 }
 
+/** Candado "Bloqueada": el servidor dice que todavía no se puede entregar (una
+ *  dependencia abierta, un tercero sin entregar, subtareas sin terminar). La
+ *  fila lo enseña en vez de un botón que devolvería un 422. */
+function BlockedDeliveryBadge({ reason }: { reason: string }) {
+  return (
+    <span
+      title={reason}
+      className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
+    >
+      <Lock className="size-3" />
+      Bloqueada
+    </span>
+  );
+}
+
 /**
- * Acciones de entrega de una tarea PADRE ya al 100%: es el entregable, y su
- * responsable lo entrega aquí mismo. Reusa el flujo de la pestaña Entregables
- * (mismo modal, misma aprobación). No aparece en subtareas ni para quien no es
- * el responsable (ese solo ve el badge).
+ * Acciones de entrega de una fila que ya está lista:
+ *
+ * - Tarea PADRE al 100% (todas sus subtareas hechas): ES el entregable, y su
+ *   responsable lo entrega aquí mismo con las dos vías de siempre (con
+ *   adjunto, o "sin adjunto"). Reusa el flujo de la pestaña Entregables (mismo
+ *   modal, misma aprobación).
+ * - SUBTAREA en progreso: nunca es un entregable en sí misma, así que ofrece
+ *   un único botón, "Marcar como realizada" (mismo camino que "sin adjunto":
+ *   crea el entregable interno que sigue el flujo de revisión habitual).
+ *
+ * No aparece para quien no es el responsable (ese solo ve el badge de avance).
  */
 function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
-  if (!isDeliverableReady(task) || !(cbs.canDeliverTask?.(task) ?? false)) {
+  const mine = cbs.canDeliverTask?.(task) ?? false;
+  if (!mine) {
     return null;
   }
-  // Misma regla que en la Estructura: si el servidor dice que todavía no se
-  // puede entregar (una dependencia abierta, un tercero sin entregar), la fila
-  // enseña el candado en vez de un botón que devolvería un 422.
-  if (task.delivery_blocked_reason !== null) {
+
+  if (task.parent_task_id !== null) {
+    if (!isSubtaskReadyToComplete(task) || !cbs.onMarkDelivered) {
+      return null;
+    }
+    if (task.delivery_blocked_reason !== null) {
+      return <BlockedDeliveryBadge reason={task.delivery_blocked_reason} />;
+    }
     return (
-      <span
-        title={task.delivery_blocked_reason}
-        className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
+      <button
+        type="button"
+        onClick={() => {
+          cbs.onMarkDelivered?.(task);
+        }}
+        title="Marcar esta subtarea como realizada"
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-brand-teal/40 px-2 py-1 text-[11px] font-semibold text-brand-teal-dark transition-colors hover:bg-brand-teal/10 dark:text-brand-teal"
       >
-        <Lock className="size-3" />
-        Bloqueada
-      </span>
+        <Check className="size-3.5" />
+        Marcar como realizada
+      </button>
     );
+  }
+
+  if (!isDeliverableReady(task)) {
+    return null;
+  }
+  if (task.delivery_blocked_reason !== null) {
+    return <BlockedDeliveryBadge reason={task.delivery_blocked_reason} />;
   }
   return (
     <>

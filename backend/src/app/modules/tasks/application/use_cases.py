@@ -674,6 +674,14 @@ class GetTasksByTeamUseCase:
                 wi_id
             ] = await self.task_repo.has_undelivered_third_party_ancestor(wi_id)
 
+        # Subtareas por padre, del mismo conjunto ya cargado: una tarea padre
+        # es el entregable y no se puede entregar con una subtarea abierta
+        # (misma regla que aplica el servidor al recibir la entrega real).
+        subtasks_by_parent: dict[UUID, list] = {}
+        for t in tasks:
+            if t.parent_task_id is not None:
+                subtasks_by_parent.setdefault(t.parent_task_id, []).append(t)
+
         def blocked_reason(task) -> str | None:
             # El motivo solo tiene sentido para algo todavía entregable: una
             # tarea cerrada no "está bloqueada", ya pasó.
@@ -683,6 +691,7 @@ class GetTasksByTeamUseCase:
                 deps_by_task.get(task.id, []),
                 task.work_item_id is not None
                 and tp_ancestor.get(task.work_item_id, False),
+                rules.has_open_subtasks(subtasks_by_parent.get(task.id, [])),
             )
 
         return [
