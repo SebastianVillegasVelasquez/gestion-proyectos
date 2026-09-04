@@ -268,6 +268,18 @@ class ResendActivationUseCase:
         user = await self.user_repo.get_by_id(user_id)
         if user is None:
             raise NotFoundError("Usuario no encontrado")
+        if user.activation_token_hash is None:
+            # `is_active` no sirve de señal aquí: es `True` por defecto en TODA
+            # cuenta (activada o no), incluidas las que nunca pasaron por este
+            # flujo. Lo que distingue "pendiente de activar" es tener un token
+            # vigente o caducado sin consumir; una vez activada (o si nunca
+            # tuvo token), el campo queda en `None`. El enlace fija la
+            # contraseña sin pedir la actual: reenviarlo sobre una cuenta sin
+            # activación pendiente equivaldría a un reseteo de contraseña sin
+            # rastro de auditoría.
+            raise ConflictError(
+                "Esta cuenta no tiene una activación pendiente; no se puede reenviar el enlace"
+            )
         raw = await issue_activation_token(self.user_repo, user_id, self._ttl_days)
         if self.event_bus is not None:
             await self.event_bus.publish(

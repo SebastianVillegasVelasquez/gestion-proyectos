@@ -39,8 +39,8 @@ function TaskLeaf({ task, cbs }: { task: ApiMyTask; cbs: LeafCbs }) {
   const delivery = deliveryStatus(task, cbs.today);
 
   return (
-    <div className="relative before:absolute before:left-[-16px] before:top-[20px] before:h-[1.5px] before:w-4 before:bg-border before:content-['']">
-      <div className="group flex flex-wrap items-center gap-2.5 rounded-lg py-2 pl-2 pr-3 transition-colors hover:bg-accent/40">
+    <div className="relative mb-1.5 before:absolute before:left-[-16px] before:top-[20px] before:h-[1.5px] before:w-4 before:bg-border before:content-['']">
+      <div className="group flex flex-wrap items-center gap-2.5 rounded-lg border border-border/50 bg-card py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent/40">
         <span className="size-5 shrink-0" aria-hidden />
         <span className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="size-2 shrink-0 rounded-full bg-brand-gold" />
@@ -218,7 +218,7 @@ function ProjectStructureBlock({
       <h3 className="border-b border-border bg-accent/50 px-4 py-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
         {projectName}
       </h3>
-      <div className="p-3">
+      <div className="bg-accent/20 p-3">
         {treeQuery.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : (
