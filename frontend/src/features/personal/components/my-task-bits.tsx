@@ -4,6 +4,7 @@ import { ArrowUpRight, FolderTree, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
 import { tipoStyle } from "@/features/projects/utils/tipo-style";
+import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import type { ApiMyTask, ApiWorkItemCrumb } from "../api/personal.api";
 
 /**
@@ -137,6 +138,12 @@ export function BlockedPopover({ task }: { task: ApiMyTask }) {
                 "Una dependencia o una actividad de terceros sigue abierta."}
             </p>
           )}
+          <Link
+            to={`/manual?tema=${MANUAL_TOPIC.bloqueada}`}
+            className="mt-2 block text-[11px] font-medium text-brand-teal-dark hover:underline dark:text-brand-teal"
+          >
+            Por qué se bloquea una tarea →
+          </Link>
         </div>
       )}
     </span>
