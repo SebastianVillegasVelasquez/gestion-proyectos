@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion } from "../types";
@@ -332,6 +333,7 @@ function MemberWorkspace() {
   const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
   const deleteDeliverable = useDeleteDeliverable(activeTeamId);
+  const changeTaskStatus = useChangeTaskStatus(projectId);
   const qc = useQueryClient();
   // Reasignar una tarea desde la estructura toca la caché de tareas del
   // proyecto (lo hace el propio hook), pero no la del workspace: la refrescamos.
@@ -513,25 +515,24 @@ function MemberWorkspace() {
     );
   };
 
-  // "Marcar como realizada" / "Sin adjunto": crea un entregable REAL (con una
-  // versión de tipo `sin_adjunto`, sin URL) igual que una entrega normal — así
-  // el líder lo ve y lo aprueba/devuelve en la pestaña de Entregables, la
-  // tarea se mueve por el mismo camino (a revisión, o directo a completada si
-  // no exige aprobación) y los avisos se disparan. Es una entrega completa en
-  // un solo paso (deliverable + versión), así que no hay nada más que hacer:
-  // se queda en la vista donde el integrante ya estaba, sin navegar a
-  // Entregables.
+  // "Entregar sin adjunto": el integrante da la tarea (o subtarea) por hecha
+  // sin registrar ningún entregable. La tarea pasa directa a COMPLETADA (100%)
+  // y el servidor avisa a quien coordina (líder/supervisor del equipo). No hay
+  // nada que revisar, así que no se navega a Entregables: la fila se refresca
+  // en su sitio al invalidar la caché de tareas del equipo.
   const markTaskDelivered = (taskId: string) => {
-    const task = (tasksQuery.data ?? []).find((t) => t.id === taskId);
-    createDeliverable.mutate(
+    changeTaskStatus.mutate(
       {
-        task_title: task?.title ?? "Entrega sin adjunto",
-        assignee_id: currentUserId,
-        task_id: taskId,
+        taskId,
+        status: "completada",
+        reason: "Entregada sin adjunto",
+        deliverWithoutEvidence: true,
       },
       {
-        onSuccess: (d) => {
-          addVersion.mutate({ deliverableId: d.id, body: { type: "sin_adjunto" } });
+        onSuccess: () => {
+          if (activeTeamId) {
+            void qc.invalidateQueries({ queryKey: ["workspace", "tasks", activeTeamId] });
+          }
         },
       },
     );

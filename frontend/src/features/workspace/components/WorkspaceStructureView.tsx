@@ -14,7 +14,12 @@ import { formatDateRange, taskRisk } from "@/features/projects/utils/task-dates"
 import { ReassignTaskButton } from "@/features/projects/components/teams/ReassignTaskButton";
 import type { WorkItemTree } from "@/features/projects/types/api.types";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
-import { STATUS_META, isDeliverableReady, isSubtaskReadyToComplete } from "../utils/team-tasks";
+import {
+  STATUS_META,
+  isDeliverableReady,
+  isStandaloneTaskReadyToDeliver,
+  isSubtaskReadyToComplete,
+} from "../utils/team-tasks";
 import { StartTaskButton } from "./StartTaskButton";
 import { TeamTaskFilterBar } from "./TeamTaskFilterBar";
 import {
@@ -59,14 +64,18 @@ function TaskLeaf({
   // teal con su nombre, que ADEMÁS abre el reasignador al pulsarla. Sin permiso
   // de revisión se queda como etiqueta de solo lectura.
   const mergedReassign = canReview && teamMembers.length > 0;
-  // Misma regla que en Tareas: una SUBTAREA nunca es un entregable en sí misma
-  // (un único botón, "Marcar como realizada"); una tarea PADRE solo se entrega
-  // cuando su avance llegó a 100% (todas sus subtareas hechas). El servidor
-  // decide si además hay un bloqueo real (dependencia, tercero, subtareas
-  // abiertas) y lo rechazaría con el mismo texto: la vista no lo vuelve a
-  // deducir, solo enseña "Bloqueada" en vez de un botón que va a fallar.
+  // Misma regla que en Tareas: una SUBTAREA se entrega en cuanto se comenzó;
+  // una tarea de nivel superior SIN subtareas, también; una tarea PADRE (con
+  // subtareas) solo cuando su avance llegó a 100%. El servidor decide si además
+  // hay un bloqueo real (dependencia, tercero, subtareas abiertas) y lo
+  // rechazaría con el mismo texto: la vista no lo vuelve a deducir, solo enseña
+  // "Bloqueada" en vez de un botón que va a fallar.
   const isSubtask = task.parent_task_id !== null;
-  const readyToDeliver = isSubtask ? isSubtaskReadyToComplete(task) : isDeliverableReady(task);
+  const readyToDeliver = isSubtask
+    ? isSubtaskReadyToComplete(task)
+    : isParent
+      ? isDeliverableReady(task)
+      : isStandaloneTaskReadyToDeliver(task, false) || isDeliverableReady(task);
   const blockedReason = task.delivery_blocked_reason;
   const canDeliverNow = readyToDeliver && blockedReason === null;
   const showBlockedBadge = readyToDeliver && blockedReason !== null;
@@ -165,15 +174,11 @@ function TaskLeaf({
                 <button
                   type="button"
                   onClick={onMarkDelivered}
-                  title={
-                    isSubtask
-                      ? "Marcar esta subtarea como realizada, sin adjunto"
-                      : "Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
-                  }
+                  title="Entregar sin adjunto: la tarea pasa al 100% y se avisa a quien coordina, sin registrar un entregable"
                   className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
                 >
                   <Check className="size-3.5" />
-                  {isSubtask ? "Marcar como realizada" : "Sin adjunto"}
+                  Entregar sin adjunto
                 </button>
               )}
             </>

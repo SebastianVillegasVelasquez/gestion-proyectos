@@ -51,6 +51,7 @@ import {
   groupTeamTasks,
   isDeliverableReady,
   isOverdue,
+  isStandaloneTaskReadyToDeliver,
   isSubtaskReadyToComplete,
   taskProgressPct,
   urgencyMeta,
@@ -150,7 +151,7 @@ function DeliverableReadyBadge() {
 interface DeliverCbs {
   /** Abre "Nuevo entregable" precargado con esta tarea (entrega con adjunto). */
   onDeliver?: (task: ApiTeamTask) => void;
-  /** Crea el entregable + una versión "sin adjunto" y lo manda a revisión. */
+  /** "Entregar sin adjunto": completa la tarea al 100% sin crear entregable. */
   onMarkDelivered?: (task: ApiTeamTask) => void;
   /** La tarea es del usuario y aún no tiene entregable: puede entregarla. */
   canDeliverTask?: (task: ApiTeamTask) => boolean;
@@ -172,28 +173,46 @@ function BlockedDeliveryBadge({ reason }: { reason: string }) {
 }
 
 /**
- * Acciones de entrega de una fila que ya está lista: tarea PADRE al 100%
- * (todas sus subtareas hechas) o SUBTAREA ya en progreso. Ninguna de las dos
- * es un entregable "ajeno" — cada una entrega la SUYA, así que ambas ofrecen
- * las mismas dos vías:
+ * Acciones de entrega de una fila lista para entregarse: una tarea de nivel
+ * superior SIN subtareas ya comenzada, una tarea PADRE al 100% (todas sus
+ * subtareas hechas), o una SUBTAREA ya comenzada. En los tres casos el
+ * responsable entrega LO SUYO, así que ofrece las mismas dos vías:
  *
  * - "Entregar": adjunta evidencia (URL o archivo). Crea el entregable y su
  *   primera versión en un solo paso (`QuickDeliverModal`), sin salir de la
  *   vista donde se está trabajando.
- * - "Marcar como realizada" / "Sin adjunto": entrega sin evidencia — mismo
- *   entregable interno, sin adjunto.
+ * - "Entregar sin adjunto": da la tarea por hecha sin registrar entregable —
+ *   pasa directa al 100% y avisa a quien coordina.
  *
  * No aparece para quien no es el responsable (ese solo ve el badge de avance).
  */
-function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
-  const mine = cbs.canDeliverTask?.(task) ?? false;
-  if (!mine) {
-    return null;
+/** ¿La fila ofrece hoy los botones de entrega para su responsable? Reúne la
+ *  regla de las tres formas (subtarea, tarea padre al 100%, tarea suelta ya
+ *  comenzada) en un solo sitio para que la fila (badge + wrapper) y
+ *  `DeliverActions` no diverjan. */
+function canDeliverRow(task: ApiTeamTask, cbs: DeliverCbs, hasSubtasks: boolean): boolean {
+  if (!(cbs.canDeliverTask?.(task) ?? false)) {
+    return false;
   }
+  if (task.parent_task_id !== null) {
+    return isSubtaskReadyToComplete(task);
+  }
+  return hasSubtasks
+    ? isDeliverableReady(task)
+    : isStandaloneTaskReadyToDeliver(task, false) || isDeliverableReady(task);
+}
 
-  const isSubtask = task.parent_task_id !== null;
-  const ready = isSubtask ? isSubtaskReadyToComplete(task) : isDeliverableReady(task);
-  if (!ready) {
+function DeliverActions({
+  task,
+  cbs,
+  hasSubtasks = false,
+}: {
+  task: ApiTeamTask;
+  cbs: DeliverCbs;
+  /** La tarea tiene subtareas: solo entrega cuando todas están hechas (100%). */
+  hasSubtasks?: boolean;
+}) {
+  if (!canDeliverRow(task, cbs, hasSubtasks)) {
     return null;
   }
   if (task.delivery_blocked_reason !== null) {
@@ -220,15 +239,11 @@ function DeliverActions({ task, cbs }: { task: ApiTeamTask; cbs: DeliverCbs }) {
           onClick={() => {
             cbs.onMarkDelivered?.(task);
           }}
-          title={
-            isSubtask
-              ? "Marcar esta subtarea como realizada, sin adjunto"
-              : "Entregar sin adjunto: crea el entregable y lo manda a revisión (o lo completa si la tarea no exige aprobación)"
-          }
+          title="Entregar sin adjunto: la tarea pasa al 100% y se avisa a quien coordina, sin registrar un entregable"
           className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           <Check className="size-3.5" />
-          {isSubtask ? "Marcar como realizada" : "Sin adjunto"}
+          Entregar sin adjunto
         </button>
       )}
     </>
@@ -504,8 +519,9 @@ function TaskRow({
           no sea padre (las tareas padre avanzan por sus subtareas). */}
       <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
 
-      {/* "Entregar": tarea padre al 100%, solo para su responsable. */}
-      <DeliverActions task={task} cbs={deliverCbs} />
+      {/* "Entregar" / "Entregar sin adjunto": tarea de nivel superior sin
+          subtareas ya comenzada, o tarea padre al 100%. Solo su responsable. */}
+      <DeliverActions task={task} cbs={deliverCbs} hasSubtasks={isParent} />
 
       {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
           eliminar (cualquier nivel — la tarea sigue siendo de SU equipo). */}
@@ -695,6 +711,7 @@ function TaskCard({
   projectId,
   teamMembers,
   hideAssignee,
+  hasSubtasks,
   onReassigned,
   onEdit,
   onDelete,
@@ -712,6 +729,8 @@ function TaskCard({
   projectId: string;
   teamMembers: ApiTeamMember[];
   hideAssignee: boolean;
+  /** La tarea tiene subtareas (conjunto completo del equipo). */
+  hasSubtasks: boolean;
   onReassigned: () => void;
   onEdit: (task: ApiTeamTask) => void;
   onDelete: (task: ApiTeamTask) => void;
@@ -783,10 +802,10 @@ function TaskCard({
         </span>
       </p>
 
-      {isDeliverableReady(task) && (
+      {canDeliverRow(task, deliverCbs, hasSubtasks) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <DeliverableReadyBadge />
-          <DeliverActions task={task} cbs={deliverCbs} />
+          {isDeliverableReady(task) && <DeliverableReadyBadge />}
+          <DeliverActions task={task} cbs={deliverCbs} hasSubtasks={hasSubtasks} />
         </div>
       )}
       <ThirdPartyDepBadge task={task} />
@@ -829,6 +848,7 @@ const KANBAN_PAGE = 15;
 function KanbanColumn({
   col,
   titleById,
+  parentIds,
   members,
   today,
   pathOf,
@@ -844,6 +864,8 @@ function KanbanColumn({
 }: {
   col: BoardColumn<ApiTeamTask>;
   titleById: Map<string, string>;
+  /** Ids de tareas que tienen subtareas (conjunto completo del equipo). */
+  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   today: string;
   pathOf: (task: ApiTeamTask) => string[];
@@ -915,6 +937,7 @@ function KanbanColumn({
                 projectId={projectId}
                 teamMembers={teamMembers}
                 hideAssignee={hideAssignee}
+                hasSubtasks={parentIds.has(task.id)}
                 onReassigned={onReassigned}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -941,6 +964,7 @@ function KanbanColumn({
 
 function KanbanView({
   allTasks,
+  parentIds,
   members,
   today,
   pathOf,
@@ -955,6 +979,7 @@ function KanbanView({
   deliverCbs,
 }: {
   allTasks: ApiTeamTask[];
+  parentIds: ReadonlySet<string>;
   members: WorkspaceMember[];
   today: string;
   pathOf: (task: ApiTeamTask) => string[];
@@ -980,6 +1005,7 @@ function KanbanView({
           key={col.key}
           col={col}
           titleById={titleById}
+          parentIds={parentIds}
           members={members}
           today={today}
           pathOf={pathOf}
@@ -1477,6 +1503,7 @@ export function TeamTasksView({
         {view === "kanban" && !emptyBag && !emptyForMember && !emptyForSelectedPerson && (
           <KanbanView
             allTasks={tasks}
+            parentIds={parentIds}
             members={members}
             today={today}
             pathOf={pathOf}

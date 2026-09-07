@@ -287,6 +287,11 @@ class TaskDependencyResponse(BaseModelConfig):
 class UpdateTaskStatusRequest(BaseModelConfig):
     status: TaskStatus
     change_reason: Optional[str] = None
+    # "Entregar sin adjunto": el responsable da la tarea por hecha sin registrar
+    # un entregable. Autoriza a fijar COMPLETADA sobre la tarea propia aunque
+    # exija aprobación (no hay evidencia que revisar) y se avisa a quien
+    # coordina. Solo tiene efecto junto a `status = completada`.
+    deliver_without_evidence: bool = False
 
 
 class UpdateTaskRequest(BaseModelConfig):

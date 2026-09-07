@@ -149,18 +149,24 @@ export function BlockedPopover({ task }: { task: ApiMyTask }) {
  *  - completada → nada
  *  - de equipo  → enlace al espacio del equipo
  *  - bloqueada  → popover con el porqué
- *  - individual → botón Entregar / Ver entrega
+ *  - individual → botón Entregar / Ver entrega, y —si aún no hay entrega y es
+ *    una tarea principal (sin tarea padre)— «Entregar sin adjunto», que la
+ *    completa al 100% sin registrar entregable y avisa a quien coordina.
  */
 export function MyTaskDeliverAction({
   task,
   isDone,
   hasDeliverable,
   onOpenIndividual,
+  onDeliverWithoutEvidence,
+  deliverWithoutEvidencePending = false,
 }: {
   task: ApiMyTask;
   isDone: boolean;
   hasDeliverable: boolean;
   onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
+  deliverWithoutEvidencePending?: boolean;
 }) {
   if (isDone) {
     return null;
@@ -179,15 +185,32 @@ export function MyTaskDeliverAction({
   if (!hasDeliverable && Boolean(task.delivery_blocked_reason)) {
     return <BlockedPopover task={task} />;
   }
+  const canDeliverWithoutEvidence =
+    !hasDeliverable && onDeliverWithoutEvidence !== undefined && task.parent_task_id === null;
   return (
-    <button
-      type="button"
-      onClick={() => {
-        onOpenIndividual(task);
-      }}
-      className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
-    >
-      {hasDeliverable ? "Ver entrega" : "Entregar"}
-    </button>
+    <span className="flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          onOpenIndividual(task);
+        }}
+        className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+      >
+        {hasDeliverable ? "Ver entrega" : "Entregar"}
+      </button>
+      {canDeliverWithoutEvidence && (
+        <button
+          type="button"
+          disabled={deliverWithoutEvidencePending}
+          onClick={() => {
+            onDeliverWithoutEvidence(task);
+          }}
+          title="Entregar sin adjunto: la tarea pasa al 100% y se avisa a quien coordina, sin registrar un entregable"
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+        >
+          {deliverWithoutEvidencePending ? "…" : "Entregar sin adjunto"}
+        </button>
+      )}
+    </span>
   );
 }
