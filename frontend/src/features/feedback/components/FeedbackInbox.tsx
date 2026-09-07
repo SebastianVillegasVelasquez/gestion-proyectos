@@ -69,7 +69,7 @@ function FeedbackCard({ item }: { item: FeedbackResponse }) {
   );
 }
 
-/** Bandeja de feedback del sitio (solo rol developer). Listar y gestionar estado. */
+/** Bandeja de feedback del sitio (developer y administración). Listar y gestionar estado. */
 export function FeedbackInbox() {
   const query = useFeedbackList();
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
