@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tasksApi } from "@/features/projects/api/tasks.api";
 import {
   personalApi,
   type AddCommentBody,
@@ -38,7 +39,23 @@ function useInvalidateAll() {
     // Entregar / revisar mueve el estado de la tarea vinculada.
     void qc.invalidateQueries({ queryKey: ["tasks"] });
     void qc.invalidateQueries({ queryKey: ["workspace"] });
+    void qc.invalidateQueries({ queryKey: ["dashboard"] });
   };
+}
+
+/**
+ * "Entregar sin adjunto" desde «Mis tareas»: la tarea individual pasa directa
+ * a completada (100%) sin registrar ningún entregable, y el servidor avisa a
+ * quien coordina el proyecto. No se navega a ninguna entrega porque no hay
+ * ninguna que ver.
+ */
+export function useCompleteMyTaskWithoutEvidence() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      tasksApi.changeStatus(taskId, "completada", "Entregada sin adjunto", true),
+    onSuccess: invalidate,
+  });
 }
 
 export function useCreatePersonalDeliverable() {

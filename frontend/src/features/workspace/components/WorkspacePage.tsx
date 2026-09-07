@@ -14,13 +14,18 @@ import {
 } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion } from "../types";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
-import { DeliverableDetailView, type EditVersionPatch } from "./DeliverableDetailView";
+import {
+  DeliverableDetailView,
+  RegisterDelivery,
+  type EditVersionPatch,
+} from "./DeliverableDetailView";
 import { FeedbackThread } from "./FeedbackThread";
 import { GroupSettingsView } from "./GroupSettingsView";
 import { MyInvitationsBanner } from "./MyInvitationsBanner";
@@ -60,7 +65,6 @@ type WorkspaceTab =
 function NewDeliverableModal({
   tasks,
   pending,
-  initialTaskId,
   onCreate,
   onClose,
 }: {
@@ -69,14 +73,11 @@ function NewDeliverableModal({
   // el responsable se eligen aquí — el responsable es siempre quien entrega.
   tasks: ApiTeamTask[];
   pending: boolean;
-  /** Preselecciona una tarea (atajo "Entregar" desde la vista de estructura). */
-  initialTaskId?: string;
   onCreate: (taskTitle: string, taskId: string | null) => void;
   onClose: () => void;
 }) {
-  const preselected = initialTaskId ? tasks.find((t) => t.id === initialTaskId) : undefined;
-  const [taskId, setTaskId] = useState<string>(preselected?.id ?? "");
-  const [title, setTitle] = useState(preselected?.title ?? "");
+  const [taskId, setTaskId] = useState<string>("");
+  const [title, setTitle] = useState("");
 
   // Al elegir una tarea real, autorrellenamos el título. Si el usuario lo
   // edita después, respetamos su valor (no sobreescribimos en cada render).
@@ -175,6 +176,65 @@ function NewDeliverableModal({
   );
 }
 
+/**
+ * "Entregar" de una fila concreta (subtarea o tarea padre lista): crea el
+ * entregable Y su primera versión en un solo paso, sin salir de la vista
+ * donde se está trabajando. Antes "Entregar" solo abría un formulario para
+ * crear el entregable EN BLANCO y mandaba a la pestaña Entregables a subir
+ * ahí la versión real — un segundo paso fácil de abandonar a medias (el
+ * entregable quedaba "en borrador" y la tarea sin moverse de su estado).
+ */
+function QuickDeliverModal({
+  taskTitle,
+  pending,
+  onAddVersion,
+  onUploadFile,
+  onClose,
+}: {
+  taskTitle: string;
+  pending: boolean;
+  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
+  onUploadFile: (file: File, note: string, observations: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Entregar tarea"
+    >
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Entregar</h2>
+            <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
+              {taskTitle}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <RegisterDelivery
+            onAddVersion={onAddVersion}
+            onUploadFile={onUploadFile}
+            uploading={pending}
+            currentVersion={0}
+            uploadedBy=""
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NoDeliverableSelected() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
@@ -207,9 +267,11 @@ function MemberWorkspace() {
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tareas");
   const [showNew, setShowNew] = useState(false);
-  // Tarea preseleccionada al abrir el modal desde el atajo "Entregar" de la
-  // vista de estructura (fase 3.4). null = alta normal desde "Nuevo entregable".
-  const [deliverTaskId, setDeliverTaskId] = useState<string | null>(null);
+  // Id de la tarea (o subtarea) que se está entregando desde el atajo
+  // "Entregar" de una fila (Tareas/Estructura): abre `QuickDeliverModal`, que
+  // crea el entregable y su versión en un solo paso y no navega a la pestaña
+  // Entregables — se queda en la vista donde el integrante ya estaba.
+  const [quickDeliverTaskId, setQuickDeliverTaskId] = useState<string | null>(null);
 
   // El equipo activo: el seleccionado o el primero disponible.
   const activeTeamId = selectedTeamId ?? teams[0]?.id ?? null;
@@ -271,6 +333,7 @@ function MemberWorkspace() {
   const editVersion = useEditVersion(activeTeamId);
   const addComment = useAddComment(activeTeamId);
   const deleteDeliverable = useDeleteDeliverable(activeTeamId);
+  const changeTaskStatus = useChangeTaskStatus(projectId);
   const qc = useQueryClient();
   // Reasignar una tarea desde la estructura toca la caché de tareas del
   // proyecto (lo hace el propio hook), pero no la del workspace: la refrescamos.
@@ -381,45 +444,95 @@ function MemberWorkspace() {
         onSuccess: (d) => {
           setSelectedDeliverableId(d.id);
           setShowNew(false);
-          setDeliverTaskId(null);
           // El entregable recién creado pasa a la vista de entregables, donde se
-          // registra la entrega real (versión).
+          // registra la entrega real (versión): este alta genérica ("Nueva
+          // entrega" de la cabecera) sí es un flujo en dos pasos a propósito.
           setActiveTab("entregables");
         },
       },
     );
   };
 
+  const quickDeliverTask = quickDeliverTaskId
+    ? (tasksQuery.data ?? []).find((t) => t.id === quickDeliverTaskId)
+    : undefined;
+
   const openDeliverForTask = (taskId: string) => {
-    setDeliverTaskId(taskId);
-    setShowNew(true);
+    setQuickDeliverTaskId(taskId);
   };
 
-  // "Entregar sin adjunto": crea un entregable REAL (con una versión de tipo
-  // `sin_adjunto`, sin URL) igual que una entrega normal — así el líder lo ve y
-  // lo aprueba/devuelve en la pestaña de Entregables, la tarea se mueve por el
-  // mismo camino (a revisión, o directo a completada si no exige aprobación) y
-  // los avisos se disparan. Antes solo cambiaba el estado de la tarea y no
-  // dejaba nada que revisar.
-  const markTaskDelivered = (taskId: string) => {
-    const task = (tasksQuery.data ?? []).find((t) => t.id === taskId);
+  const closeQuickDeliver = () => {
+    setQuickDeliverTaskId(null);
+  };
+
+  // "Entregar" desde una fila (con adjunto): crea el entregable y su versión
+  // (URL) en un solo paso — sin este segundo tiro, el entregable quedaba "en
+  // borrador" y la tarea sin moverse si el integrante no volvía a completar
+  // el alta desde la pestaña Entregables. Tampoco navega ahí: la entrega ya
+  // quedó registrada, no hace falta salir de Tareas/Estructura para verlo.
+  const quickDeliverWithVersion = (v: Omit<DeliverableVersion, "id" | "versionNumber">) => {
+    const task = quickDeliverTask;
+    if (!task) {
+      return;
+    }
     createDeliverable.mutate(
-      {
-        task_title: task?.title ?? "Entrega sin adjunto",
-        assignee_id: currentUserId,
-        task_id: taskId,
-      },
+      { task_title: task.title, assignee_id: currentUserId, task_id: task.id },
       {
         onSuccess: (d) => {
           addVersion.mutate(
-            { deliverableId: d.id, body: { type: "sin_adjunto" } },
             {
-              onSuccess: () => {
-                setSelectedDeliverableId(d.id);
-                setActiveTab("entregables");
+              deliverableId: d.id,
+              body: {
+                type: v.type,
+                url: v.url ?? undefined,
+                note: v.note,
+                observations: v.observations || undefined,
               },
             },
+            { onSuccess: closeQuickDeliver },
           );
+        },
+      },
+    );
+  };
+
+  // Misma idea, entregando un ARCHIVO.
+  const quickDeliverWithFile = (file: File, note: string, observations: string) => {
+    const task = quickDeliverTask;
+    if (!task) {
+      return;
+    }
+    createDeliverable.mutate(
+      { task_title: task.title, assignee_id: currentUserId, task_id: task.id },
+      {
+        onSuccess: (d) => {
+          uploadVersionFile.mutate(
+            { deliverableId: d.id, body: { file, note, observations: observations || undefined } },
+            { onSuccess: closeQuickDeliver },
+          );
+        },
+      },
+    );
+  };
+
+  // "Entregar sin adjunto": el integrante da la tarea (o subtarea) por hecha
+  // sin registrar ningún entregable. La tarea pasa directa a COMPLETADA (100%)
+  // y el servidor avisa a quien coordina (líder/supervisor del equipo). No hay
+  // nada que revisar, así que no se navega a Entregables: la fila se refresca
+  // en su sitio al invalidar la caché de tareas del equipo.
+  const markTaskDelivered = (taskId: string) => {
+    changeTaskStatus.mutate(
+      {
+        taskId,
+        status: "completada",
+        reason: "Entregada sin adjunto",
+        deliverWithoutEvidence: true,
+      },
+      {
+        onSuccess: () => {
+          if (activeTeamId) {
+            void qc.invalidateQueries({ queryKey: ["workspace", "tasks", activeTeamId] });
+          }
         },
       },
     );
@@ -671,12 +784,22 @@ function MemberWorkspace() {
         <NewDeliverableModal
           tasks={linkableTasks}
           pending={createDeliverable.isPending}
-          initialTaskId={deliverTaskId ?? undefined}
           onCreate={handleCreate}
           onClose={() => {
             setShowNew(false);
-            setDeliverTaskId(null);
           }}
+        />
+      )}
+
+      {quickDeliverTask && (
+        <QuickDeliverModal
+          taskTitle={quickDeliverTask.title}
+          pending={
+            createDeliverable.isPending || addVersion.isPending || uploadVersionFile.isPending
+          }
+          onAddVersion={quickDeliverWithVersion}
+          onUploadFile={quickDeliverWithFile}
+          onClose={closeQuickDeliver}
         />
       )}
     </div>

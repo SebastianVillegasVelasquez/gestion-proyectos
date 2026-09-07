@@ -127,15 +127,23 @@ const EMAIL_CONSOLE_ITEM: NavItem = {
   href: "/dev/email-test",
 };
 
-// El developer ve la navegación completa MÁS la bandeja de feedback y Correos.
-const DEVELOPER_SECTIONS: NavSection[] = withGeneralItems([
-  { id: "feedback", label: "Feedback", icon: Inbox, href: "/feedback" },
-  EMAIL_CONSOLE_ITEM,
-]);
+const FEEDBACK_ITEM: NavItem = {
+  id: "feedback",
+  label: "Feedback",
+  icon: Inbox,
+  href: "/feedback",
+};
 
-// El super_admin ve la navegación de administración MÁS la consola de Correos.
-// Feedback no: esa bandeja es del rol técnico.
-const SUPER_ADMIN_SECTIONS: NavSection[] = withGeneralItems([EMAIL_CONSOLE_ITEM]);
+// El developer ve la navegación completa MÁS la bandeja de feedback y Correos.
+const DEVELOPER_SECTIONS: NavSection[] = withGeneralItems([FEEDBACK_ITEM, EMAIL_CONSOLE_ITEM]);
+
+// El super_admin ve la navegación de administración MÁS la bandeja de feedback
+// y la consola de Correos.
+const SUPER_ADMIN_SECTIONS: NavSection[] = withGeneralItems([FEEDBACK_ITEM, EMAIL_CONSOLE_ITEM]);
+
+// El admin ve la navegación de administración MÁS la bandeja de feedback
+// (Correos se queda en developer / super_admin).
+const ADMIN_SECTIONS: NavSection[] = withGeneralItems([FEEDBACK_ITEM]);
 
 const ROUTE_TO_ITEM: Record<string, string> = {
   "/": "overview",
@@ -178,8 +186,8 @@ export function Sidebar({
   const { user } = useAuth();
   const logout = useLogout();
 
-  // User: navegación reducida. Developer: completa + bandeja de feedback.
-  // Resto (admin): navegación completa.
+  // User: navegación reducida. Developer / super_admin / admin: administración +
+  // bandeja de feedback (y Correos solo developer / super_admin).
   const sections =
     user?.role === Role.USER
       ? USER_SECTIONS
@@ -187,7 +195,7 @@ export function Sidebar({
         ? DEVELOPER_SECTIONS
         : user?.role === Role.SUPER_ADMIN
           ? SUPER_ADMIN_SECTIONS
-          : SECTIONS;
+          : ADMIN_SECTIONS;
 
   const active = ROUTE_TO_ITEM[location.pathname] ?? "overview";
 

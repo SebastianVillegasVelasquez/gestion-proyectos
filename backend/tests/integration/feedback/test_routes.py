@@ -1,8 +1,8 @@
 """E2E del feedback del sitio.
 
 Flujo de usuario: un usuario autenticado envía feedback desde la app; el rol
-DEVELOPER lo ve en su bandeja y le cambia el estado. Ni admin ni super_admin
-acceden a la bandeja (es exclusiva del developer).
+DEVELOPER y la administración (admin / super_admin) lo ven en su bandeja y le
+cambian el estado. Un usuario normal no accede a la bandeja.
 """
 
 
@@ -47,15 +47,21 @@ class TestFeedbackFlow:
         assert updated.status_code == 200, updated.text
         assert updated.json()["status"] == "realizado"
 
-    async def test_admin_cannot_access_inbox(
-        self, client, member_headers, admin_headers
+    async def test_admin_can_access_inbox(self, client, member_headers, admin_headers):
+        await _submit(client, member_headers)
+        inbox = await client.get("/api/v1/feedback/", headers=admin_headers)
+        assert inbox.status_code == 200, inbox.text
+        assert inbox.json()["total"] >= 1
+
+    async def test_super_admin_can_access_inbox(
+        self, client, member_headers, super_admin_headers
     ):
         await _submit(client, member_headers)
-        denied = await client.get("/api/v1/feedback/", headers=admin_headers)
-        assert denied.status_code == 403
+        inbox = await client.get("/api/v1/feedback/", headers=super_admin_headers)
+        assert inbox.status_code == 200, inbox.text
 
-    async def test_super_admin_cannot_access_inbox(self, client, super_admin_headers):
-        denied = await client.get("/api/v1/feedback/", headers=super_admin_headers)
+    async def test_plain_user_cannot_access_inbox(self, client, member_headers):
+        denied = await client.get("/api/v1/feedback/", headers=member_headers)
         assert denied.status_code == 403
 
     async def test_requires_authentication(self, client):

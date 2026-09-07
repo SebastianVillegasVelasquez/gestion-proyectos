@@ -1336,6 +1336,7 @@ class ChangeTaskStatusUseCase:
                 project_id=project_id,
                 new_status=data.status,
                 requires_approval=task.requires_approval,
+                deliver_without_evidence=data.deliver_without_evidence,
             )
 
         previous_status = task.status
@@ -1418,6 +1419,7 @@ class ChangeTaskStatusUseCase:
         new_status: TaskStatus,
         current_user_role: str | None = None,
         requires_approval: bool = True,
+        deliver_without_evidence: bool = False,
     ) -> None:
         # Override de gestión: admin / super_admin / developer pueden fijar cualquier
         # estado (corrección administrativa). role_satisfies ya trata a developer
@@ -1439,6 +1441,17 @@ class ChangeTaskStatusUseCase:
         if (
             is_assignee
             and not requires_approval
+            and new_status == TaskStatus.COMPLETADA
+        ):
+            return
+
+        # "Entregar sin adjunto": el responsable da su tarea por hecha sin
+        # registrar un entregable. Como no hay evidencia que revisar, se permite
+        # fijar COMPLETADA sobre la tarea propia aunque exija aprobación; el
+        # aviso a quien coordina sigue saliendo por `TaskCompleted`.
+        if (
+            is_assignee
+            and deliver_without_evidence
             and new_status == TaskStatus.COMPLETADA
         ):
             return

@@ -122,13 +122,15 @@ describe("Sidebar items (admin)", () => {
     expect(screen.getByRole("button", { name: "Configuración" })).toBeInTheDocument();
   });
 
-  it("does not show the Feedback inbox for admins", () => {
+  it("shows the Feedback inbox for admins", () => {
     renderSidebar();
-    expect(screen.queryByRole("button", { name: "Feedback" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
+    // Correos sigue siendo de developer / super_admin, no de admin.
+    expect(screen.queryByRole("button", { name: "Correos" })).not.toBeInTheDocument();
   });
 });
 
-describe("Sidebar feedback inbox (developer)", () => {
+describe("Sidebar feedback inbox (developer / super_admin)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.role = "developer";
@@ -136,9 +138,14 @@ describe("Sidebar feedback inbox (developer)", () => {
 
   it("shows the Feedback inbox and the full admin navigation", () => {
     renderSidebar();
-    // Bandeja de feedback (exclusiva del developer)…
     expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
     // …además de la navegación completa que ve administración.
     expect(screen.getByRole("button", { name: "Todos los proyectos" })).toBeInTheDocument();
+  });
+
+  it("also shows the Feedback inbox for super_admin", () => {
+    authState.role = "super_admin";
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
   });
 });

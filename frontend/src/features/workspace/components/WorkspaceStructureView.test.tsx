@@ -158,12 +158,13 @@ describe("WorkspaceStructureView", () => {
   });
 
   // ── Flujo de entrega: mismas reglas que en la vista Lista (TeamTasksView),
-  //    aquí ejercitadas contra el árbol de la Estructura — donde el bug vivía:
-  //    esta vista ofrecía Entregar/Sin adjunto a CUALQUIER tarea (incluidas
-  //    subtareas y padres con subtareas abiertas) porque nunca miraba
-  //    `parent_task_id` ni `progress_pct`, solo `canDeliverTask`. ────────────
+  //    aquí ejercitadas contra el árbol de la Estructura. Una tarea de nivel
+  //    superior sin subtareas ya comenzada, o una subtarea ya comenzada,
+  //    ofrecen "Entregar" y "Entregar sin adjunto"; una tarea padre con
+  //    subtareas abiertas, ninguno de los dos hasta el 100%. ────────────────
 
-  it("una tarea padre con subtareas sin terminar no ofrece Entregar", () => {
+  it("una tarea padre con subtareas sin terminar no ofrece Entregar (solo la subtarea lista lo ofrece)", () => {
+    const onDeliverTask = vi.fn();
     renderView(
       <WorkspaceStructureView
         {...base}
@@ -178,17 +179,18 @@ describe("WorkspaceStructureView", () => {
             status: "en_progreso",
           }),
         ]}
-        onDeliverTask={vi.fn()}
+        onDeliverTask={onDeliverTask}
         onMarkDeliveredTask={vi.fn()}
         canDeliverTask={() => true}
       />,
     );
-    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sin adjunto/i })).not.toBeInTheDocument();
+    const entregarButtons = screen.getAllByRole("button", { name: /^entregar$/i });
+    expect(entregarButtons).toHaveLength(1);
   });
 
-  it("una subtarea nunca ofrece Entregar/Sin adjunto: solo Comenzar y luego Marcar como realizada", async () => {
+  it("una subtarea sin iniciar ofrece Comenzar; ya en progreso, Entregar y Entregar sin adjunto", async () => {
     const user = userEvent.setup();
+    const onDeliverTask = vi.fn();
     const onMarkDeliveredTask = vi.fn();
     const { rerender } = renderView(
       <WorkspaceStructureView
@@ -205,7 +207,7 @@ describe("WorkspaceStructureView", () => {
             assignee_name: "Ana",
           }),
         ]}
-        onDeliverTask={vi.fn()}
+        onDeliverTask={onDeliverTask}
         onMarkDeliveredTask={onMarkDeliveredTask}
         canDeliverTask={() => true}
       />,
@@ -214,11 +216,9 @@ describe("WorkspaceStructureView", () => {
     // Sin iniciar: "Comenzar", nunca los botones de entrega.
     expect(await screen.findByRole("button", { name: /comenzar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /marcar como realizada/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /entregar sin adjunto/i })).not.toBeInTheDocument();
 
-    // Ya en progreso: "Marcar como realizada" y solo eso.
+    // Ya en progreso: ambos botones de entrega.
     rerender(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
@@ -237,15 +237,16 @@ describe("WorkspaceStructureView", () => {
               assignee_name: "Ana",
             }),
           ]}
-          onDeliverTask={vi.fn()}
+          onDeliverTask={onDeliverTask}
           onMarkDeliveredTask={onMarkDeliveredTask}
           canDeliverTask={() => true}
         />
       </QueryClientProvider>,
     );
     expect(screen.queryByRole("button", { name: /comenzar/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^entregar$/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /marcar como realizada/i }));
+    await user.click(screen.getByRole("button", { name: /^entregar$/i }));
+    expect(onDeliverTask).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
+    await user.click(screen.getByRole("button", { name: /entregar sin adjunto/i }));
     expect(onMarkDeliveredTask).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
   });
 });

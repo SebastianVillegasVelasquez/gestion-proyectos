@@ -112,12 +112,17 @@ export function MyTasksView({
   loading,
   deliverableTaskIds,
   onOpenIndividual,
+  onDeliverWithoutEvidence,
+  deliverWithoutEvidencePending,
 }: {
   tasks: ApiMyTask[];
   loading: boolean;
   /** ids de tareas que ya tienen una entrega personal (para el texto del botón). */
   deliverableTaskIds: Set<string>;
   onOpenIndividual: (task: ApiMyTask) => void;
+  /** "Entregar sin adjunto": completa la tarea individual al 100% sin entregable. */
+  onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
+  deliverWithoutEvidencePending?: boolean;
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [view, setView] = useState<ViewMode>("lista");
@@ -364,6 +369,8 @@ export function MyTasksView({
           today={today}
           deliverableTaskIds={deliverableTaskIds}
           onOpenIndividual={onOpenIndividual}
+          onDeliverWithoutEvidence={onDeliverWithoutEvidence}
+          deliverWithoutEvidencePending={deliverWithoutEvidencePending}
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-accent/20 p-3">
@@ -428,6 +435,8 @@ export function MyTasksView({
                             isDone={status === "done"}
                             hasDeliverable={hasDeliverable}
                             onOpenIndividual={onOpenIndividual}
+                            onDeliverWithoutEvidence={onDeliverWithoutEvidence}
+                            deliverWithoutEvidencePending={deliverWithoutEvidencePending}
                           />
                         </div>
 

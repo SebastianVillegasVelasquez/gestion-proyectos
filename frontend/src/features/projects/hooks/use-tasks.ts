@@ -257,11 +257,14 @@ export function useChangeTaskStatus(projectId: string) {
       taskId,
       status,
       reason,
+      deliverWithoutEvidence,
     }: {
       taskId: string;
       status: TaskStatus;
       reason?: string;
-    }) => tasksApi.changeStatus(taskId, status, reason),
+      /** "Entregar sin adjunto": completa la tarea propia sin entregable. */
+      deliverWithoutEvidence?: boolean;
+    }) => tasksApi.changeStatus(taskId, status, reason, deliverWithoutEvidence),
     onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId) }),
   });
 }

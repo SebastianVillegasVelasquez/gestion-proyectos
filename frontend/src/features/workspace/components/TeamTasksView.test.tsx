@@ -234,8 +234,8 @@ describe("TeamTasksView — botón Comenzar", () => {
 //   1. Una tarea PADRE solo ofrece Entregar/Sin adjunto cuando su avance llegó
 //      a 100% (todas sus subtareas COMPLETADAS) — mientras quede una abierta,
 //      no hay botón de entrega aunque el responsable pueda entregarla.
-//   2. Una SUBTAREA nunca ofrece Entregar/Sin adjunto: solo "Comenzar" (si no
-//      ha arrancado) y luego "Marcar como realizada" (si ya está en curso).
+//   2. Una SUBTAREA ofrece "Comenzar" (si no ha arrancado) y luego "Entregar"
+//      / "Entregar sin adjunto" (si ya está en curso).
 //   3. Un bloqueo real del servidor (`delivery_blocked_reason`) se enseña como
 //      "Bloqueada" en vez del botón, tanto en padres como en subtareas.
 describe("TeamTasksView — entrega de tareas y subtareas", () => {
@@ -249,8 +249,9 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
     } as never);
   });
 
-  it("una tarea padre con una subtarea abierta no ofrece Entregar todavía", async () => {
+  it("una tarea padre con una subtarea abierta no ofrece Entregar todavía (solo la subtarea abierta lo ofrece)", async () => {
     const user = userEvent.setup();
+    const onDeliver = vi.fn();
     renderView(
       false,
       [
@@ -270,12 +271,17 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
           status: "en_progreso",
         }),
       ],
-      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+      { onDeliver, onMarkDelivered: vi.fn(), canDeliverTask: () => true },
     );
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
-    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Sin adjunto/i })).toBeNull();
+    // El único "Entregar" en pantalla es el de la subtarea abierta (la que sí
+    // está lista); el padre, con la otra subtarea todavía sin cerrar, no
+    // ofrece ninguno.
+    const entregarButtons = screen.getAllByRole("button", { name: /^Entregar$/i });
+    expect(entregarButtons).toHaveLength(1);
+    await user.click(entregarButtons[0]);
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "open" }));
   });
 
   it("una tarea padre al 100% ofrece Entregar y Sin adjunto", async () => {
@@ -294,8 +300,37 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
     expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "parent" }));
   });
 
-  it("una subtarea en progreso ofrece 'Marcar como realizada' y no 'Entregar'", async () => {
+  it("una tarea de nivel superior sin subtareas ya comenzada ofrece Entregar y Entregar sin adjunto", async () => {
     const user = userEvent.setup();
+    const onDeliver = vi.fn();
+    const onMarkDelivered = vi.fn();
+    renderView(
+      false,
+      // progress_pct 35 (por estado): la tarea NO llega a 100 y aun así, al no
+      // tener subtareas, ya se puede entregar en cuanto está "en progreso".
+      [task({ id: "solo", title: "Tarea suelta", status: "en_progreso", progress_pct: 35 })],
+      { onDeliver, onMarkDelivered, canDeliverTask: () => true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Entregar$/i }));
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "solo" }));
+    await user.click(screen.getByRole("button", { name: /Entregar sin adjunto/i }));
+    expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "solo" }));
+  });
+
+  it("una tarea de nivel superior sin subtareas sin comenzar no ofrece entrega todavía", () => {
+    renderView(
+      false,
+      [task({ id: "solo", title: "Tarea suelta", status: "pendiente_por_iniciar" })],
+      { onDeliver: vi.fn(), onMarkDelivered: vi.fn(), canDeliverTask: () => true },
+    );
+    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Entregar sin adjunto/i })).toBeNull();
+  });
+
+  it("una subtarea en progreso ofrece 'Entregar' y 'Entregar sin adjunto'", async () => {
+    const user = userEvent.setup();
+    const onDeliver = vi.fn();
     const onMarkDelivered = vi.fn();
     renderView(
       false,
@@ -308,16 +343,17 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
           status: "en_progreso",
         }),
       ],
-      { onDeliver: vi.fn(), onMarkDelivered, canDeliverTask: () => true },
+      { onDeliver, onMarkDelivered, canDeliverTask: () => true },
     );
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
-    expect(screen.queryByRole("button", { name: /^Entregar$/i })).toBeNull();
-    await user.click(screen.getByRole("button", { name: /Marcar como realizada/i }));
+    await user.click(screen.getByRole("button", { name: /^Entregar$/i }));
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
+    await user.click(screen.getByRole("button", { name: /Entregar sin adjunto/i }));
     expect(onMarkDelivered).toHaveBeenCalledWith(expect.objectContaining({ id: "child" }));
   });
 
-  it("una subtarea sin iniciar ofrece Comenzar, no Marcar como realizada", async () => {
+  it("una subtarea sin iniciar ofrece Comenzar, no Entregar sin adjunto", async () => {
     const user = userEvent.setup();
     renderView(
       false,
@@ -335,7 +371,7 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
     expect(await screen.findByRole("button", { name: /Comenzar/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Marcar como realizada/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Entregar sin adjunto/i })).toBeNull();
   });
 
   it("una subtarea bloqueada por una dependencia muestra 'Bloqueada' en vez del botón", async () => {
@@ -357,7 +393,7 @@ describe("TeamTasksView — entrega de tareas y subtareas", () => {
 
     await user.click(await screen.findByRole("button", { name: /Ver subtareas/i }));
     expect(screen.getByText("Bloqueada")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Marcar como realizada/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Entregar sin adjunto/i })).toBeNull();
   });
 
   it("sin canDeliverTask (no es mi entregable) no ofrece ningún botón de entrega", () => {

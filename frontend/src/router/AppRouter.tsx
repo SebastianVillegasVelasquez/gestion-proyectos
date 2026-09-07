@@ -144,8 +144,8 @@ export const AppRouter = () => (
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />
 
-        {/* Herramientas del rol técnico (developer). */}
-        <Route element={<RoleGuard roles={[Role.DEVELOPER]} />}>
+        {/* Bandeja de feedback: developer y administración (admin / super_admin). */}
+        <Route element={<RoleGuard roles={ADMIN_ROLES} />}>
           <Route path="/feedback" element={<FeedbackInbox />} />
         </Route>
         <Route element={<RoleGuard roles={EMAIL_CONSOLE_ROLES} />}>

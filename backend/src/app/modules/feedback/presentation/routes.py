@@ -24,8 +24,9 @@ from app.shared.pagination import Pagination, pagination_params
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
-# La bandeja de feedback es del rol técnico (developer); ni el admin la ve.
-_developer = require_role("developer")
+# La bandeja de feedback la gestionan el rol técnico (developer) y la
+# administración (admin / super_admin): todos ellos revisan lo que llega.
+_feedback_manager = require_role("developer", "admin", "super_admin")
 
 
 @router.post("/", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
@@ -42,9 +43,9 @@ async def create_feedback(
 async def list_feedback(
     pagination: Pagination = Depends(pagination_params),
     repo=Depends(feedback_repo_dependency),
-    current_user=Depends(_developer),
+    current_user=Depends(_feedback_manager),
 ):
-    """Bandeja de feedback recibido (solo developer)."""
+    """Bandeja de feedback recibido (developer y administración)."""
     return await ListFeedbackUseCase(repo).execute(pagination)
 
 
@@ -53,7 +54,7 @@ async def update_feedback_status(
     feedback_id: UUID,
     data: UpdateFeedbackStatusRequest,
     repo=Depends(feedback_repo_dependency),
-    current_user=Depends(_developer),
+    current_user=Depends(_feedback_manager),
 ):
     """Cambia el estado de gestión de un feedback (realizado, imposible, etc.)."""
     return await UpdateFeedbackStatusUseCase(repo).execute(feedback_id, data.status)
