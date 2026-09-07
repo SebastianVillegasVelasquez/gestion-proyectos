@@ -31,6 +31,8 @@ import {
   useUpdatePersonalVersion,
   useUploadPersonalVersionFile,
 } from "../hooks/use-personal-deliverables";
+import { ManualHint } from "@/features/manual/components/ManualHint";
+import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { MyTasksView } from "./MyTasksView";
 
 const AVATAR_COLORS = [
@@ -391,15 +393,18 @@ export function PersonalDeliverablesPage() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setShowNew(true);
-          }}
-          className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
-        >
-          Nueva entrega
-        </button>
+        <div className="flex items-center gap-2">
+          <ManualHint topic={MANUAL_TOPIC.misTareas} label="Cómo funciona" />
+          <button
+            type="button"
+            onClick={() => {
+              setShowNew(true);
+            }}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+          >
+            Nueva entrega
+          </button>
+        </div>
       </header>
 
       <div className="flex shrink-0 gap-1 border-b border-border">

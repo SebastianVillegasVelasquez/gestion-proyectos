@@ -1,8 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render as rtlRender, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import type { ReactElement, ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 
 import { DeliverableDetailView } from "./DeliverableDetailView";
+
+// La vista enlaza al manual desde las acciones de revisión, así que necesita
+// contexto de router: se envuelve una vez aquí en vez de en cada caso.
+function render(ui: ReactElement) {
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <MemoryRouter>{children}</MemoryRouter>
+  );
+  return rtlRender(ui, { wrapper: Wrapper });
+}
 import type { Deliverable, WorkspaceMember } from "../types";
 
 const members: WorkspaceMember[] = [

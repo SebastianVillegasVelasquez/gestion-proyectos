@@ -6,20 +6,42 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/common/AsyncStates";
 import { DEFAULT_ARTICLE_ID, MANUAL_ARTICLES, MANUAL_SECTIONS } from "../manual-content";
 import { filterSections } from "../utils/search";
-import type { ManualArticle, ManualSection } from "../types";
+import type { ManualArticle, ManualAudience, ManualSection } from "../types";
 import { ManualBlockView } from "./manual-blocks";
 
 /** Parámetro de la URL: `/manual?tema=entregar-tarea` es un enlace compartible
  *  a un tema concreto, que es como la gente pasa ayuda a un compañero. */
 const PARAM = "tema";
 
-function LeaderBadge() {
+const AUDIENCE_BADGE: Record<ManualAudience, { label: string; title: string; chip: string }> = {
+  integrante: {
+    label: "Integrante",
+    title: "Aplica cuando trabajas y entregas tus propias tareas",
+    chip: "bg-brand-gold/15 text-brand-gold-dark dark:text-brand-gold",
+  },
+  lider: {
+    label: "Líder",
+    title: "Solo aplica si lideras o supervisas un equipo",
+    chip: "bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal",
+  },
+};
+
+/** Marca de a qué rol le concierne un tema. Sin `audience`, el tema es de
+ *  todos y no lleva marca: solo se señala lo que NO es común. */
+function AudienceBadge({ audience }: { audience: ManualAudience | undefined }) {
+  if (!audience) {
+    return null;
+  }
+  const meta = AUDIENCE_BADGE[audience];
   return (
     <span
-      title="Solo aplica si lideras o supervisas un equipo"
-      className="shrink-0 rounded bg-brand-teal/10 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-brand-teal-dark dark:text-brand-teal"
+      title={meta.title}
+      className={cn(
+        "shrink-0 rounded px-1.5 py-px text-[10px] font-bold uppercase tracking-wide",
+        meta.chip,
+      )}
     >
-      Líder
+      {meta.label}
     </span>
   );
 }
@@ -74,10 +96,15 @@ function ManualIndex({
         <nav aria-label="Temas del manual" className="flex flex-col gap-5">
           {sections.map((section) => (
             <div key={section.id}>
-              <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <section.Icon className="size-3.5 shrink-0" />
-                {section.title}
-              </p>
+              <div className="mb-1.5 px-1">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <section.Icon className="size-3.5 shrink-0" />
+                  {section.title}
+                </p>
+                {section.hint && (
+                  <p className="pl-5 text-[11px] text-muted-foreground/70">{section.hint}</p>
+                )}
+              </div>
               <ul className="flex flex-col gap-0.5">
                 {section.articles.map((article) => {
                   const isActive = article.id === activeId;
@@ -99,7 +126,7 @@ function ManualIndex({
                         )}
                       >
                         <span className="min-w-0 flex-1 truncate">{article.title}</span>
-                        {article.audience === "lider" && <LeaderBadge />}
+                        <AudienceBadge audience={article.audience} />
                       </button>
                     </li>
                   );
@@ -130,7 +157,7 @@ function ManualArticleView({
       </p>
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">{article.title}</h2>
-        {article.audience === "lider" && <LeaderBadge />}
+        <AudienceBadge audience={article.audience} />
       </div>
       <p className="mb-6 text-[15px] text-muted-foreground">{article.summary}</p>
 

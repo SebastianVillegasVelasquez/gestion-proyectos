@@ -1,6 +1,7 @@
-import { AlertTriangle, Info, Lightbulb } from "lucide-react";
+import { AlertTriangle, Info, Lightbulb, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseInline } from "../utils/inline";
+import { resolveVideo } from "../utils/video";
 import type { ManualBlock, NoteTone } from "../types";
 
 /** Texto de un bloque con sus marcas ya resueltas. */
@@ -127,6 +128,47 @@ export function ManualBlockView({ block }: { block: ManualBlock }) {
           ))}
         </ul>
       );
+
+    case "video": {
+      const source = resolveVideo(block.src);
+      if (source.kind === "none") {
+        // El apartado existe antes que el video: se dice que viene, en vez de
+        // dejar un reproductor vacío que parece un fallo de carga.
+        return (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-accent/30 px-6 py-10 text-center">
+            <Video className="size-7 text-muted-foreground" />
+            <p className="text-sm font-semibold text-foreground">El video está en camino</p>
+            <p className="max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+              Todavía no está publicado. Mientras tanto, los temas del índice cubren lo mismo paso a
+              paso.
+            </p>
+          </div>
+        );
+      }
+      return (
+        <figure className="flex flex-col gap-2">
+          <div className="aspect-video w-full overflow-hidden rounded-xl border border-border bg-black">
+            {source.kind === "embed" ? (
+              <iframe
+                src={source.url}
+                title={block.caption}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                className="size-full"
+              />
+            ) : (
+              // Sin pista de subtítulos: el video es material de apoyo y todo
+              // su contenido está escrito, paso a paso, en los temas del índice.
+              <video src={source.url} controls className="size-full">
+                Tu navegador no puede reproducir este video.
+              </video>
+            )}
+          </div>
+          <figcaption className="text-[13px] text-muted-foreground">{block.caption}</figcaption>
+        </figure>
+      );
+    }
 
     case "table":
       return (

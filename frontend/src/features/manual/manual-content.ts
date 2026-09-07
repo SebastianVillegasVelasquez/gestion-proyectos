@@ -1,14 +1,23 @@
-import { CalendarRange, LifeBuoy, ListTodo, Rocket, Users2 } from "lucide-react";
+import { Boxes, Crown, LifeBuoy, Rocket, UserRound } from "lucide-react";
 import type { ManualSection } from "./types";
 
-// Manual de usuario de Bitácora OBJ para quien TRABAJA en los proyectos:
-// integrantes de un equipo y quien los lidera o supervisa. Cubre las dos
-// pantallas donde pasa su día —el espacio de trabajo del equipo y «Mis
-// tareas»— y está escrito contra el flujo real de la aplicación: los nombres
-// entre `[[…]]` son los que se leen literalmente en pantalla.
+// Manual de usuario de Bitácora OBJ para quien TRABAJA en los proyectos.
+// Está partido por rol —una guía para el integrante y otra para quien lidera—
+// porque hacen cosas distintas con las mismas pantallas, y escrito contra el
+// flujo real de la aplicación: los nombres entre `[[…]]` son los que se leen
+// literalmente en pantalla.
 //
 // Para añadir un tema: un objeto más en `articles`. El índice lateral, la
 // búsqueda y la navegación anterior/siguiente salen solos de esta estructura.
+
+/**
+ * URL del video de bienvenida. `null` mientras no esté grabado: el apartado
+ * existe igualmente y muestra un aviso en lugar de un reproductor vacío.
+ *
+ * Admite YouTube y Vimeo (se convierte a su URL de incrustación) o el enlace
+ * directo a un `.mp4`. Para publicarlo basta con pegar aquí la URL.
+ */
+export const MANUAL_VIDEO_URL: string | null = null;
 
 // Las pastillas de estado se copian tal cual de la app (`STATUS_META`,
 // `DELIVERABLE_STATUS_BADGE`, `DUE_STATUS_CLASSES`): el manual tiene que
@@ -39,11 +48,12 @@ const DUE_CHIP = {
 };
 
 export const MANUAL_SECTIONS: ManualSection[] = [
-  // ── 1. Primeros pasos ────────────────────────────────────────────────────
+  // ── 1. Primeros pasos (todos) ────────────────────────────────────────────
   {
     id: "primeros-pasos",
     title: "Primeros pasos",
     Icon: Rocket,
+    hint: "Para todo el mundo",
     articles: [
       {
         id: "bienvenida",
@@ -78,6 +88,27 @@ export const MANUAL_SECTIONS: ManualSection[] = [
             tone: "tip",
             title: "La regla corta",
             text: "¿Quieres ver cómo va tu equipo? Ve a [[Espacios de Trabajo]]. ¿Quieres saber qué tienes que entregar tú? Ve a [[Mis tareas]].",
+          },
+        ],
+      },
+      {
+        id: "video",
+        title: "Video: recorrido guiado",
+        summary: "Un paseo por la aplicación de principio a fin, en video.",
+        keywords: ["video", "tutorial", "recorrido", "demo", "capacitacion"],
+        blocks: [
+          {
+            kind: "p",
+            text: "Si prefieres verlo antes que leerlo, este recorrido cubre lo esencial: entrar a tu equipo, encontrar tu trabajo, comenzarlo y entregarlo, y qué pasa después con tu entrega.",
+          },
+          {
+            kind: "video",
+            src: MANUAL_VIDEO_URL,
+            caption: "Recorrido guiado por Bitácora OBJ",
+          },
+          {
+            kind: "p",
+            text: "El video no sustituye al manual: para consultar un detalle concreto —qué significa un estado, por qué una tarea sale bloqueada— es más rápido buscarlo en el índice de la izquierda.",
           },
         ],
       },
@@ -143,15 +174,6 @@ export const MANUAL_SECTIONS: ManualSection[] = [
           },
         ],
       },
-    ],
-  },
-
-  // ── 2. El espacio de trabajo del equipo ──────────────────────────────────
-  {
-    id: "workspace",
-    title: "Tu espacio de trabajo",
-    Icon: Users2,
-    articles: [
       {
         id: "que-es-workspace",
         title: "Entrar a tu equipo",
@@ -189,18 +211,122 @@ export const MANUAL_SECTIONS: ManualSection[] = [
               ["[[Configuración]]", "Los avisos que quieres recibir de este equipo."],
             ],
           },
+        ],
+      },
+      {
+        id: "tu-rol",
+        title: "Tu rol: integrante o líder",
+        summary: "Las dos formas de usar la aplicación y en qué se diferencian.",
+        keywords: ["rol", "integrante", "lider", "supervisor", "permisos", "diferencias"],
+        blocks: [
+          {
+            kind: "p",
+            text: "Dentro de cada equipo tienes uno de tres roles, y **es el que decide lo que ves y lo que puedes hacer**. Ojo: es un rol **por equipo**, así que puedes ser integrante en uno y líder en otro.",
+          },
+          {
+            kind: "table",
+            head: ["Rol", "Su trabajo en la aplicación"],
+            rows: [
+              [
+                "Integrante",
+                "Hace el trabajo: ve **lo suyo**, lo comienza, lo entrega y responde a las revisiones que recibe.",
+              ],
+              [
+                "Líder",
+                "Coordina: ve el trabajo de **todos**, lo reparte, revisa las entregas y gestiona al equipo.",
+              ],
+              [
+                "Supervisor",
+                "Igual que el líder para repartir y revisar el trabajo; no gestiona la composición del equipo.",
+              ],
+            ],
+          },
+          {
+            kind: "p",
+            text: "Este manual tiene una guía para cada uno. Ve directo a la tuya:",
+          },
+          {
+            kind: "list",
+            items: [
+              "**Guía del integrante** — qué ves, cómo encuentras tu trabajo, cómo lo entregas y qué pasa con tus entregables.",
+              "**Guía del líder** — qué ves de más, cómo repartes el trabajo y cómo revisas lo que te llega.",
+            ],
+          },
+          {
+            kind: "note",
+            tone: "tip",
+            text: "Si lideras un equipo, léete también la guía del integrante: tú también tienes tareas asignadas y las entregas exactamente igual que el resto.",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ── 2. Guía del integrante ───────────────────────────────────────────────
+  {
+    id: "integrante",
+    title: "Guía del integrante",
+    Icon: UserRound,
+    hint: "Hacer y entregar tu trabajo",
+    articles: [
+      {
+        id: "integrante-que-ves",
+        title: "Qué ves como integrante",
+        summary: "El alcance de tu vista y qué puedes y no puedes hacer.",
+        audience: "integrante",
+        keywords: ["que veo", "alcance", "permisos", "puedo", "no puedo"],
+        blocks: [
+          {
+            kind: "p",
+            text: "La aplicación te muestra **tu** trabajo, no el de todo el equipo. No es que esté escondido: es que tu pantalla está acotada a lo que te toca, para que no tengas que filtrar entre el trabajo de doce personas para encontrar el tuyo.",
+          },
+          { kind: "p", text: "En concreto, dentro del espacio del equipo:" },
+          {
+            kind: "list",
+            items: [
+              "En [[Tareas]] la lista viene ya filtrada a las tareas **asignadas a ti**.",
+              "En [[Estructura]] solo se dibujan las ramas del proyecto donde tienes trabajo.",
+              "En [[Cronograma]] ves **tus** barras, no las de tus compañeros.",
+              "En [[Progreso]] sí ves cómo va el equipo completo: es información de contexto, no de reparto.",
+              "En [[Archivos]] ves la raíz del proyecto y las carpetas de **tus** equipos.",
+            ],
+          },
+          { kind: "p", text: "Y esto es lo que puedes hacer con ello:" },
+          {
+            kind: "table",
+            head: ["Puedes", "No puedes"],
+            rows: [
+              [
+                "Comenzar y entregar tus tareas",
+                "Aprobar, devolver o rechazar una entrega (ni la tuya ni la de otro)",
+              ],
+              [
+                "Subir versiones y corregir las tuyas",
+                "Crear, editar, reasignar o eliminar tareas",
+              ],
+              [
+                "Comentar y mencionar en cualquier entregable del equipo",
+                "Filtrar el trabajo por otra persona",
+              ],
+              [
+                "Subir archivos a las carpetas de tu equipo",
+                "Cambiar roles, invitar o quitar integrantes",
+              ],
+            ],
+          },
           {
             kind: "note",
             tone: "info",
-            text: "Como integrante ves **tu** trabajo. Quien lidera o supervisa ve el de todo el equipo y puede filtrar por persona; por eso algunas opciones solo le aparecen a esa persona.",
+            text: "Si echas en falta un botón que un compañero sí tiene, casi siempre es esto: esa persona es **Líder** o **Supervisor** del equipo.",
           },
         ],
       },
       {
         id: "ver-tareas",
         title: "Encontrar tus tareas",
-        summary: "Lista o Kanban, agrupaciones y filtros para llegar a lo que buscas.",
-        keywords: ["lista", "kanban", "filtros", "buscar", "agrupar", "tablero"],
+        summary: "Lista o Kanban, y los filtros para llegar a lo que buscas.",
+        audience: "integrante",
+        keywords: ["lista", "kanban", "filtros", "buscar", "tablero"],
         blocks: [
           {
             kind: "p",
@@ -240,7 +366,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
       {
         id: "estados-tarea",
         title: "Qué significa cada estado",
-        summary: "La leyenda de las pastillas de estado, la urgencia y la barra de avance.",
+        summary: "La leyenda de las pastillas, la urgencia y la barra de avance.",
         keywords: ["estado", "colores", "leyenda", "urgencia", "prioridad", "avance", "porcentaje"],
         blocks: [
           { kind: "p", text: "El **estado** dice en qué punto del camino está la tarea:" },
@@ -298,6 +424,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         id: "comenzar-tarea",
         title: "Comenzar una tarea",
         summary: "El primer paso, y a quién avisa cuando lo das.",
+        audience: "integrante",
         keywords: ["comenzar", "empezar", "iniciar", "en progreso"],
         blocks: [
           {
@@ -327,6 +454,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         id: "entregar-tarea",
         title: "Entregar una tarea",
         summary: "Las dos formas de entregar y en qué se diferencian.",
+        audience: "integrante",
         keywords: ["entregar", "entrega", "sin adjunto", "adjunto", "evidencia", "terminar"],
         blocks: [
           {
@@ -378,6 +506,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         id: "subtareas",
         title: "Tareas con subtareas",
         summary: "Cómo avanza una tarea que se repartió en partes más pequeñas.",
+        audience: "integrante",
         keywords: ["subtarea", "subtareas", "padre", "hijas", "dividir"],
         blocks: [
           {
@@ -436,15 +565,33 @@ export const MANUAL_SECTIONS: ManualSection[] = [
       },
       {
         id: "entregables",
-        title: "Seguir tus entregables",
-        summary: "Versiones, comentarios y qué significa cada estado de la entrega.",
-        keywords: ["entregable", "versiones", "revision", "comentarios", "aprobado", "rechazado"],
+        title: "Tus entregables y sus revisiones",
+        summary: "Qué pasa con tu entrega después de enviarla, y cómo responder a los cambios.",
+        audience: "integrante",
+        keywords: ["entregable", "versiones", "revision", "comentarios", "aprobado", "devuelta"],
         blocks: [
           {
             kind: "p",
             text: "Cada vez que entregas con adjunto se crea un **entregable** en la sección [[Entregables]]. A la izquierda está la lista; al centro, su historial de versiones; a la derecha, la conversación.",
           },
-          { kind: "p", text: "El estado del entregable te dice qué se espera ahora:" },
+          { kind: "p", text: "A partir de ahí, el circuito visto desde tu lado es este:" },
+          {
+            kind: "steps",
+            items: [
+              "Entregas. El entregable queda **En Revisión** y tu tarea también pasa a **En revisión**.",
+              "Quien lidera o supervisa lo mira y decide.",
+              "Si lo **aprueba**, el entregable queda **Aprobado** y tu tarea pasa a **Completada**. Ya está.",
+              "Si te **pide cambios**, el entregable queda en **Cambios Solicitados** y tu tarea vuelve a **Devuelta**: te llega el aviso con el motivo escrito.",
+              "Corriges y **añades una versión más al mismo entregable**. Vuelve a estar En Revisión y se repite el ciclo.",
+            ],
+          },
+          {
+            kind: "note",
+            tone: "warn",
+            title: "No crees un entregable nuevo",
+            text: "Cuando te piden cambios, abre el que ya existe y súbele otra versión. Se numeran V1, V2, V3… y así queda claro qué cambió entre una y otra. Un entregable nuevo rompe ese hilo.",
+          },
+          { kind: "p", text: "Los cinco estados posibles de un entregable:" },
           {
             kind: "legend",
             items: [
@@ -477,112 +624,13 @@ export const MANUAL_SECTIONS: ManualSection[] = [
           },
           {
             kind: "p",
-            text: "Si te piden cambios, **no crees un entregable nuevo**: abre el que ya existe y añade una versión más. Se numeran V1, V2, V3… y así queda claro qué cambió entre una y otra.",
-          },
-          {
-            kind: "p",
-            text: "Puedes corregir una versión que acabas de subir (el enlace, la nota o las observaciones) y borrar el entregable completo mientras **no esté aprobado**. Una vez aprobado queda como registro.",
-          },
-          {
-            kind: "note",
-            tone: "info",
-            text: "En el hilo de la derecha puedes comentar y **mencionar** a un compañero para que le llegue el aviso.",
+            text: "Puedes corregir una versión que acabas de subir (el enlace, la nota o las observaciones) y borrar el entregable completo mientras **no esté aprobado**. Una vez aprobado queda como registro. En el hilo de la derecha puedes comentar y **mencionar** a alguien para que le llegue el aviso.",
           },
         ],
       },
-      {
-        id: "estructura-cronograma",
-        title: "Estructura y Cronograma",
-        summary: "Ver de dónde sale tu trabajo y cómo encaja en el calendario.",
-        keywords: ["estructura", "arbol", "cronograma", "gantt", "fechas", "calendario"],
-        blocks: [
-          {
-            kind: "p",
-            text: "[[Estructura]] muestra el árbol del proyecto y cuelga cada tarea de la pieza a la que pertenece. Solo se dibujan las ramas donde tu equipo tiene trabajo, así que no te pierdes en partes que no te tocan.",
-          },
-          {
-            kind: "p",
-            text: "Es una vista **de trabajo**, no de solo lectura: desde aquí también puedes pulsar [[Comenzar]], [[Entregar]] y [[Entregar sin adjunto]], con las mismas reglas que en la lista. Mucha gente la prefiere porque ve el contexto de lo que entrega.",
-          },
-          {
-            kind: "p",
-            text: "[[Cronograma]] pone esas mismas tareas en una línea de tiempo, con flechas entre las que dependen unas de otras. Como integrante ves **tus** barras; quien coordina ve las de todo el equipo.",
-          },
-          {
-            kind: "note",
-            tone: "tip",
-            text: "Si te mueven una fecha porque la tarea de la que dependes se entregó antes o después, te llega un aviso con la nueva fecha de inicio. No tienes que recalcular nada a mano.",
-          },
-        ],
-      },
-      {
-        id: "archivos-equipo",
-        title: "Los archivos del proyecto",
-        summary: "Navegar el archivador, subir ficheros y encontrar entregas anteriores.",
-        keywords: ["archivos", "carpetas", "subir", "drive", "descargar", "documentos"],
-        blocks: [
-          {
-            kind: "p",
-            text: "[[Archivos]] es el archivador del proyecto y funciona como cualquier gestor de archivos: entras en una carpeta a la vez y vuelves con la **ruta de migas** de arriba.",
-          },
-          {
-            kind: "list",
-            items: [
-              "Cambia entre **lista** y **cuadrícula** con los dos botones de la derecha; la aplicación recuerda tu elección.",
-              "El buscador filtra **dentro de la carpeta abierta**, por nombre.",
-              "Para subir algo usa [[Subir]] o **arrastra el fichero** sobre la zona de contenido.",
-              "[[Nueva carpeta]] crea una subcarpeta donde estés parado.",
-              "Al pulsar el nombre de un fichero se abre una vista previa; el icono de descarga lo baja a tu equipo.",
-            ],
-          },
-          {
-            kind: "note",
-            tone: "info",
-            text: "Los archivos que entregas desde una tarea aterrizan aquí solos, en la carpeta de tu equipo, y se marcan con una etiqueta **V1**, **V2**… junto al nombre de la tarea de la que salieron.",
-          },
-          {
-            kind: "p",
-            text: "Como integrante ves la raíz del proyecto y las carpetas de **tus** equipos. Si el archivador aparece recortado, la propia pantalla te lo dice: la jerarquía completa la ve quien coordina el proyecto.",
-          },
-        ],
-      },
-      {
-        id: "avisos-equipo",
-        title: "Los avisos de tu equipo",
-        summary: "Elegir qué notificaciones quieres recibir de cada equipo.",
-        keywords: ["notificaciones", "avisos", "correo", "silenciar", "campana"],
-        blocks: [
-          {
-            kind: "p",
-            text: "En la sección [[Configuración]] del equipo, el bloque [[Notificaciones del equipo]] tiene cuatro interruptores. Son **por equipo**: puedes seguir de cerca uno y silenciar otro.",
-          },
-          {
-            kind: "list",
-            items: [
-              "**Se me asigna una tarea nueva**",
-              "**Rechazan o devuelven un entregable**",
-              "**Alguien comenta en un entregable**",
-              "**Se aprueba un entregable**",
-            ],
-          },
-          {
-            kind: "p",
-            text: "Los avisos llegan a la **campana** del menú lateral y quedan en [[Notificaciones]], donde puedes filtrarlos y borrar los que ya no necesites. Algunos se envían además por correo.",
-          },
-        ],
-      },
-    ],
-  },
-
-  // ── 3. Mis tareas ────────────────────────────────────────────────────────
-  {
-    id: "mis-tareas",
-    title: "Mis tareas",
-    Icon: ListTodo,
-    articles: [
       {
         id: "mis-tareas-vista",
-        title: "Las tres pestañas",
+        title: "Mis tareas: las tres pestañas",
         summary: "Qué hay en Mis tareas, Mis entregas y Para revisar.",
         keywords: ["mis entregas", "pestanas", "revisar", "personal"],
         blocks: [
@@ -669,12 +717,10 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         id: "entregar-desde-mis-tareas",
         title: "Entregar desde Mis tareas",
         summary: "El botón cambia según la tarea sea individual o de equipo.",
+        audience: "integrante",
         keywords: ["entregar", "individual", "equipo", "boton"],
         blocks: [
-          {
-            kind: "p",
-            text: "En cada fila, el botón de la derecha depende del tipo de tarea:",
-          },
+          { kind: "p", text: "En cada fila, el botón de la derecha depende del tipo de tarea:" },
           {
             kind: "table",
             head: ["Si la tarea es…", "Verás"],
@@ -708,6 +754,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         id: "mis-entregas-detalle",
         title: "Trabajar una entrega individual",
         summary: "Adjuntar, corregir y conversar en tus entregas personales.",
+        audience: "integrante",
         keywords: ["mis entregas", "version", "adjuntar", "comentar", "personal"],
         blocks: [
           {
@@ -732,12 +779,62 @@ export const MANUAL_SECTIONS: ManualSection[] = [
     ],
   },
 
-  // ── 4. Si lideras el equipo ──────────────────────────────────────────────
+  // ── 3. Guía del líder ────────────────────────────────────────────────────
   {
     id: "lider",
-    title: "Si lideras el equipo",
-    Icon: CalendarRange,
+    title: "Guía del líder",
+    Icon: Crown,
+    hint: "Repartir, revisar y hacer seguimiento",
     articles: [
+      {
+        id: "lider-que-ves",
+        title: "Qué ves como líder o supervisor",
+        summary: "Todo lo que aparece de más respecto a un integrante.",
+        audience: "lider",
+        keywords: ["que veo", "lider", "supervisor", "diferencias", "permisos"],
+        blocks: [
+          {
+            kind: "p",
+            text: "Con rol **Líder** o **Supervisor** en un equipo, las mismas pantallas te muestran el trabajo de **todo el equipo**, no solo el tuyo, y aparecen los controles para repartirlo y revisarlo.",
+          },
+          {
+            kind: "table",
+            head: ["En la sección…", "Lo que tú ves de más"],
+            rows: [
+              [
+                "[[Tareas]]",
+                "Abre en la **bolsa del equipo** (las tareas sin responsable). Puedes filtrar por persona, agrupar [[Por integrante]] o [[Por estado]], y tienes [[Nueva tarea]], el **+** para subtareas, y editar, reasignar y eliminar en cada fila.",
+              ],
+              [
+                "[[Tareas]] › [[Trazabilidad]]",
+                "Una tercera vista, exclusiva tuya: el historial de todo lo que ha pasado con cada tarea del equipo.",
+              ],
+              [
+                "[[Entregables]]",
+                "Los botones de revisión: [[Aprobar]], [[Solicitar cambios]] y [[Rechazar]].",
+              ],
+              [
+                "[[Estructura]] y [[Cronograma]]",
+                "El trabajo de **todo** el equipo (un integrante solo ve el suyo), con la barra de filtros para acotar.",
+              ],
+              [
+                "[[Configuración]]",
+                "La lista de [[Integrantes]] con su carga, el cambio de rol, quitar gente y archivar el equipo.",
+              ],
+            ],
+          },
+          {
+            kind: "note",
+            tone: "info",
+            text: "El rol es **por equipo**. En un equipo donde eres integrante verás la pantalla de integrante, aunque lideres otro.",
+          },
+          {
+            kind: "note",
+            tone: "warn",
+            text: "Una cosa que **no** puedes hacer: aprobar tu propia entrega. Si una tarea es tuya, la entregas como cualquiera y la revisa otra persona con permiso.",
+          },
+        ],
+      },
       {
         id: "repartir-trabajo",
         title: "Repartir el trabajo",
@@ -747,7 +844,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
         blocks: [
           {
             kind: "p",
-            text: "Como **Líder** o **Supervisor** de un equipo, la sección [[Tareas]] abre mostrando la **bolsa del equipo**: las tareas que todavía no tienen responsable. Es tu punto de partida para repartir.",
+            text: "La sección [[Tareas]] abre mostrando la **bolsa del equipo**: las tareas que todavía no tienen responsable. Es tu punto de partida para repartir.",
           },
           {
             kind: "list",
@@ -765,49 +862,119 @@ export const MANUAL_SECTIONS: ManualSection[] = [
           {
             kind: "note",
             tone: "tip",
-            text: "Al crear la tarea decides si **requiere aprobación**. Sin ella, quien la tiene entrega y la tarea queda cerrada; con ella, pasa por ti antes de darse por hecha.",
+            title: "La decisión que más te va a afectar",
+            text: "Al crear la tarea eliges si **requiere aprobación**. Sin ella, quien la tiene entrega y la tarea queda cerrada sola; con ella, pasa por ti antes de darse por hecha. Actívala solo donde de verdad vas a revisar: si la pones en todo, tu cola de revisión se convierte en el cuello de botella del proyecto.",
+          },
+        ],
+      },
+      {
+        id: "lider-entregables",
+        title: "El circuito de una entrega",
+        summary: "Qué te llega, por dónde, y en qué estado queda la tarea.",
+        audience: "lider",
+        keywords: ["entregable", "circuito", "flujo", "entregas", "cola"],
+        blocks: [
+          {
+            kind: "p",
+            text: "No todo lo que entrega tu equipo pasa por ti. Conviene tener claro qué te llega y qué no:",
+          },
+          {
+            kind: "table",
+            head: ["Cómo entregó", "Qué pasa"],
+            rows: [
+              [
+                "[[Entregar]] en una tarea **con aprobación**",
+                "Se crea el entregable **En Revisión** y la tarea queda **En revisión**. Aparece en [[Entregables]] esperándote.",
+              ],
+              [
+                "[[Entregar]] en una tarea **sin aprobación**",
+                "Se registra el entregable y la tarea se **completa sola**. Lo ves en [[Entregables]] como registro, pero no tienes que hacer nada.",
+              ],
+              [
+                "[[Entregar sin adjunto]]",
+                "**No se crea entregable.** La tarea pasa directa al 100 % y te llega un aviso. No hay nada que revisar.",
+              ],
+              [
+                "Entrega **individual** (tarea sin equipo)",
+                "No aparece en el equipo: la revisas en [[Mis tareas]] › [[Para revisar]].",
+              ],
+            ],
+          },
+          {
+            kind: "p",
+            text: "En la sección [[Entregables]] tienes la lista a la izquierda con el estado de cada una. Al abrir una ves su **historial de versiones** (V1, V2, V3…) con quién subió cada una y cuándo, más la nota y las observaciones que escribió, y a la derecha el hilo de conversación.",
+          },
+          {
+            kind: "note",
+            tone: "tip",
+            text: "Mira siempre la **última versión** y las observaciones que la acompañan: ahí es donde la persona te dice qué cambió respecto a lo que le devolviste.",
           },
         ],
       },
       {
         id: "revisar-entregas",
         title: "Revisar una entrega",
-        summary: "Aprobar, pedir cambios o rechazar, y qué pasa con la tarea.",
+        summary: "Aprobar, pedir cambios o rechazar, y qué le pasa a la tarea.",
         audience: "lider",
         keywords: ["aprobar", "rechazar", "solicitar cambios", "revisar", "revision"],
         blocks: [
           {
             kind: "p",
-            text: "Cuando alguien entrega, su entregable aparece en [[Entregables]] en estado **En Revisión**. Ábrelo, mira la última versión y decide:",
+            text: "Abre el entregable, mira la última versión y decide. Son tres botones y cada uno deja la tarea en un sitio distinto:",
           },
           {
-            kind: "legend",
-            items: [
-              {
-                label: "Aprobar",
-                desc: "Aceptas el trabajo. La tarea pasa a **Completada**. El comentario es opcional.",
-                chip: DELIVERABLE_CHIP.aprobado,
-              },
-              {
-                label: "Solicitar cambios",
-                desc: "El entregable sigue vivo y la tarea vuelve a **Devuelta**. Sé concreto: tu texto es lo que leerá quien entregó.",
-                chip: DELIVERABLE_CHIP.cambios,
-              },
-              {
-                label: "Rechazar",
-                desc: "Cierras la entrega tal como está. El motivo queda en el historial de la tarea.",
-                chip: DELIVERABLE_CHIP.rechazado,
-              },
+            kind: "table",
+            head: ["Botón", "El entregable queda", "Y la tarea"],
+            rows: [
+              ["[[Aprobar]]", "**Aprobado**", "**Completada**. Fin del circuito."],
+              [
+                "[[Solicitar cambios]]",
+                "**Cambios Solicitados**",
+                "**Devuelta**. Sigue viva y espera otra versión.",
+              ],
+              [
+                "[[Rechazar]]",
+                "**Rechazado**",
+                "Se cierra tal como está. El motivo queda registrado.",
+              ],
             ],
           },
           {
             kind: "note",
             tone: "warn",
-            text: "En **Solicitar cambios** y **Rechazar** el motivo no es opcional. Es lo único que la otra persona va a tener para saber qué corregir.",
+            title: "El motivo no es opcional",
+            text: "En [[Solicitar cambios]] y [[Rechazar]] tienes que escribir por qué. Es lo único que la otra persona va a tener para saber qué corregir — sé concreto. En [[Aprobar]] el comentario sí es opcional: el trabajo habla por sí solo.",
           },
           {
             kind: "p",
-            text: "En los tres casos se avisa a quien entregó. Las entregas **individuales** (de tareas sin equipo) no llegan aquí: las revisas en [[Mis tareas]] › [[Para revisar]].",
+            text: "En los tres casos se avisa a quien entregó. Si pediste cambios, cuando suba la V2 el entregable vuelve a **En Revisión** y te toca de nuevo.",
+          },
+          {
+            kind: "note",
+            tone: "info",
+            text: "Aprobar una tarea puede desbloquear otras: las que dependían de ella se desbloquean y se reprograman solas, y sus responsables reciben el aviso con la nueva fecha.",
+          },
+        ],
+      },
+      {
+        id: "revisar-individuales",
+        title: "La cola de entregas individuales",
+        summary: "Revisar el trabajo que no va por equipo.",
+        audience: "lider",
+        keywords: ["para revisar", "individual", "personal", "cola", "coordinador"],
+        blocks: [
+          {
+            kind: "p",
+            text: "Las tareas **sin equipo** (individuales) no pasan por la sección [[Entregables]] de ningún equipo. Si coordinas o supervisas el proyecto al que pertenecen, sus entregas te llegan a [[Mis tareas]] › [[Para revisar]], con un contador al lado de la pestaña.",
+          },
+          {
+            kind: "p",
+            text: "La pantalla es la misma que la de un entregable de equipo: historial de versiones al centro, conversación a la derecha, y los mismos tres botones de revisión.",
+          },
+          {
+            kind: "note",
+            tone: "info",
+            text: "Aquí el permiso no viene del rol de equipo sino del **rol de proyecto**: aparece si eres coordinador o supervisor del proyecto de esa tarea.",
           },
         ],
       },
@@ -824,11 +991,11 @@ export const MANUAL_SECTIONS: ManualSection[] = [
           },
           {
             kind: "p",
-            text: "En [[Tareas]] tienes además una tercera vista, [[Trazabilidad]], con el historial de lo que ha pasado con cada tarea del equipo: cambios de estado, reasignaciones y entregas, con quién y cuándo.",
+            text: "En [[Tareas]] tienes además la vista [[Trazabilidad]], con el historial de lo que ha pasado con cada tarea del equipo: cambios de estado, reasignaciones y entregas, con quién y cuándo.",
           },
           {
             kind: "p",
-            text: "En [[Cronograma]] ves las barras de **todo** el equipo (un integrante solo ve las suyas), con las flechas de dependencia para detectar dónde se va a atascar la cadena.",
+            text: "En [[Cronograma]] ves las barras de **todo** el equipo, con las flechas de dependencia para detectar dónde se va a atascar la cadena.",
           },
           {
             kind: "note",
@@ -874,7 +1041,98 @@ export const MANUAL_SECTIONS: ManualSection[] = [
     ],
   },
 
-  // ── 5. Ayuda ─────────────────────────────────────────────────────────────
+  // ── 4. Las herramientas del proyecto (ambos roles) ───────────────────────
+  {
+    id: "proyecto",
+    title: "Herramientas del proyecto",
+    Icon: Boxes,
+    hint: "Iguales para los dos roles",
+    articles: [
+      {
+        id: "estructura-cronograma",
+        title: "Estructura y Cronograma",
+        summary: "Ver de dónde sale el trabajo y cómo encaja en el calendario.",
+        keywords: ["estructura", "arbol", "cronograma", "gantt", "fechas", "calendario"],
+        blocks: [
+          {
+            kind: "p",
+            text: "[[Estructura]] muestra el árbol del proyecto y cuelga cada tarea de la pieza a la que pertenece. Solo se dibujan las ramas donde el equipo tiene trabajo, así que no te pierdes en partes que no tocan.",
+          },
+          {
+            kind: "p",
+            text: "Es una vista **de trabajo**, no de solo lectura: desde aquí también se puede pulsar [[Comenzar]], [[Entregar]] y [[Entregar sin adjunto]], con las mismas reglas que en la lista. Mucha gente la prefiere porque ve el contexto de lo que entrega.",
+          },
+          {
+            kind: "p",
+            text: "[[Cronograma]] pone esas mismas tareas en una línea de tiempo, con flechas entre las que dependen unas de otras. Un integrante ve **sus** barras; quien coordina ve las de todo el equipo.",
+          },
+          {
+            kind: "note",
+            tone: "tip",
+            text: "Si se mueve una fecha porque la tarea de la que dependes se entregó antes o después, te llega un aviso con la nueva fecha de inicio. No hay que recalcular nada a mano.",
+          },
+        ],
+      },
+      {
+        id: "archivos-equipo",
+        title: "Los archivos del proyecto",
+        summary: "Navegar el archivador, subir ficheros y encontrar entregas anteriores.",
+        keywords: ["archivos", "carpetas", "subir", "drive", "descargar", "documentos"],
+        blocks: [
+          {
+            kind: "p",
+            text: "[[Archivos]] es el archivador del proyecto y funciona como cualquier gestor de archivos: entras en una carpeta a la vez y vuelves con la **ruta de migas** de arriba.",
+          },
+          {
+            kind: "list",
+            items: [
+              "Cambia entre **lista** y **cuadrícula** con los dos botones de la derecha; la aplicación recuerda tu elección.",
+              "El buscador filtra **dentro de la carpeta abierta**, por nombre.",
+              "Para subir algo usa [[Subir]] o **arrastra el fichero** sobre la zona de contenido.",
+              "[[Nueva carpeta]] crea una subcarpeta donde estés parado.",
+              "Al pulsar el nombre de un fichero se abre una vista previa; el icono de descarga lo baja a tu equipo.",
+            ],
+          },
+          {
+            kind: "note",
+            tone: "info",
+            text: "Los archivos que se entregan desde una tarea aterrizan aquí solos, en la carpeta del equipo, y se marcan con una etiqueta **V1**, **V2**… junto al nombre de la tarea de la que salieron.",
+          },
+          {
+            kind: "p",
+            text: "Un integrante ve la raíz del proyecto y las carpetas de **sus** equipos. Si el archivador aparece recortado, la propia pantalla lo dice: la jerarquía completa la ve quien coordina el proyecto.",
+          },
+        ],
+      },
+      {
+        id: "avisos-equipo",
+        title: "Los avisos de tu equipo",
+        summary: "Elegir qué notificaciones quieres recibir de cada equipo.",
+        keywords: ["notificaciones", "avisos", "correo", "silenciar", "campana"],
+        blocks: [
+          {
+            kind: "p",
+            text: "En la sección [[Configuración]] del equipo, el bloque [[Notificaciones del equipo]] tiene cuatro interruptores. Son **por equipo**: puedes seguir de cerca uno y silenciar otro.",
+          },
+          {
+            kind: "list",
+            items: [
+              "**Se me asigna una tarea nueva**",
+              "**Rechazan o devuelven un entregable**",
+              "**Alguien comenta en un entregable**",
+              "**Se aprueba un entregable**",
+            ],
+          },
+          {
+            kind: "p",
+            text: "Los avisos llegan a la **campana** del menú lateral y quedan en [[Notificaciones]], donde puedes filtrarlos y borrar los que ya no necesites. Algunos se envían además por correo.",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ── 5. Ayuda rápida ──────────────────────────────────────────────────────
   {
     id: "ayuda",
     title: "Ayuda rápida",
@@ -941,6 +1199,10 @@ export const MANUAL_SECTIONS: ManualSection[] = [
                 "Me llegan demasiados avisos.",
                 "Ajusta los cuatro interruptores en [[Configuración]] del equipo. Son independientes para cada equipo.",
               ],
+              [
+                "Soy líder, ¿puedo aprobar mi propia entrega?",
+                "No. Si la tarea es tuya, la revisa otra persona con permiso en ese equipo o proyecto.",
+              ],
             ],
           },
         ],
@@ -969,6 +1231,21 @@ export const MANUAL_SECTIONS: ManualSection[] = [
     ],
   },
 ];
+
+/**
+ * Temas a los que la propia aplicación enlaza («¿cómo se hace esto?» junto al
+ * control que lo hace). Se centralizan aquí para que un cambio de `id` en el
+ * contenido rompa el test que los valida, y no un enlace en silencio.
+ */
+export const MANUAL_TOPIC = {
+  entregar: "entregar-tarea",
+  bloqueada: "tarea-bloqueada",
+  entregables: "entregables",
+  misTareas: "mis-tareas-vista",
+  archivos: "archivos-equipo",
+  revisar: "revisar-entregas",
+  video: "video",
+} as const;
 
 /** Todos los artículos en el orden del índice — alimenta «anterior / siguiente». */
 export const MANUAL_ARTICLES = MANUAL_SECTIONS.flatMap((section) =>

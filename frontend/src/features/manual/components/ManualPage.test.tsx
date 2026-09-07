@@ -79,9 +79,10 @@ describe("ManualPage", () => {
     const user = userEvent.setup();
     renderManual();
 
+    const second = MANUAL_ARTICLES[1].article.title;
     await user.click(screen.getByRole("button", { name: /Siguiente/i }));
 
-    expect(screen.getByRole("heading", { name: "Tu primer ingreso" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: second })).toBeInTheDocument();
     // Ya no es el primero: ahora sí hay "Anterior".
     expect(screen.getByRole("button", { name: /Anterior/i })).toBeInTheDocument();
   });
@@ -89,5 +90,18 @@ describe("ManualPage", () => {
   it("marca los temas que solo aplican a quien lidera", () => {
     renderManual("/manual?tema=revisar-entregas");
     expect(screen.getAllByText("Líder").length).toBeGreaterThan(0);
+  });
+
+  it("marca los temas propios del integrante", () => {
+    renderManual("/manual?tema=integrante-que-ves");
+    expect(screen.getAllByText("Integrante").length).toBeGreaterThan(0);
+  });
+
+  it("el apartado de video avisa cuando todavía no está publicado", () => {
+    // `MANUAL_VIDEO_URL` es null mientras no se grabe: se muestra el aviso en
+    // lugar de un reproductor vacío.
+    renderManual("/manual?tema=video");
+    expect(screen.getByRole("heading", { name: /Video: recorrido guiado/i })).toBeInTheDocument();
+    expect(screen.getByText(/El video está en camino/i)).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { filterSections, normalize } from "./search";
 import type { ManualSection } from "../types";
-import { MANUAL_SECTIONS } from "../manual-content";
+import { MANUAL_SECTIONS, MANUAL_TOPIC } from "../manual-content";
 
 const sections: ManualSection[] = [
   {
@@ -96,6 +96,13 @@ describe("contenido del manual", () => {
         expect(article.summary.length).toBeGreaterThan(0);
         expect(article.blocks.length).toBeGreaterThan(0);
       }
+    }
+  });
+
+  it("los temas a los que enlaza la app existen (los enlaces de ayuda no se rompen)", () => {
+    const ids = new Set(MANUAL_SECTIONS.flatMap((s) => s.articles.map((a) => a.id)));
+    for (const [name, id] of Object.entries(MANUAL_TOPIC)) {
+      expect(ids, `MANUAL_TOPIC.${name} apunta a "${id}", que ya no existe`).toContain(id);
     }
   });
 });

@@ -16,6 +16,19 @@ export interface ReleaseNote {
 // De la más reciente a la más antigua.
 export const RELEASES: ReleaseNote[] = [
   {
+    id: "2026-09-07-manual-usuario-all",
+    date: "2026-09-07",
+    title: "Ya hay manual de usuario",
+    audience: "all",
+    items: [
+      "Nueva opción [Manual de usuario] en el menú lateral: una guía con el índice de temas a la izquierda y buscador, para aprender a usar la aplicación sin preguntarle a nadie.",
+      "Está partido por rol: una guía para el integrante (encontrar tu trabajo, comenzarlo, entregarlo y responder a las revisiones) y otra para quien lidera (repartir el trabajo, revisar entregas y hacer seguimiento).",
+      "Cubre lo importante paso a paso: cómo entregar con o sin adjunto, qué significa cada estado, por qué una tarea sale «Bloqueada», y cómo funcionan los entregables y sus versiones.",
+      "Dentro de la aplicación verás enlaces de ayuda (?) junto a los controles: te llevan directo al tema del manual que los explica.",
+      "Incluye un apartado para el video de recorrido guiado, que se publicará ahí mismo.",
+    ],
+  },
+  {
     id: "2026-09-06-entrega-un-paso-all",
     date: "2026-09-06",
     title: "Entregar es un solo paso, con o sin adjunto",

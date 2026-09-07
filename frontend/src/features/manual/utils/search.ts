@@ -15,6 +15,8 @@ function blockText(block: ManualBlock): string {
       return block.items.map((i) => `${i.label} ${plainText(i.desc)}`).join(" ");
     case "table":
       return [...block.head, ...block.rows.flat().map(plainText)].join(" ");
+    case "video":
+      return block.caption;
   }
 }
 
