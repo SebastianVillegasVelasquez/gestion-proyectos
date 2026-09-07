@@ -1270,9 +1270,11 @@ export function TeamTasksView({
   const onReassigned = () =>
     void qc.invalidateQueries({ queryKey: ["workspace", "tasks", teamId] });
   // En Kanban la agrupación por estado ES el tablero; agrupar por integrante
-  // dentro de columnas de estado no tendría dónde ir.
+  // dentro de columnas de estado no tendría dónde ir. En Lista, quien coordina
+  // elige el eje; un integrante ve una sola lista jerárquica ("ninguno"), donde
+  // comenzar una subtarea no la saca de debajo de su tarea principal.
   const effectiveGrouping: TaskGrouping =
-    view === "lista" && canFilterByPerson ? grouping : "estado";
+    view !== "lista" ? "estado" : canFilterByPerson ? grouping : "ninguno";
   // El nombre del responsable sobra cuando la vista ya está acotada a una
   // persona: agrupada por integrante, o filtrada a un responsable concreto.
   const hideAssignee =
@@ -1378,6 +1380,7 @@ export function TeamTasksView({
             options={[
               { value: "integrante", label: "Por integrante", Icon: Users2 },
               { value: "estado", label: "Por estado", Icon: ListTodo },
+              { value: "ninguno", label: "Sin agrupar", Icon: List },
             ]}
           />
         )}

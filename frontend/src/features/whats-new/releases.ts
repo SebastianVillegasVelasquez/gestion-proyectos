@@ -16,6 +16,38 @@ export interface ReleaseNote {
 // De la más reciente a la más antigua.
 export const RELEASES: ReleaseNote[] = [
   {
+    id: "2026-09-07-subtareas-no-se-dispersan-normal",
+    date: "2026-09-07",
+    title: "Las subtareas ya no se desordenan al comenzarlas",
+    audience: "normal",
+    items: [
+      "En las tareas del equipo, la lista mantiene siempre su estructura: cada subtarea queda debajo de su tarea principal, aunque cambie de estado.",
+      "Antes, al pulsar «Comenzar» en una subtarea, esta saltaba fuera de su grupo y las demás subtareas de esa tarea aparecían sueltas, como si fueran tareas independientes.",
+      "Ahora comenzar una subtarea solo cambia su estado a «En progreso»; su sitio en la lista no se mueve.",
+      "Para ver solo lo que está en progreso, vencido o pendiente, usa los filtros de la parte superior: acotan la lista sin romper la jerarquía.",
+    ],
+  },
+  {
+    id: "2026-09-07-novedades-no-reaparecen-normal",
+    date: "2026-09-07",
+    title: "El aviso de novedades ya no reaparece",
+    audience: "normal",
+    items: [
+      "El tablero «Qué hay de nuevo» a veces intentaba abrirse un instante aunque ya lo hubieras visto.",
+      "Ahora espera a confirmar qué novedades has leído antes de decidir si se muestra, así que no vuelve a parpadear.",
+    ],
+  },
+  {
+    id: "2026-09-07-actividad-reciente-aprovecha-alto-elevated",
+    date: "2026-09-07",
+    title: "«Actividad reciente» aprovecha todo el alto",
+    audience: "elevated",
+    items: [
+      "En el detalle del proyecto, la tarjeta de «Actividad reciente» dejaba un hueco en blanco abajo que además tapaba parte del contenido.",
+      "Ese espacio se usa ahora para mostrar más movimientos del proyecto, sin cambiar el tamaño de la tarjeta.",
+    ],
+  },
+  {
     id: "2026-09-07-manual-usuario-all",
     date: "2026-09-07",
     title: "Ya hay manual de usuario",

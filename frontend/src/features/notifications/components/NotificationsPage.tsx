@@ -56,6 +56,11 @@ function Row({
   const tone = TYPE_TONE[n.notification_type] ?? DEFAULT_TONE;
   const priority = notificationPriority(n.notification_type);
   const unread = !n.is_read;
+  // Solo en esta vista completa: si el aviso viene de una tarea delegada a un
+  // equipo, mostramos de qué equipo, como contexto extra que en el panel
+  // compacto de la campana sobraría.
+  const teamName =
+    n.payload && typeof n.payload.team_name === "string" ? n.payload.team_name : null;
 
   return (
     <li
@@ -89,6 +94,12 @@ function Row({
           <span>{notificationTypeLabel(n.notification_type)}</span>
           <span>·</span>
           <span>{formatRelativeTime(n.created_at)}</span>
+          {teamName && (
+            <>
+              <span>·</span>
+              <span>Equipo: {teamName}</span>
+            </>
+          )}
         </span>
       </button>
 

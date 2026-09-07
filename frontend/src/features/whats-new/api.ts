@@ -1,6 +1,6 @@
 import http from "@/lib/http";
 
-interface SeenReleasesResponse {
+export interface SeenReleasesResponse {
   release_ids: string[];
 }
 

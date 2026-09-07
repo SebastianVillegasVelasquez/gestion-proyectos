@@ -298,9 +298,10 @@ export function visibleRows(rows: TaskTreeRow[], collapsed: Set<string>): TaskTr
 
 // ── Agrupación ──────────────────────────────────────────────────────────────
 
-// Solo dos ejes: "¿cómo va Ana?" y "¿qué está en revisión?". La lectura por
-// elemento vive ahora en el cronograma, que ya cuelga de la estructura.
-export type TaskGrouping = "integrante" | "estado";
+// Ejes de la Lista: "¿cómo va Ana?", "¿qué está en revisión?" y "sin agrupar"
+// —una sola lista que conserva la jerarquía tarea → subtarea—. La lectura por
+// elemento vive en el cronograma, que ya cuelga de la estructura.
+export type TaskGrouping = "integrante" | "estado" | "ninguno";
 
 export interface TaskGroup {
   /** Identidad estable del grupo (id de usuario o estado). */
@@ -368,8 +369,25 @@ function groupByStatus(tasks: ApiTeamTask[]): TaskGroup[] {
   );
 }
 
+/**
+ * "Sin agrupar": un único grupo con TODAS las tareas. Como ningún padre queda
+ * fuera del grupo, `buildTaskRows` puede anidar cada subtarea bajo el suyo:
+ * comenzar o entregar una subtarea cambia su estado pero NO la saca de su
+ * sitio en la lista. El acotado por estado/persona se hace con los filtros de
+ * arriba, que no rompen la jerarquía.
+ */
+function groupAll(tasks: ApiTeamTask[]): TaskGroup[] {
+  return [toGroup("__todas__", "Todas las tareas", tasks)];
+}
+
 export function groupTeamTasks(tasks: ApiTeamTask[], grouping: TaskGrouping): TaskGroup[] {
-  return grouping === "estado" ? groupByStatus(tasks) : groupByAssignee(tasks);
+  if (grouping === "estado") {
+    return groupByStatus(tasks);
+  }
+  if (grouping === "ninguno") {
+    return groupAll(tasks);
+  }
+  return groupByAssignee(tasks);
 }
 
 // ── Carga de trabajo ────────────────────────────────────────────────────────

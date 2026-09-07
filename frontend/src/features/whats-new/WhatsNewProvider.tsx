@@ -35,8 +35,11 @@ export function WhatsNewProvider({ children }: { children: ReactNode }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [autoDismissed, setAutoDismissed] = useState(false);
 
-  // Apertura automática: solo tras cargar el set de vistas y si hay pendientes.
-  const autoOpen = seenQuery.isSuccess && unseen.length > 0 && !autoDismissed;
+  // Apertura automática: solo cuando el set de vistas está REALMENTE cargado.
+  // En el primer render `seenIds` es `undefined` y todo parece "no visto"; sin
+  // este guardo el modal parpadeaba un instante antes de llegar la respuesta.
+  const seenLoaded = seenQuery.isSuccess && seenIds !== undefined;
+  const autoOpen = seenLoaded && unseen.length > 0 && !autoDismissed;
   const isOpen = manualOpen || autoOpen;
 
   // Reapertura manual sin pendientes → mostramos el changelog relevante completo.
