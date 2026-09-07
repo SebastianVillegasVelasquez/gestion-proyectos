@@ -87,7 +87,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
 };
 
 export function ProjectActivityCard({ projectId }: { projectId: string }) {
-  const activityQuery = useProjectActivity(projectId, 8);
+  const activityQuery = useProjectActivity(projectId, 20);
   const items = activityQuery.data?.items ?? [];
 
   return (
@@ -116,7 +116,7 @@ export function ProjectActivityCard({ projectId }: { projectId: string }) {
             </p>
           </div>
         ) : (
-          <ul className="-mr-1 flex max-h-[320px] flex-col overflow-y-auto pr-1">
+          <ul className="-mr-1 flex min-h-[320px] flex-1 flex-col overflow-y-auto pr-1">
             {items.map((item, idx) => {
               const meta = KIND_META[item.kind] ?? KIND_META.cambio_estado;
               const Icon = meta.icon;

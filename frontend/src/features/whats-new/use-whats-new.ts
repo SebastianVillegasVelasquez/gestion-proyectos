@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { whatsNewApi } from "./api";
+import { whatsNewApi, type SeenReleasesResponse } from "./api";
 
 const seenKey = ["whats-new", "seen"] as const;
 
@@ -18,6 +18,15 @@ export function useMarkReleasesSeen() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (releaseIds: string[]) => whatsNewApi.markSeen(releaseIds),
+    // Optimista: dejamos el set "vistas" al día en la caché ANTES de que responda
+    // el POST. Así, si el provider se re-monta mientras la petición está en vuelo
+    // (o si falla), el modal ya no se considera pendiente y no reaparece. El
+    // endpoint es idempotente sobre este conjunto.
+    onMutate: (releaseIds) => {
+      qc.setQueryData<SeenReleasesResponse>(seenKey, (prev) => ({
+        release_ids: [...new Set([...(prev?.release_ids ?? []), ...releaseIds])],
+      }));
+    },
     onSuccess: (data) => {
       qc.setQueryData(seenKey, data);
     },

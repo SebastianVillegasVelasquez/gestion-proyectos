@@ -3,8 +3,11 @@ import json
 from app.core.logger import get_logger
 from app.modules.notifications.application.preferences import (
     TeamNotificationGate,
+    display_name,
     project_lead_ids,
+    task_title,
     team_lead_ids,
+    team_name,
 )
 from app.modules.notifications.domain.repository import NotificationRepository
 from app.modules.notifications.infrastructure.enums import NotificationType
@@ -415,18 +418,35 @@ class NotifyLeadsOnTaskStarted:
             )
             return
 
+        # Enriquecemos el aviso con "quién" y "qué": el responsable que arrancó,
+        # el título de la tarea y —si viene de un equipo— su nombre. Se resuelve
+        # una sola vez (no por destinatario). El nombre del equipo viaja en el
+        # payload; la vista completa de notificaciones lo muestra como contexto.
+        who = await display_name(self._session, event.assigned_id) or "Un integrante"
+        title = await task_title(self._session, event.task_id)
+        tname = await team_name(self._session, event.team_id)
+        message = (
+            f"{who} empezó a trabajar en «{title}»."
+            if title
+            else f"{who} empezó a trabajar en una tarea."
+        )
+        payload = {
+            "project_id": str(event.project_id),
+            "task_id": str(event.task_id),
+            "team_id": (str(event.team_id) if event.team_id else None),
+            "task_title": title,
+            "actor_name": who,
+            "team_name": tname,
+        }
+
         for user_id in recipients:
             await self._repo.add(
                 Notification(
                     user_to_id=user_id,
                     actor_id=event.actor_id,
                     notification_type=NotificationType.TAREA_INICIADA,
-                    message="Un integrante empezó a trabajar una tarea.",
-                    payload={
-                        "project_id": str(event.project_id),
-                        "task_id": str(event.task_id),
-                        "team_id": (str(event.team_id) if event.team_id else None),
-                    },
+                    message=message,
+                    payload=payload,
                 )
             )
             try:
@@ -483,17 +503,36 @@ class NotifyProjectLeadsOnTaskCompleted:
             )
             return
 
+        # Igual que en "tarea iniciada": nombramos la tarea y a su responsable en
+        # vez de un texto genérico. El nombre del equipo va en el payload para la
+        # vista completa de notificaciones.
+        who = await display_name(self._session, event.assigned_id)
+        title = await task_title(self._session, event.task_id)
+        tname = await team_name(self._session, event.team_id)
+        if title:
+            suffix = f" (responsable: {who})" if who else ""
+            message = (
+                f"Se completó «{title}»{suffix} y el avance del proyecto se actualizó."
+            )
+        else:
+            message = "Se completó una tarea y el avance se actualizó."
+        payload = {
+            "project_id": str(event.project_id),
+            "task_id": str(event.task_id),
+            "team_id": (str(event.team_id) if event.team_id else None),
+            "task_title": title,
+            "assignee_name": who,
+            "team_name": tname,
+        }
+
         for user_id in recipients:
             await self._repo.add(
                 Notification(
                     user_to_id=user_id,
                     actor_id=event.actor_id,
                     notification_type=NotificationType.TAREA_COMPLETADA,
-                    message="Se completó una tarea y el avance se actualizó.",
-                    payload={
-                        "project_id": str(event.project_id),
-                        "task_id": str(event.task_id),
-                    },
+                    message=message,
+                    payload=payload,
                 )
             )
             try:
@@ -528,9 +567,7 @@ class NotifyOnTaskChainRescheduled:
             else f"que se completó «{event.trigger_name}»"
         )
         if fecha:
-            message = (
-                f"Tu tarea se reprogramó tras {origen}: " f"ahora empieza el {fecha}."
-            )
+            message = f"Tu tarea se reprogramó tras {origen}: ahora empieza el {fecha}."
         else:
             message = f"Tu tarea se reprogramó tras {origen}."
 

@@ -13,13 +13,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
+from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
-from app.modules.teams.infrastructure.models import TeamMember
+from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_models import TeamNotificationSetting
 
 # Roles de proyecto a los que «les interesa» que una tarea se apruebe: la
@@ -46,6 +48,34 @@ class TeamNotificationGate:
         if row is None:
             return True
         return bool(getattr(row, field, True))
+
+
+# ── Datos para el texto de los avisos ───────────────────────────────────────
+# Los manejadores que ya reciben la sesión del request pueden enriquecer el
+# mensaje con "quién" y "qué" en vez de un texto genérico ("un integrante…").
+
+
+async def display_name(session: AsyncSession, user_id: UUID | None) -> str | None:
+    """Nombre visible ("Nombre Apellido") de una persona, o None si no hay id."""
+    if user_id is None:
+        return None
+    return await session.scalar(
+        select(func.trim(func.concat(User.name, " ", User.last_name))).where(
+            User.id == user_id
+        )
+    )
+
+
+async def task_title(session: AsyncSession, task_id: UUID) -> str | None:
+    """Título de una tarea por su id (para nombrarla en el aviso)."""
+    return await session.scalar(select(Task.title).where(Task.id == task_id))
+
+
+async def team_name(session: AsyncSession, team_id: UUID | None) -> str | None:
+    """Nombre del equipo al que está delegada la tarea, o None si no hay equipo."""
+    if team_id is None:
+        return None
+    return await session.scalar(select(Team.name).where(Team.id == team_id))
 
 
 async def project_lead_ids(
