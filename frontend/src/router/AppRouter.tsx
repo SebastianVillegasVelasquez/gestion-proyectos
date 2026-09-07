@@ -24,6 +24,7 @@ const PersonalDeliverablesPage = lazy(() =>
   })),
 );
 const SettingsPage = lazy(() => import("@/features/settings/components/SettingsPage.tsx"));
+const ManualPage = lazy(() => import("@/features/manual/components/ManualPage.tsx"));
 const NotificationsPage = lazy(() =>
   import("@/features/notifications/components/NotificationsPage.tsx").then((m) => ({
     default: m.NotificationsPage,
@@ -141,6 +142,7 @@ export const AppRouter = () => (
         <Route path="/mis-entregas" element={<PersonalDeliverablesPage />} />
         <Route path="/notificaciones" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/manual" element={<ManualPage />} />
         {/* Portal del cliente (pantalla única de solo lectura). */}
         <Route path="/portal" element={<ClientPortal />} />
 
