@@ -2,6 +2,8 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle2, Lock, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CommentType, Deliverable } from "../types";
+import { ManualHint } from "@/features/manual/components/ManualHint";
+import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 
 // Las tres decisiones de revisión. Cada una es un COMENTARIO tipado: el motivo
 // queda en el hilo y el backend mueve el estado del entregable y de la tarea
@@ -140,9 +142,12 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        Revisión
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          Revisión
+        </p>
+        <ManualHint topic={MANUAL_TOPIC.revisar} label="Cómo revisar" />
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {(Object.keys(DECISIONS) as Decision[]).map((key) => {

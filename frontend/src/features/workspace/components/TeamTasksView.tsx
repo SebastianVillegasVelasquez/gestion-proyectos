@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
 import {
   AlertTriangle,
   Check,
@@ -38,6 +39,8 @@ import { useTeamTasks, useWorkspaceAccess } from "../hooks/use-workspace";
 import { EditTeamTaskModal } from "./EditTeamTaskModal";
 import { NewSubtaskModal } from "./NewSubtaskModal";
 import { NewTeamTaskModal } from "./NewTeamTaskModal";
+import { ManualHint } from "@/features/manual/components/ManualHint";
+import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { StartTaskButton } from "./StartTaskButton";
 import type { ApiTeamMember, ApiTeamTask } from "../api/workspace.api";
 import type { WorkspaceMember } from "../types";
@@ -162,13 +165,16 @@ interface DeliverCbs {
  *  fila lo enseña en vez de un botón que devolvería un 422. */
 function BlockedDeliveryBadge({ reason }: { reason: string }) {
   return (
-    <span
-      title={reason}
-      className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:text-amber-400"
+    // Enlaza al manual: el `title` dice QUÉ falta, y el tema explica POR QUÉ
+    // existe el bloqueo y qué se puede hacer al respecto.
+    <Link
+      to={`/manual?tema=${MANUAL_TOPIC.bloqueada}`}
+      title={`${reason} — abre el manual para saber más`}
+      className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
     >
       <Lock className="size-3" />
       Bloqueada
-    </span>
+    </Link>
   );
 }
 
@@ -1377,6 +1383,8 @@ export function TeamTasksView({
         )}
 
         <div className="flex-1" />
+
+        <ManualHint topic={MANUAL_TOPIC.entregar} label="Cómo entregar" />
 
         {!showFilterBar && (
           <span className="text-[11px] text-slate-400 dark:text-slate-500">

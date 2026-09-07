@@ -33,6 +33,8 @@ import {
   useUploadFile,
 } from "../hooks/use-project-files";
 import { formatFileSize } from "../utils/format-size";
+import { ManualHint } from "@/features/manual/components/ManualHint";
+import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { FilePreviewModal, type PreviewableFile } from "./FilePreviewModal";
 
 const VIEW_KEY = "files.view";
@@ -669,6 +671,8 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               <Grid2x2 className="size-3.5" />
             </button>
           </div>
+
+          <ManualHint topic={MANUAL_TOPIC.archivos} />
 
           {canWrite && (
             <>
