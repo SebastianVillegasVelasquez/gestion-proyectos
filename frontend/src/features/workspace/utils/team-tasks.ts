@@ -163,9 +163,9 @@ export function activeBlockers(task: ApiTeamTask) {
 // hecha, basta "Marcar como realizada" (crea un entregable "sin adjunto" que
 // sigue el mismo flujo de revisión que cualquier otra entrega).
 
-/** Una tarea padre es un entregable: cuando su avance llega al 100% (todas las
- *  subtareas hechas y, si hacía falta, ya aprobada) queda lista para entregarse
- *  como tal. Las subtareas nunca son entregables. */
+/** Una tarea padre CON subtareas es un entregable: cuando su avance llega al
+ *  100% (todas las subtareas hechas y, si hacía falta, ya aprobada) queda lista
+ *  para entregarse como tal. Las subtareas nunca son entregables. */
 export function isDeliverableReady(
   task: Pick<ApiTeamTask, "parent_task_id" | "progress_pct" | "status">,
 ): boolean {
@@ -177,12 +177,30 @@ export function isDeliverableReady(
   );
 }
 
-/** Una subtarea EN PROGRESO (ya se le dio "Comenzar") que su responsable puede
- *  dar por hecha. */
+/** Una tarea de nivel superior SIN subtareas queda lista para entregar en
+ *  cuanto su responsable la ha comenzado ("en progreso") o se la han devuelto:
+ *  no hay subtareas de las que dependa su avance, así que ella misma es lo que
+ *  se entrega. Los bloqueos por dependencia los sigue filtrando el servidor
+ *  vía `delivery_blocked_reason`. */
+export function isStandaloneTaskReadyToDeliver(
+  task: Pick<ApiTeamTask, "parent_task_id" | "status">,
+  hasSubtasks: boolean,
+): boolean {
+  return (
+    task.parent_task_id === null &&
+    !hasSubtasks &&
+    (task.status === "en_progreso" || task.status === "devuelta")
+  );
+}
+
+/** Una subtarea ya comenzada ("en progreso") o devuelta que su responsable
+ *  puede dar por hecha. */
 export function isSubtaskReadyToComplete(
   task: Pick<ApiTeamTask, "parent_task_id" | "status">,
 ): boolean {
-  return task.parent_task_id !== null && task.status === "en_progreso";
+  return (
+    task.parent_task_id !== null && (task.status === "en_progreso" || task.status === "devuelta")
+  );
 }
 
 // ── Jerarquía padre → subtarea ──────────────────────────────────────────────

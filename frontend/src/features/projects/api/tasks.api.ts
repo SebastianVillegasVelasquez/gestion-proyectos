@@ -76,9 +76,20 @@ export const tasksApi = {
   demoteWorkItem: (workItemId: string) =>
     http.delete(`/work-items/${workItemId}/task`).then(() => undefined),
 
-  changeStatus: (taskId: string, status: TaskStatus, reason?: string) =>
+  changeStatus: (
+    taskId: string,
+    status: TaskStatus,
+    reason?: string,
+    /** "Entregar sin adjunto": completa la tarea propia sin registrar un
+     *  entregable, aunque exija aprobación. Solo aplica con `status = completada`. */
+    deliverWithoutEvidence?: boolean,
+  ) =>
     http
-      .patch<Task>(`/tasks/${taskId}/status`, { status, change_reason: reason })
+      .patch<Task>(`/tasks/${taskId}/status`, {
+        status,
+        change_reason: reason,
+        deliver_without_evidence: deliverWithoutEvidence,
+      })
       .then((r) => r.data),
 
   listDependencies: (taskId: string) =>

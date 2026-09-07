@@ -21,6 +21,7 @@ import type { ApiMyTask, ApiPersonalDeliverable } from "../api/personal.api";
 import {
   useAddPersonalComment,
   useAddPersonalVersion,
+  useCompleteMyTaskWithoutEvidence,
   useCreatePersonalDeliverable,
   useDeletePersonalDeliverable,
   useMyPersonalDeliverables,
@@ -235,6 +236,7 @@ export function PersonalDeliverablesPage() {
   const deleteDeliverable = useDeletePersonalDeliverable();
   const addComment = useAddPersonalComment();
   const setApproval = useSetPersonalApproval();
+  const completeWithoutEvidence = useCompleteMyTaskWithoutEvidence();
 
   const rawList = useMemo<ApiPersonalDeliverable[]>(
     () => (tab === "mias" ? mineQuery.data : reviewQuery.data) ?? [],
@@ -456,6 +458,10 @@ export function PersonalDeliverablesPage() {
           loading={myTasksQuery.isLoading}
           deliverableTaskIds={deliverableTaskIds}
           onOpenIndividual={openIndividual}
+          onDeliverWithoutEvidence={(task) => {
+            completeWithoutEvidence.mutate(task.id);
+          }}
+          deliverWithoutEvidencePending={completeWithoutEvidence.isPending}
         />
       ) : loading ? (
         <div className="flex-1">

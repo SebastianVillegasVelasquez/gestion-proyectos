@@ -466,9 +466,16 @@ class NotifyProjectLeadsOnTaskCompleted:
         if event.actor_id is not None:
             exclude.add(event.actor_id)
         try:
-            recipients = await project_lead_ids(
-                self._session, event.project_id, exclude=exclude
-            )
+            # Tarea delegada a un equipo: avisa a su líder/supervisor (que es
+            # quien la coordina); si no, a coordinación/supervisión del proyecto.
+            if event.team_id is not None:
+                recipients = await team_lead_ids(
+                    self._session, event.team_id, exclude=exclude
+                )
+            else:
+                recipients = await project_lead_ids(
+                    self._session, event.project_id, exclude=exclude
+                )
         except Exception:
             logger.exception(
                 "No se pudieron resolver los líderes del proyecto %s",
@@ -482,7 +489,7 @@ class NotifyProjectLeadsOnTaskCompleted:
                     user_to_id=user_id,
                     actor_id=event.actor_id,
                     notification_type=NotificationType.TAREA_COMPLETADA,
-                    message="Se aprobó una tarea del proyecto y su avance se actualizó.",
+                    message="Se completó una tarea y el avance se actualizó.",
                     payload={
                         "project_id": str(event.project_id),
                         "task_id": str(event.task_id),

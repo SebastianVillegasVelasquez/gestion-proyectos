@@ -25,6 +25,8 @@ interface LeafCbs {
   today: string;
   deliverableTaskIds: Set<string>;
   onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
+  deliverWithoutEvidencePending?: boolean;
 }
 
 // ── Fila de tarea (hoja) — misma lectura que la Estructura de Equipos, pero de
@@ -68,6 +70,8 @@ function TaskLeaf({ task, cbs }: { task: ApiMyTask; cbs: LeafCbs }) {
             isDone={isDone}
             hasDeliverable={cbs.deliverableTaskIds.has(task.id)}
             onOpenIndividual={cbs.onOpenIndividual}
+            onDeliverWithoutEvidence={cbs.onDeliverWithoutEvidence}
+            deliverWithoutEvidencePending={cbs.deliverWithoutEvidencePending}
           />
         </span>
       </div>
@@ -255,11 +259,15 @@ export function PersonalStructureView({
   today,
   deliverableTaskIds,
   onOpenIndividual,
+  onDeliverWithoutEvidence,
+  deliverWithoutEvidencePending,
 }: {
   tasks: ApiMyTask[];
   today: string;
   deliverableTaskIds: Set<string>;
   onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
+  deliverWithoutEvidencePending?: boolean;
 }) {
   const byProject = useMemo(() => {
     const groups = new Map<string, { name: string; tasks: ApiMyTask[] }>();
@@ -273,7 +281,13 @@ export function PersonalStructureView({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [tasks]);
 
-  const cbs: LeafCbs = { today, deliverableTaskIds, onOpenIndividual };
+  const cbs: LeafCbs = {
+    today,
+    deliverableTaskIds,
+    onOpenIndividual,
+    onDeliverWithoutEvidence,
+    deliverWithoutEvidencePending,
+  };
 
   if (byProject.length === 0) {
     return (

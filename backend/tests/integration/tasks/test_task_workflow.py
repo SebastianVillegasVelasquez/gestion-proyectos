@@ -335,6 +335,80 @@ class TestRequiresApprovalToggle:
         )
         assert approved.status_code == 200, approved.text
 
+    async def test_deliver_without_evidence_lets_assignee_complete_despite_approval(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """ "Entregar sin adjunto": el responsable completa su tarea al 100% aunque
+        exija aprobación — no hay evidencia que revisar."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        assignee = await _create_plain_user(
+            client, admin_headers, "assignee-dwe@test.com"
+        )
+        await _add_project_member(client, admin_headers, project_id, assignee["id"])
+
+        task = await self._task_for(
+            client, admin_headers, project_id, modulo["id"], assignee["id"], True
+        )
+        assignee_headers = _headers_for(assignee["id"])
+
+        await client.patch(
+            f"/api/v1/tasks/{task['id']}/status",
+            headers=assignee_headers,
+            json={"status": "en_progreso"},
+        )
+
+        # Sin la bandera sigue bloqueado (exige aprobación).
+        blocked = await client.patch(
+            f"/api/v1/tasks/{task['id']}/status",
+            headers=assignee_headers,
+            json={"status": "completada"},
+        )
+        assert blocked.status_code == 403, blocked.text
+
+        done = await client.patch(
+            f"/api/v1/tasks/{task['id']}/status",
+            headers=assignee_headers,
+            json={"status": "completada", "deliver_without_evidence": True},
+        )
+        assert done.status_code == 200, done.text
+        assert done.json()["status"] == "completada"
+
+    async def test_deliver_without_evidence_still_forbids_third_party(
+        self, client, admin_headers, valid_project_payload
+    ):
+        """La bandera no salta un bloqueo real: alguien que NO es el responsable
+        no completa la tarea aunque la mande."""
+        project_id = await _create_project(client, admin_headers, valid_project_payload)
+        tipo_id = await _create_tipo(client, admin_headers, project_id, "Módulo")
+        modulo = await _create_item(
+            client, admin_headers, project_id, tipo_id, "Módulo 1"
+        )
+        assignee = await _create_plain_user(
+            client, admin_headers, "assignee-dwe2@test.com"
+        )
+        other = await _create_plain_user(client, admin_headers, "other-dwe2@test.com")
+        await _add_project_member(client, admin_headers, project_id, assignee["id"])
+        await _add_project_member(client, admin_headers, project_id, other["id"])
+
+        task = await self._task_for(
+            client, admin_headers, project_id, modulo["id"], assignee["id"], True
+        )
+        await client.patch(
+            f"/api/v1/tasks/{task['id']}/status",
+            headers=_headers_for(assignee["id"]),
+            json={"status": "en_progreso"},
+        )
+        denied = await client.patch(
+            f"/api/v1/tasks/{task['id']}/status",
+            headers=_headers_for(other["id"]),
+            json={"status": "completada", "deliver_without_evidence": True},
+        )
+        assert denied.status_code == 403, denied.text
+
     async def test_false_lets_assignee_complete_without_a_reviewer(
         self, client, admin_headers, valid_project_payload
     ):
