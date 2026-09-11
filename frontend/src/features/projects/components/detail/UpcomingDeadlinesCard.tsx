@@ -53,12 +53,14 @@ export function UpcomingDeadlinesCard({
 }) {
   const navigate = useNavigate();
 
+  // Tope duro de filas: como mucho 10, y con scroll interno si llegara a ese
+  // número, para que la tarjeta no arrastre el alto de su columna.
   const items = useMemo(
     () =>
       tasks
         .filter((t) => t.due_date != null && OPEN.includes(t.status))
         .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))
-        .slice(0, 5),
+        .slice(0, 10),
     [tasks],
   );
 
@@ -103,7 +105,7 @@ export function UpcomingDeadlinesCard({
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="-mr-1 flex max-h-[32rem] min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
             {items.map((task) => {
               const info = dueInfo(task.due_date!);
               const c = chip(task.due_date!);

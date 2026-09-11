@@ -86,9 +86,13 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
   },
 };
 
+// Tope duro de eventos mostrados: la tarjeta nunca crece más allá de esto, sea
+// cual sea el alto que le preste el grid (evita que arrastre a su columna).
+const MAX_ITEMS = 10;
+
 export function ProjectActivityCard({ projectId }: { projectId: string }) {
-  const activityQuery = useProjectActivity(projectId, 20);
-  const items = activityQuery.data?.items ?? [];
+  const activityQuery = useProjectActivity(projectId, MAX_ITEMS);
+  const items = (activityQuery.data?.items ?? []).slice(0, MAX_ITEMS);
 
   return (
     <Card className="flex flex-1 flex-col rounded-2xl">
@@ -116,7 +120,7 @@ export function ProjectActivityCard({ projectId }: { projectId: string }) {
             </p>
           </div>
         ) : (
-          <ul className="-mr-1 flex min-h-[320px] flex-1 flex-col overflow-y-auto pr-1">
+          <ul className="-mr-1 flex max-h-[32rem] min-h-[320px] flex-1 flex-col overflow-y-auto pr-1">
             {items.map((item, idx) => {
               const meta = KIND_META[item.kind] ?? KIND_META.cambio_estado;
               const Icon = meta.icon;
