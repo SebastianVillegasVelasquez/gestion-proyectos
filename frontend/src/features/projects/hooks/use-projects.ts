@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "@/features/projects/api/projects.api";
 import { projectKeys } from "./query-keys";
 import type {
+  ClientAccessInfo,
+  ClientScheduleConfig,
   CreateProjectNotePayload,
   CreateProjectPayload,
   UpdateProjectPayload,
@@ -67,6 +69,27 @@ export function useRegenerateClientAccess(id: string) {
     mutationFn: () => projectsApi.regenerateClientAccess(id),
     onSuccess: (data) => {
       qc.setQueryData(projectKeys.clientAccess(id), data);
+    },
+  });
+}
+
+/** Guarda el recorte del cronograma del cliente y refresca el acceso mostrado. */
+export function useSaveClientScheduleConfig(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: ClientScheduleConfig) => projectsApi.saveClientScheduleConfig(id, cfg),
+    onSuccess: (project) => {
+      qc.setQueryData<ClientAccessInfo>(projectKeys.clientAccess(id), (prev) =>
+        prev
+          ? {
+              ...prev,
+              schedule_element_depth: project.client_schedule_element_depth,
+              schedule_include_tasks: project.client_schedule_include_tasks,
+              schedule_include_subtasks: project.client_schedule_include_subtasks,
+            }
+          : prev,
+      );
+      void qc.invalidateQueries({ queryKey: projectKeys.detail(id) });
     },
   });
 }

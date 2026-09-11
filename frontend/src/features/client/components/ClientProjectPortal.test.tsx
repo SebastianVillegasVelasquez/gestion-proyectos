@@ -95,6 +95,7 @@ describe("ClientProjectPortal", () => {
           tipo_id: "t-modulo",
           tipo_nombre: "Módulo",
           es_dependencia_externa: false,
+          kind: "elemento",
         },
         {
           key: "n1",
@@ -109,6 +110,7 @@ describe("ClientProjectPortal", () => {
           tipo_id: "t-unidad",
           tipo_nombre: "Unidad",
           es_dependencia_externa: false,
+          kind: "elemento",
         },
       ],
     };

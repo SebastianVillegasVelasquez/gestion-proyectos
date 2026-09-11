@@ -41,6 +41,9 @@ export interface PublicScheduleItem {
   tipo_id: string | null;
   tipo_nombre: string | null;
   es_dependencia_externa: boolean;
+  // "elemento" | "tarea" | "subtarea": qué representa la fila. Solo llegan
+  // "tarea"/"subtarea" si el equipo abrió el cronograma a ese detalle.
+  kind: "elemento" | "tarea" | "subtarea";
 }
 
 export interface PublicProjectSchedule {

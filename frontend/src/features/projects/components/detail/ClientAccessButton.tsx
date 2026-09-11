@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Share2, X } from "lucide-react";
+import { GanttChartSquare, Share2, X } from "lucide-react";
 import { useClientAccess, useRegenerateClientAccess } from "../../hooks/use-projects";
 import { ClientAccessFields } from "./ClientAccessFields";
+import { ClientScheduleConfigModal } from "./ClientScheduleConfigModal";
 
 /**
  * Control compacto para compartir el proyecto con el cliente: un botón discreto
@@ -12,23 +13,34 @@ import { ClientAccessFields } from "./ClientAccessFields";
  */
 export function ClientAccessButton({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const accessQuery = useClientAccess(projectId, open);
   const regenerate = useRegenerateClientAccess(projectId);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Cerrar al hacer clic fuera o con Escape: comportamiento esperado de un popover.
+  // Mientras el modal de configuración está abierto, el popover no se cierra
+  // (el modal vive dentro de `containerRef`, así que sus clics cuentan como
+  // "dentro", pero lo dejamos explícito).
   useEffect(() => {
     if (!open) {
       return;
     }
     const onPointerDown = (e: MouseEvent) => {
+      if (configOpen) {
+        return;
+      }
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        if (configOpen) {
+          setConfigOpen(false);
+        } else {
+          setOpen(false);
+        }
       }
     };
     document.addEventListener("mousedown", onPointerDown);
@@ -37,7 +49,7 @@ export function ClientAccessButton({ projectId }: { projectId: string }) {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, configOpen]);
 
   return (
     <div ref={containerRef} className="relative shrink-0">
@@ -79,15 +91,37 @@ export function ClientAccessButton({ projectId }: { projectId: string }) {
           ) : accessQuery.isError || !accessQuery.data ? (
             <p className="text-xs text-rose-500">No se pudo obtener el enlace. Intenta de nuevo.</p>
           ) : (
-            <ClientAccessFields
-              token={accessQuery.data.token}
-              onRegenerate={() => {
-                regenerate.mutate();
-              }}
-              regenerating={regenerate.isPending}
-            />
+            <>
+              <ClientAccessFields
+                token={accessQuery.data.token}
+                onRegenerate={() => {
+                  regenerate.mutate();
+                }}
+                regenerating={regenerate.isPending}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setConfigOpen(true);
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+              >
+                <GanttChartSquare className="size-3.5 text-brand-blue" />
+                Configurar cronograma del cliente
+              </button>
+            </>
           )}
         </div>
+      )}
+
+      {configOpen && accessQuery.data && (
+        <ClientScheduleConfigModal
+          projectId={projectId}
+          access={accessQuery.data}
+          onClose={() => {
+            setConfigOpen(false);
+          }}
+        />
       )}
     </div>
   );

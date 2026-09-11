@@ -4,7 +4,7 @@ import datetime
 import uuid
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Enum, Float, ForeignKey, String, Text, UUID
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, String, Text, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Date
 
@@ -34,6 +34,23 @@ class Project(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # de ESTE proyecto. Regenerarlo invalida el enlace anterior (revocación).
     client_access_token: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, unique=True, index=True
+    )
+
+    # ── Alcance del cronograma que ve el cliente en el portal público ──────────
+    # Recorte configurable desde "Compartir con el cliente". `element_depth` = 0
+    # significa "todos los niveles de la estructura"; N ≥ 1 muestra solo los
+    # elementos hasta la profundidad N (nivel 1 = raíz). Las tareas y subtareas
+    # nunca se muestran salvo que se active cada flag (y las subtareas requieren
+    # que las tareas estén activadas). El backend del portal aplica este recorte
+    # en `get_project_schedule_by_token`.
+    client_schedule_element_depth: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    client_schedule_include_tasks: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    client_schedule_include_subtasks: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
 
     members: Mapped[list[ProjectMember]] = relationship(

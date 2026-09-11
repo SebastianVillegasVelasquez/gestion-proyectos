@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
-from pydantic import StringConstraints, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from app.modules.identity.presentation.schemas import UserResponse
 from app.modules.project.infrastructure.enums import ProjectRole
@@ -38,6 +38,10 @@ class ProjectResponse(BaseModelConfig):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     progress_pct: Optional[float] = None
+    # Alcance del cronograma del portal del cliente (ver `ClientAccessResponse`).
+    client_schedule_element_depth: int = 0
+    client_schedule_include_tasks: bool = False
+    client_schedule_include_subtasks: bool = False
 
 
 class UpdateProjectRequest(BaseModelConfig):
@@ -51,6 +55,21 @@ class UpdateProjectRequest(BaseModelConfig):
 
     start_date: date | None = None
     end_date: date | None = None
+
+    # Alcance del cronograma del portal del cliente. Se envían los tres juntos
+    # desde el modal "Configurar cronograma"; `exclude_unset` deja intactos los
+    # que no viajen (p. ej. un PATCH que solo cambia el nombre).
+    client_schedule_element_depth: int | None = Field(default=None, ge=0, le=20)
+    client_schedule_include_tasks: bool | None = None
+    client_schedule_include_subtasks: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_schedule_scope(self) -> "UpdateProjectRequest":
+        # Sin tareas no hay subtareas que mostrar: normalizamos aquí para que el
+        # backend del portal no tenga que cruzar ambos flags.
+        if self.client_schedule_include_tasks is False:
+            self.client_schedule_include_subtasks = False
+        return self
 
 
 class ProjectMemberRequest(BaseModelConfig):
@@ -103,9 +122,18 @@ class ResponseProjectMember(BaseModelConfig):
 
 
 class ClientAccessResponse(BaseModelConfig):
-    """Token del portal del cliente. El frontend arma el enlace /portal/{token}."""
+    """Token del portal del cliente + alcance del cronograma que verá.
+
+    El frontend arma el enlace /portal/{token} y precarga con estos valores el
+    modal "Configurar cronograma". `schedule_element_depth` = 0 significa "todos
+    los niveles de la estructura"; N ≥ 1, solo hasta esa profundidad. Las tareas
+    y subtareas solo se muestran si su flag está activo (subtareas ⇒ tareas).
+    """
 
     token: str
+    schedule_element_depth: int = 0
+    schedule_include_tasks: bool = False
+    schedule_include_subtasks: bool = False
 
 
 class CreateProjectNoteRequest(BaseModelConfig):

@@ -1,5 +1,7 @@
 import http from "@/lib/http";
 import type {
+  ClientAccessInfo,
+  ClientScheduleConfig,
   CreateProjectNotePayload,
   CreateProjectPayload,
   Project,
@@ -20,12 +22,23 @@ export const projectsApi = {
 
   remove: (id: string) => http.delete(`/projects/${id}`).then(() => undefined),
 
-  // Portal del cliente: token para armar el enlace público /portal/{token}.
+  // Portal del cliente: token para armar el enlace público /portal/{token} +
+  // el alcance actual del cronograma que verá el cliente.
   getClientAccess: (id: string) =>
-    http.get<{ token: string }>(`/projects/${id}/client-access`).then((r) => r.data),
+    http.get<ClientAccessInfo>(`/projects/${id}/client-access`).then((r) => r.data),
 
   regenerateClientAccess: (id: string) =>
-    http.post<{ token: string }>(`/projects/${id}/client-access/regenerate`).then((r) => r.data),
+    http.post<ClientAccessInfo>(`/projects/${id}/client-access/regenerate`).then((r) => r.data),
+
+  /** Guarda hasta qué profundidad ve el cliente el cronograma Gantt. */
+  saveClientScheduleConfig: (id: string, cfg: ClientScheduleConfig) =>
+    http
+      .patch<Project>(`/projects/${id}`, {
+        client_schedule_element_depth: cfg.element_depth,
+        client_schedule_include_tasks: cfg.include_tasks,
+        client_schedule_include_subtasks: cfg.include_subtasks,
+      })
+      .then((r) => r.data),
 
   // Notas / recordatorios del proyecto.
   listNotes: (id: string) => http.get<ProjectNote[]>(`/projects/${id}/notes`).then((r) => r.data),
