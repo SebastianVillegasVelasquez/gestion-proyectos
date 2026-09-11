@@ -29,10 +29,14 @@ import type { TaskStatus } from "@/features/projects/types/api.types";
 import type { PublicProjectSchedule, PublicScheduleItem } from "../api/portal.api";
 
 // Espejo de las constantes del cronograma interno: una fila, una escala, un
-// mismo lenguaje visual. Aquí cada fila es un ELEMENTO padre de la estructura (un
-// componente/entregable), nunca una tarea ni una subtarea; no hay columnas de
-// personas.
-const LABEL_W = 260;
+// mismo lenguaje visual. Cada fila es un ELEMENTO de la estructura (y, si el
+// equipo lo habilitó, sus tareas/subtareas); no hay columnas de personas.
+// La columna de nombres es redimensionable (arrastrando su borde derecho) para
+// leer nombres largos sin truncar; el ancho elegido se recuerda por navegador.
+const LABEL_W_DEFAULT = 260;
+const LABEL_W_MIN = 180;
+const LABEL_W_MAX = 620;
+const LABEL_W_STORAGE_KEY = "client-schedule:label-w";
 // Pista de tiempo más ancha que el cronograma interno: el portal es una sola
 // pantalla sin barra lateral, así que puede (y debe) respirar horizontalmente.
 const MIN_TRACK = 640;
@@ -80,6 +84,54 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
   const [onlyAtRisk, setOnlyAtRisk] = useState(false);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+
+  // Ancho (redimensionable) de la columna de nombres. Se lee de localStorage al
+  // montar y se guarda al soltar el arrastre; si el navegador lo bloquea, se
+  // usa el valor por defecto sin romper nada.
+  const [labelW, setLabelW] = useState<number>(() => {
+    try {
+      const raw = window.localStorage.getItem(LABEL_W_STORAGE_KEY);
+      const n = raw ? Number.parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n)) {
+        return Math.min(LABEL_W_MAX, Math.max(LABEL_W_MIN, n));
+      }
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    return LABEL_W_DEFAULT;
+  });
+  const [resizing, setResizing] = useState(false);
+
+  // Arrastre del borde derecho de la columna de nombres. Se escucha en `window`
+  // para no perder el puntero si sale del tirador, y se persiste al soltar.
+  const startResize = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = labelW;
+      setResizing(true);
+      const onMove = (ev: PointerEvent) => {
+        const next = Math.min(LABEL_W_MAX, Math.max(LABEL_W_MIN, startW + (ev.clientX - startX)));
+        setLabelW(next);
+      };
+      const onUp = () => {
+        setResizing(false);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setLabelW((w) => {
+          try {
+            window.localStorage.setItem(LABEL_W_STORAGE_KEY, String(w));
+          } catch {
+            /* almacenamiento no disponible */
+          }
+          return w;
+        });
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [labelW],
+  );
 
   // Estilo por tipo de elemento: EL MISMO color que la Estructura y el
   // cronograma interno (paleta determinista sobre `tipo_id`; naranja fijo para
@@ -224,9 +276,9 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
         return;
       }
       const contentX = (todayPct / 100) * trackWidth;
-      el.scrollTo({ left: contentX - (el.clientWidth - LABEL_W) / 2, behavior });
+      el.scrollTo({ left: contentX - (el.clientWidth - labelW) / 2, behavior });
     },
-    [todayPct, trackWidth],
+    [todayPct, trackWidth, labelW],
   );
   useEffect(() => {
     if (!autoScrolledRef.current && todayPct != null && scrollRef.current) {
@@ -461,18 +513,42 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
       ) : (
         <div
           ref={scrollRef}
-          className="relative max-h-[80vh] min-h-[28rem] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          className={cn(
+            "relative max-h-[80vh] min-h-[28rem] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950",
+            resizing && "cursor-col-resize select-none",
+          )}
         >
-          <div className="relative" style={{ width: LABEL_W + trackWidth, minWidth: "100%" }}>
+          <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
             <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
               <div
-                style={{ width: LABEL_W }}
+                style={{ width: labelW }}
                 className="sticky left-0 z-10 flex shrink-0 items-end border-r border-slate-200 bg-white px-3 pb-1.5 dark:border-slate-800 dark:bg-slate-950"
               >
                 <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Cronograma · {rows.length}
                 </span>
+                {/* Tirador para ensanchar/estrechar la columna de nombres. */}
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Ajustar ancho de la columna de nombres"
+                  onPointerDown={startResize}
+                  onDoubleClick={() => {
+                    setLabelW(LABEL_W_DEFAULT);
+                    try {
+                      window.localStorage.setItem(LABEL_W_STORAGE_KEY, String(LABEL_W_DEFAULT));
+                    } catch {
+                      /* almacenamiento no disponible */
+                    }
+                  }}
+                  title="Arrastra para ajustar · doble clic para restablecer"
+                  className={cn(
+                    "absolute -right-1.5 top-0 z-40 h-full w-3 cursor-col-resize touch-none",
+                    "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors hover:after:bg-brand-gold",
+                    resizing && "after:bg-brand-gold",
+                  )}
+                />
               </div>
               <div className="relative shrink-0" style={{ width: trackWidth }}>
                 <div className="relative h-6">
@@ -526,7 +602,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               {/* Capa de fondo: fines de semana y rejilla, alineadas al eje */}
               <div
                 className="pointer-events-none absolute inset-y-0 z-0"
-                style={{ left: LABEL_W, width: trackWidth }}
+                style={{ left: labelW, width: trackWidth }}
               >
                 {weekends.map((b) => (
                   <div
@@ -555,7 +631,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               {todayPct != null && (
                 <div
                   className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-400/80"
-                  style={{ left: LABEL_W + pctToPx(todayPct) }}
+                  style={{ left: labelW + pctToPx(todayPct) }}
                 />
               )}
 
@@ -585,7 +661,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                       style={{ height: ROW_H }}
                     >
                       <div
-                        style={{ width: LABEL_W }}
+                        style={{ width: labelW }}
                         className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-slate-200 bg-white pr-2 text-left transition-colors group-hover/row:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900"
                       >
                         {/* Sangría por nivel + chevron si el componente tiene hijos */}
@@ -613,17 +689,24 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                           ) : (
                             <span className="w-3.5 shrink-0" aria-hidden />
                           )}
-                          {/* Marcador + chip del TIPO de elemento: mismo color
-                              que la Estructura y el cronograma interno. */}
+                          {/* Marcador + chip. En un elemento, el chip es su TIPO
+                              (mismo color que la Estructura); en una tarea o
+                              subtarea, un chip neutro que la identifica como tal. */}
                           <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
-                          {item.tipo_nombre && (
-                            <span
-                              className={cn(
-                                "shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide",
-                                style.chip,
-                              )}
-                            >
-                              {item.tipo_nombre}
+                          {item.kind === "elemento" ? (
+                            item.tipo_nombre && (
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide",
+                                  style.chip,
+                                )}
+                              >
+                                {item.tipo_nombre}
+                              </span>
+                            )
+                          ) : (
+                            <span className="shrink-0 rounded bg-slate-100 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                              {item.kind === "subtarea" ? "Subtarea" : "Tarea"}
                             </span>
                           )}
                           <p

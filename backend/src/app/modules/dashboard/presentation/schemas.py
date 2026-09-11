@@ -144,6 +144,10 @@ class PublicScheduleItemResponse(BaseModelConfig):
     tipo_id: str | None = None
     tipo_nombre: str | None = None
     es_dependencia_externa: bool = False
+    # "elemento" | "tarea" | "subtarea": qué representa la fila. Solo aparecen
+    # "tarea"/"subtarea" si el proyecto abrió el cronograma del cliente a ese
+    # detalle desde "Compartir con el cliente".
+    kind: str = "elemento"
 
 
 class PublicProjectScheduleResponse(BaseModelConfig):

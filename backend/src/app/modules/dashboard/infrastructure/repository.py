@@ -122,6 +122,10 @@ class ScheduleItem:
     tipo_id: str | None = None
     tipo_nombre: str | None = None
     es_dependencia_externa: bool = False
+    # Qué representa la fila: un elemento de la estructura, o —si el proyecto
+    # abrió el cronograma del cliente a ese detalle— una tarea o una subtarea de
+    # un elemento. La UI lo usa para el rótulo y un marcador discreto.
+    kind: str = "elemento"  # "elemento" | "tarea" | "subtarea"
 
 
 @dataclass
@@ -994,6 +998,41 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
             if task.work_item_id is not None:
                 tasks_by_item.setdefault(task.work_item_id, []).append(task)
 
+        # Subtareas por tarea padre: solo se emiten como filas si el proyecto
+        # abrió el cronograma del cliente a ese detalle (`include_subtasks`).
+        subtasks_by_parent: dict[uuid.UUID, list[Task]] = {}
+        for task in task_rows:
+            if task.parent_task_id is not None:
+                subtasks_by_parent.setdefault(task.parent_task_id, []).append(task)
+
+        # ── Alcance configurado desde "Compartir con el cliente" ──────────────
+        # `element_depth` = 0 ⇒ todos los niveles; N ≥ 1 ⇒ solo hasta ese nivel
+        # (nivel 1 = raíz). Las tareas/subtareas nunca se listan salvo su flag.
+        max_element_depth = project.client_schedule_element_depth or 0
+        include_tasks = bool(project.client_schedule_include_tasks)
+        include_subtasks = include_tasks and bool(
+            project.client_schedule_include_subtasks
+        )
+
+        # Fechas del proyecto para el relleno: un elemento (o tarea) sin fecha de
+        # fin propia toma la del proyecto para que igual se dibuje en el Gantt.
+        proj_start = project.start_date
+        proj_end = project.end_date
+
+        def resolve_range(
+            starts: list[datetime.date], ends: list[datetime.date]
+        ) -> tuple[datetime.date, datetime.date] | None:
+            """(inicio, fin) de una barra, rellenando la fin faltante con la del
+            proyecto (y la de inicio, en su defecto, con la del proyecto o la
+            propia fin). None si no hay forma de anclarla en el tiempo."""
+            end = max(ends) if ends else proj_end
+            if end is None:
+                return None
+            start = min(starts) if starts else (proj_start or end)
+            if start > end:
+                start = end
+            return start, end
+
         # Agregado de subárbol (memoizado): fechas para el rango + conteos de avance.
         subtree_cache: dict[
             uuid.UUID, tuple[list[datetime.date], list[datetime.date], int, int]
@@ -1038,15 +1077,73 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
         items: list[ScheduleItem] = []
         counter = 0
 
+        def task_progress(task: Task) -> int:
+            """Avance de una tarea: 100 si está completada; si tiene subtareas,
+            la fracción completada de ellas; 0 en otro caso."""
+            if task.status == _COMPLETED:
+                return 100
+            subs = subtasks_by_parent.get(task.id, [])
+            if subs:
+                done = sum(1 for s in subs if s.status == _COMPLETED)
+                return round(done / len(subs) * 100)
+            return 0
+
+        def emit_task(task: Task, parent_key: str, depth: int, tipo, kind: str) -> None:
+            """Añade la fila de una tarea/subtarea (y, si procede, sus subtareas).
+
+            Hereda el color del elemento del que cuelga para no romper la
+            continuidad visual con la Estructura.
+            """
+            nonlocal counter
+            rng = resolve_range(
+                [task.start_date] if task.start_date is not None else [],
+                [task.due_date] if task.due_date is not None else [],
+            )
+            if rng is None:
+                return
+            key = f"n{counter}"
+            counter += 1
+            progress = task_progress(task)
+            items.append(
+                ScheduleItem(
+                    key=key,
+                    parent_key=parent_key,
+                    name=task.title,
+                    depth=depth,
+                    order=len(items),
+                    start_date=rng[0],
+                    due_date=rng[1],
+                    status=_status_value(task.status),
+                    progress_pct=progress,
+                    tipo_id=str(tipo.id) if tipo is not None else None,
+                    tipo_nombre=tipo.nombre if tipo is not None else None,
+                    es_dependencia_externa=(
+                        tipo.es_dependencia_externa if tipo is not None else False
+                    ),
+                    kind=kind,
+                )
+            )
+            if kind == "tarea" and include_subtasks:
+                for sub in sorted(
+                    subtasks_by_parent.get(task.id, []),
+                    key=lambda t: (t.orden, t.title),
+                ):
+                    emit_task(sub, key, depth + 1, tipo, "subtarea")
+
         # DFS: un elemento sin rango resoluble no dibuja barra, pero sus hijos sí
         # pueden tenerlo; en ese caso se reasignan al ancestro incluido más cercano
-        # para que la jerarquía quede consistente.
+        # para que la jerarquía quede consistente. `depth` es la profundidad que
+        # verá el cliente (compactada al saltar ancestros sin fecha); el recorte
+        # por nivel (`max_element_depth`) se mide sobre ella.
         def walk(node: WorkItem, parent_key: str | None, depth: int) -> None:
             nonlocal counter
+            if max_element_depth and depth >= max_element_depth:
+                return
             starts, ends, total, completed = subtree(node)
             child_parent = parent_key
             child_depth = depth
-            if starts and ends:
+            rng = resolve_range(starts, ends)
+            if rng is not None:
                 if total > 0:
                     progress = round(completed / total * 100)
                 elif node.porcentaje_completado is not None:
@@ -1063,8 +1160,8 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         name=node.nombre,
                         depth=depth,
                         order=len(items),
-                        start_date=min(starts),
-                        due_date=max(ends),
+                        start_date=rng[0],
+                        due_date=rng[1],
                         status=derive_status(progress),
                         progress_pct=progress,
                         tipo_id=str(node.tipo_id),
@@ -1072,16 +1169,27 @@ class SqlAlchemyDashboardRepository(DashboardRepository):
                         es_dependencia_externa=(
                             tipo.es_dependencia_externa if tipo is not None else False
                         ),
+                        kind="elemento",
                     )
                 )
                 child_parent = key
                 child_depth = depth + 1
 
-                # Las tareas del elemento NO se listan como filas: el cronograma
-                # del cliente es un espejo de la ESTRUCTURA del proyecto (sólo
-                # elementos padre), no del trabajo individual. Las tareas siguen
-                # aportando su rango y su avance al agregado del elemento (ver
-                # `subtree`), pero nunca aparecen —ni ellas ni sus responsables—.
+                # Las tareas del elemento solo se listan como filas si el proyecto
+                # abrió el cronograma del cliente a ese detalle. Una tarea que ES
+                # el elemento (`represents_work_item`) no se repite. Siempre
+                # aportan su rango y avance al agregado del elemento (ver
+                # `subtree`); nunca aparecen sus responsables ni equipos.
+                if include_tasks and (
+                    not max_element_depth or child_depth <= max_element_depth
+                ):
+                    for task in sorted(
+                        tasks_by_item.get(node.id, []),
+                        key=lambda t: (t.orden, t.title),
+                    ):
+                        if task.parent_task_id is not None or task.represents_work_item:
+                            continue
+                        emit_task(task, key, child_depth, tipo, "tarea")
             for child in children.get(node.id, []):
                 walk(child, child_parent, child_depth)
 

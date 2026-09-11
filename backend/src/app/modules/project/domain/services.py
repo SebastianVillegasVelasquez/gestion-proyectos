@@ -39,13 +39,27 @@ class ProjectService:
             # Proyectos creados antes de esta función: generamos el token al vuelo.
             project.client_access_token = generate_client_token()
             await self.repo.update(project)
-        return ClientAccessResponse(token=project.client_access_token)
+        return self._client_access_response(project)
 
     async def regenerate_client_access(self, project_id: UUID) -> ClientAccessResponse:
         project = await self._get_active(project_id)
         project.client_access_token = generate_client_token()
         await self.repo.update(project)
-        return ClientAccessResponse(token=project.client_access_token)
+        return self._client_access_response(project)
+
+    @staticmethod
+    def _client_access_response(project: Project) -> ClientAccessResponse:
+        """Token + alcance del cronograma que verá el cliente (para el modal).
+
+        Se llama solo tras garantizar el token (crear/rotar), de ahí el assert.
+        """
+        assert project.client_access_token is not None
+        return ClientAccessResponse(
+            token=project.client_access_token,
+            schedule_element_depth=project.client_schedule_element_depth,
+            schedule_include_tasks=project.client_schedule_include_tasks,
+            schedule_include_subtasks=project.client_schedule_include_subtasks,
+        )
 
     async def project_exists(self, project_id) -> bool:
         project: Union[Project, None] = await self.repo.get_by_id(project_id)
@@ -113,6 +127,16 @@ class ProjectService:
             start_date=project.start_date,
             end_date=project.end_date,
             progress_pct=pct,
+            client_schedule_element_depth=getattr(
+                project, "client_schedule_element_depth", 0
+            )
+            or 0,
+            client_schedule_include_tasks=bool(
+                getattr(project, "client_schedule_include_tasks", False)
+            ),
+            client_schedule_include_subtasks=bool(
+                getattr(project, "client_schedule_include_subtasks", False)
+            ),
         )
 
 

@@ -11,6 +11,9 @@ function project(over: Partial<Project> = {}): Project {
     start_date: null,
     end_date: null,
     progress_pct: 40,
+    client_schedule_element_depth: 0,
+    client_schedule_include_tasks: false,
+    client_schedule_include_subtasks: false,
     ...over,
   };
 }

@@ -13,7 +13,17 @@ import {
   YAxis,
 } from "recharts";
 import type { PieSectorDataItem } from "recharts/types/polar/Pie";
-import { CalendarRange, ChartPie, ListChecks, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  CalendarRange,
+  ChartPie,
+  ListChecks,
+  Minus,
+  PackageCheck,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/common/Skeleton";
@@ -41,14 +51,65 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 
 // Cuántos periodos se muestran según la granularidad elegida (desempeño).
 const RANGE: Record<DeliveryGranularity, number> = { semana: 8, mes: 6 };
-const ON_TIME_COLOR = "var(--color-brand-teal)";
-const LATE_COLOR = "var(--color-brand-red)";
+// Colores de marca con respaldo HEX (mismo criterio que el gráfico de
+// rendimiento de Equipos de trabajo): las CSS vars no resuelven dentro del SVG
+// de recharts en algunos navegadores.
+const ON_TIME_COLOR = "var(--color-brand-teal, #4da0b1)";
+const LATE_COLOR = "var(--color-brand-red, #c4573a)";
 
 const TREND_META = {
-  up: { icon: TrendingUp, label: "Mejorando", tone: "text-emerald-600 dark:text-emerald-400" },
-  down: { icon: TrendingDown, label: "Empeorando", tone: "text-rose-600 dark:text-rose-400" },
-  flat: { icon: Minus, label: "Estable", tone: "text-muted-foreground" },
+  up: {
+    icon: TrendingUp,
+    label: "Mejora",
+    tile: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  },
+  down: {
+    icon: TrendingDown,
+    label: "Empeora",
+    tile: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  },
+  flat: {
+    icon: Minus,
+    label: "Estable",
+    tile: "bg-accent text-muted-foreground",
+  },
 };
+
+// Píldora de filtro: mismo patrón que Equipos de trabajo (rounded-full, activo
+// en teal). Se usa en el filtro de prioridad y en el de periodo.
+const pillClass = (active: boolean) =>
+  cn(
+    "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+    active ? "bg-brand-teal text-white" : "bg-accent text-muted-foreground hover:text-foreground",
+  );
+
+// Tarjeta de cifra: calcada de `StatTile` de Equipos de trabajo (borde + cuadro
+// de icono tintado + valor grande + etiqueta pequeña).
+function StatTile({
+  Icon,
+  label,
+  value,
+  tone,
+}: {
+  Icon: LucideIcon;
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3">
+      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", tone)}>
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-lg font-semibold leading-tight tabular-nums text-foreground">
+          {value}
+        </span>
+        <span className="block truncate text-[11px] text-muted-foreground">{label}</span>
+      </span>
+    </div>
+  );
+}
 
 // Sector activo del donut: crece un poco y suma un anillo exterior fino al hover.
 function ActiveSlice(props: PieSectorDataItem) {
@@ -100,12 +161,12 @@ function DeliveryTooltip({
       ) : (
         <div className="mt-1 flex flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="size-2 rounded-sm" style={{ backgroundColor: ON_TIME_COLOR }} />
+            <span className="size-2 rounded-full" style={{ backgroundColor: ON_TIME_COLOR }} />
             {b.onTime} a tiempo
           </span>
           {b.late > 0 && (
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="size-2 rounded-sm" style={{ backgroundColor: LATE_COLOR }} />
+              <span className="size-2 rounded-full" style={{ backgroundColor: LATE_COLOR }} />
               {b.late} tardía{b.late === 1 ? "" : "s"}
             </span>
           )}
@@ -151,12 +212,7 @@ function StatusView({ tasks }: { tasks: Task[] }) {
                 onClick={() => {
                   setPriority(p);
                 }}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  isActive
-                    ? "bg-brand-blue text-white"
-                    : "bg-accent text-muted-foreground hover:text-foreground",
-                )}
+                className={pillClass(isActive)}
               >
                 {label}
               </button>
@@ -237,18 +293,25 @@ function StatusView({ tasks }: { tasks: Task[] }) {
             </div>
           </div>
 
-          {/* Leyenda, centrada en filas que se ajustan al ancho */}
-          <ul className="flex w-full max-w-md flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {/* Leyenda como chips tintados, igual que las etiquetas de tipo de la
+              Estructura: punto de color + fondo suave del propio estado. */}
+          <ul className="flex w-full max-w-md flex-wrap items-center justify-center gap-2">
             {segments.map((seg) => (
-              <li key={seg.status} className="flex items-center gap-2 text-sm">
+              <li
+                key={seg.status}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                  seg.soft,
+                )}
+              >
                 <span
-                  className="size-2.5 shrink-0 rounded-sm"
+                  className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: seg.color }}
                 />
-                <span className="text-muted-foreground">{seg.label}</span>
-                <span className="font-semibold tabular-nums text-foreground">{seg.count}</span>
-                <span className="text-xs tabular-nums text-muted-foreground/70">
-                  ({Math.round((seg.count / metrics.total) * 100)}%)
+                <span>{seg.label}</span>
+                <span className="font-semibold tabular-nums">{seg.count}</span>
+                <span className="tabular-nums opacity-70">
+                  {Math.round((seg.count / metrics.total) * 100)}%
                 </span>
               </li>
             ))}
@@ -272,8 +335,8 @@ function DeliveryView({ tasks }: { tasks: Task[] }) {
 
   return (
     <>
-      {/* Filtro de periodo, centrado */}
-      <div className="flex items-center gap-1 rounded-lg bg-accent p-0.5">
+      {/* Filtro de periodo: mismas píldoras que Equipos de trabajo */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         {(
           [
             { key: "semana", label: "Semanas" },
@@ -286,38 +349,28 @@ function DeliveryView({ tasks }: { tasks: Task[] }) {
             onClick={() => {
               setGranularity(key);
             }}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-              granularity === key
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
+            className={pillClass(granularity === key)}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {/* Resumen del rango visible, centrado */}
-      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-xl bg-accent/40 px-3.5 py-2.5 text-sm">
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-lg font-semibold tabular-nums text-foreground">
-            {summary.totalDelivered}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            entregada{summary.totalDelivered === 1 ? "" : "s"}
-          </span>
-        </span>
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-lg font-semibold tabular-nums text-foreground">
-            {summary.onTimePct}%
-          </span>
-          <span className="text-xs text-muted-foreground">a tiempo</span>
-        </span>
-        <span className={cn("flex items-center gap-1.5 text-xs font-medium", trend.tone)}>
-          <TrendIcon className="size-3.5" />
-          {trend.label}
-        </span>
+      {/* Resumen del rango visible como tarjetas de cifra (calcadas de Equipos) */}
+      <div className="grid w-full max-w-lg grid-cols-3 gap-3">
+        <StatTile
+          Icon={PackageCheck}
+          value={String(summary.totalDelivered)}
+          label={`entregada${summary.totalDelivered === 1 ? "" : "s"}`}
+          tone="bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal"
+        />
+        <StatTile
+          Icon={Target}
+          value={`${String(summary.onTimePct)}%`}
+          label="a tiempo"
+          tone="bg-brand-gold/15 text-brand-gold-dark dark:text-brand-gold"
+        />
+        <StatTile Icon={TrendIcon} value={trend.label} label="tendencia" tone={trend.tile} />
       </div>
 
       {summary.totalDelivered === 0 ? (
@@ -373,14 +426,14 @@ function DeliveryView({ tasks }: { tasks: Task[] }) {
         </div>
       )}
 
-      {/* Leyenda, centrada */}
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: ON_TIME_COLOR }} />A
+      {/* Leyenda como chips tintados, igual que la vista por estado */}
+      <div className="flex items-center justify-center gap-2">
+        <span className="flex items-center gap-1.5 rounded-full bg-brand-teal/10 px-2.5 py-1 text-xs font-medium text-brand-teal-dark dark:text-brand-teal">
+          <span className="size-2 rounded-full" style={{ backgroundColor: ON_TIME_COLOR }} />A
           tiempo
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: LATE_COLOR }} />
+        <span className="flex items-center gap-1.5 rounded-full bg-brand-red/10 px-2.5 py-1 text-xs font-medium text-brand-red-dark dark:text-brand-red">
+          <span className="size-2 rounded-full" style={{ backgroundColor: LATE_COLOR }} />
           Tardías
         </span>
       </div>
@@ -420,7 +473,7 @@ export function ProjectChartsCard({
         {/* Cabecera + selector de gráfico */}
         <div className="flex w-full items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
               <Icon className="size-[18px]" />
             </span>
             <div>
@@ -428,7 +481,7 @@ export function ProjectChartsCard({
               <p className="text-xs text-muted-foreground">{meta.subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-accent p-0.5">
+          <div className="flex items-center gap-1">
             {(
               [
                 { key: "estado", icon: ChartPie, label: "Por estado" },
@@ -443,11 +496,12 @@ export function ProjectChartsCard({
                 }}
                 aria-label={label}
                 title={label}
+                aria-pressed={view === key}
                 className={cn(
-                  "flex size-7 items-center justify-center rounded-md transition-colors",
+                  "flex size-8 items-center justify-center rounded-full transition-colors",
                   view === key
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-brand-teal text-white"
+                    : "bg-accent text-muted-foreground hover:text-foreground",
                 )}
               >
                 <TabIcon className="size-4" />

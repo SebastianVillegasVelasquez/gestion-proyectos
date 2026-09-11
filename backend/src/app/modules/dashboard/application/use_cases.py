@@ -314,6 +314,7 @@ class GetPublicProjectScheduleUseCase:
                     tipo_id=item.tipo_id,
                     tipo_nombre=item.tipo_nombre,
                     es_dependencia_externa=item.es_dependencia_externa,
+                    kind=item.kind,
                 )
                 for item in schedule.items
             ],

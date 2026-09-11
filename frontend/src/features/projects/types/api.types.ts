@@ -21,6 +21,26 @@ export interface Project {
   start_date: string | null;
   end_date: string | null;
   progress_pct: number | null;
+  // Alcance del cronograma del portal del cliente. `element_depth` 0 = todos los
+  // niveles de la estructura; N ≥ 1 = solo hasta esa profundidad.
+  client_schedule_element_depth: number;
+  client_schedule_include_tasks: boolean;
+  client_schedule_include_subtasks: boolean;
+}
+
+/** Configuración del recorte del cronograma que ve el cliente. */
+export interface ClientScheduleConfig {
+  element_depth: number;
+  include_tasks: boolean;
+  include_subtasks: boolean;
+}
+
+/** GET /projects/{id}/client-access: token + alcance del cronograma. */
+export interface ClientAccessInfo {
+  token: string;
+  schedule_element_depth: number;
+  schedule_include_tasks: boolean;
+  schedule_include_subtasks: boolean;
 }
 
 export interface CreateProjectPayload {
@@ -31,7 +51,11 @@ export interface CreateProjectPayload {
   end_date?: string | null;
 }
 
-export type UpdateProjectPayload = Partial<CreateProjectPayload>;
+export type UpdateProjectPayload = Partial<CreateProjectPayload> & {
+  client_schedule_element_depth?: number;
+  client_schedule_include_tasks?: boolean;
+  client_schedule_include_subtasks?: boolean;
+};
 
 export interface ProjectNote {
   id: string;
