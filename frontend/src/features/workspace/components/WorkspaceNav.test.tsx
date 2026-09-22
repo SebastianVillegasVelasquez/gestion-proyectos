@@ -20,13 +20,14 @@ describe("WorkspaceNav", () => {
     }
   });
 
-  it("marca la sección activa con aria-current y muestra el contador", () => {
+  it("marca la sección activa con aria-current y muestra el contador (expandido)", async () => {
     render(<WorkspaceNav items={items} active="tareas" onSelect={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /expandir el menú/i }));
     expect(screen.getByRole("button", { name: /tareas/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  it("no pinta contador cuando es 0 o indefinido", () => {
+  it("no pinta contador cuando es 0 o indefinido", async () => {
     render(
       <WorkspaceNav
         items={[{ id: "entregables" as const, label: "Entregables", Icon: Package, count: 0 }]}
@@ -34,6 +35,7 @@ describe("WorkspaceNav", () => {
         onSelect={vi.fn()}
       />,
     );
+    await userEvent.click(screen.getByRole("button", { name: /expandir el menú/i }));
     expect(screen.queryByText("0")).toBeNull();
   });
 
@@ -44,19 +46,20 @@ describe("WorkspaceNav", () => {
     expect(onSelect).toHaveBeenCalledWith("configuracion");
   });
 
-  it("colapsa a riel de iconos y recuerda la preferencia", async () => {
+  it("arranca colapsado sin preferencia guardada, y recuerda la preferencia al expandir", async () => {
     const { unmount } = render(<WorkspaceNav items={items} active="tareas" onSelect={vi.fn()} />);
-    // Expandido: se ven las etiquetas.
-    expect(screen.getByText("Entregables")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /colapsar el menú/i }));
-    expect(screen.queryByText("Entregables")).toBeNull();
-    expect(localStorage.getItem("workspace.nav.collapsed")).toBe("1");
-
-    // Al volver a montar arranca colapsado (preferencia recordada).
-    unmount();
-    render(<WorkspaceNav items={items} active="tareas" onSelect={vi.fn()} />);
+    // Sin preferencia guardada: arranca colapsado (riel de iconos), para no
+    // restarle ancho a la tabla de tareas por defecto.
     expect(screen.queryByText("Entregables")).toBeNull();
     expect(screen.getByRole("button", { name: /expandir el menú/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /expandir el menú/i }));
+    expect(screen.getByText("Entregables")).toBeInTheDocument();
+    expect(localStorage.getItem("workspace.nav.collapsed")).toBe("0");
+
+    // Al volver a montar respeta la preferencia guardada (expandido).
+    unmount();
+    render(<WorkspaceNav items={items} active="tareas" onSelect={vi.fn()} />);
+    expect(screen.getByText("Entregables")).toBeInTheDocument();
   });
 });
