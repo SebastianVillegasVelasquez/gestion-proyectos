@@ -32,9 +32,12 @@ export function resolveVideo(src: string | null | undefined): VideoSource {
     return { kind: "embed", url: `https://player.vimeo.com/video/${vimeo[1]}` };
   }
 
-  // Cualquier otra cosa se trata como fichero servido por nosotros. Se exige
-  // http(s) para no dejar que un `javascript:` acabe en un `src`.
-  if (/^https?:\/\//i.test(url)) {
+  // Cualquier otra cosa se trata como fichero servido por nosotros: http(s)
+  // absoluto, o relativo al origen actual (p. ej. "/resources/videos/x.mp4",
+  // que apunta a lo mismo en localhost:5173 que en producción sin hardcodear
+  // el dominio). "//host/…" se rechaza aparte: el navegador lo resuelve como
+  // absoluto a OTRO host, no como relativo al nuestro.
+  if (/^https?:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//"))) {
     return { kind: "file", url };
   }
   return { kind: "none" };
