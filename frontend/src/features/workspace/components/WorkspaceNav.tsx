@@ -22,9 +22,12 @@ const STORAGE_KEY = "workspace.nav.collapsed";
 
 function readCollapsed(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    // Sin preferencia guardada arranca COLAPSADO: expandido de entrada le resta
+    // ancho a la tabla de tareas y es fácil olvidarse de volver a cerrarlo.
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === null ? true : stored === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
