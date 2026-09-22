@@ -97,11 +97,10 @@ describe("ManualPage", () => {
     expect(screen.getAllByText("Integrante").length).toBeGreaterThan(0);
   });
 
-  it("el apartado de video avisa cuando todavía no está publicado", () => {
-    // `MANUAL_VIDEO_URL` es null mientras no se grabe: se muestra el aviso en
-    // lugar de un reproductor vacío.
+  it("el apartado de video reproduce el .mp4 publicado en MANUAL_VIDEO_URL", () => {
     renderManual("/manual?tema=video");
     expect(screen.getByRole("heading", { name: /Video: recorrido guiado/i })).toBeInTheDocument();
-    expect(screen.getByText(/El video está en camino/i)).toBeInTheDocument();
+    const player = document.querySelector("video");
+    expect(player).toHaveAttribute("src", "/resources/videos/bienvenida.mp4");
   });
 });
