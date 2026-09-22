@@ -14,10 +14,15 @@ import type { ManualSection } from "./types";
  * URL del video de bienvenida. `null` mientras no esté grabado: el apartado
  * existe igualmente y muestra un aviso en lugar de un reproductor vacío.
  *
- * Admite YouTube y Vimeo (se convierte a su URL de incrustación) o el enlace
- * directo a un `.mp4`. Para publicarlo basta con pegar aquí la URL.
+ * Admite YouTube y Vimeo (se convierte a su URL de incrustación), un `.mp4`
+ * absoluto, o —como aquí— una ruta relativa al origen. El archivo NO vive en
+ * este repo ni en la imagen: `/resources/videos/` lo sirve nginx desde un
+ * bind mount montado en el servidor (ver `frontend/nginx.conf` y el
+ * `compose.yaml` de producción), así que subir o reemplazar el .mp4 no
+ * exige reconstruir nada. Cambiar esta línea sí: es un commit + redeploy
+ * normal, igual que cualquier otro cambio al contenido del manual.
  */
-export const MANUAL_VIDEO_URL: string | null = null;
+export const MANUAL_VIDEO_URL: string | null = "/resources/videos/bienvenida.mp4";
 
 // Las pastillas de estado se copian tal cual de la app (`STATUS_META`,
 // `DELIVERABLE_STATUS_BADGE`, `DUE_STATUS_CLASSES`): el manual tiene que
