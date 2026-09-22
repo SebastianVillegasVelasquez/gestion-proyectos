@@ -40,9 +40,19 @@ describe("resolveVideo", () => {
     });
   });
 
-  it("descarta lo que no sea http(s): nada raro llega a un src", () => {
+  it("una ruta relativa al origen también se trata como fichero propio", () => {
+    expect(resolveVideo("/resources/videos/bienvenida.mp4")).toEqual({
+      kind: "file",
+      url: "/resources/videos/bienvenida.mp4",
+    });
+  });
+
+  it("descarta lo que no sea http(s) o relativo al origen: nada raro llega a un src", () => {
     expect(resolveVideo("javascript:alert(1)")).toEqual({ kind: "none" });
     expect(resolveVideo("data:text/html,<script>")).toEqual({ kind: "none" });
     expect(resolveVideo("recorrido.mp4")).toEqual({ kind: "none" });
+    // "//host/…" es absoluto a OTRO host para el navegador, no relativo al
+    // nuestro: no puede colarse como si fuera un fichero propio.
+    expect(resolveVideo("//evil.example.com/video.mp4")).toEqual({ kind: "none" });
   });
 });

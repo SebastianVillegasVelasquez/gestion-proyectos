@@ -20,6 +20,11 @@ frontend/dist/
 frontend/.vite/
 frontend/.pnpm-store
 
+# Videos del manual: se prueban en local igual que se sirven en producción
+# (misma ruta relativa /resources/videos/…), pero el archivo NUNCA se
+# commitea — en prod vive fuera de la imagen, montado en el servidor.
+frontend/public/resources/videos/
+
 # =========================
 # Environment
 # =========================

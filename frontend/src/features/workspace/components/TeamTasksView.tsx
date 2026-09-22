@@ -407,7 +407,12 @@ function TaskRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-3 border-t border-slate-100 py-2.5 pr-4 first:border-t-0 dark:border-slate-800",
+        // Bajo `md` (portátiles chicos y móvil) la fila se apila en tarjeta:
+        // el título va arriba con todo su ancho y los metadatos abajo, en una
+        // franja que envuelve. De `md` en adelante vuelve a ser la fila de
+        // siempre — el estilo de escritorio no cambia, solo se le achican
+        // algunas columnas hasta `xl` para darle aire al título/ruta.
+        "group relative flex flex-col gap-2 border-t border-slate-100 py-2.5 pr-4 first:border-t-0 dark:border-slate-800 md:flex-row md:items-center md:gap-3",
         // Las subtareas se tiñen para que el bloque padre+hijas se lea como una
         // unidad aunque la indentación sea sutil.
         depth > 0 && "bg-slate-50/60 dark:bg-slate-800/20",
@@ -421,15 +426,15 @@ function TaskRow({
         <span aria-hidden className={cn("absolute inset-y-1 left-0 w-1 rounded-r", color.bar)} />
       )}
       {/* Columna elástica: es la única que cede espacio, por eso lleva min-w-0. */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 md:flex-1">
         <p
-          className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200"
+          className="flex items-start gap-1.5 text-sm text-slate-700 dark:text-slate-200 md:items-center"
           title={task.title}
         >
           {depth > 0 && (
             <CornerDownRight
               aria-label="Subtarea"
-              className="size-3.5 shrink-0 text-slate-300 dark:text-slate-600"
+              className="mt-0.5 size-3.5 shrink-0 text-slate-300 dark:text-slate-600 md:mt-0"
             />
           )}
           {hasChildren && (
@@ -438,7 +443,7 @@ function TaskRow({
               onClick={onToggleCollapse}
               aria-expanded={!collapsed}
               title={collapsed ? "Ver subtareas" : "Ocultar subtareas"}
-              className="flex shrink-0 items-center rounded text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+              className="mt-0.5 flex shrink-0 items-center rounded text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300 md:mt-0"
             >
               {collapsed ? (
                 <ChevronRight className="size-3.5" />
@@ -447,7 +452,10 @@ function TaskRow({
               )}
             </button>
           )}
-          <span className="truncate">{task.title}</span>
+          {/* Debajo de `md` el título envuelve (se lee completo, sin recortar);
+              de `md` en adelante vuelve al comportamiento actual de una sola
+              línea con "…" — el `title` de arriba siempre lleva el texto entero. */}
+          <span className="break-words md:truncate">{task.title}</span>
           {hasChildren && collapsed && (
             <span className="shrink-0 rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               subtareas ocultas
@@ -455,11 +463,11 @@ function TaskRow({
           )}
           {isDeliverableReady(task) && <DeliverableReadyBadge />}
         </p>
-        <p className="flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="flex flex-wrap items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 md:flex-nowrap md:truncate">
           {color && (
             <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />
           )}
-          <span className="truncate">
+          <span className="break-words md:truncate">
             {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
                 esto la subtarea aparecería suelta y sin contexto. */}
             {detachedParentTitle !== null && (
@@ -474,104 +482,114 @@ function TaskRow({
         <BlockedBy task={task} />
       </div>
 
-      {/* Responsable. Cuando la vista ya va agrupada o filtrada por persona el
-          nombre es redundante: se oculta (y para el líder queda solo el icono
-          de reasignar). Si no, líder/supervisor ven el selector; el resto, el
-          nombre. */}
-      {hideAssignee ? (
-        canReview && teamMembers.length > 0 ? (
-          <span className="flex w-[150px] shrink-0 justify-start">
-            <ReassignTaskButton
-              compact
-              projectId={projectId}
-              taskId={task.id}
-              currentAssigneeId={task.assignee_id}
-              members={teamMembers}
-              onDone={onReassigned}
-            />
-          </span>
-        ) : null
-      ) : (
-        <span className="w-[150px] shrink-0">
-          {canReview && teamMembers.length > 0 ? (
-            <ReassignTaskButton
-              projectId={projectId}
-              taskId={task.id}
-              currentAssigneeId={task.assignee_id}
-              members={teamMembers}
-              onDone={onReassigned}
-            />
-          ) : (
-            <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
-              {task.assignee_name ?? "Sin responsable"}
+      {/* Metadatos (responsable, avance, fecha, estado, urgencia, acciones):
+          en tarjeta (< md) van en una franja que envuelve debajo del título;
+          de `md` en adelante el wrapper se vuelve invisible (`contents`) y
+          cada pieza vuelve a ser una columna de ancho fijo de la fila, igual
+          que antes. Entre `md` y `xl` esas columnas son más angostas —le
+          quitan ancho fijo a lo secundario para dárselo al título/ruta en
+          portátiles—; en `xl` (monitores grandes) recuperan el ancho actual. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 md:contents">
+        {/* Responsable. Cuando la vista ya va agrupada o filtrada por persona el
+            nombre es redundante: se oculta (y para el líder queda solo el icono
+            de reasignar). Si no, líder/supervisor ven el selector; el resto, el
+            nombre. */}
+        {hideAssignee ? (
+          canReview && teamMembers.length > 0 ? (
+            <span className="flex shrink-0 justify-start md:w-[110px] xl:w-[150px]">
+              <ReassignTaskButton
+                compact
+                projectId={projectId}
+                taskId={task.id}
+                currentAssigneeId={task.assignee_id}
+                members={teamMembers}
+                onDone={onReassigned}
+              />
             </span>
-          )}
+          ) : null
+        ) : (
+          <span className="shrink-0 md:w-[110px] xl:w-[150px]">
+            {canReview && teamMembers.length > 0 ? (
+              <ReassignTaskButton
+                projectId={projectId}
+                taskId={task.id}
+                currentAssigneeId={task.assignee_id}
+                members={teamMembers}
+                onDone={onReassigned}
+              />
+            ) : (
+              <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
+                {task.assignee_name ?? "Sin responsable"}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Anchos fijos: las columnas quedan alineadas entre filas y grupos. */}
+        <ProgressBar task={task} className="w-[110px] shrink-0 md:w-[90px] xl:w-[120px]" />
+        <span className="shrink-0 md:w-[70px] xl:w-[88px] md:text-right">
+          <DueDate task={task} today={today} />
         </span>
-      )}
+        <span className="flex shrink-0 justify-center md:w-[84px] xl:w-[100px]">
+          <StatusBadge task={task} />
+        </span>
+        <span className="flex shrink-0 justify-center md:w-[64px] xl:w-[76px]">
+          <UrgencyBadge task={task} />
+        </span>
 
-      {/* Anchos fijos: las columnas quedan alineadas entre filas y grupos. */}
-      <ProgressBar task={task} className="w-[120px] shrink-0" />
-      <span className="w-[88px] shrink-0 text-right">
-        <DueDate task={task} today={today} />
-      </span>
-      <span className="flex w-[100px] shrink-0 justify-center">
-        <StatusBadge task={task} />
-      </span>
-      <span className="flex w-[76px] shrink-0 justify-center">
-        <UrgencyBadge task={task} />
-      </span>
+        {/* "Comenzar": solo el responsable, en su propia tarea sin iniciar y que
+            no sea padre (las tareas padre avanzan por sus subtareas). */}
+        <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
 
-      {/* "Comenzar": solo el responsable, en su propia tarea sin iniciar y que
-          no sea padre (las tareas padre avanzan por sus subtareas). */}
-      <StartTaskButton task={task} projectId={projectId} isParent={isParent} />
+        {/* "Entregar" / "Entregar sin adjunto": tarea de nivel superior sin
+            subtareas ya comenzada, o tarea padre al 100%. Solo su responsable. */}
+        <DeliverActions task={task} cbs={deliverCbs} hasSubtasks={isParent} />
 
-      {/* "Entregar" / "Entregar sin adjunto": tarea de nivel superior sin
-          subtareas ya comenzada, o tarea padre al 100%. Solo su responsable. */}
-      <DeliverActions task={task} cbs={deliverCbs} hasSubtasks={isParent} />
-
-      {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
-          eliminar (cualquier nivel — la tarea sigue siendo de SU equipo). */}
-      {canReview ? (
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all focus-within:opacity-100 group-hover:opacity-100">
-          {task.parent_task_id === null && (
+        {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
+            eliminar (cualquier nivel — la tarea sigue siendo de SU equipo).
+            En tarjeta (< md) van siempre visibles: no hay hover en táctil. */}
+        {canReview ? (
+          <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-all md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
+            {task.parent_task_id === null && (
+              <button
+                type="button"
+                onClick={() => {
+                  onAddSubtask(task);
+                }}
+                title="Agregar subtarea"
+                aria-label={`Agregar subtarea a ${task.title}`}
+                className="rounded-md p-1 text-slate-400 transition-colors hover:bg-brand-teal/10 hover:text-brand-teal-dark dark:hover:text-brand-teal"
+              >
+                <Plus className="size-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
-                onAddSubtask(task);
+                onEdit(task);
               }}
-              title="Agregar subtarea"
-              aria-label={`Agregar subtarea a ${task.title}`}
-              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-brand-teal/10 hover:text-brand-teal-dark dark:hover:text-brand-teal"
+              title="Editar tarea"
+              aria-label={`Editar ${task.title}`}
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             >
-              <Plus className="size-4" />
+              <Pencil className="size-3.5" />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              onEdit(task);
-            }}
-            title="Editar tarea"
-            aria-label={`Editar ${task.title}`}
-            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onDelete(task);
-            }}
-            title="Eliminar tarea"
-            aria-label={`Eliminar ${task.title}`}
-            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </span>
-      ) : (
-        <span className="size-6 shrink-0" aria-hidden />
-      )}
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(task);
+              }}
+              title="Eliminar tarea"
+              aria-label={`Eliminar ${task.title}`}
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </span>
+        ) : (
+          <span className="hidden shrink-0 md:block md:size-6" aria-hidden />
+        )}
+      </div>
     </div>
   );
 }
