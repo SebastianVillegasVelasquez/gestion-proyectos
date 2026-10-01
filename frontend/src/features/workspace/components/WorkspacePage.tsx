@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOutletContext, useSearchParams } from "react-router";
 import {
+  ArrowLeft,
   BarChart3,
   CalendarRange,
   FolderArchive,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { cn } from "@/lib/utils";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -24,6 +26,7 @@ import { DeliverableList } from "./DeliverableList";
 import {
   DeliverableDetailView,
   RegisterDelivery,
+  type DeliveryFolderOption,
   type EditVersionPatch,
 } from "./DeliverableDetailView";
 import { FeedbackThread } from "./FeedbackThread";
@@ -34,6 +37,8 @@ import { TeamProgressView } from "./TeamProgressView";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { WorkspaceStructureView } from "./WorkspaceStructureView";
 import { ProjectFilesBrowser } from "@/features/files/components/ProjectFilesBrowser";
+import { useProjectFiles } from "@/features/files/hooks/use-project-files";
+import type { ApiProjectFolder } from "@/features/files/api/files.api";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { mapDeliverable, mapMember } from "../utils/adapters";
 import type { ApiTeamTask } from "../api/workspace.api";
@@ -59,6 +64,17 @@ type WorkspaceTab =
   | "archivos"
   | "progreso"
   | "configuracion";
+
+/** Subcarpetas (recursivas) de la carpeta del equipo, para el selector de
+ *  destino al entregar un archivo. La carpeta del equipo en sí NO se incluye:
+ *  es la opción "por defecto" del selector. */
+function flattenTeamSubfolders(folder: ApiProjectFolder, depth = 0): DeliveryFolderOption[] {
+  const prefix = depth > 0 ? "— ".repeat(depth) : "";
+  return folder.children.flatMap((child) => [
+    { id: child.id, label: `${prefix}${child.name}` },
+    ...flattenTeamSubfolders(child, depth + 1),
+  ]);
+}
 
 // ── New deliverable modal ──────────────────────────────────────────────────
 
@@ -188,13 +204,24 @@ function QuickDeliverModal({
   taskTitle,
   pending,
   onAddVersion,
-  onUploadFile,
+  onUploadFiles,
+  folderOptions,
   onClose,
 }: {
   taskTitle: string;
   pending: boolean;
-  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
-  onUploadFile: (file: File, note: string, observations: string) => void;
+  onAddVersion: (
+    v: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => void;
+  onUploadFiles: (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => void;
+  folderOptions: DeliveryFolderOption[];
   onClose: () => void;
 }) {
   return (
@@ -224,10 +251,11 @@ function QuickDeliverModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <RegisterDelivery
             onAddVersion={onAddVersion}
-            onUploadFile={onUploadFile}
+            onUploadFiles={onUploadFiles}
             uploading={pending}
             currentVersion={0}
             uploadedBy=""
+            folderOptions={folderOptions}
           />
         </div>
       </div>
@@ -285,6 +313,24 @@ function MemberWorkspace() {
   const projectId = activeTeam?.project_id ?? "";
   const treeQuery = useWorkTree(projectId);
   const nodeTypesQuery = useNodeTypes(projectId);
+  // Subcarpetas del equipo, para que al entregar un archivo se pueda elegir
+  // dónde cae dentro de la estructura de carpetas que el equipo ya organizó.
+  // Se pide solo cuando hace falta (la pestaña Archivos ya la pide por su
+  // cuenta, y el modal de entrega rápida se puede abrir desde Estructura o
+  // Tareas): traer el archivador completo del proyecto en CADA apertura del
+  // espacio de trabajo —incluso para quien solo mira "Tareas"— es una llamada
+  // de red que la mayoría de las visitas no necesita.
+  const wantsFolderOptions =
+    activeTab === "entregables" || activeTab === "archivos" || quickDeliverTaskId !== null;
+  const filesTreeQuery = useProjectFiles(projectId, wantsFolderOptions);
+  const teamFolderOptions = useMemo<DeliveryFolderOption[]>(() => {
+    const root = filesTreeQuery.data?.root;
+    if (!root || !activeTeamId) {
+      return [];
+    }
+    const teamFolder = root.children.find((f) => f.team_id === activeTeamId);
+    return teamFolder ? flattenTeamSubfolders(teamFolder) : [];
+  }, [filesTreeQuery.data, activeTeamId]);
   const typeNameById = useMemo(() => {
     const m = new Map<string, string>();
     (nodeTypesQuery.data ?? []).forEach((t) => m.set(t.id, t.nombre));
@@ -349,7 +395,10 @@ function MemberWorkspace() {
     setActiveTab("tareas");
   };
 
-  const handleAddVersion = (version: Omit<DeliverableVersion, "id" | "versionNumber">) => {
+  const handleAddVersion = (
+    version: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => {
     if (!selectedDeliverable) {
       return;
     }
@@ -360,19 +409,56 @@ function MemberWorkspace() {
         url: version.url ?? undefined,
         note: version.note,
         observations: version.observations || undefined,
+        mark_delivered: markDelivered,
       },
     });
   };
 
-  /** Entrega un archivo: sube y el servidor lo deja en la carpeta del equipo. */
-  const handleUploadFile = (file: File, note: string, observations: string) => {
-    if (!selectedDeliverable) {
+  /** Entrega uno o varios archivos: se suben en orden (uno por versión) y solo
+   *  el ÚLTIMO lleva el `markDelivered` real — los anteriores nunca cierran la
+   *  entrega por sí solos, para no dar por completada la tarea a medio subir. */
+  const handleUploadFiles = (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => {
+    if (!selectedDeliverable || files.length === 0) {
       return;
     }
-    uploadVersionFile.mutate({
-      deliverableId: selectedDeliverable.id,
-      body: { file, note, observations: observations || undefined },
-    });
+    const deliverableId = selectedDeliverable.id;
+    void files
+      .reduce(
+        (chain, file, i) =>
+          chain.then(
+            () =>
+              new Promise<void>((resolve, reject) => {
+                uploadVersionFile.mutate(
+                  {
+                    deliverableId,
+                    body: {
+                      file,
+                      note: note || file.name,
+                      observations: observations || undefined,
+                      markDelivered: i === files.length - 1 ? markDelivered : false,
+                      folderId,
+                    },
+                  },
+                  {
+                    onSuccess: () => {
+                      resolve();
+                    },
+                    onError: reject,
+                  },
+                );
+              }),
+          ),
+        Promise.resolve(),
+      )
+      .catch(() => {
+        /* el error ya queda en el estado de la mutación (uploadVersionFile.isError) */
+      });
   };
 
   const handleEditVersion = (versionId: string, patch: EditVersionPatch) => {
@@ -465,54 +551,113 @@ function MemberWorkspace() {
     setQuickDeliverTaskId(null);
   };
 
-  // "Entregar" desde una fila (con adjunto): crea el entregable y su versión
-  // (URL) en un solo paso — sin este segundo tiro, el entregable quedaba "en
-  // borrador" y la tarea sin moverse si el integrante no volvía a completar
-  // el alta desde la pestaña Entregables. Tampoco navega ahí: la entrega ya
-  // quedó registrada, no hace falta salir de Tareas/Estructura para verlo.
-  const quickDeliverWithVersion = (v: Omit<DeliverableVersion, "id" | "versionNumber">) => {
-    const task = quickDeliverTask;
-    if (!task) {
+  // El entregable de ESTA tarea, si la entrega continua ya lo dejó creado en
+  // una vuelta anterior — reusarlo es lo que permite seguir subiendo versiones
+  // sobre el mismo entregable en vez de chocar con la regla de "una tarea, un
+  // entregable" del backend.
+  const existingDeliverableFor = (taskId: string) =>
+    (deliverablesQuery.data ?? []).find((d) => d.task_id === taskId);
+
+  /** Entregable de la tarea en curso: el existente, o uno nuevo si aún no hay. */
+  const withTaskDeliverable = (task: ApiTeamTask, onReady: (deliverableId: string) => void) => {
+    const existing = existingDeliverableFor(task.id);
+    if (existing) {
+      onReady(existing.id);
       return;
     }
     createDeliverable.mutate(
       { task_title: task.title, assignee_id: currentUserId, task_id: task.id },
       {
         onSuccess: (d) => {
-          addVersion.mutate(
-            {
-              deliverableId: d.id,
-              body: {
-                type: v.type,
-                url: v.url ?? undefined,
-                note: v.note,
-                observations: v.observations || undefined,
-              },
-            },
-            { onSuccess: closeQuickDeliver },
-          );
+          onReady(d.id);
         },
       },
     );
   };
 
-  // Misma idea, entregando un ARCHIVO.
-  const quickDeliverWithFile = (file: File, note: string, observations: string) => {
+  // "Entregar" desde una fila (con adjunto): crea el entregable (o reusa el
+  // que ya exista) y registra la versión en un solo paso — sin este segundo
+  // tiro, el entregable quedaba "en borrador" y la tarea sin moverse si el
+  // integrante no volvía a completar el alta desde la pestaña Entregables.
+  // Tampoco navega ahí: la entrega ya quedó registrada, no hace falta salir
+  // de Tareas/Estructura para verlo. Con la casilla sin marcar, el modal se
+  // queda abierto para poder seguir entregando sobre la misma tarea.
+  const quickDeliverWithVersion = (
+    v: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => {
     const task = quickDeliverTask;
     if (!task) {
       return;
     }
-    createDeliverable.mutate(
-      { task_title: task.title, assignee_id: currentUserId, task_id: task.id },
-      {
-        onSuccess: (d) => {
-          uploadVersionFile.mutate(
-            { deliverableId: d.id, body: { file, note, observations: observations || undefined } },
-            { onSuccess: closeQuickDeliver },
-          );
+    withTaskDeliverable(task, (deliverableId) => {
+      addVersion.mutate(
+        {
+          deliverableId,
+          body: {
+            type: v.type,
+            url: v.url ?? undefined,
+            note: v.note,
+            observations: v.observations || undefined,
+            mark_delivered: markDelivered,
+          },
         },
-      },
-    );
+        { onSuccess: markDelivered ? closeQuickDeliver : undefined },
+      );
+    });
+  };
+
+  // Misma idea, entregando uno o varios ARCHIVOS: solo el último de la tanda
+  // lleva el `markDelivered` real (ver `handleUploadFiles`).
+  const quickDeliverWithFile = (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => {
+    const task = quickDeliverTask;
+    if (!task || files.length === 0) {
+      return;
+    }
+    withTaskDeliverable(task, (deliverableId) => {
+      void files
+        .reduce(
+          (chain, file, i) =>
+            chain.then(
+              () =>
+                new Promise<void>((resolve, reject) => {
+                  uploadVersionFile.mutate(
+                    {
+                      deliverableId,
+                      body: {
+                        file,
+                        note: note || file.name,
+                        observations: observations || undefined,
+                        markDelivered: i === files.length - 1 ? markDelivered : false,
+                        folderId,
+                      },
+                    },
+                    {
+                      onSuccess: () => {
+                        resolve();
+                      },
+                      onError: reject,
+                    },
+                  );
+                }),
+            ),
+          Promise.resolve(),
+        )
+        .then(() => {
+          if (markDelivered) {
+            closeQuickDeliver();
+          }
+        })
+        .catch(() => {
+          /* el error ya queda en el estado de la mutación (uploadVersionFile.isError) */
+        });
+    });
   };
 
   // "Entregar sin adjunto": el integrante da la tarea (o subtarea) por hecha
@@ -670,8 +815,17 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "entregables" && (
-              <>
-                <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
+              // En pantallas angostas las tres columnas (lista, detalle,
+              // comentarios) no caben una al lado de otra — por debajo de
+              // `lg` se apilan verticalmente y la lista se oculta en cuanto
+              // hay un entregable abierto, con un botón para volver a ella.
+              <div className="flex w-full flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+                <div
+                  className={cn(
+                    "w-full shrink-0 overflow-hidden border-b border-slate-200 lg:w-72 lg:border-b-0 lg:border-r dark:border-slate-800",
+                    selectedDeliverable && "hidden lg:block",
+                  )}
+                >
                   {deliverablesQuery.isLoading ? (
                     <div className="p-4">
                       <LoadingSkeleton rows={3} />
@@ -688,7 +842,16 @@ function MemberWorkspace() {
 
                 {selectedDeliverable ? (
                   <>
-                    <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-slate-200 lg:border-r dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDeliverableId(null);
+                        }}
+                        className="flex shrink-0 items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 text-[13px] font-medium text-slate-500 hover:bg-slate-50 lg:hidden dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
+                      >
+                        <ArrowLeft className="size-3.5" /> Volver a entregables
+                      </button>
                       <DeliverableDetailView
                         deliverable={selectedDeliverable}
                         members={members}
@@ -707,14 +870,15 @@ function MemberWorkspace() {
                             : null
                         }
                         onAddVersion={handleAddVersion}
-                        onUploadFile={handleUploadFile}
+                        onUploadFiles={handleUploadFiles}
                         uploadPending={uploadVersionFile.isPending}
                         onEditVersion={handleEditVersion}
                         onReview={handleReview}
                         onDelete={handleDelete}
+                        folderOptions={teamFolderOptions}
                       />
                     </div>
-                    <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
+                    <div className="flex h-80 w-full shrink-0 flex-col overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[400px] lg:border-l lg:border-t-0 dark:border-slate-800">
                       <FeedbackThread
                         comments={selectedDeliverable.comments}
                         members={members}
@@ -726,7 +890,7 @@ function MemberWorkspace() {
                 ) : (
                   <NoDeliverableSelected />
                 )}
-              </>
+              </div>
             )}
 
             {activeTab === "progreso" && (
@@ -798,7 +962,8 @@ function MemberWorkspace() {
             createDeliverable.isPending || addVersion.isPending || uploadVersionFile.isPending
           }
           onAddVersion={quickDeliverWithVersion}
-          onUploadFile={quickDeliverWithFile}
+          onUploadFiles={quickDeliverWithFile}
+          folderOptions={teamFolderOptions}
           onClose={closeQuickDeliver}
         />
       )}

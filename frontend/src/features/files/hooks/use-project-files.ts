@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { filesApi, type CreateFolderBody } from "../api/files.api";
 
-const key = (projectId: string) => ["project-files", projectId] as const;
+export const projectFilesKey = (projectId: string) => ["project-files", projectId] as const;
+const key = projectFilesKey;
 
-export function useProjectFiles(projectId: string) {
+export function useProjectFiles(projectId: string, enabled = true) {
   return useQuery({
     queryKey: key(projectId),
     queryFn: () => filesApi.tree(projectId),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && enabled,
   });
 }
 
@@ -38,9 +39,35 @@ export function useDeleteFolder(projectId: string) {
   );
 }
 
+export function useRenameFolder(projectId: string) {
+  return useTreeMutation(projectId, (vars: { folderId: string; name: string }) =>
+    filesApi.renameFolder(projectId, vars.folderId, vars.name),
+  );
+}
+
+export function useMoveFolder(projectId: string) {
+  return useTreeMutation(projectId, (vars: { folderId: string; parentId: string | null }) =>
+    filesApi.moveFolder(projectId, vars.folderId, vars.parentId),
+  );
+}
+
+export function useRenameFile(projectId: string) {
+  return useTreeMutation(projectId, (vars: { fileId: string; name: string }) =>
+    filesApi.renameFile(projectId, vars.fileId, vars.name),
+  );
+}
+
+export function useMoveFile(projectId: string) {
+  return useTreeMutation(projectId, (vars: { fileId: string; folderId: string }) =>
+    filesApi.moveFile(projectId, vars.fileId, vars.folderId),
+  );
+}
+
 export function useUploadFile(projectId: string) {
-  return useTreeMutation(projectId, (vars: { folderId: string; file: File }) =>
-    filesApi.upload(projectId, vars.folderId, vars.file),
+  return useTreeMutation(
+    projectId,
+    (vars: { folderId: string; file: File; onProgress?: (pct: number) => void }) =>
+      filesApi.upload(projectId, vars.folderId, vars.file, { onProgress: vars.onProgress }),
   );
 }
 

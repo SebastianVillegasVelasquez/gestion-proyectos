@@ -32,6 +32,12 @@ class AddVersionRequest(BaseModelConfig):
     note: Optional[str] = None
     # Instrucciones para el siguiente rol de la cadena. Interno del equipo.
     observations: Optional[str] = None
+    # Entrega continua: el valor por defecto (`True`) conserva el comportamiento
+    # clásico —esta versión cierra la entrega y mueve la tarea—. El flujo nuevo
+    # de entrega continua en Estructura manda `False` explícito mientras la
+    # casilla "marcar como entregada" esté desmarcada, para poder seguir
+    # subiendo versiones sobre el mismo entregable sin cerrarlo.
+    mark_delivered: bool = True
 
     @model_validator(mode="before")
     @classmethod
