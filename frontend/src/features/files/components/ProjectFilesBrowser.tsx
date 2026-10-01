@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ChevronRight,
   Download,
@@ -14,6 +14,7 @@ import {
   Grid2x2,
   Home,
   List as ListIcon,
+  Pencil,
   Search,
   Trash2,
   Upload,
@@ -29,13 +30,25 @@ import {
   useCreateFolder,
   useDeleteFile,
   useDeleteFolder,
+  useMoveFile,
+  useMoveFolder,
   useProjectFiles,
-  useUploadFile,
+  useRenameFile,
+  useRenameFolder,
 } from "../hooks/use-project-files";
 import { formatFileSize } from "../utils/format-size";
 import { ManualHint } from "@/features/manual/components/ManualHint";
 import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { FilePreviewModal, type PreviewableFile } from "./FilePreviewModal";
+import { UploadQueuePanel, useUploadQueue } from "./UploadQueuePanel";
+
+/** Lo que se arrastra: una carpeta o un archivo, identificados por su id. */
+interface DragPayload {
+  kind: "folder" | "file";
+  id: string;
+}
+
+const DRAG_MIME = "application/x-bitacora-file-item";
 
 const VIEW_KEY = "files.view";
 
@@ -220,26 +233,132 @@ interface RowActions {
   onPreview: (file: ApiProjectFile) => void;
   onDeleteFolder: (folder: ApiProjectFolder) => void;
   onDeleteFile: (file: ApiProjectFile) => void;
+  renaming: DragPayload | null;
+  onStartRename: (kind: "folder" | "file", id: string) => void;
+  onCancelRename: () => void;
+  onSubmitRenameFolder: (folder: ApiProjectFolder, name: string) => void;
+  onSubmitRenameFile: (file: ApiProjectFile, name: string) => void;
+  dropTargetId: string | null;
+  onDropTargetChange: (id: string | null) => void;
+  onMoveInto: (payload: DragPayload, targetFolder: ApiProjectFolder) => void;
+}
+
+function readDragPayload(e: DragEvent): DragPayload | null {
+  try {
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    return raw ? (JSON.parse(raw) as DragPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Entrada en línea para renombrar: Enter guarda, Escape cancela. */
+function RenameInput({
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  initial: string;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <input
+      autoFocus
+      value={value}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      onChange={(e) => {
+        setValue(e.target.value);
+      }}
+      onBlur={() => {
+        onSubmit(value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onSubmit(value);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      className="min-w-0 flex-1 rounded-md border border-brand-gold bg-background px-1.5 py-0.5 text-[13px] outline-none ring-1 ring-brand-gold/30"
+    />
+  );
 }
 
 function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions: RowActions }) {
+  const draggable = actions.canWrite && !folder.is_root;
+  const isRenaming = actions.renaming?.kind === "folder" && actions.renaming.id === folder.id;
+  const isDropTarget = actions.dropTargetId === folder.id;
   return (
-    <div className="group grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/60 sm:grid-cols-[minmax(0,1fr)_140px_120px_80px]">
-      <button
-        type="button"
-        onClick={() => {
-          actions.onOpenFolder(folder);
-        }}
-        className="flex min-w-0 items-center gap-2.5 text-left"
-      >
-        <Folder className="size-4 shrink-0 fill-brand-gold/20 text-brand-gold" />
-        <span className="truncate text-[13px] font-medium text-foreground">{folder.name}</span>
-        {folder.team_name && (
-          <span className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[10px] font-semibold text-brand-teal-dark dark:text-brand-teal sm:inline-flex">
-            <Users2 className="size-2.5" /> {folder.team_name}
-          </span>
-        )}
-      </button>
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: "folder", id: folder.id }));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(e) => {
+        if (!actions.canWrite) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        actions.onDropTargetChange(folder.id);
+      }}
+      onDragLeave={() => {
+        if (isDropTarget) {
+          actions.onDropTargetChange(null);
+        }
+      }}
+      onDrop={(e) => {
+        if (!actions.canWrite) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        actions.onDropTargetChange(null);
+        const payload = readDragPayload(e);
+        if (payload) {
+          actions.onMoveInto(payload, folder);
+        }
+      }}
+      className={cn(
+        "group grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/60 sm:grid-cols-[minmax(0,1fr)_140px_120px_80px]",
+        isDropTarget && "bg-brand-gold/10 ring-1 ring-brand-gold/40",
+      )}
+    >
+      {isRenaming ? (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Folder className="size-4 shrink-0 fill-brand-gold/20 text-brand-gold" />
+          <RenameInput
+            initial={folder.name}
+            onSubmit={(name) => {
+              actions.onSubmitRenameFolder(folder, name);
+            }}
+            onCancel={actions.onCancelRename}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            actions.onOpenFolder(folder);
+          }}
+          className="flex min-w-0 items-center gap-2.5 text-left"
+        >
+          <Folder className="size-4 shrink-0 fill-brand-gold/20 text-brand-gold" />
+          <span className="truncate text-[13px] font-medium text-foreground">{folder.name}</span>
+          {folder.team_name && (
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[10px] font-semibold text-brand-teal-dark dark:text-brand-teal sm:inline-flex">
+              <Users2 className="size-2.5" /> {folder.team_name}
+            </span>
+          )}
+        </button>
+      )}
       <span className="hidden text-[12px] text-muted-foreground sm:block">Carpeta</span>
       <span className="hidden text-[12px] text-muted-foreground sm:block">
         {formatDate(folder.created_at)}
@@ -248,18 +367,30 @@ function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions:
         <span className="hidden text-[11px] tabular-nums text-muted-foreground sm:inline">
           {countLabel(folder)}
         </span>
-        {actions.canWrite && !folder.is_root && (
-          <button
-            type="button"
-            onClick={() => {
-              actions.onDeleteFolder(folder);
-            }}
-            disabled={actions.busy}
-            title="Borrar la carpeta y su contenido"
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+        {actions.canWrite && !folder.is_root && !isRenaming && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onStartRename("folder", folder.id);
+              }}
+              title="Renombrar"
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onDeleteFolder(folder);
+              }}
+              disabled={actions.busy}
+              title="Borrar la carpeta y su contenido"
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -269,31 +400,52 @@ function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions:
 function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActions }) {
   const { Icon, tint } = fileIconFor(file.content_type);
   const delivery = file.delivery;
+  const isRenaming = actions.renaming?.kind === "file" && actions.renaming.id === file.id;
   return (
-    <div className="group grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/60 sm:grid-cols-[minmax(0,1fr)_140px_120px_80px]">
-      <button
-        type="button"
-        onClick={() => {
-          actions.onPreview(file);
-        }}
-        className="flex min-w-0 items-center gap-2.5 text-left"
-      >
-        <Icon className={cn("size-4 shrink-0", tint)} />
-        <span className="truncate text-[13px] text-foreground group-hover:text-brand-gold-dark group-hover:underline dark:group-hover:text-brand-gold">
-          {file.name}
-        </span>
-        {delivery && (
-          <span
-            title={`Entrega V${String(delivery.version_number)} de «${delivery.task_title}»`}
-            className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-bold text-brand-gold-dark dark:text-brand-gold sm:inline-flex"
-          >
-            V{delivery.version_number}
-            <span className="max-w-[120px] truncate font-medium opacity-80">
-              {delivery.task_title}
-            </span>
+    <div
+      draggable={actions.canWrite}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: "file", id: file.id }));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="group grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/60 sm:grid-cols-[minmax(0,1fr)_140px_120px_80px]"
+    >
+      {isRenaming ? (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Icon className={cn("size-4 shrink-0", tint)} />
+          <RenameInput
+            initial={file.name}
+            onSubmit={(name) => {
+              actions.onSubmitRenameFile(file, name);
+            }}
+            onCancel={actions.onCancelRename}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            actions.onPreview(file);
+          }}
+          className="flex min-w-0 items-center gap-2.5 text-left"
+        >
+          <Icon className={cn("size-4 shrink-0", tint)} />
+          <span className="truncate text-[13px] text-foreground group-hover:text-brand-gold-dark group-hover:underline dark:group-hover:text-brand-gold">
+            {file.name}
           </span>
-        )}
-      </button>
+          {delivery && (
+            <span
+              title={`Entrega V${String(delivery.version_number)} de «${delivery.task_title}»`}
+              className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-bold text-brand-gold-dark dark:text-brand-gold sm:inline-flex"
+            >
+              V{delivery.version_number}
+              <span className="max-w-[120px] truncate font-medium opacity-80">
+                {delivery.task_title}
+              </span>
+            </span>
+          )}
+        </button>
+      )}
       <span className="hidden truncate text-[12px] text-muted-foreground sm:block">
         {file.uploaded_by_name ?? "—"}
       </span>
@@ -312,18 +464,30 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
         >
           <Download className="size-3.5" />
         </button>
-        {actions.canWrite && (
-          <button
-            type="button"
-            onClick={() => {
-              actions.onDeleteFile(file);
-            }}
-            disabled={actions.busy}
-            title="Borrar archivo"
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+        {actions.canWrite && !isRenaming && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onStartRename("file", file.id);
+              }}
+              title="Renombrar"
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onDeleteFile(file);
+              }}
+              disabled={actions.busy}
+              title="Borrar archivo"
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -331,16 +495,89 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
 }
 
 function FolderCard({ folder, actions }: { folder: ApiProjectFolder; actions: RowActions }) {
+  const draggable = actions.canWrite && !folder.is_root;
+  const isRenaming = actions.renaming?.kind === "folder" && actions.renaming.id === folder.id;
+  const isDropTarget = actions.dropTargetId === folder.id;
   return (
-    <button
-      type="button"
-      onClick={() => {
-        actions.onOpenFolder(folder);
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: "folder", id: folder.id }));
+        e.dataTransfer.effectAllowed = "move";
       }}
-      className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand-gold/50 hover:bg-accent/40"
+      onDragOver={(e) => {
+        if (!actions.canWrite) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        actions.onDropTargetChange(folder.id);
+      }}
+      onDragLeave={() => {
+        if (isDropTarget) {
+          actions.onDropTargetChange(null);
+        }
+      }}
+      onDrop={(e) => {
+        if (!actions.canWrite) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        actions.onDropTargetChange(null);
+        const payload = readDragPayload(e);
+        if (payload) {
+          actions.onMoveInto(payload, folder);
+        }
+      }}
+      className={cn(
+        "group relative flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand-gold/50 hover:bg-accent/40",
+        isDropTarget && "border-brand-gold bg-brand-gold/10 ring-1 ring-brand-gold/40",
+      )}
     >
-      <Folder className="size-8 fill-brand-gold/20 text-brand-gold" />
-      <span className="truncate text-[13px] font-medium text-foreground">{folder.name}</span>
+      {actions.canWrite && !folder.is_root && !isRenaming && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onStartRename("folder", folder.id);
+          }}
+          title="Renombrar"
+          className="absolute right-2 top-2 rounded-md bg-card/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          if (!isRenaming) {
+            actions.onOpenFolder(folder);
+          }
+        }}
+        className="flex flex-col gap-2 text-left"
+      >
+        <Folder className="size-8 fill-brand-gold/20 text-brand-gold" />
+      </button>
+      {isRenaming ? (
+        <RenameInput
+          initial={folder.name}
+          onSubmit={(name) => {
+            actions.onSubmitRenameFolder(folder, name);
+          }}
+          onCancel={actions.onCancelRename}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            actions.onOpenFolder(folder);
+          }}
+          className="truncate text-left text-[13px] font-medium text-foreground"
+        >
+          {folder.name}
+        </button>
+      )}
       <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {folder.team_name ? (
           <>
@@ -350,22 +587,63 @@ function FolderCard({ folder, actions }: { folder: ApiProjectFolder; actions: Ro
           countLabel(folder)
         )}
       </span>
-    </button>
+    </div>
   );
 }
 
 function FileCard({ file, actions }: { file: ApiProjectFile; actions: RowActions }) {
   const { Icon, tint } = fileIconFor(file.content_type);
+  const isRenaming = actions.renaming?.kind === "file" && actions.renaming.id === file.id;
   return (
-    <button
-      type="button"
-      onClick={() => {
-        actions.onPreview(file);
+    <div
+      draggable={actions.canWrite}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: "file", id: file.id }));
+        e.dataTransfer.effectAllowed = "move";
       }}
-      className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand-gold/50 hover:bg-accent/40"
+      className="group relative flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand-gold/50 hover:bg-accent/40"
     >
-      <Icon className={cn("size-8", tint)} />
-      <span className="truncate text-[13px] text-foreground">{file.name}</span>
+      {actions.canWrite && !isRenaming && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onStartRename("file", file.id);
+          }}
+          title="Renombrar"
+          className="absolute right-2 top-2 rounded-md bg-card/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          actions.onPreview(file);
+        }}
+        className="flex flex-col gap-2 text-left"
+      >
+        <Icon className={cn("size-8", tint)} />
+      </button>
+      {isRenaming ? (
+        <RenameInput
+          initial={file.name}
+          onSubmit={(name) => {
+            actions.onSubmitRenameFile(file, name);
+          }}
+          onCancel={actions.onCancelRename}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            actions.onPreview(file);
+          }}
+          className="truncate text-left text-[13px] text-foreground"
+        >
+          {file.name}
+        </button>
+      )}
       <span className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
         <span>{formatFileSize(file.size_bytes)}</span>
         {file.delivery && (
@@ -374,7 +652,7 @@ function FileCard({ file, actions }: { file: ApiProjectFile; actions: RowActions
           </span>
         )}
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -396,8 +674,12 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const query = useProjectFiles(projectId);
   const createFolder = useCreateFolder(projectId);
   const deleteFolder = useDeleteFolder(projectId);
-  const uploadFile = useUploadFile(projectId);
   const deleteFile = useDeleteFile(projectId);
+  const renameFolder = useRenameFolder(projectId);
+  const renameFile = useRenameFile(projectId);
+  const moveFolder = useMoveFolder(projectId);
+  const moveFile = useMoveFile(projectId);
+  const uploads = useUploadQueue(projectId);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [pathIds, setPathIds] = useState<string[]>([]);
@@ -408,6 +690,9 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const [dragOver, setDragOver] = useState(false);
   const [pendingFolderDelete, setPendingFolderDelete] = useState<ApiProjectFolder | null>(null);
   const [pendingFileDelete, setPendingFileDelete] = useState<ApiProjectFile | null>(null);
+  const [renaming, setRenaming] = useState<DragPayload | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const root = query.data?.root;
 
@@ -436,13 +721,18 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const busy =
     createFolder.isPending ||
     deleteFolder.isPending ||
-    uploadFile.isPending ||
-    deleteFile.isPending;
+    deleteFile.isPending ||
+    renameFolder.isPending ||
+    renameFile.isPending ||
+    moveFolder.isPending ||
+    moveFile.isPending;
 
   const opError = useMemo(() => {
-    const failed = [createFolder, deleteFolder, uploadFile, deleteFile].find((m) => m.isError);
-    return failed ? getErrorMessage(failed.error, "No se pudo completar la operación") : null;
-  }, [createFolder, deleteFolder, uploadFile, deleteFile]);
+    const failed = [createFolder, deleteFolder, deleteFile, renameFolder, renameFile].find(
+      (m) => m.isError,
+    );
+    return failed ? getErrorMessage(failed.error, "No se pudo completar la operación") : moveError;
+  }, [createFolder, deleteFolder, deleteFile, renameFolder, renameFile, moveError]);
 
   const q = term.trim().toLowerCase();
   const folders = useMemo(() => {
@@ -470,9 +760,34 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   };
 
   const doUpload = (files: FileList | null) => {
-    const file = files?.[0];
-    if (file && current) {
-      uploadFile.mutate({ folderId: current.id, file });
+    if (files && files.length > 0 && current) {
+      uploads.enqueue(current.id, files);
+    }
+  };
+
+  const moveInto = (payload: DragPayload, targetFolder: ApiProjectFolder) => {
+    setMoveError(null);
+    if (payload.kind === "folder") {
+      if (payload.id === targetFolder.id) {
+        return;
+      }
+      moveFolder.mutate(
+        { folderId: payload.id, parentId: targetFolder.id },
+        {
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover la carpeta"));
+          },
+        },
+      );
+    } else {
+      moveFile.mutate(
+        { fileId: payload.id, folderId: targetFolder.id },
+        {
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover el archivo"));
+          },
+        },
+      );
     }
   };
 
@@ -492,6 +807,44 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
     },
     onDeleteFolder: setPendingFolderDelete,
     onDeleteFile: setPendingFileDelete,
+    renaming,
+    onStartRename: (kind, id) => {
+      setRenaming({ kind, id });
+    },
+    onCancelRename: () => {
+      setRenaming(null);
+    },
+    onSubmitRenameFolder: (folder, name) => {
+      if (!name.trim() || name.trim() === folder.name) {
+        setRenaming(null);
+        return;
+      }
+      renameFolder.mutate(
+        { folderId: folder.id, name: name.trim() },
+        {
+          onSettled: () => {
+            setRenaming(null);
+          },
+        },
+      );
+    },
+    onSubmitRenameFile: (file, name) => {
+      if (!name.trim() || name.trim() === file.name) {
+        setRenaming(null);
+        return;
+      }
+      renameFile.mutate(
+        { fileId: file.id, name: name.trim() },
+        {
+          onSettled: () => {
+            setRenaming(null);
+          },
+        },
+      );
+    },
+    dropTargetId,
+    onDropTargetChange: setDropTargetId,
+    onMoveInto: moveInto,
   };
 
   if (query.isLoading) {
@@ -582,6 +935,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
       <input
         ref={inputRef}
         type="file"
+        multiple
         className="hidden"
         onChange={(e) => {
           doUpload(e.target.files);
@@ -594,6 +948,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
         <nav aria-label="Ruta" className="flex min-w-0 flex-1 items-center gap-1 text-[13px]">
           {chain.map((folder, i) => {
             const isLast = i === chain.length - 1;
+            const isDropTarget = dropTargetId === folder.id;
             return (
               <span key={folder.id} className="flex min-w-0 items-center gap-1">
                 {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" />}
@@ -603,11 +958,36 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
                     goTo(i);
                   }}
                   disabled={isLast}
+                  onDragOver={(e) => {
+                    if (!folder.can_write || isLast) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setDropTargetId(folder.id);
+                  }}
+                  onDragLeave={() => {
+                    if (isDropTarget) {
+                      setDropTargetId(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (!folder.can_write || isLast) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setDropTargetId(null);
+                    const payload = readDragPayload(e);
+                    if (payload) {
+                      actions.onMoveInto(payload, folder);
+                    }
+                  }}
                   className={cn(
                     "flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 transition-colors",
                     isLast
                       ? "font-semibold text-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    isDropTarget &&
+                      "bg-brand-gold/10 text-brand-gold-dark ring-1 ring-brand-gold/40",
                   )}
                 >
                   {i === 0 ? (
@@ -689,11 +1069,10 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                disabled={uploadFile.isPending}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark disabled:opacity-50"
               >
                 <Upload className="size-3.5" />
-                {uploadFile.isPending ? "Subiendo…" : "Subir"}
+                {uploads.isUploading ? "Subiendo…" : "Subir"}
               </button>
             </>
           )}
@@ -749,7 +1128,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (canWrite) {
+          if (canWrite && e.dataTransfer.files.length > 0) {
             doUpload(e.dataTransfer.files);
           }
         }}
@@ -806,6 +1185,12 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
           </div>
         )}
       </div>
+
+      <UploadQueuePanel
+        items={uploads.items}
+        onDismiss={uploads.dismiss}
+        onClearFinished={uploads.clearFinished}
+      />
     </div>
   );
 }
