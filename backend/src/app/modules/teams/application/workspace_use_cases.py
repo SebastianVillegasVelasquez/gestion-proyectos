@@ -233,6 +233,13 @@ class WorkspaceService:
                 uploaded_by=current_user.id,
             )
         )
+        if not data.mark_delivered:
+            # Entrega continua: la versión queda registrada pero la tarea sigue
+            # abierta —ni revisión ni cierre— hasta que se marque como entregada.
+            await self._repo.save_deliverable(deliverable)
+            return DeliverableResponse.of(
+                await self._require_deliverable(team_id, deliverable.id)
+            )
         return await self._close_delivery(team_id, deliverable, task, current_user)
 
     async def add_file_version(
@@ -246,6 +253,8 @@ class WorkspaceService:
         note: str | None,
         observations: str | None,
         current_user,
+        mark_delivered: bool = True,
+        folder_id: UUID | None = None,
     ) -> DeliverableResponse:
         """Entrega un ARCHIVO: se guarda en la carpeta del equipo dentro del
         archivador del proyecto (que se crea sola si aún no existe) y la versión
@@ -272,6 +281,7 @@ class WorkspaceService:
             content_type=content_type,
             content=content,
             uploader_id=current_user.id,
+            folder_id=folder_id,
         )
         await self._repo.add_version(
             DeliverableVersion(
@@ -284,6 +294,11 @@ class WorkspaceService:
                 uploaded_by=current_user.id,
             )
         )
+        if not mark_delivered:
+            await self._repo.save_deliverable(deliverable)
+            return DeliverableResponse.of(
+                await self._require_deliverable(team_id, deliverable.id)
+            )
         return await self._close_delivery(team_id, deliverable, task, current_user)
 
     async def _close_delivery(
