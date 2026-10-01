@@ -178,6 +178,8 @@ async def upload_version_file(
     file: UploadFile = File(...),
     note: str | None = Form(None),
     observations: str | None = Form(None),
+    mark_delivered: bool = Form(True),
+    folder_id: UUID | None = Form(None),
     repo=Depends(workspace_repo_dependency),
     files_repo=Depends(project_files_repo_dependency),
     storage=Depends(file_storage_dependency),
@@ -213,6 +215,8 @@ async def upload_version_file(
         content=content,
         note=note,
         observations=observations,
+        mark_delivered=mark_delivered,
+        folder_id=folder_id,
         current_user=current_user,
     )
 

@@ -268,6 +268,160 @@ class ProjectFilesService:
                 file.soft_delete()
         await self._repo.save()
 
+    async def rename_folder(
+        self, project_id: UUID, folder_id: UUID, name: str, current_user
+    ) -> FolderResponse:
+        access = await self._require_view(project_id, current_user)
+        folder = await self._repo.get_folder(project_id, folder_id)
+        if folder is None:
+            raise NotFoundError("Carpeta no encontrada")
+        if folder.parent_id is None:
+            raise ForbiddenError("La carpeta raíz del proyecto no se renombra")
+
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        if not access.can_write_in(self._owner(folder, by_id)):
+            raise ForbiddenError("No puedes renombrar esta carpeta")
+
+        name = name.strip()
+        if await self._repo.sibling_exists(
+            folder.parent_id, name, exclude_id=folder.id
+        ):
+            raise ConflictError("Ya hay una carpeta con ese nombre aquí")
+
+        folder.name = name
+        await self._repo.save()
+        return FolderResponse(
+            id=folder.id,
+            parent_id=folder.parent_id,
+            name=folder.name,
+            team_id=folder.team_id,
+            team_name=None,
+            is_root=False,
+            can_write=True,
+            created_at=folder.created_at,
+        )
+
+    async def move_folder(
+        self, project_id: UUID, folder_id: UUID, parent_id: UUID | None, current_user
+    ) -> FolderResponse:
+        access = await self._require_view(project_id, current_user)
+        folder = await self._repo.get_folder(project_id, folder_id)
+        if folder is None:
+            raise NotFoundError("Carpeta no encontrada")
+        if folder.parent_id is None:
+            raise ForbiddenError("La carpeta raíz del proyecto no se mueve")
+
+        root = await self._ensure_root(project_id)
+        target_id = parent_id or root.id
+        target = await self._repo.get_folder(project_id, target_id)
+        if target is None:
+            raise NotFoundError("La carpeta destino no existe")
+        if target_id == folder.id:
+            raise ForbiddenError("No puedes mover una carpeta dentro de sí misma")
+
+        descendants = await self._repo.descendant_ids(project_id, folder.id)
+        if target_id in descendants:
+            raise ForbiddenError(
+                "No puedes mover una carpeta dentro de su propio contenido"
+            )
+
+        if target.parent_id is None:
+            # Mover algo a la raíz sería crear una carpeta huérfana de dueño: en
+            # la raíz solo viven carpetas de equipo, y esas no se mueven.
+            raise ForbiddenError("En la raíz del proyecto solo hay carpetas de equipo")
+
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        if not access.can_write_in(
+            self._owner(folder, by_id)
+        ) or not access.can_write_in(self._owner(target, by_id)):
+            raise ForbiddenError("No puedes mover contenido aquí")
+        if self._owner(folder, by_id) != self._owner(target, by_id):
+            # Mover entre carpetas de dueños distintos cruzaría el archivo de un
+            # equipo hacia otro por la puerta de atrás del árbol.
+            raise ForbiddenError("No puedes mover contenido fuera de su propio equipo")
+
+        if await self._repo.sibling_exists(
+            target.id, folder.name, exclude_id=folder.id
+        ):
+            raise ConflictError("Ya hay una carpeta con ese nombre en el destino")
+
+        folder.parent_id = target.id
+        await self._repo.save()
+        return FolderResponse(
+            id=folder.id,
+            parent_id=folder.parent_id,
+            name=folder.name,
+            team_id=folder.team_id,
+            team_name=None,
+            is_root=False,
+            can_write=True,
+            created_at=folder.created_at,
+        )
+
+    async def rename_file(
+        self, project_id: UUID, file_id: UUID, name: str, current_user
+    ) -> FileResponse:
+        access = await self._require_view(project_id, current_user)
+        file = await self._repo.get_file(project_id, file_id)
+        if file is None:
+            raise NotFoundError("Archivo no encontrado")
+        folder = await self._repo.get_folder(project_id, file.folder_id)
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        if not access.can_write_in(self._owner(folder, by_id)):
+            raise ForbiddenError("No puedes renombrar este archivo")
+
+        name = sanitize_filename(name)
+        if await self._repo.file_name_taken(file.folder_id, name, exclude_id=file.id):
+            raise ConflictError("Ya hay un archivo con ese nombre en esta carpeta")
+
+        file.name = name
+        await self._repo.save()
+        return FileResponse(
+            id=file.id,
+            folder_id=file.folder_id,
+            name=file.name,
+            content_type=file.content_type,
+            size_bytes=file.size_bytes,
+            uploaded_by=file.uploaded_by,
+            uploaded_by_name=None,
+            created_at=file.created_at,
+        )
+
+    async def move_file(
+        self, project_id: UUID, file_id: UUID, folder_id: UUID, current_user
+    ) -> FileResponse:
+        access = await self._require_view(project_id, current_user)
+        file = await self._repo.get_file(project_id, file_id)
+        if file is None:
+            raise NotFoundError("Archivo no encontrado")
+        source_folder = await self._repo.get_folder(project_id, file.folder_id)
+        target_folder = await self._repo.get_folder(project_id, folder_id)
+        if target_folder is None:
+            raise NotFoundError("La carpeta destino no existe")
+
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        if not access.can_write_in(
+            self._owner(source_folder, by_id)
+        ) or not access.can_write_in(self._owner(target_folder, by_id)):
+            raise ForbiddenError("No puedes mover este archivo")
+        if self._owner(source_folder, by_id) != self._owner(target_folder, by_id):
+            raise ForbiddenError("No puedes mover un archivo fuera de su propio equipo")
+
+        name = await self._free_name(target_folder.id, file.name)
+        file.name = name
+        file.folder_id = target_folder.id
+        await self._repo.save()
+        return FileResponse(
+            id=file.id,
+            folder_id=file.folder_id,
+            name=file.name,
+            content_type=file.content_type,
+            size_bytes=file.size_bytes,
+            uploaded_by=file.uploaded_by,
+            uploaded_by_name=None,
+            created_at=file.created_at,
+        )
+
     async def upload_file(
         self,
         project_id: UUID,
@@ -328,6 +482,7 @@ class ProjectFilesService:
         content_type: str,
         content: bytes,
         uploader_id: UUID,
+        folder_id: UUID | None = None,
     ) -> ProjectFile:
         """Guarda un archivo en la carpeta del equipo, creándola si no existe.
 
@@ -338,7 +493,31 @@ class ProjectFilesService:
         entrega no puede quedar bloqueada por un paso de organización: el
         archivo tiene que caer en algún sitio con nombre, y el nombre correcto
         es el del equipo.
+
+        `folder_id`, si viene, es una SUBCARPETA elegida a mano por quien
+        entrega (la estructura de carpetas que ya tiene el equipo). Solo se usa
+        si de verdad cuelga del árbol de ESTE equipo: nunca se acepta a ciegas,
+        o cualquiera podría apuntar la entrega a la carpeta de otro.
         """
+        if folder_id is not None:
+            chosen = await self._repo.get_folder(project_id, folder_id)
+            by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+            if chosen is not None and self._owner(chosen, by_id) == FolderOwner(
+                team_id=team_id
+            ):
+                name = await self._free_name(chosen.id, sanitize_filename(filename))
+                key = self._storage.save(f"projects/{project_id}", name, content)
+                return await self._repo.add_file(
+                    ProjectFile(
+                        folder_id=chosen.id,
+                        project_id=project_id,
+                        name=name,
+                        content_type=content_type or "application/octet-stream",
+                        size_bytes=len(content),
+                        storage_key=key,
+                        uploaded_by=uploader_id,
+                    )
+                )
         return await self._store_for_owner(
             project_id,
             FolderOwner(team_id=team_id),

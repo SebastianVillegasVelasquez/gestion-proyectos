@@ -69,7 +69,32 @@ export const filesApi = {
   deleteFolder: (projectId: string, folderId: string) =>
     http.delete(`${base(projectId)}/folders/${folderId}`).then(() => undefined),
 
-  upload: (projectId: string, folderId: string, file: File) => {
+  renameFolder: (projectId: string, folderId: string, name: string) =>
+    http
+      .patch<ApiProjectFolder>(`${base(projectId)}/folders/${folderId}`, { name })
+      .then((r) => r.data),
+
+  moveFolder: (projectId: string, folderId: string, parentId: string | null) =>
+    http
+      .patch<ApiProjectFolder>(`${base(projectId)}/folders/${folderId}/move`, {
+        parent_id: parentId,
+      })
+      .then((r) => r.data),
+
+  renameFile: (projectId: string, fileId: string, name: string) =>
+    http.patch<ApiProjectFile>(`${base(projectId)}/${fileId}`, { name }).then((r) => r.data),
+
+  moveFile: (projectId: string, fileId: string, folderId: string) =>
+    http
+      .patch<ApiProjectFile>(`${base(projectId)}/${fileId}/move`, { folder_id: folderId })
+      .then((r) => r.data),
+
+  upload: (
+    projectId: string,
+    folderId: string,
+    file: File,
+    options?: { onProgress?: (pct: number) => void; signal?: AbortSignal },
+  ) => {
     const form = new FormData();
     form.append("file", file);
     return http
@@ -78,6 +103,13 @@ export const filesApi = {
         // global (10 s) cortaría archivos grandes a media transferencia.
         timeout: 120_000,
         headers: { "Content-Type": "multipart/form-data" },
+        signal: options?.signal,
+        onUploadProgress: (event) => {
+          if (!options?.onProgress || !event.total) {
+            return;
+          }
+          options.onProgress(Math.round((event.loaded / event.total) * 100));
+        },
       })
       .then((r) => r.data);
   },

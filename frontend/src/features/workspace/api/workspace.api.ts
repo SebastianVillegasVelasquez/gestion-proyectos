@@ -156,6 +156,9 @@ export interface NewVersionBody {
   url?: string;
   note?: string;
   observations?: string;
+  /** Entrega continua: por defecto `true` (cierra la entrega). `false` deja
+   *  la tarea abierta para seguir registrando versiones. */
+  mark_delivered?: boolean;
 }
 
 /** Entrega de un ARCHIVO: va multipart, así que no es un `NewVersionBody`. */
@@ -224,10 +227,16 @@ export const workspaceApi = {
 
   /** Entrega un archivo: el backend lo guarda en la carpeta del equipo dentro
    *  del proyecto y crea la versión apuntando a él. */
-  uploadVersionFile: (teamId: string, deliverableId: string, body: NewFileVersionBody) =>
+  uploadVersionFile: (
+    teamId: string,
+    deliverableId: string,
+    body: NewFileVersionBody,
+    options?: { onProgress?: (pct: number) => void },
+  ) =>
     postDeliveryFile<ApiDeliverable>(
       `${base(teamId)}/deliverables/${deliverableId}/versions/upload`,
       body,
+      options,
     ),
 
   editVersion: (teamId: string, deliverableId: string, versionId: string, body: EditVersionBody) =>

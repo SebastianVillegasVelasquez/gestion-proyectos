@@ -330,14 +330,17 @@ export function PersonalDeliverablesPage() {
     });
   };
 
-  const handleUploadFile = (file: File, note: string, observations: string) => {
-    if (!selected) {
+  const handleUploadFiles = (files: File[], note: string, observations: string) => {
+    if (!selected || files.length === 0) {
       return;
     }
-    uploadVersionFile.mutate({
-      id: selected.id,
-      body: { file, note, observations: observations || undefined },
-    });
+    const id = selected.id;
+    for (const file of files) {
+      uploadVersionFile.mutate({
+        id,
+        body: { file, note: note || file.name, observations: observations || undefined },
+      });
+    }
   };
 
   const handleEditVersion = (versionId: string, patch: EditVersionPatch) => {
@@ -536,7 +539,7 @@ export function PersonalDeliverablesPage() {
                       : null
                   }
                   onAddVersion={handleAddVersion}
-                  onUploadFile={handleUploadFile}
+                  onUploadFiles={handleUploadFiles}
                   uploadPending={uploadVersionFile.isPending}
                   onEditVersion={handleEditVersion}
                   onReview={handleReview}

@@ -756,3 +756,166 @@ class TestDeliverableOwnershipRules:
             f"/api/v1/teams/{s.team.id}/deliverables/{del_id}", headers=integrante_h
         )
         assert r.status_code == 422, r.text
+
+
+class TestContinuousDelivery:
+    """`mark_delivered=False`: la versión queda registrada pero la tarea sigue
+    abierta, para poder seguir entregando hasta marcar la casilla."""
+
+    async def test_version_without_mark_delivered_keeps_the_task_open(
+        self, client, scenario, db_session
+    ):
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+        deliverable_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={
+                "type": "enlace",
+                "url": "https://ejemplo.com/v1",
+                "mark_delivered": False,
+            },
+            headers=integrante_h,
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["status"] == "borrador"
+
+        await db_session.refresh(task)
+        assert task.status == TaskStatus.PENDIENTE_POR_INICIAR
+
+        # Puede seguir entregando: una segunda versión, también sin cerrar.
+        r2 = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={
+                "type": "enlace",
+                "url": "https://ejemplo.com/v2",
+                "mark_delivered": False,
+            },
+            headers=integrante_h,
+        )
+        assert r2.status_code == 201, r2.text
+        assert len(r2.json()["versions"]) == 2
+
+        # La tercera, con la casilla marcada, cierra la entrega de verdad.
+        r3 = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={
+                "type": "enlace",
+                "url": "https://ejemplo.com/v3",
+                "mark_delivered": True,
+            },
+            headers=integrante_h,
+        )
+        assert r3.status_code == 201, r3.text
+        assert r3.json()["status"] == "aprobado"
+
+        await db_session.refresh(task)
+        assert task.status == TaskStatus.COMPLETADA
+
+    async def test_add_version_defaults_to_mark_delivered_true(
+        self, client, scenario, db_session
+    ):
+        """Sin el campo, se comporta como siempre (compatibilidad con el flujo
+        clásico de la pestaña Entregables)."""
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+        deliverable_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions",
+            json={"type": "enlace", "url": "https://ejemplo.com"},
+            headers=integrante_h,
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["status"] == "aprobado"
+        await db_session.refresh(task)
+        assert task.status == TaskStatus.COMPLETADA
+
+    async def test_file_upload_respects_the_chosen_destination_folder(
+        self, client, scenario, db_session
+    ):
+        """La entrega continua deja elegir, dentro de la carpeta del equipo, una
+        subcarpeta ya organizada por el equipo (en vez de siempre caer en la
+        raíz de la carpeta del equipo)."""
+        s = scenario
+        task = await _make_task(
+            db_session, s.team.id, s.integrante.id, requires_approval=False
+        )
+        integrante_h = await _headers_for(s.integrante)
+        lider_h = await _headers_for(s.lider)
+
+        # El líder abre la carpeta del equipo y organiza una subcarpeta
+        # "Entregas" dentro de ella.
+        team_folder = await client.post(
+            f"/api/v1/projects/{s.team.project_id}/files/folders",
+            json={"name": s.team.name, "team_id": str(s.team.id)},
+            headers=lider_h,
+        )
+        assert team_folder.status_code == 201, team_folder.text
+        team_folder_id = team_folder.json()["id"]
+        sub = await client.post(
+            f"/api/v1/projects/{s.team.project_id}/files/folders",
+            json={"name": "Entregas", "parent_id": team_folder_id},
+            headers=lider_h,
+        )
+        assert sub.status_code == 201, sub.text
+        sub_id = sub.json()["id"]
+
+        deliverable_id = (
+            await client.post(
+                f"/api/v1/teams/{s.team.id}/deliverables",
+                json={
+                    "task_title": task.title,
+                    "assignee_id": str(s.integrante.id),
+                    "task_id": str(task.id),
+                },
+                headers=integrante_h,
+            )
+        ).json()["id"]
+
+        r = await client.post(
+            f"/api/v1/teams/{s.team.id}/deliverables/{deliverable_id}/versions/upload",
+            files={"file": ("informe.pdf", b"contenido", "application/pdf")},
+            data={"mark_delivered": "false", "folder_id": sub_id},
+            headers=integrante_h,
+        )
+        assert r.status_code == 201, r.text
+
+        tree2 = await client.get(
+            f"/api/v1/projects/{s.team.project_id}/files", headers=lider_h
+        )
+        team_folder2 = next(
+            f
+            for f in tree2.json()["root"]["children"]
+            if f["team_id"] == str(s.team.id)
+        )
+        sub2 = next(f for f in team_folder2["children"] if f["id"] == sub_id)
+        assert [f["name"] for f in sub2["files"]] == ["informe.pdf"]
+        assert team_folder2["files"] == []

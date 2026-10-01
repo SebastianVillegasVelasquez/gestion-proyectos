@@ -62,6 +62,23 @@ class FolderResponse(BaseModelConfig):
     files: list[FileResponse] = []
 
 
+class RenameFolderRequest(BaseModelConfig):
+    name: FolderName
+
+
+class RenameFileRequest(BaseModelConfig):
+    name: FolderName
+
+
+class MoveFolderRequest(BaseModelConfig):
+    # Carpeta destino. Omitida = la raíz del proyecto.
+    parent_id: Optional[UUID] = None
+
+
+class MoveFileRequest(BaseModelConfig):
+    folder_id: UUID
+
+
 class TeamOption(BaseModelConfig):
     id: UUID
     name: str

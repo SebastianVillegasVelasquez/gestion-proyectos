@@ -96,8 +96,14 @@ export function useAddVersion(teamId: string | null) {
 export function useUploadVersionFile(teamId: string | null) {
   return useDeliverableMutation(
     teamId,
-    (vars: { deliverableId: string; body: NewFileVersionBody }) =>
-      workspaceApi.uploadVersionFile(teamId!, vars.deliverableId, vars.body),
+    (vars: {
+      deliverableId: string;
+      body: NewFileVersionBody;
+      onProgress?: (pct: number) => void;
+    }) =>
+      workspaceApi.uploadVersionFile(teamId!, vars.deliverableId, vars.body, {
+        onProgress: vars.onProgress,
+      }),
   );
 }
 
