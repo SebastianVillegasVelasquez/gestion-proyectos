@@ -313,7 +313,14 @@ function MemberWorkspace() {
   const nodeTypesQuery = useNodeTypes(projectId);
   // Subcarpetas del equipo, para que al entregar un archivo se pueda elegir
   // dónde cae dentro de la estructura de carpetas que el equipo ya organizó.
-  const filesTreeQuery = useProjectFiles(projectId);
+  // Se pide solo cuando hace falta (la pestaña Archivos ya la pide por su
+  // cuenta, y el modal de entrega rápida se puede abrir desde Estructura o
+  // Tareas): traer el archivador completo del proyecto en CADA apertura del
+  // espacio de trabajo —incluso para quien solo mira "Tareas"— es una llamada
+  // de red que la mayoría de las visitas no necesita.
+  const wantsFolderOptions =
+    activeTab === "entregables" || activeTab === "archivos" || quickDeliverTaskId !== null;
+  const filesTreeQuery = useProjectFiles(projectId, wantsFolderOptions);
   const teamFolderOptions = useMemo<DeliveryFolderOption[]>(() => {
     const root = filesTreeQuery.data?.root;
     if (!root || !activeTeamId) {
