@@ -112,17 +112,24 @@ class ProjectFilesRepository:
         )
         return list(rows.scalars().all())
 
-    async def sibling_exists(self, parent_id: UUID, name: str) -> bool:
-        """¿Ya hay una carpeta viva con ese nombre bajo el mismo padre?"""
+    async def sibling_exists(
+        self, parent_id: UUID, name: str, *, exclude_id: UUID | None = None
+    ) -> bool:
+        """¿Ya hay una carpeta viva con ese nombre bajo el mismo padre?
+
+        `exclude_id` se usa al renombrar o mover una carpeta: no debe chocar
+        consigo misma cuando el nombre no cambia.
+        """
+        conditions = [
+            ProjectFolder.parent_id == parent_id,
+            func.lower(ProjectFolder.name) == name.lower(),
+            ProjectFolder.deleted_at.is_(None),
+        ]
+        if exclude_id is not None:
+            conditions.append(ProjectFolder.id != exclude_id)
         return (
             await self._session.scalar(
-                select(func.count())
-                .select_from(ProjectFolder)
-                .where(
-                    ProjectFolder.parent_id == parent_id,
-                    func.lower(ProjectFolder.name) == name.lower(),
-                    ProjectFolder.deleted_at.is_(None),
-                )
+                select(func.count()).select_from(ProjectFolder).where(*conditions)
             )
             or 0
         ) > 0
@@ -132,6 +139,24 @@ class ProjectFilesRepository:
         await self._session.flush()
         await self._session.refresh(folder)
         return folder
+
+    async def descendant_ids(self, project_id: UUID, folder_id: UUID) -> set[UUID]:
+        """Todos los ids bajo `folder_id` (sin incluirlo), para impedir que una
+        carpeta se mueva dentro de sí misma o de una de sus propias hijas."""
+        folders = await self.list_folders(project_id)
+        by_parent: dict[UUID, list[UUID]] = {}
+        for f in folders:
+            if f.parent_id is not None:
+                by_parent.setdefault(f.parent_id, []).append(f.id)
+        result: set[UUID] = set()
+        stack = [folder_id]
+        while stack:
+            current = stack.pop()
+            for child_id in by_parent.get(current, []):
+                if child_id not in result:
+                    result.add(child_id)
+                    stack.append(child_id)
+        return result
 
     # ── archivos ─────────────────────────────────────────────────────────────
 
@@ -158,16 +183,19 @@ class ProjectFilesRepository:
             )
         )
 
-    async def file_name_taken(self, folder_id: UUID, name: str) -> bool:
+    async def file_name_taken(
+        self, folder_id: UUID, name: str, *, exclude_id: UUID | None = None
+    ) -> bool:
+        conditions = [
+            ProjectFile.folder_id == folder_id,
+            func.lower(ProjectFile.name) == name.lower(),
+            ProjectFile.deleted_at.is_(None),
+        ]
+        if exclude_id is not None:
+            conditions.append(ProjectFile.id != exclude_id)
         return (
             await self._session.scalar(
-                select(func.count())
-                .select_from(ProjectFile)
-                .where(
-                    ProjectFile.folder_id == folder_id,
-                    func.lower(ProjectFile.name) == name.lower(),
-                    ProjectFile.deleted_at.is_(None),
-                )
+                select(func.count()).select_from(ProjectFile).where(*conditions)
             )
             or 0
         ) > 0

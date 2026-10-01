@@ -16,7 +16,11 @@ from app.modules.files.presentation.schemas import (
     CreateFolderRequest,
     FileResponse,
     FolderResponse,
+    MoveFileRequest,
+    MoveFolderRequest,
     ProjectFilesResponse,
+    RenameFileRequest,
+    RenameFolderRequest,
 )
 from app.shared.exceptions import ValidationError
 
@@ -64,6 +68,64 @@ async def delete_folder(
     current_user=Depends(get_current_user),
 ):
     await _service(repo, storage).delete_folder(project_id, folder_id, current_user)
+
+
+@router.patch("/folders/{folder_id}", response_model=FolderResponse)
+async def rename_folder(
+    project_id: UUID,
+    folder_id: UUID,
+    data: RenameFolderRequest,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await _service(repo, storage).rename_folder(
+        project_id, folder_id, data.name, current_user
+    )
+
+
+@router.patch("/folders/{folder_id}/move", response_model=FolderResponse)
+async def move_folder(
+    project_id: UUID,
+    folder_id: UUID,
+    data: MoveFolderRequest,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Arrastrar una carpeta sobre otra: la mueve dentro, sin tocar su contenido."""
+    return await _service(repo, storage).move_folder(
+        project_id, folder_id, data.parent_id, current_user
+    )
+
+
+@router.patch("/{file_id}", response_model=FileResponse)
+async def rename_file(
+    project_id: UUID,
+    file_id: UUID,
+    data: RenameFileRequest,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    return await _service(repo, storage).rename_file(
+        project_id, file_id, data.name, current_user
+    )
+
+
+@router.patch("/{file_id}/move", response_model=FileResponse)
+async def move_file(
+    project_id: UUID,
+    file_id: UUID,
+    data: MoveFileRequest,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Arrastrar un archivo sobre una carpeta: lo mueve dentro de ella."""
+    return await _service(repo, storage).move_file(
+        project_id, file_id, data.folder_id, current_user
+    )
 
 
 @router.post(
