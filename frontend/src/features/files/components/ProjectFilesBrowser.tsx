@@ -11,6 +11,7 @@ import {
   FileVideo,
   Folder,
   FolderPlus,
+  FolderInput,
   Grid2x2,
   Home,
   List as ListIcon,
@@ -124,6 +125,155 @@ function resolvePath(root: ApiProjectFolder, ids: string[]): ApiProjectFolder[] 
     node = next;
   }
   return chain;
+}
+
+function findFolder(root: ApiProjectFolder, id: string): ApiProjectFolder | null {
+  if (root.id === id) {
+    return root;
+  }
+  for (const child of root.children) {
+    const found = findFolder(child, id);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function collectDescendantIds(folder: ApiProjectFolder): Set<string> {
+  const ids = new Set<string>();
+  const walk = (f: ApiProjectFolder) => {
+    for (const child of f.children) {
+      ids.add(child.id);
+      walk(child);
+    }
+  };
+  walk(folder);
+  return ids;
+}
+
+/** Carpetas donde SÍ se puede soltar algo, aplanadas con sangría por
+ *  profundidad — la alternativa táctil al arrastrar y soltar, que en un
+ *  teléfono o tablet no existe (el drag and drop nativo es solo de mouse). */
+function flattenMoveTargets(
+  folder: ApiProjectFolder,
+  excludeIds: ReadonlySet<string>,
+  depth = 0,
+): { id: string; label: string }[] {
+  const acc: { id: string; label: string }[] = [];
+  for (const child of folder.children) {
+    if (excludeIds.has(child.id)) {
+      continue;
+    }
+    if (child.can_write) {
+      acc.push({ id: child.id, label: `${"— ".repeat(depth)}${child.name}` });
+    }
+    acc.push(...flattenMoveTargets(child, excludeIds, depth + 1));
+  }
+  return acc;
+}
+
+// ── Modal: mover a… (alternativa táctil al drag and drop) ───────────────────
+
+function MoveToDialog({
+  itemName,
+  options,
+  pending,
+  error,
+  onMove,
+  onClose,
+}: {
+  itemName: string;
+  options: { id: string; label: string }[];
+  pending: boolean;
+  error: string | null;
+  onMove: (folderId: string) => void;
+  onClose: () => void;
+}) {
+  const [folderId, setFolderId] = useState(options[0]?.id ?? "");
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mover a"
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+            <FolderInput className="size-4 text-brand-gold-dark dark:text-brand-gold" />
+            Mover a…
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <p className="mt-1 truncate text-xs text-muted-foreground">{itemName}</p>
+        {options.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No hay ninguna otra carpeta disponible para mover esto.
+          </p>
+        ) : (
+          <form
+            className="mt-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (folderId) {
+                onMove(folderId);
+              }
+            }}
+          >
+            <select
+              autoFocus
+              value={folderId}
+              onChange={(e) => {
+                setFolderId(e.target.value);
+              }}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
+            >
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {error && (
+              <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                {error}
+              </p>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-accent"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={!folderId || pending}
+                className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-brand-gold-dark disabled:opacity-40"
+              >
+                {pending ? "Moviendo…" : "Mover"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function countLabel(folder: ApiProjectFolder): string {
@@ -241,6 +391,10 @@ interface RowActions {
   dropTargetId: string | null;
   onDropTargetChange: (id: string | null) => void;
   onMoveInto: (payload: DragPayload, targetFolder: ApiProjectFolder) => void;
+  /** Alternativa táctil a arrastrar: abre el diálogo "Mover a…". El drag and
+   *  drop nativo no existe en teléfonos ni tablets, así que sin esto mover
+   *  algo sería imposible fuera de un mouse. */
+  onRequestMove: (kind: "folder" | "file", id: string, name: string) => void;
 }
 
 function readDragPayload(e: DragEvent): DragPayload | null {
@@ -375,9 +529,19 @@ function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions:
                 actions.onStartRename("folder", folder.id);
               }}
               title="Renombrar"
-              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
             >
               <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onRequestMove("folder", folder.id, folder.name);
+              }}
+              title="Mover a…"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+            >
+              <FolderInput className="size-3.5" />
             </button>
             <button
               type="button"
@@ -386,7 +550,7 @@ function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions:
               }}
               disabled={actions.busy}
               title="Borrar la carpeta y su contenido"
-              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -460,7 +624,7 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
           type="button"
           onClick={() => void filesApi.download(actions.projectId, file.id, file.name)}
           title="Descargar"
-          className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
         >
           <Download className="size-3.5" />
         </button>
@@ -472,9 +636,19 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
                 actions.onStartRename("file", file.id);
               }}
               title="Renombrar"
-              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
             >
               <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                actions.onRequestMove("file", file.id, file.name);
+              }}
+              title="Mover a…"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+            >
+              <FolderInput className="size-3.5" />
             </button>
             <button
               type="button"
@@ -483,7 +657,7 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
               }}
               disabled={actions.busy}
               title="Borrar archivo"
-              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
+              className="rounded-md p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950/40"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -536,17 +710,30 @@ function FolderCard({ folder, actions }: { folder: ApiProjectFolder; actions: Ro
       )}
     >
       {actions.canWrite && !folder.is_root && !isRenaming && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.onStartRename("folder", folder.id);
-          }}
-          title="Renombrar"
-          className="absolute right-2 top-2 rounded-md bg-card/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
-        >
-          <Pencil className="size-3.5" />
-        </button>
+        <div className="absolute right-2 top-2 flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onRequestMove("folder", folder.id, folder.name);
+            }}
+            title="Mover a…"
+            className="rounded-md bg-card/80 p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          >
+            <FolderInput className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onStartRename("folder", folder.id);
+            }}
+            title="Renombrar"
+            className="rounded-md bg-card/80 p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+        </div>
       )}
       <button
         type="button"
@@ -604,17 +791,30 @@ function FileCard({ file, actions }: { file: ApiProjectFile; actions: RowActions
       className="group relative flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand-gold/50 hover:bg-accent/40"
     >
       {actions.canWrite && !isRenaming && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.onStartRename("file", file.id);
-          }}
-          title="Renombrar"
-          className="absolute right-2 top-2 rounded-md bg-card/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
-        >
-          <Pencil className="size-3.5" />
-        </button>
+        <div className="absolute right-2 top-2 flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onRequestMove("file", file.id, file.name);
+            }}
+            title="Mover a…"
+            className="rounded-md bg-card/80 p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          >
+            <FolderInput className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onStartRename("file", file.id);
+            }}
+            title="Renombrar"
+            className="rounded-md bg-card/80 p-1 max-sm:p-2 text-muted-foreground opacity-0 transition-opacity max-sm:opacity-100 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+        </div>
       )}
       <button
         type="button"
@@ -693,6 +893,11 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const [renaming, setRenaming] = useState<DragPayload | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [moveRequest, setMoveRequest] = useState<{
+    kind: "folder" | "file";
+    id: string;
+    name: string;
+  } | null>(null);
 
   const root = query.data?.root;
 
@@ -791,6 +996,55 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
     }
   };
 
+  const moveOptions = useMemo(() => {
+    if (!moveRequest || !root) {
+      return [];
+    }
+    const exclude = new Set<string>();
+    if (moveRequest.kind === "folder") {
+      exclude.add(moveRequest.id);
+      const folder = findFolder(root, moveRequest.id);
+      if (folder) {
+        for (const id of collectDescendantIds(folder)) {
+          exclude.add(id);
+        }
+      }
+    }
+    return flattenMoveTargets(root, exclude);
+  }, [moveRequest, root]);
+
+  const submitMove = (folderId: string) => {
+    if (!moveRequest) {
+      return;
+    }
+    setMoveError(null);
+    if (moveRequest.kind === "folder") {
+      moveFolder.mutate(
+        { folderId: moveRequest.id, parentId: folderId },
+        {
+          onSuccess: () => {
+            setMoveRequest(null);
+          },
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover la carpeta"));
+          },
+        },
+      );
+    } else {
+      moveFile.mutate(
+        { fileId: moveRequest.id, folderId },
+        {
+          onSuccess: () => {
+            setMoveRequest(null);
+          },
+          onError: (err) => {
+            setMoveError(getErrorMessage(err, "No se pudo mover el archivo"));
+          },
+        },
+      );
+    }
+  };
+
   const actions: RowActions = {
     projectId,
     canWrite,
@@ -845,6 +1099,10 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
     dropTargetId,
     onDropTargetChange: setDropTargetId,
     onMoveInto: moveInto,
+    onRequestMove: (kind, id, name) => {
+      setMoveError(null);
+      setMoveRequest({ kind, id, name });
+    },
   };
 
   if (query.isLoading) {
@@ -866,6 +1124,19 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
           file={preview}
           onClose={() => {
             setPreview(null);
+          }}
+        />
+      )}
+      {moveRequest && (
+        <MoveToDialog
+          itemName={moveRequest.name}
+          options={moveOptions}
+          pending={moveFolder.isPending || moveFile.isPending}
+          error={moveError}
+          onMove={submitMove}
+          onClose={() => {
+            setMoveRequest(null);
+            setMoveError(null);
           }}
         />
       )}
