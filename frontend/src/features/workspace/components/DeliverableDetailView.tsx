@@ -369,35 +369,57 @@ function DeliveryTimeline({
 
 // ── Registrar entrega: una URL, o un archivo (elegido o arrastrado) ──────────
 
+/** Una subcarpeta del archivador del equipo, para elegir dónde cae la entrega. */
+export interface DeliveryFolderOption {
+  id: string;
+  label: string;
+}
+
 export interface RegisterDeliveryProps {
-  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
-  /** Entrega un archivo. Va por su propio camino (multipart) y el servidor lo
-   *  guarda en la carpeta del equipo —o en la de la persona, si la tarea es
-   *  individual—; sin él, el tipo "Archivo" no se ofrece. */
-  onUploadFile?: (file: File, note: string, observations: string) => void;
+  onAddVersion: (
+    v: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => void;
+  /** Entrega uno o varios archivos (uno por versión, en el mismo envío). Va
+   *  por su propio camino (multipart) y el servidor los guarda en la carpeta
+   *  del equipo —o en la de la persona, si la tarea es individual—; sin él,
+   *  el tipo "Archivo" no se ofrece. */
+  onUploadFiles?: (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => void;
   /** Hay una subida en vuelo. */
   uploading?: boolean;
   currentVersion: number;
   uploadedBy: string;
   /** Se llama tras registrar la entrega (para cerrar el modal que lo contiene). */
   onDone?: () => void;
+  /** Subcarpetas del equipo donde elegir dónde cae el archivo. Vacío/omitido
+   *  = el servidor decide (la carpeta del equipo tal cual). */
+  folderOptions?: DeliveryFolderOption[];
 }
 
 export function RegisterDelivery({
   onAddVersion,
-  onUploadFile,
+  onUploadFiles,
   uploading = false,
   currentVersion,
   uploadedBy,
   onDone,
+  folderOptions = [],
 }: RegisterDeliveryProps) {
   const [type, setType] = useState<ResourceType>("enlace");
   const [typeTouchedByUser, setTypeTouchedByUser] = useState(false);
   const [url, setUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [note, setNote] = useState("");
   const [observations, setObservations] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [markDelivered, setMarkDelivered] = useState(false);
+  const [folderId, setFolderId] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   // `dragenter`/`dragleave` también saltan al cruzar los hijos del recuadro:
   // sin contar las entradas, el aviso parpadearía al mover el ratón por dentro.
@@ -406,18 +428,22 @@ export function RegisterDelivery({
   const isFile = type === "archivo";
   // Sin manejador de subida el tipo "Archivo" ni se ofrece: mejor no enseñar
   // una opción que no lleva a ninguna parte.
-  const types = onUploadFile ? UPLOADABLE_RESOURCE_TYPES : URL_RESOURCE_TYPES;
+  const types = onUploadFiles ? UPLOADABLE_RESOURCE_TYPES : URL_RESOURCE_TYPES;
 
-  /** Soltar un archivo elige el tipo por ti: si has arrastrado algo, lo que
-   *  quieres entregar es eso, no una URL. */
-  const takeFile = (dropped: File) => {
-    setFile(dropped);
+  /** Soltar archivos elige el tipo por ti: si has arrastrado algo, lo que
+   *  quieres entregar es eso, no una URL. Se acumulan, no se reemplazan: una
+   *  entrega continua suele juntar varios archivos antes de mandarlos. */
+  const takeFiles = (dropped: File[]) => {
+    if (dropped.length === 0) {
+      return;
+    }
+    setFiles((prev) => [...prev, ...dropped]);
     setType("archivo");
     setTypeTouchedByUser(true);
   };
 
   const acceptsDrop = (e: DragEvent) =>
-    onUploadFile !== undefined && e.dataTransfer.types.includes("Files");
+    onUploadFiles !== undefined && e.dataTransfer.types.includes("Files");
 
   const dragHandlers = {
     onDragEnter: (e: DragEvent) => {
@@ -446,10 +472,7 @@ export function RegisterDelivery({
       e.preventDefault();
       dragDepth.current = 0;
       setDragging(false);
-      const dropped = e.dataTransfer.files[0];
-      if (dropped) {
-        takeFile(dropped);
-      }
+      takeFiles(Array.from(e.dataTransfer.files));
     },
   };
 
@@ -463,34 +486,45 @@ export function RegisterDelivery({
 
   const handleAdd = () => {
     if (isFile) {
-      if (!file) {
+      if (files.length === 0) {
         return;
       }
-      onUploadFile?.(file, note.trim() || file.name, observations.trim());
+      onUploadFiles?.(
+        files,
+        note.trim(),
+        observations.trim(),
+        markDelivered,
+        folderId || undefined,
+      );
     } else {
       if (!url.trim()) {
         return;
       }
-      onAddVersion({
-        type,
-        url: url.trim(),
-        uploadedBy,
-        uploadedAt: new Date().toISOString(),
-        note: note.trim() || `${RESOURCE_META[type].label} — V${currentVersion + 1}`,
-        observations: observations.trim(),
-      });
+      onAddVersion(
+        {
+          type,
+          url: url.trim(),
+          uploadedBy,
+          uploadedAt: new Date().toISOString(),
+          note: note.trim() || `${RESOURCE_META[type].label} — V${currentVersion + 1}`,
+          observations: observations.trim(),
+        },
+        markDelivered,
+      );
     }
     setUrl("");
-    setFile(null);
+    setFiles([]);
     setNote("");
     setObservations("");
     setTypeTouchedByUser(false);
     setType("enlace");
+    setMarkDelivered(false);
+    setFolderId("");
     onDone?.();
   };
 
   const meta = RESOURCE_META[type];
-  const ready = isFile ? file !== null : url.trim() !== "";
+  const ready = isFile ? files.length > 0 : url.trim() !== "";
 
   return (
     <div className="relative space-y-3" {...dragHandlers}>
@@ -535,9 +569,10 @@ export function RegisterDelivery({
             <input
               ref={fileInput}
               type="file"
+              multiple
               className="hidden"
               onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
+                takeFiles(Array.from(e.target.files ?? []));
                 // Se limpia para que elegir el MISMO archivo dos veces vuelva a
                 // disparar `change`.
                 e.target.value = "";
@@ -550,14 +585,56 @@ export function RegisterDelivery({
             >
               <Paperclip className="size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
-                {file ? file.name : "Elegir un archivo o arrastrarlo aquí…"}
+                {files.length > 0
+                  ? `${String(files.length)} archivo${files.length === 1 ? "" : "s"} elegido${files.length === 1 ? "" : "s"}`
+                  : "Elegir uno o varios archivos, o arrastrarlos aquí…"}
               </span>
-              {file && (
-                <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
-                  {formatFileSize(file.size)}
-                </span>
-              )}
             </button>
+            {files.length > 0 && (
+              <ul className="space-y-1">
+                {files.map((f, i) => (
+                  <li
+                    key={`${f.name}-${String(i)}`}
+                    className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-[12px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                    <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
+                      {formatFileSize(f.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiles((prev) => prev.filter((_, j) => j !== i));
+                      }}
+                      className="shrink-0 rounded-md p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {folderOptions.length > 0 && (
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Carpeta de destino
+                </label>
+                <select
+                  value={folderId}
+                  onChange={(e) => {
+                    setFolderId(e.target.value);
+                  }}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="">Carpeta del equipo (por defecto)</option>
+                  {folderOptions.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </>
         ) : (
           <input
@@ -588,6 +665,21 @@ export function RegisterDelivery({
           placeholder="Observaciones para el siguiente rol (ej: falta revisar el minuto 3). Solo lo ve el equipo, nunca el cliente."
           className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
         />
+        <label className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[12px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={markDelivered}
+            onChange={(e) => {
+              setMarkDelivered(e.target.checked);
+            }}
+            className="mt-0.5 size-3.5 shrink-0 accent-brand-gold"
+          />
+          <span>
+            <span className="font-medium">Marcar como entregada.</span> Si lo marcas, esta entrega
+            cierra la tarea. Si lo dejas sin marcar, queda registrada y puedes seguir subiendo
+            entregas hasta marcarla.
+          </span>
+        </label>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-slate-400 dark:text-slate-500">{meta.hint}</p>
           <button
@@ -623,10 +715,19 @@ interface DeliverableDetailViewProps {
   deletePending?: boolean;
   /** Error al borrar (se muestra en el diálogo de confirmación). */
   deleteError?: string | null;
-  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
-  /** Entrega un ARCHIVO (se guarda en la carpeta del equipo). Sin él, el
-   *  formulario solo ofrece los recursos por URL. */
-  onUploadFile?: (file: File, note: string, observations: string) => void;
+  onAddVersion: (
+    v: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => void;
+  /** Entrega uno o varios ARCHIVOS (se guardan en la carpeta del equipo). Sin
+   *  él, el formulario solo ofrece los recursos por URL. */
+  onUploadFiles?: (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => void;
   /** Hay una subida de archivo en vuelo. */
   uploadPending?: boolean;
   /** Corrige una entrega ya subida (no crea versión nueva). Solo si `canDeliver`. */
@@ -634,6 +735,8 @@ interface DeliverableDetailViewProps {
   onReview: (type: CommentType, reason: string) => void;
   /** Borra el entregable. Solo se ofrece a quien lo entregó. */
   onDelete?: () => void;
+  /** Subcarpetas del equipo donde elegir dónde cae el archivo entregado. */
+  folderOptions?: DeliveryFolderOption[];
 }
 
 export function DeliverableDetailView({
@@ -647,11 +750,12 @@ export function DeliverableDetailView({
   deletePending = false,
   deleteError = null,
   onAddVersion,
-  onUploadFile,
+  onUploadFiles,
   uploadPending = false,
   onEditVersion,
   onReview,
   onDelete,
+  folderOptions = [],
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
   const [showRegister, setShowRegister] = useState(false);
@@ -768,8 +872,9 @@ export function DeliverableDetailView({
           currentVersion={deliverable.versions.length}
           uploadedBy={currentUserId}
           onAddVersion={onAddVersion}
-          onUploadFile={onUploadFile}
+          onUploadFiles={onUploadFiles}
           uploading={uploadPending}
+          folderOptions={folderOptions}
           onClose={() => {
             setShowRegister(false);
           }}
@@ -802,15 +907,26 @@ function RegisterDeliveryModal({
   currentVersion,
   uploadedBy,
   onAddVersion,
-  onUploadFile,
+  onUploadFiles,
   uploading,
+  folderOptions,
   onClose,
 }: {
   currentVersion: number;
   uploadedBy: string;
-  onAddVersion: (v: Omit<DeliverableVersion, "id" | "versionNumber">) => void;
-  onUploadFile?: (file: File, note: string, observations: string) => void;
+  onAddVersion: (
+    v: Omit<DeliverableVersion, "id" | "versionNumber">,
+    markDelivered: boolean,
+  ) => void;
+  onUploadFiles?: (
+    files: File[],
+    note: string,
+    observations: string,
+    markDelivered: boolean,
+    folderId: string | undefined,
+  ) => void;
   uploading: boolean;
+  folderOptions?: DeliveryFolderOption[];
   onClose: () => void;
 }) {
   return (
@@ -843,11 +959,12 @@ function RegisterDeliveryModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <RegisterDelivery
             onAddVersion={onAddVersion}
-            onUploadFile={onUploadFile}
+            onUploadFiles={onUploadFiles}
             uploading={uploading}
             currentVersion={currentVersion}
             uploadedBy={uploadedBy}
             onDone={onClose}
+            folderOptions={folderOptions}
           />
         </div>
       </div>
