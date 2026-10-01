@@ -4,11 +4,11 @@ import { filesApi, type CreateFolderBody } from "../api/files.api";
 export const projectFilesKey = (projectId: string) => ["project-files", projectId] as const;
 const key = projectFilesKey;
 
-export function useProjectFiles(projectId: string) {
+export function useProjectFiles(projectId: string, enabled = true) {
   return useQuery({
     queryKey: key(projectId),
     queryFn: () => filesApi.tree(projectId),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && enabled,
   });
 }
 

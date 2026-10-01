@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOutletContext, useSearchParams } from "react-router";
 import {
+  ArrowLeft,
   BarChart3,
   CalendarRange,
   FolderArchive,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { AppOutletContext } from "@/components/layout/AppLayout";
+import { cn } from "@/lib/utils";
 import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
 import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -313,7 +315,14 @@ function MemberWorkspace() {
   const nodeTypesQuery = useNodeTypes(projectId);
   // Subcarpetas del equipo, para que al entregar un archivo se pueda elegir
   // dónde cae dentro de la estructura de carpetas que el equipo ya organizó.
-  const filesTreeQuery = useProjectFiles(projectId);
+  // Se pide solo cuando hace falta (la pestaña Archivos ya la pide por su
+  // cuenta, y el modal de entrega rápida se puede abrir desde Estructura o
+  // Tareas): traer el archivador completo del proyecto en CADA apertura del
+  // espacio de trabajo —incluso para quien solo mira "Tareas"— es una llamada
+  // de red que la mayoría de las visitas no necesita.
+  const wantsFolderOptions =
+    activeTab === "entregables" || activeTab === "archivos" || quickDeliverTaskId !== null;
+  const filesTreeQuery = useProjectFiles(projectId, wantsFolderOptions);
   const teamFolderOptions = useMemo<DeliveryFolderOption[]>(() => {
     const root = filesTreeQuery.data?.root;
     if (!root || !activeTeamId) {
@@ -806,8 +815,17 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "entregables" && (
-              <>
-                <div className="w-72 shrink-0 overflow-hidden border-r border-slate-200 dark:border-slate-800">
+              // En pantallas angostas las tres columnas (lista, detalle,
+              // comentarios) no caben una al lado de otra — por debajo de
+              // `lg` se apilan verticalmente y la lista se oculta en cuanto
+              // hay un entregable abierto, con un botón para volver a ella.
+              <div className="flex w-full flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+                <div
+                  className={cn(
+                    "w-full shrink-0 overflow-hidden border-b border-slate-200 lg:w-72 lg:border-b-0 lg:border-r dark:border-slate-800",
+                    selectedDeliverable && "hidden lg:block",
+                  )}
+                >
                   {deliverablesQuery.isLoading ? (
                     <div className="p-4">
                       <LoadingSkeleton rows={3} />
@@ -824,7 +842,16 @@ function MemberWorkspace() {
 
                 {selectedDeliverable ? (
                   <>
-                    <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-slate-200 lg:border-r dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDeliverableId(null);
+                        }}
+                        className="flex shrink-0 items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 text-[13px] font-medium text-slate-500 hover:bg-slate-50 lg:hidden dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
+                      >
+                        <ArrowLeft className="size-3.5" /> Volver a entregables
+                      </button>
                       <DeliverableDetailView
                         deliverable={selectedDeliverable}
                         members={members}
@@ -851,7 +878,7 @@ function MemberWorkspace() {
                         folderOptions={teamFolderOptions}
                       />
                     </div>
-                    <div className="flex w-[400px] shrink-0 flex-col overflow-hidden">
+                    <div className="flex h-80 w-full shrink-0 flex-col overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[400px] lg:border-l lg:border-t-0 dark:border-slate-800">
                       <FeedbackThread
                         comments={selectedDeliverable.comments}
                         members={members}
@@ -863,7 +890,7 @@ function MemberWorkspace() {
                 ) : (
                   <NoDeliverableSelected />
                 )}
-              </>
+              </div>
             )}
 
             {activeTab === "progreso" && (
