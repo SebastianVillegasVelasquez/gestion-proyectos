@@ -11,7 +11,32 @@ interface Props {
   value: string | null;
   onSelect: (workItemId: string | null) => void;
   onClose: () => void;
+  /** Textos del diálogo. Por defecto, los de «ubicar una tarea»; otros usos
+   *  (p. ej. filtrar un informe por una rama) los reemplazan. */
+  copy?: Partial<PickerCopy>;
 }
+
+interface PickerCopy {
+  title: string;
+  description: string;
+  /** Primera fila: lo que significa «ningún elemento». */
+  noneLabel: string;
+  /** Pie cuando no hay ningún elemento elegido. */
+  noneFooter: string;
+  confirmLabel: string;
+  emptyTree: string;
+}
+
+const DEFAULT_COPY: PickerCopy = {
+  title: "Ubicación en la estructura",
+  description:
+    "Elige el elemento del que cuelga esta tarea. Se reflejará en la estructura y en el cronograma.",
+  noneLabel: "Sin ubicación (tarea independiente)",
+  noneFooter: "Sin ubicación: la tarea queda suelta en el proyecto.",
+  confirmLabel: "Usar esta ubicación",
+  emptyTree:
+    "Este proyecto todavía no tiene estructura. Crea la tarea suelta y ubícala cuando exista.",
+};
 
 interface FlatRow {
   item: WorkItemTree;
@@ -65,7 +90,15 @@ function flatten(
  * elemento — los mismos que en la Estructura y el cronograma, para que sea el
  * mismo objeto en las tres pantallas.
  */
-export function WorkItemPickerModal({ tree, nodeTypes, value, onSelect, onClose }: Props) {
+export function WorkItemPickerModal({
+  tree,
+  nodeTypes,
+  value,
+  onSelect,
+  onClose,
+  copy: copyOverride,
+}: Props) {
+  const copy = { ...DEFAULT_COPY, ...copyOverride };
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(value);
@@ -132,12 +165,9 @@ export function WorkItemPickerModal({ tree, nodeTypes, value, onSelect, onClose 
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <FolderTree className="size-4 text-brand-teal" />
-              Ubicación en la estructura
+              {copy.title}
             </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Elige el elemento del que cuelga esta tarea. Se reflejará en la estructura y en el
-              cronograma.
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{copy.description}</p>
           </div>
           <button
             type="button"
@@ -183,14 +213,12 @@ export function WorkItemPickerModal({ tree, nodeTypes, value, onSelect, onClose 
             )}
           >
             <Slash className="size-3.5 shrink-0" />
-            Sin ubicación (tarea independiente)
+            {copy.noneLabel}
           </button>
 
           {rows.length === 0 ? (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-              {tree.length === 0
-                ? "Este proyecto todavía no tiene estructura. Crea la tarea suelta y ubícala cuando exista."
-                : "Ningún elemento coincide con la búsqueda."}
+              {tree.length === 0 ? copy.emptyTree : "Ningún elemento coincide con la búsqueda."}
             </p>
           ) : (
             <ul>
@@ -275,7 +303,7 @@ export function WorkItemPickerModal({ tree, nodeTypes, value, onSelect, onClose 
                 <span className="font-semibold text-foreground">{selectedRow.item.nombre}</span>
               </>
             ) : (
-              "Sin ubicación: la tarea queda suelta en el proyecto."
+              copy.noneFooter
             )}
           </p>
           <div className="flex shrink-0 gap-2">
@@ -293,7 +321,7 @@ export function WorkItemPickerModal({ tree, nodeTypes, value, onSelect, onClose 
               }}
               className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Usar esta ubicación
+              {copy.confirmLabel}
             </button>
           </div>
         </footer>
