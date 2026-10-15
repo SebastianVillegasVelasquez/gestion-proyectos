@@ -233,3 +233,18 @@ class TestProjectAnalytics:
         ov = r.json()["overview"]
         assert ov["total_tasks"] == 2  # A y B
         assert r.json()["filters"]["assignee_id"] == str(ana.id)
+
+    async def test_period_filter_keeps_tasks_due_inside_the_range(
+        self, client, admin_headers, analytics_project
+    ):
+        project, *_ = analytics_project
+        r = await client.get(
+            f"/api/v1/projects/{project.id}/analytics",
+            params={
+                "date_from": MON_16.isoformat(),
+                "date_to": FRI_20.isoformat(),
+            },
+            headers=admin_headers,
+        )
+        # Solo B (vence lun 16), C (mié 18) y la cancelada (lun 16): A vencía mié 11.
+        assert r.json()["overview"]["total_tasks"] == 3

@@ -605,6 +605,15 @@ def _passes(task: Task, f: AnalyticsFilters, subtree: set[UUID] | None) -> bool:
         return False
     if subtree is not None and task.work_item_id not in subtree:
         return False
+    if f.date_from is not None or f.date_to is not None:
+        # Periodo = tareas cuya fecha límite cae dentro del rango. Sin fecha
+        # límite no se puede situar en un periodo, así que quedan fuera.
+        if task.due_date is None:
+            return False
+        if f.date_from is not None and task.due_date < f.date_from:
+            return False
+        if f.date_to is not None and task.due_date > f.date_to:
+            return False
     return True
 
 
