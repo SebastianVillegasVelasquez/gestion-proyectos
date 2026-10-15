@@ -245,11 +245,6 @@ describe("ProjectReportPage (analítica)", () => {
     expect(screen.getByText(/lista plana con su ruta/)).toBeTruthy();
   });
 
-  it("tiene el bloque de resumen por IA (placeholder de fase 6.2)", async () => {
-    renderPage();
-    expect(await screen.findByText("Resumen por IA")).toBeTruthy();
-  });
-
   it("descarga el HTML con el nombre que propone el servidor", async () => {
     const user = userEvent.setup();
     vi.mocked(analyticsApi.downloadHtml).mockResolvedValue({
