@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import type { ProjectAnalytics } from "../../api/analytics.api";
 import { bdays } from "../../utils/format";
-import { BurnupChart } from "../viz/BurnupChart";
 import { HealthCard } from "../viz/HealthCard";
 import { KpiTile } from "../viz/KpiTile";
 import { PlanProgressCard } from "../viz/PlanProgressCard";
@@ -63,29 +62,19 @@ export function GeneralTab({ data }: { data: ProjectAnalytics }) {
 
       <PlanProgressCard plan={data.plan} />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[3fr_2fr]">
         <HealthCard health={data.health} />
         <StatusDonut overview={ov} />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card className="rounded-2xl shadow-sm">
-          <CardContent className="p-6">
-            <h3 className="mb-1 text-xl font-semibold tracking-tight text-foreground">
-              Avance en el tiempo
-            </h3>
-            <BurnupChart points={data.burnup.points} scope={data.burnup.total_scope} />
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl shadow-sm">
-          <CardContent className="p-6">
-            <h3 className="mb-3 text-xl font-semibold tracking-tight text-foreground">
-              Tareas completadas por semana
-            </h3>
-            <ThroughputChart weeks={ov.throughput_last_weeks} />
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="p-5 sm:p-6">
+          <h3 className="mb-4 text-xl font-semibold tracking-tight text-foreground">
+            Tareas completadas por semana
+          </h3>
+          <ThroughputChart weeks={ov.throughput_last_weeks} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

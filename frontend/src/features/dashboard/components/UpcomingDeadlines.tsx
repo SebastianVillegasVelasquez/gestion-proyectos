@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import type { Deadline } from "../types";
 
-const MAX_VISIBLE = 4;
+const MAX_VISIBLE = 3;
 
 /** Fila compacta: chip de fecha + título con la prioridad pegada al lado (antes
  *  iban en extremos opuestos por un `justify-between` y se leían desconectados);

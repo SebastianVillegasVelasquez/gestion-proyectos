@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { BarChart3, Download, Sparkles } from "lucide-react";
+import { BarChart3, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/utils/get-error-message";
 import { analyticsApi, type AnalyticsFilters as Filters } from "../api/analytics.api";
@@ -95,21 +95,6 @@ export function ProjectReportPage() {
       )}
 
       <AnalyticsFilters projectId={projectId} value={filters} onChange={setFilters} />
-
-      {/* Resumen por IA (fase 6.2): el bloque ya vive aquí; el texto llega al
-          conectar el módulo conversacional de OpenAI. */}
-      <section className="flex items-start gap-4 rounded-2xl border border-brand-gold/25 bg-gradient-to-r from-brand-gold-light/70 to-card p-5 shadow-sm dark:from-brand-gold/10">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-card text-brand-gold shadow-sm">
-          <Sparkles className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Resumen por IA</h2>
-          <p className="text-[15px] text-muted-foreground">
-            El resumen automático del informe se genera al conectar el módulo de IA (Fase 6.2).
-            Mientras tanto, revisa las secciones de abajo.
-          </p>
-        </div>
-      </section>
 
       <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist">
         {TABS.map((t) => (

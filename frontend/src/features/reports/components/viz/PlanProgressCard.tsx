@@ -86,7 +86,7 @@ export function PlanProgressCard({ plan }: { plan: PlanProgress }) {
   const badge = STATUS_BADGE[plan.status];
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-semibold tracking-tight text-foreground">
@@ -137,15 +137,17 @@ export function PlanProgressCard({ plan }: { plan: PlanProgress }) {
           />
           <span className="absolute right-0 top-1/2 size-4 -translate-y-1/2 rounded-full border-2 border-border bg-card" />
         </div>
-        <div className="relative mt-2 flex items-start justify-between text-[13px]">
+        {/* En pantallas estrechas «hoy» baja a su propia línea en vez de
+            solaparse con las fechas de inicio y cierre. */}
+        <div className="mt-2 grid grid-cols-2 gap-y-1 text-[13px] sm:grid-cols-3">
           <span>
             <strong className="font-semibold text-foreground">{fullDate(plan.window_start)}</strong>{" "}
             <span className="text-muted-foreground">· inicio</span>
           </span>
-          <span className="absolute left-1/2 -translate-x-1/2 text-center text-xs font-semibold text-brand-gold-dark sm:text-[13px]">
+          <span className="order-last col-span-2 text-center text-xs font-semibold text-brand-gold-dark sm:order-none sm:col-span-1 sm:text-[13px]">
             Hoy {dayMonth(plan.today)} · día {plan.day_index} de {plan.total_days}
           </span>
-          <span>
+          <span className="text-right">
             <strong className="font-semibold text-foreground">{fullDate(plan.window_end)}</strong>{" "}
             <span className="text-muted-foreground">· cierre</span>
           </span>

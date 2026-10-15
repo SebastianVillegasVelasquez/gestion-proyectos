@@ -27,7 +27,13 @@ function Card({ className, accent, interactive, ...props }: CardProps) {
 
 function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   // Padding más ajustado en móvil; a partir de `sm` recupera el del diseño.
-  return <div className={cn("flex flex-col space-y-1 p-4 sm:p-5", className)} {...props} />;
+  return (
+    <div
+      data-slot="card-header"
+      className={cn("flex flex-col space-y-1 p-4 sm:p-5", className)}
+      {...props}
+    />
+  );
 }
 
 // `ref` incluido en las props: React 19 lo trata como una prop normal en
@@ -38,7 +44,17 @@ function CardContent({
   ref,
   ...props
 }: HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
-  return <div ref={ref} className={cn("p-4 pt-0 sm:p-5 sm:pt-0", className)} {...props} />;
+  // El `pt-0` solo corresponde cuando el contenido va justo debajo de un
+  // CardHeader (que ya aporta su propio padding inferior). Fijarlo siempre
+  // dejaba sin aire arriba a las tarjetas sin cabecera —a partir de `sm`, donde
+  // `sm:pt-0` ganaba a cualquier `py-*` que se pasara por className—.
+  return (
+    <div
+      ref={ref}
+      className={cn("p-4 sm:p-5 [[data-slot=card-header]+&]:pt-0", className)}
+      {...props}
+    />
+  );
 }
 
 function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
