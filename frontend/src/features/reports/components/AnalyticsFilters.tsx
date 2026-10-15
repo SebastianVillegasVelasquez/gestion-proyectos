@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { FolderTree, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/features/projects/types/labels";
 import { useProjectMembers } from "@/features/projects/hooks/use-members";
 import { useTeams } from "@/features/projects/hooks/use-teams";
-import { useWorkTree } from "@/features/projects/hooks/use-structure";
+import { useNodeTypes, useWorkTree } from "@/features/projects/hooks/use-structure";
+import { WorkItemPickerModal } from "@/features/projects/tasks/WorkItemPickerModal";
 import type { TaskPriority, TaskStatus } from "@/features/projects/types/api.types";
 import type { AnalyticsFilters as Filters } from "../api/analytics.api";
 import { PERIOD_PRESETS, activePreset } from "../utils/period-presets";
@@ -70,6 +71,8 @@ export function AnalyticsFilters({
   const teams = useTeams(projectId);
   const members = useProjectMembers(projectId);
   const tree = useWorkTree(projectId);
+  const nodeTypes = useNodeTypes(projectId);
+  const [browsingTree, setBrowsingTree] = useState(false);
   const structure = useMemo(() => flattenStructure(tree.data ?? []), [tree.data]);
 
   const set = (patch: Partial<Filters>) => {
@@ -272,14 +275,31 @@ export function AnalyticsFilters({
 
       <div className="mt-4">
         <Field label="Estructura">
-          <StructurePicker
-            options={structure}
-            value={value.work_item_id}
-            loading={tree.isLoading}
-            onChange={(id) => {
-              set({ work_item_id: id });
-            }}
-          />
+          <div className="flex gap-2">
+            {/* Escribir para buscar… */}
+            <div className="min-w-0 flex-1">
+              <StructurePicker
+                options={structure}
+                value={value.work_item_id}
+                loading={tree.isLoading}
+                onChange={(id) => {
+                  set({ work_item_id: id });
+                }}
+              />
+            </div>
+            {/* …o abrir el árbol completo y elegir mirándolo. */}
+            <button
+              type="button"
+              onClick={() => {
+                setBrowsingTree(true);
+              }}
+              disabled={structure.length === 0}
+              className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:border-brand-gold/60 hover:bg-accent disabled:opacity-60"
+            >
+              <FolderTree className="size-4 text-brand-teal" />
+              <span className="hidden sm:inline">Ver árbol</span>
+            </button>
+          </div>
         </Field>
       </div>
 
@@ -301,6 +321,29 @@ export function AnalyticsFilters({
             Limpiar todo
           </button>
         </div>
+      )}
+
+      {browsingTree && (
+        <WorkItemPickerModal
+          tree={tree.data ?? []}
+          nodeTypes={nodeTypes.data ?? []}
+          value={value.work_item_id ?? null}
+          onSelect={(id) => {
+            set({ work_item_id: id ?? undefined });
+          }}
+          onClose={() => {
+            setBrowsingTree(false);
+          }}
+          copy={{
+            title: "Filtrar por la estructura",
+            description:
+              "Elige un elemento: el informe mostrará solo su rendimiento y el de todo lo que cuelga de él.",
+            noneLabel: "Toda la estructura",
+            noneFooter: "Sin filtro: se muestra todo el proyecto.",
+            confirmLabel: "Filtrar por este elemento",
+            emptyTree: "Este proyecto todavía no tiene estructura.",
+          }}
+        />
       )}
     </section>
   );

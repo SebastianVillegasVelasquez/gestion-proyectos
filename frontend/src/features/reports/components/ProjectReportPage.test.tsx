@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -24,7 +24,10 @@ vi.mock("@/features/projects/hooks/use-members", () => ({
   useProjectMembers: () => ({ data: [] }),
 }));
 vi.mock("@/features/projects/hooks/use-structure", () => ({
-  useWorkTree: () => ({ data: [] }),
+  useWorkTree: () => ({
+    data: [{ id: "e1", nombre: "Unidad 1", tipo_id: "tp1", children: [] }],
+  }),
+  useNodeTypes: () => ({ data: [] }),
 }));
 
 function renderPage() {
@@ -243,6 +246,29 @@ describe("ProjectReportPage (analítica)", () => {
     expect(screen.queryByText("iniciadas al 60%")).toBeNull();
     expect(screen.getByText("Clase A")).toBeTruthy();
     expect(screen.getByText(/lista plana con su ruta/)).toBeTruthy();
+  });
+
+  it("ya no muestra el bloque de resumen por IA", async () => {
+    renderPage();
+    await screen.findByText("Avance frente al plan");
+    expect(screen.queryByText("Resumen por IA")).toBeNull();
+  });
+
+  it("filtra por estructura eligiendo un elemento en el árbol emergente", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Avance frente al plan");
+
+    await user.click(screen.getByRole("button", { name: /Ver árbol/ }));
+    const dialog = screen.getByRole("dialog", { name: /ubicación en la estructura/i });
+    await user.click(within(dialog).getByRole("button", { name: /Unidad 1/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Filtrar por este elemento" }));
+
+    await waitFor(() => {
+      expect(analyticsApi.get).toHaveBeenLastCalledWith("p1", { work_item_id: "e1" });
+    });
+    // …y queda como pastilla que se puede quitar.
+    expect(screen.getByText("Estructura: Unidad 1")).toBeTruthy();
   });
 
   it("descarga el HTML con el nombre que propone el servidor", async () => {
