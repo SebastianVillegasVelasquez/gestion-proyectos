@@ -36,7 +36,7 @@ export function StatusDonut({ overview }: { overview: AnalyticsOverview }) {
   }));
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <h3 className="text-xl font-semibold tracking-tight text-foreground">
         Distribución por estado
       </h3>

@@ -1,99 +1,78 @@
-import { useState } from "react";
 import type { WeekCount } from "../../api/analytics.api";
 
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** "2026-03-09" -> "9 mar" */
 function shortDate(iso: string): string {
   const [, m, d] = iso.split("-").map(Number);
-  const months = [
-    "ene",
-    "feb",
-    "mar",
-    "abr",
-    "may",
-    "jun",
-    "jul",
-    "ago",
-    "sep",
-    "oct",
-    "nov",
-    "dic",
-  ];
-  return `${String(d)} ${months[m - 1] ?? ""}`;
+  return `${String(d)} ${MONTHS[m - 1] ?? ""}`;
 }
 
 /**
- * Tareas completadas por semana (throughput). Una sola serie -> sin leyenda,
- * el título la nombra. Magnitud: barras desde la línea base.
+ * Tareas completadas por semana (throughput). Una sola serie, así que no lleva
+ * leyenda: el título la nombra. Cada barra trae su cifra encima y su semana
+ * debajo, de modo que se lee igual en un móvil que en un monitor grande; la
+ * altura crece con el ancho disponible.
  */
 export function ThroughputChart({ weeks }: { weeks: WeekCount[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...weeks.map((w) => w.count), 1);
-  const n = weeks.length;
-  if (n === 0) {
+  if (weeks.length === 0) {
     return <p className="text-xs text-muted-foreground">Sin datos.</p>;
   }
-  const slot = 100 / n;
-  const barW = slot * 0.62;
+  const max = Math.max(...weeks.map((w) => w.count), 1);
+  const total = weeks.reduce((sum, w) => sum + w.count, 0);
 
   return (
     <div className="viz-root">
-      <div className="relative h-40 w-full">
-        <svg
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="absolute inset-0 h-full w-full"
-        >
-          <line
-            x1="0"
-            x2="100"
-            y1="100"
-            y2="100"
-            stroke="var(--viz-grid)"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
+      <div className="relative h-52 sm:h-64 lg:h-72">
+        {/* Guías horizontales a ¼, ½ y ¾ de la escala. */}
+        {[25, 50, 75].map((pct) => (
+          <div
+            key={pct}
+            aria-hidden
+            className="absolute inset-x-0 border-t border-dashed"
+            style={{ bottom: `${String(pct)}%`, borderColor: "var(--viz-grid)" }}
           />
-          {weeks.map((w, i) => {
-            const h = (w.count / max) * 96;
-            return (
-              <rect
-                key={w.week_start}
-                x={i * slot + (slot - barW) / 2}
-                y={100 - h}
-                width={barW}
-                height={Math.max(h, w.count > 0 ? 1 : 0)}
-                fill="var(--viz-s1)"
-                opacity={hover == null || hover === i ? 1 : 0.55}
-                onMouseEnter={() => {
-                  setHover(i);
-                }}
-                onMouseLeave={() => {
-                  setHover(null);
+        ))}
+        <div
+          className="absolute inset-0 flex items-end gap-1.5 border-b sm:gap-3"
+          style={{ borderColor: "var(--viz-grid)" }}
+        >
+          {weeks.map((w) => (
+            <div
+              key={w.week_start}
+              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+              title={`Semana del ${shortDate(w.week_start)}: ${String(w.count)} completada${w.count === 1 ? "" : "s"}`}
+            >
+              <span className="mb-1 text-[11px] font-semibold tabular-nums text-foreground sm:text-xs">
+                {w.count}
+              </span>
+              <div
+                className="w-full max-w-14 rounded-t-md transition-[height] duration-500"
+                style={{
+                  // 88 %: deja aire arriba para la cifra de la barra más alta.
+                  height: `${String((w.count / max) * 88)}%`,
+                  minHeight: w.count > 0 ? 3 : 0,
+                  background: "var(--viz-s1)",
                 }}
               />
-            );
-          })}
-        </svg>
-        <span className="absolute -left-1 top-0 -translate-x-full text-[10px] tabular-nums text-muted-foreground">
-          {max}
-        </span>
-
-        {hover != null && (
-          <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-md border border-border bg-card px-2 py-1 text-[11px] shadow-sm"
-            style={{ left: `${((hover + 0.5) * slot).toFixed(2)}%`, top: 0 }}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 flex gap-1.5 sm:gap-3">
+        {weeks.map((w) => (
+          <span
+            key={w.week_start}
+            className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground sm:text-xs"
           >
-            <div className="font-medium text-foreground">
-              Semana del {shortDate(weeks[hover].week_start)}
-            </div>
-            <div className="tabular-nums text-muted-foreground">
-              {weeks[hover].count} completada{weeks[hover].count === 1 ? "" : "s"}
-            </div>
-          </div>
-        )}
+            {shortDate(w.week_start)}
+          </span>
+        ))}
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-        <span>{shortDate(weeks[0].week_start)}</span>
-        <span>{shortDate(weeks[n - 1].week_start)}</span>
-      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        {total} tarea{total === 1 ? "" : "s"} completada{total === 1 ? "" : "s"} en las últimas{" "}
+        {weeks.length} semanas · semana que empieza el día indicado
+      </p>
     </div>
   );
 }

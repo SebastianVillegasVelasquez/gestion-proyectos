@@ -23,7 +23,7 @@ function share(count: number, total: number): number {
 export function HealthCard({ health }: { health: Health }) {
   const visible = SEGMENTS.filter((s) => health[s.key] > 0);
   return (
-    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <h3 className="text-xl font-semibold tracking-tight text-foreground">
         Salud de las {health.total} tareas
       </h3>
