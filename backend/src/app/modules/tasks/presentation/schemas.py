@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 from uuid import UUID
 
 from pydantic import Field, StringConstraints, model_validator
@@ -441,3 +441,51 @@ class TaskHistoryResponse(BaseModelConfig):
 
     # Datos del autor del cambio gracias a la relación changed_by
     changed_by: UserAuditResponse
+
+
+###############
+# Avance declarado + evidencia
+###############
+
+
+class ProgressEvidenceResponse(BaseModelConfig):
+    """Lo que respalda una edición de avance: un archivo de la tarea o una
+    versión de su entregable. `file_id` permite abrirlo desde el archivador."""
+
+    kind: Literal["file", "deliverable_version"]
+    ref_id: UUID
+    file_id: Optional[UUID] = None
+    label: str
+    content_type: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class TaskProgressUpdateResponse(BaseModelConfig):
+    id: UUID
+    previous_pct: int
+    new_pct: int
+    note: Optional[str] = None
+    author_id: UUID
+    author_name: str
+    created_at: datetime
+    evidence: Optional[ProgressEvidenceResponse] = None
+
+
+class TaskProgressResponse(BaseModelConfig):
+    """Estado del avance de una tarea para su pantalla de edición.
+
+    `can_edit` ya trae resuelto quién y cuándo puede editar; `locked_reason`
+    es el texto a mostrar cuando no. La UI no re-deduce la política.
+    """
+
+    task_id: UUID
+    project_id: UUID
+    progress_pct: int
+    manual_progress_pct: Optional[int] = None
+    can_edit: bool
+    locked_reason: Optional[str] = None
+    # True si la tarea ya tiene un entregable al que se puede sumar el archivo.
+    has_deliverable: bool = False
+    updates: list[TaskProgressUpdateResponse] = []
+    # Evidencia ya vinculada a la tarea que se puede reutilizar en otra edición.
+    evidence_options: list[ProgressEvidenceResponse] = []
