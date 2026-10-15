@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/SideBar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
+import { ViewAsBanner } from "@/components/layout/ViewAsSwitcher";
 import { FirstLoginPasswordGate } from "@/features/auth/components/FirstLoginPasswordGate";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
 
@@ -84,6 +85,7 @@ export const AppLayout = () => {
         />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <ViewAsBanner />
           {/* Mobile-only topbar */}
           <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
             <div className="flex items-center gap-3">
