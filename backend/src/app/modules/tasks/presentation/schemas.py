@@ -215,6 +215,9 @@ class TaskResponse(TaskBase):
     # avance de las subtareas, sin llegar a 100 hasta que el entregable padre
     # se aprueba. Se calcula en lectura (rollup de las hojas hacia arriba).
     progress_pct: int = 0
+    # Porcentaje declarado por el responsable (con evidencia). `None` = nunca
+    # lo editó y el avance sale del estado. Solo aplica a tareas sin subtareas.
+    manual_progress_pct: Optional[int] = None
     # True solo si la tarea depende (FtS) de una «actividad de terceros». La
     # estructura muestra la etiqueta "Depende de terceros".
     depends_on_third_party: bool = False
