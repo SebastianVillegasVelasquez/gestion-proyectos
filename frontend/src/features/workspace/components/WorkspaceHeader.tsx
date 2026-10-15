@@ -1,10 +1,13 @@
 import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProjectBadge } from "@/components/common/EntityBadge";
 import type { WorkspaceMember } from "../types";
 
 interface HeaderTeam {
   id: string;
   name: string;
+  project_id?: string;
+  project_name?: string | null;
 }
 
 interface WorkspaceHeaderProps {
@@ -33,6 +36,10 @@ export function WorkspaceHeader({
   const others = members.filter((m) => m.id !== leader?.id);
   const visible = others.slice(0, 4);
   const hiddenCount = others.length - visible.length;
+  const activeTeam = teams.find((t) => t.id === activeTeamId);
+  // Con varios proyectos, el mismo nombre de equipo puede repetirse: el proyecto
+  // va siempre al lado, con su color, y también dentro del selector.
+  const teamLabel = (t: HeaderTeam) => (t.project_name ? `${t.name} · ${t.project_name}` : t.name);
 
   return (
     <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
@@ -51,7 +58,7 @@ export function WorkspaceHeader({
             >
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {teamLabel(t)}
                 </option>
               ))}
             </select>
@@ -59,6 +66,13 @@ export function WorkspaceHeader({
           </div>
         ) : (
           <h1 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50">{name}</h1>
+        )}
+        {activeTeam?.project_name && (
+          <ProjectBadge
+            name={activeTeam.project_name}
+            seed={activeTeam.project_id}
+            className="mt-1 text-[12px] font-medium text-slate-500 dark:text-slate-400"
+          />
         )}
         {description && (
           <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">

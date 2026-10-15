@@ -23,6 +23,7 @@ import {
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProjectMark } from "@/components/common/EntityBadge";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EditProgressButton } from "@/features/task-progress/components/EditProgressButton";
 import { canOfferProgressEdit } from "@/features/task-progress/utils";
@@ -496,7 +497,13 @@ function TaskRow({
                 Subtarea de «{detachedParentTitle}» ·{" "}
               </span>
             )}
-            <Crumb path={pathOf(task)} /> · {task.project_name}
+            <Crumb path={pathOf(task)} /> ·{" "}
+            <ProjectMark
+              name={task.project_name}
+              seed={task.project_id}
+              className="mr-1 -translate-y-px align-middle"
+            />
+            {task.project_name}
           </span>
         </p>
         <ThirdPartyDepBadge task={task} />
