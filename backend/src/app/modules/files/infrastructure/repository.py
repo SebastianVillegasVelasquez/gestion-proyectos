@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
+from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_models import (
@@ -222,6 +223,15 @@ class ProjectFilesRepository:
             version.file_id: (version, deliverable)
             for version, deliverable in rows.all()
         }
+
+    async def task_titles(self, task_ids: list[UUID]) -> dict[UUID, str]:
+        """Título de cada tarea con archivos vinculados, en una sola consulta."""
+        if not task_ids:
+            return {}
+        rows = await self._session.execute(
+            select(Task.id, Task.title).where(Task.id.in_(task_ids))
+        )
+        return {tid: title for tid, title in rows.all()}
 
     async def add_file(self, file: ProjectFile) -> ProjectFile:
         self._session.add(file)

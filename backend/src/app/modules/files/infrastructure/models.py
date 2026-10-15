@@ -143,5 +143,16 @@ class ProjectFile(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True,
     )
 
+    # Tarea a la que este archivo da soporte (entrega o evidencia de avance).
+    # Es el eslabón de trazabilidad archivo ⇄ tarea: sin él un archivo solo se
+    # sabía "del equipo", no "de qué trabajo". NULL = archivo suelto del
+    # archivador. `SET NULL`: borrar la tarea no debe llevarse el archivo.
+    task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     folder: Mapped["ProjectFolder"] = relationship("ProjectFolder")
     author: Mapped[Optional["User"]] = relationship("User")

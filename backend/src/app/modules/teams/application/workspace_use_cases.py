@@ -282,6 +282,7 @@ class WorkspaceService:
             content=content,
             uploader_id=current_user.id,
             folder_id=folder_id,
+            task_id=deliverable.task_id,
         )
         await self._repo.add_version(
             DeliverableVersion(
