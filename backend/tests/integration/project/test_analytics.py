@@ -234,6 +234,28 @@ class TestProjectAnalytics:
         assert ov["total_tasks"] == 2  # A y B
         assert r.json()["filters"]["assignee_id"] == str(ana.id)
 
+    async def test_plan_health_and_components(
+        self, client, admin_headers, analytics_project
+    ):
+        project, *_ = analytics_project
+        r = await client.get(
+            f"/api/v1/projects/{project.id}/analytics", headers=admin_headers
+        )
+        body = r.json()
+
+        # La salud no cuenta la cancelada y suma lo que hay que entregar.
+        assert body["health"]["total"] == 3
+        assert body["health"]["completed"] == 2
+        assert body["plan"]["completed_tasks"] == 2
+        assert body["plan"]["status"] in {"on_track", "watch", "at_risk"}
+
+        # Un único componente (la unidad) con las 3 tareas vivas y avance
+        # parcial de la que sigue en curso.
+        [unit] = body["components"]
+        assert (unit["total"], unit["completed"], unit["started"]) == (3, 2, 1)
+        assert unit["completed_pct"] == 67
+        assert unit["started_progress_pct"] == 35  # por estado: en progreso
+
     async def test_period_filter_keeps_tasks_due_inside_the_range(
         self, client, admin_headers, analytics_project
     ):

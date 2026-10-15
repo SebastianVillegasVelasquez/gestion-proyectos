@@ -88,6 +88,56 @@ class TaskRowResponse(BaseModelConfig):
     slip_bdays: int | None = None
     returns: int
     versions: int
+    progress_pct: int
+
+
+class PlanProgressResponse(BaseModelConfig):
+    """Lo esperado hoy según el cronograma frente a lo realmente completado."""
+
+    window_start: str
+    window_end: str
+    today: str
+    day_index: int
+    total_days: int
+    expected_tasks: int
+    expected_pct: int
+    completed_tasks: int
+    completed_pct: int
+    gap_pts: int
+    status: str
+
+
+class HealthResponse(BaseModelConfig):
+    total: int
+    completed: int
+    on_track: int
+    at_risk: int
+    overdue: int
+
+
+class ComponentStatsResponse(BaseModelConfig):
+    """Estado de un componente de la estructura, sumando todo lo que cuelga de él."""
+
+    id: UUID
+    parent_id: UUID | None = None
+    name: str
+    tipo_id: UUID | None = None
+    tipo_nombre: str | None = None
+    depth: int
+    path: list[str]
+    child_count: int
+    direct_tasks: int
+    total: int
+    completed: int
+    started: int
+    not_started: int
+    overdue: int
+    at_risk: int
+    completed_pct: int
+    started_pct: int
+    progress_pct: int
+    started_progress_pct: int
+    state: str
 
 
 class ProjectAnalyticsResponse(BaseModelConfig):
@@ -97,7 +147,10 @@ class ProjectAnalyticsResponse(BaseModelConfig):
     filters: dict[str, str | None]
     overview: OverviewResponse
     burnup: BurnupResponse
+    plan: PlanProgressResponse
+    health: HealthResponse
     by_team: list[TeamPerformanceResponse]
     by_person: list[PersonPerformanceResponse]
     delivery_lapses: list[DeliveryLapseResponse]
     tasks: list[TaskRowResponse]
+    components: list[ComponentStatsResponse]
