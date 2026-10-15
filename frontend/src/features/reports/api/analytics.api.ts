@@ -77,7 +77,71 @@ export interface AnalyticsTaskRow {
   slip_bdays: number | null;
   returns: number;
   versions: number;
+  /** Avance de la tarea: declarado por su responsable, por estado o de subtareas. */
+  progress_pct: number;
 }
+
+export type PlanStatus = "on_track" | "watch" | "at_risk";
+/** Lo esperado hoy según el cronograma frente a lo realmente completado. */
+export interface PlanProgress {
+  window_start: string;
+  window_end: string;
+  today: string;
+  day_index: number;
+  total_days: number;
+  expected_tasks: number;
+  expected_pct: number;
+  completed_tasks: number;
+  completed_pct: number;
+  /** esperado - real, en puntos; positivo = por detrás del plan. */
+  gap_pts: number;
+  status: PlanStatus;
+}
+
+/** Salud de las tareas vivas (sin canceladas). */
+export interface Health {
+  total: number;
+  completed: number;
+  on_track: number;
+  at_risk: number;
+  overdue: number;
+}
+
+export type ComponentState =
+  | "sin_tareas"
+  | "sin_iniciar"
+  | "en_curso"
+  | "en_riesgo"
+  | "atrasada"
+  | "completada";
+
+/** Estado de un componente de la estructura sumando TODO lo que cuelga de él.
+ *  Llegan en orden de árbol (cada padre antes que sus hijos). */
+export interface ComponentStats {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  tipo_id: string | null;
+  tipo_nombre: string | null;
+  depth: number;
+  path: string[];
+  child_count: number;
+  direct_tasks: number;
+  total: number;
+  completed: number;
+  started: number;
+  not_started: number;
+  overdue: number;
+  at_risk: number;
+  completed_pct: number;
+  started_pct: number;
+  /** Media del avance de todas las tareas: cuenta también el trabajo empezado. */
+  progress_pct: number;
+  /** Cuánto llevan, de media, las tareas ya iniciadas. */
+  started_progress_pct: number;
+  state: ComponentState;
+}
+
 export interface ProjectAnalytics {
   project_id: string;
   project_name: string;
@@ -85,10 +149,13 @@ export interface ProjectAnalytics {
   filters: Record<string, string | null>;
   overview: AnalyticsOverview;
   burnup: Burnup;
+  plan: PlanProgress;
+  health: Health;
   by_team: TeamPerformance[];
   by_person: PersonPerformance[];
   delivery_lapses: DeliveryLapse[];
   tasks: AnalyticsTaskRow[];
+  components: ComponentStats[];
 }
 
 export interface AnalyticsFilters {
