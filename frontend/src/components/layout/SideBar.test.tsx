@@ -16,8 +16,23 @@ vi.mock("react-router", () => ({
 }));
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { name: "Ana López", role: authState.role }, isAuthenticated: true }),
+  useAuth: () => ({
+    user: { name: "Ana López", role: authState.role },
+    isAuthenticated: true,
+    hasRole: () => false,
+    realRole: authState.role,
+    viewAsRole: null,
+    // Sin roles inferiores que previsualizar: el conmutador «Ver como…» no sale.
+    previewableRoles: [],
+    setViewAsRole: vi.fn(),
+  }),
   useLogout: () => ({ mutate: logoutMutate, isPending: false }),
+}));
+
+// El selector de proyecto activo consulta proyectos/equipos/tareas: aquí no hay
+// nada que elegir.
+vi.mock("@/features/projects/hooks/use-project-scope-options", () => ({
+  useProjectScopeOptions: () => [],
 }));
 
 // El pie del sidebar incluye <NotificationBell/>, que consulta el backend.
