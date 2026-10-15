@@ -45,7 +45,7 @@ export function UserDashboardPage() {
     // los tres paneles caben de verdad uno al lado del otro. En lg lo hacía
     // igual y el contenido que sobraba —los vencimientos al desplegar "ver
     // más"— quedaba recortado y sin forma de alcanzarlo.
-    <div className="flex flex-col gap-3 overflow-y-auto p-4 sm:p-5 xl:h-full xl:overflow-hidden">
+    <div className="flex flex-col gap-3 overflow-y-auto p-4 sm:p-5 xl:h-full">
       <DashboardHeader
         name={user?.name ?? "Usuario"}
         date={TODAY_FORMATTER.format(today)}
@@ -75,7 +75,7 @@ export function UserDashboardPage() {
       {/* En lg se repartía en 4 columnas y el tablero (que a su vez tiene tres
           columnas dentro) quedaba en ~250 px por columna. Ahora en lg son dos
           filas de dos y solo en xl se abre a cuatro. */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:min-h-[22rem] xl:flex-1 xl:grid-cols-4">
         <div className="flex min-h-[280px] flex-col lg:col-span-2 xl:min-h-0">
           <TaskBoard tasks={tasks} />
         </div>
@@ -94,7 +94,7 @@ export function UserDashboardPage() {
 
       {/* Vencimientos propios + el pulso de los equipos que lidero. Para un
           integrante sin equipos a cargo, el segundo panel muestra su vacío. */}
-      <div className="grid grid-cols-1 gap-3 lg:shrink-0 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-3 lg:shrink-0 xl:grid-cols-2">
         <UpcomingDeadlines
           deadlines={deadlines}
           deliveredLast7d={summaryQuery.data?.delivered_last_7d}

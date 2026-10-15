@@ -23,7 +23,7 @@ import { useMyTeamActivity, useRecentActivity } from "../hooks/use-dashboard-sum
 import type { ActivityItem, ActivityKind } from "../types";
 
 // Cuántos eventos se ven plegado / desplegado (el backend trae hasta 10).
-const COLLAPSED = 5;
+const COLLAPSED = 3;
 const EXPANDED = 10;
 
 // Cada tipo de evento del historial de tareas se traduce a un verbo, un icono y

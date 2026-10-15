@@ -33,7 +33,7 @@ export function DashboardPage() {
   const deadlines = panels ? panels.upcoming_deadlines.map((d) => toDeadline(d, today)) : [];
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-8 lg:h-full lg:overflow-hidden">
+    <div className="flex flex-col gap-3 px-4 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-8 lg:h-full lg:overflow-y-auto">
       <DashboardHeader
         name={user?.name ?? "Usuario"}
         date={TODAY_FORMATTER.format(today)}
@@ -49,7 +49,7 @@ export function DashboardPage() {
         isError={summaryQuery.isError}
       />
 
-      <div className="grid min-h-0 grid-cols-1 gap-3 lg:flex-1 lg:grid-cols-4">
+      <div className="grid min-h-0 grid-cols-1 gap-3 lg:min-h-[22rem] lg:flex-1 lg:grid-cols-4">
         <div className="flex min-h-0 flex-col lg:col-span-3">
           <TaskBoard tasks={tasks} />
         </div>
@@ -58,7 +58,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:shrink-0">
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 lg:shrink-0">
         <UpcomingDeadlines deadlines={deadlines} />
         <ActivityPanel />
       </div>
