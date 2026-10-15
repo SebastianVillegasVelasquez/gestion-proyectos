@@ -97,6 +97,9 @@ class ProjectFilesService:
         by_id = {f.id: f for f in folders}
         teams = {t.id: t.name for t in await self._repo.list_project_teams(project_id)}
         deliveries = await self._repo.deliveries_by_file(project_id)
+        task_titles = await self._repo.task_titles(
+            list({f.task_id for f in files if f.task_id is not None})
+        )
 
         # El recorte se hace en el PRIMER NIVEL y no archivo por archivo: como
         # cada carpeta de primer nivel es de un equipo, dejarla fuera se lleva
@@ -129,6 +132,8 @@ class ProjectFilesService:
                     else None
                 ),
                 created_at=f.created_at,
+                task_id=f.task_id,
+                task_title=task_titles.get(f.task_id) if f.task_id else None,
                 delivery=(
                     FileDelivery(
                         deliverable_id=deliverable.id,
@@ -483,6 +488,7 @@ class ProjectFilesService:
         content: bytes,
         uploader_id: UUID,
         folder_id: UUID | None = None,
+        task_id: UUID | None = None,
     ) -> ProjectFile:
         """Guarda un archivo en la carpeta del equipo, creándola si no existe.
 
@@ -516,6 +522,7 @@ class ProjectFilesService:
                         size_bytes=len(content),
                         storage_key=key,
                         uploaded_by=uploader_id,
+                        task_id=task_id,
                     )
                 )
         return await self._store_for_owner(
@@ -526,6 +533,7 @@ class ProjectFilesService:
             content_type=content_type,
             content=content,
             uploader_id=uploader_id,
+            task_id=task_id,
         )
 
     async def store_personal_file(
@@ -537,6 +545,7 @@ class ProjectFilesService:
         filename: str,
         content_type: str,
         content: bytes,
+        task_id: UUID | None = None,
     ) -> ProjectFile:
         """Igual que `store_team_file`, para la entrega de una tarea INDIVIDUAL.
 
@@ -553,6 +562,7 @@ class ProjectFilesService:
             content_type=content_type,
             content=content,
             uploader_id=user_id,
+            task_id=task_id,
         )
 
     async def _store_for_owner(
@@ -565,6 +575,7 @@ class ProjectFilesService:
         content_type: str,
         content: bytes,
         uploader_id: UUID,
+        task_id: UUID | None = None,
     ) -> ProjectFile:
         root = await self._ensure_root(project_id)
         folder = next(
@@ -598,6 +609,7 @@ class ProjectFilesService:
                 size_bytes=len(content),
                 storage_key=key,
                 uploaded_by=uploader_id,
+                task_id=task_id,
             )
         )
 

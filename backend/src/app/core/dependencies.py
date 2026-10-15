@@ -115,6 +115,14 @@ def task_repo_dependency(db: AsyncSession = Depends(get_db)) -> TaskRepository:
     return TaskRepository(db)
 
 
+def task_progress_repo_dependency(db: AsyncSession = Depends(get_db)):
+    from app.modules.tasks.infrastructure.progress_repository import (
+        TaskProgressRepository,
+    )
+
+    return TaskProgressRepository(db)
+
+
 def dashboard_repo_dependency(
     db: AsyncSession = Depends(get_db),
 ) -> DashboardRepository:

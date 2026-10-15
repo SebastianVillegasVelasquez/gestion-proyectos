@@ -65,6 +65,66 @@ function analytics(over: Partial<ProjectAnalytics> = {}): ProjectAnalytics {
         { date: "2026-08-24", ideal: 5, actual: 4 },
       ],
     },
+    plan: {
+      window_start: "2026-08-01",
+      window_end: "2026-09-30",
+      today: "2026-08-28",
+      day_index: 27,
+      total_days: 60,
+      expected_tasks: 7,
+      expected_pct: 70,
+      completed_tasks: 4,
+      completed_pct: 40,
+      gap_pts: 30,
+      status: "at_risk",
+    },
+    health: { total: 10, completed: 4, on_track: 3, at_risk: 1, overdue: 2 },
+    components: [
+      {
+        id: "e1",
+        parent_id: null,
+        name: "Unidad 1",
+        tipo_id: "tp1",
+        tipo_nombre: "Unidad",
+        depth: 0,
+        path: ["Unidad 1"],
+        child_count: 1,
+        direct_tasks: 1,
+        total: 5,
+        completed: 2,
+        started: 2,
+        not_started: 1,
+        overdue: 1,
+        at_risk: 0,
+        completed_pct: 40,
+        started_pct: 40,
+        progress_pct: 55,
+        started_progress_pct: 60,
+        state: "atrasada",
+      },
+      {
+        id: "e2",
+        parent_id: "e1",
+        name: "Clase A",
+        tipo_id: "tp2",
+        tipo_nombre: "Clase",
+        depth: 1,
+        path: ["Unidad 1", "Clase A"],
+        child_count: 0,
+        direct_tasks: 4,
+        total: 4,
+        completed: 4,
+        started: 0,
+        not_started: 0,
+        overdue: 0,
+        at_risk: 0,
+        completed_pct: 100,
+        started_pct: 0,
+        progress_pct: 100,
+        started_progress_pct: 0,
+        state: "completada",
+      },
+    ],
     by_team: [
       {
         team_id: "t1",
@@ -117,6 +177,7 @@ function analytics(over: Partial<ProjectAnalytics> = {}): ProjectAnalytics {
         slip_bdays: 3,
         returns: 1,
         versions: 2,
+        progress_pct: 100,
       },
     ],
     ...over,
@@ -132,15 +193,20 @@ describe("ProjectReportPage (analítica)", () => {
   it("muestra las métricas generales", async () => {
     renderPage();
     expect(await screen.findByRole("button", { name: /Diplomado IA/ })).toBeTruthy();
-    expect(screen.getByText("40%")).toBeTruthy(); // avance
+    expect(screen.getAllByText("40%").length).toBeGreaterThan(0); // avance
     expect(screen.getByText("Retrabajo")).toBeTruthy();
+    // El rediseño: avance frente al plan, salud y distribución por estado.
+    expect(screen.getByText("Avance frente al plan")).toBeTruthy();
+    expect(screen.getByText(/En riesgo · 30 pts bajo el plan/)).toBeTruthy();
+    expect(screen.getByText("Salud de las 10 tareas")).toBeTruthy();
+    expect(screen.getByText("Distribución por estado")).toBeTruthy();
   });
 
   it("cambia de pestaña a Equipos y muestra su tabla", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("40%");
-    await user.click(screen.getByRole("button", { name: "Equipos" }));
+    await screen.findByText("Avance frente al plan");
+    await user.click(screen.getByRole("tab", { name: "Equipos" }));
     expect(screen.getByText("Producción")).toBeTruthy();
     expect(screen.getByText("Carga por integrante")).toBeTruthy();
   });
@@ -148,10 +214,35 @@ describe("ProjectReportPage (analítica)", () => {
   it("la pestaña Lapsos separa producción y revisión", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("40%");
-    await user.click(screen.getByRole("button", { name: /Lapsos/ }));
+    await screen.findByText("Avance frente al plan");
+    await user.click(screen.getByRole("tab", { name: /Lapsos/ }));
     expect(screen.getByText("Grabar video")).toBeTruthy();
     expect(screen.getByText(/5 \+ 3 = 8 d/)).toBeTruthy();
+  });
+
+  it("la pestaña Componentes lista el árbol con hechas, iniciadas y avance", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Avance frente al plan");
+    await user.click(screen.getByRole("tab", { name: "Componentes" }));
+    expect(screen.getByText("Unidad 1")).toBeTruthy();
+    expect(screen.getByText("Clase A")).toBeTruthy();
+    expect(screen.getByText("iniciadas al 60%")).toBeTruthy();
+
+    // Plegar la rama esconde a sus hijos.
+    await user.click(screen.getByRole("button", { name: "Plegar Unidad 1" }));
+    expect(screen.queryByText("Clase A")).toBeNull();
+  });
+
+  it("filtrar componentes por estado pasa a una lista plana con la ruta", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Avance frente al plan");
+    await user.click(screen.getByRole("tab", { name: "Componentes" }));
+    await user.click(screen.getByRole("button", { name: /Completado/ }));
+    expect(screen.queryByText("iniciadas al 60%")).toBeNull();
+    expect(screen.getByText("Clase A")).toBeTruthy();
+    expect(screen.getByText(/lista plana con su ruta/)).toBeTruthy();
   });
 
   it("tiene el bloque de resumen por IA (placeholder de fase 6.2)", async () => {
@@ -170,7 +261,7 @@ describe("ProjectReportPage (analítica)", () => {
     Object.assign(URL, { createObjectURL, revokeObjectURL });
 
     renderPage();
-    await screen.findByText("40%");
+    await screen.findByText("Avance frente al plan");
     await user.click(screen.getByRole("button", { name: /Descargar HTML/i }));
 
     expect(analyticsApi.downloadHtml).toHaveBeenCalledWith("p1", {});

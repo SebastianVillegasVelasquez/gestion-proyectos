@@ -20,6 +20,8 @@ import {
   DUE_STATUS_LABELS,
   type DueStatus,
 } from "../utils/due-status";
+import { EditProgressButton } from "@/features/task-progress/components/EditProgressButton";
+import { canOfferProgressEdit } from "@/features/task-progress/utils";
 import { MyTaskDeliverAction, TaskOriginCrumb } from "./my-task-bits";
 import { PersonalStructureView } from "./PersonalStructureView";
 import { PersonalGanttView } from "./PersonalGanttView";
@@ -429,6 +431,13 @@ export function MyTasksView({
                           <span className="shrink-0 text-[11px] text-muted-foreground">
                             {TASK_STATUS_LABELS[task.status]}
                           </span>
+
+                          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-foreground">
+                            {task.progress_pct}%
+                          </span>
+                          {canOfferProgressEdit(task.status, true) && (
+                            <EditProgressButton taskId={task.id} taskTitle={task.title} />
+                          )}
 
                           <MyTaskDeliverAction
                             task={task}

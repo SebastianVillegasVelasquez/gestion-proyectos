@@ -128,6 +128,11 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
+    # Avance DECLARADO por el responsable (0-99), siempre con evidencia: ver
+    # `TaskProgressUpdate`. NULL = nunca lo editó y el avance sale del estado.
+    # Solo cuenta en tareas sin subtareas; en una padre manda el promedio.
+    manual_progress_pct: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     __table_args__ = (
         Index(
             "uq_task_represents_work_item",
@@ -174,6 +179,48 @@ class Task(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         foreign_keys="TaskDependency.task_id",
         back_populates="task",
         cascade="all, delete-orphan",
+    )
+
+
+class TaskProgressUpdate(Base, UUIDMixin, TimestampMixin):
+    """Una edición del avance de una tarea, con la evidencia que la respalda.
+
+    Es el registro de trazabilidad del avance declarado: quién lo movió, de qué
+    porcentaje a cuál, cuándo y qué lo prueba. Cada fila lleva AL MENOS una
+    evidencia: un archivo del archivador (vinculado a la tarea) o una versión de
+    su entregable. Las FK a la evidencia son `SET NULL`: si alguien borra el
+    archivo, la edición sigue siendo historia aunque el material ya no se abra.
+    """
+
+    __tablename__ = "task_progress_updates"
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    previous_pct: Mapped[int] = mapped_column(Integer, nullable=False)
+    new_pct: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_files.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    deliverable_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("deliverable_versions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    author: Mapped["User"] = relationship("User")
+
+    __table_args__ = (
+        CheckConstraint("new_pct BETWEEN 0 AND 99", name="ck_progress_update_range"),
     )
 
 

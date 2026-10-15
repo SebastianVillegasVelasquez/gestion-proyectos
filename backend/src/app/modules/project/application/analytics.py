@@ -21,7 +21,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.infrastructure.models import User
 from app.modules.project.infrastructure.models import Project
-from app.modules.project.structure.infrastructure.models import WorkItem
+from app.modules.project.application.analytics_rollups import (
+    AT_RISK_HORIZON_BDAYS,
+    ComponentStats,
+    HealthBreakdown,
+    PlanProgress,
+    build_component_stats,
+    build_health,
+    build_plan_progress,
+)
+from app.modules.project.structure.infrastructure.models import TipoNodo, WorkItem
+from app.modules.tasks.domain.services import progress_by_id
 from app.modules.tasks.infrastructure.enums import TaskStatus
 from app.modules.tasks.infrastructure.models import Task, TaskHistory, TaskTimeEntry
 from app.modules.teams.infrastructure.models import Team, TeamMember
@@ -38,7 +48,7 @@ _OPEN = (
     TaskStatus.EN_REVISION,
     TaskStatus.DEVUELTA,
 )
-_AT_RISK_HORIZON_BDAYS = 5
+_AT_RISK_HORIZON_BDAYS = AT_RISK_HORIZON_BDAYS
 
 
 # ── Estructuras de salida ────────────────────────────────────────────────────
@@ -138,6 +148,7 @@ class TaskRow:
     slip_bdays: int | None  # + = cerró tarde; None si no aplica
     returns: int
     versions: int
+    progress_pct: int  # avance de la tarea (declarado, por estado o de subtareas)
 
 
 @dataclass
@@ -148,10 +159,13 @@ class ProjectAnalytics:
     filters: dict[str, str | None]
     overview: Overview
     burnup: Burnup
+    plan: PlanProgress
+    health: HealthBreakdown
     by_team: list[TeamPerformance] = field(default_factory=list)
     by_person: list[PersonPerformance] = field(default_factory=list)
     delivery_lapses: list[DeliveryLapse] = field(default_factory=list)
     tasks: list[TaskRow] = field(default_factory=list)
+    components: list[ComponentStats] = field(default_factory=list)
 
 
 # ── Utilidades de agregación ─────────────────────────────────────────────────
@@ -205,8 +219,11 @@ class ProjectAnalyticsBuilder:
         path_by_item = _build_paths(work_items)
         subtree = _subtree_ids(work_items, f.work_item_id) if f.work_item_id else None
 
-        tasks = await self._tasks(project_id)
-        tasks = [t for t in tasks if _passes(t, f, subtree)]
+        all_tasks = await self._tasks(project_id)
+        # El avance se resuelve sobre TODAS las tareas del proyecto: una padre
+        # promedia a sus subtareas aunque un filtro deje fuera a alguna.
+        task_progress = progress_by_id(all_tasks)
+        tasks = [t for t in all_tasks if _passes(t, f, subtree)]
         task_ids = [t.id for t in tasks]
 
         history = await self._history(task_ids)
@@ -270,19 +287,9 @@ class ProjectAnalyticsBuilder:
             if not_cancelled
             else 0
         )
-        overdue_open = sum(
-            1
-            for t in tasks
-            if t.status in _OPEN and t.due_date is not None and t.due_date < today
-        )
-        at_risk_open = sum(
-            1
-            for t in tasks
-            if t.status in _OPEN
-            and t.due_date is not None
-            and today <= t.due_date
-            and business_days_between(today, t.due_date) <= _AT_RISK_HORIZON_BDAYS
-        )
+        health = build_health(tasks, today)
+        overdue_open = health.overdue
+        at_risk_open = health.at_risk
         slips = [
             business_days_between(t.due_date, cd)  # + = tarde
             for t in completed_tasks
@@ -316,6 +323,24 @@ class ProjectAnalyticsBuilder:
             f.date_from,
             f.date_to,
             today,
+        )
+
+        plan = build_plan_progress(
+            tasks,
+            datetime.date.fromisoformat(burnup.window_start),
+            datetime.date.fromisoformat(burnup.window_end),
+            today,
+        )
+
+        # ── Por componente de la estructura ──
+        components = build_component_stats(
+            work_items,
+            tasks,
+            task_progress,
+            path_by_item,
+            await self._tipo_names({w.tipo_id for w in work_items}),
+            today,
+            only_subtree=subtree,
         )
 
         # ── Por equipo ──
@@ -449,6 +474,7 @@ class ProjectAnalyticsBuilder:
                     slip_bdays=slip,
                     returns=returns_by_task.get(t.id, 0),
                     versions=versions_by_task.get(t.id, 0),
+                    progress_pct=task_progress.get(t.id, 0),
                 )
             )
         rows.sort(key=lambda r: (r.element_path, r.title))
@@ -468,10 +494,13 @@ class ProjectAnalyticsBuilder:
             },
             overview=overview,
             burnup=burnup,
+            plan=plan,
+            health=health,
             by_team=by_team,
             by_person=by_person,
             delivery_lapses=lapses,
             tasks=rows,
+            components=components,
         )
 
     # ── Consultas ──────────────────────────────────────────────────────────────
@@ -502,6 +531,16 @@ class ProjectAnalyticsBuilder:
             .scalars()
             .all()
         )
+
+    async def _tipo_names(self, tipo_ids: set[UUID]) -> dict[UUID, str]:
+        if not tipo_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(TipoNodo.id, TipoNodo.nombre).where(TipoNodo.id.in_(tipo_ids))
+            )
+        ).all()
+        return {tid: name for tid, name in rows}
 
     async def _history(self, task_ids: list[UUID]) -> list[TaskHistory]:
         if not task_ids:
@@ -605,6 +644,15 @@ def _passes(task: Task, f: AnalyticsFilters, subtree: set[UUID] | None) -> bool:
         return False
     if subtree is not None and task.work_item_id not in subtree:
         return False
+    if f.date_from is not None or f.date_to is not None:
+        # Periodo = tareas cuya fecha límite cae dentro del rango. Sin fecha
+        # límite no se puede situar en un periodo, así que quedan fuera.
+        if task.due_date is None:
+            return False
+        if f.date_from is not None and task.due_date < f.date_from:
+            return False
+        if f.date_to is not None and task.due_date > f.date_to:
+            return False
     return True
 
 

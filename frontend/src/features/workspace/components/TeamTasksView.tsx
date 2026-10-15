@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { EditProgressButton } from "@/features/task-progress/components/EditProgressButton";
+import { canOfferProgressEdit } from "@/features/task-progress/utils";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { getErrorMessage } from "@/utils/get-error-message";
@@ -137,6 +139,25 @@ function ProgressBar({ task, className }: { task: ApiTeamTask; className?: strin
       </span>
     </div>
   );
+}
+
+/** «Avance» para el responsable de la tarea: declara su porcentaje con
+ *  evidencia. Las tareas con subtareas lo calculan desde ellas, así que no lo
+ *  ofrecen. */
+function ProgressEditAction({
+  task,
+  hasSubtasks,
+  compact = false,
+}: {
+  task: ApiTeamTask;
+  hasSubtasks: boolean;
+  compact?: boolean;
+}) {
+  const { user } = useAuth();
+  if (hasSubtasks || !canOfferProgressEdit(task.status, task.assignee_id === user?.id)) {
+    return null;
+  }
+  return <EditProgressButton taskId={task.id} taskTitle={task.title} compact={compact} />;
 }
 
 function DeliverableReadyBadge() {
@@ -543,6 +564,7 @@ function TaskRow({
 
         {/* "Entregar" / "Entregar sin adjunto": tarea de nivel superior sin
             subtareas ya comenzada, o tarea padre al 100%. Solo su responsable. */}
+        <ProgressEditAction task={task} hasSubtasks={isParent} compact />
         <DeliverActions task={task} cbs={deliverCbs} hasSubtasks={isParent} />
 
         {/* Acciones del líder: partir en subtareas (solo tareas raíz), editar y
@@ -835,6 +857,9 @@ function TaskCard({
       <ThirdPartyDepBadge task={task} />
       <BlockedBy task={task} />
       <ProgressBar task={task} className="mt-2.5" />
+      <div className="mt-1.5 flex">
+        <ProgressEditAction task={task} hasSubtasks={hasSubtasks} compact />
+      </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
         {hideAssignee ? (

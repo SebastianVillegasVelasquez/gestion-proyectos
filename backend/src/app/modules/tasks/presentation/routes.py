@@ -1,11 +1,16 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from starlette import status
+
+from app.core.config import get_settings
 
 from app.core.dependencies import (
     event_bus_dependency,
+    file_storage_dependency,
     get_current_user,
+    project_files_repo_dependency,
+    task_progress_repo_dependency,
     workspace_repo_dependency,
     project_members_repo_dependency,
     project_repo_dependency,
@@ -14,6 +19,13 @@ from app.core.dependencies import (
     team_repo_dependency,
     user_repo_dependency,
     worktree_repo_dependency,
+)
+from app.modules.files.application.use_cases import ProjectFilesService
+from app.modules.tasks.application.progress_use_cases import (
+    GetTaskProgressUseCase,
+    ProgressEvidenceInput,
+    RegisterTaskProgressUseCase,
+    UploadedEvidence,
 )
 from app.modules.tasks.application.use_cases import (
     AddTaskDependencyUseCase,
@@ -56,6 +68,7 @@ from app.modules.tasks.presentation.schemas import (
     CreateTimeEntryRequest,
     MyTaskItemResponse,
     TaskEffortResponse,
+    TaskProgressResponse,
     TimeEntryResponse,
     TaskDependencyResponse,
     TaskResponse,
@@ -65,7 +78,7 @@ from app.modules.tasks.presentation.schemas import (
 )
 from app.modules.teams.domain.workspace import WorkspaceAccess
 from app.shared.events import EventBus
-from app.shared.exceptions import ForbiddenError
+from app.shared.exceptions import ForbiddenError, ValidationError
 
 router = APIRouter(tags=["Tasks"])
 
@@ -229,6 +242,71 @@ async def delete_time_entry(
     """Borra un apunte de esfuerzo (solo el propio, o cualquiera si administras)."""
     await DeleteTimeEntryUseCase(task_repo).execute(
         entry_id, current_user.id, current_user.role
+    )
+
+
+# ── Avance declarado con evidencia ────────────────────────────────────────────
+@router.get("/tasks/{task_id}/progress", response_model=TaskProgressResponse)
+async def get_task_progress(
+    task_id: UUID,
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    progress_repo=Depends(task_progress_repo_dependency),
+):
+    """Avance de la tarea, su bitácora de ediciones y la evidencia reutilizable.
+    `can_edit` ya viene resuelto para quien pregunta."""
+    return await GetTaskProgressUseCase(task_repo, progress_repo).execute(
+        task_id, current_user.id
+    )
+
+
+@router.post("/tasks/{task_id}/progress", response_model=TaskProgressResponse)
+async def register_task_progress(
+    task_id: UUID,
+    progress_pct: int = Form(...),
+    note: str | None = Form(None),
+    file_id: UUID | None = Form(None),
+    deliverable_version_id: UUID | None = Form(None),
+    attach_to_deliverable: bool = Form(False),
+    file: UploadFile | None = File(None),
+    current_user=Depends(_any_user),
+    task_repo=Depends(task_repo_dependency),
+    progress_repo=Depends(task_progress_repo_dependency),
+    files_repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+):
+    """Edita el avance de una tarea PROPIA. Exige exactamente una evidencia: un
+    archivo nuevo (`file`), uno ya vinculado a la tarea (`file_id`) o una versión
+    de su entregable (`deliverable_version_id`). Va multipart por el binario."""
+    upload = None
+    if file is not None:
+        content = await file.read()
+        limit_mb = get_settings().MAX_UPLOAD_MB
+        if not content:
+            raise ValidationError("El archivo está vacío")
+        if len(content) > limit_mb * 1024 * 1024:
+            raise ValidationError(f"El archivo supera el límite de {limit_mb} MB")
+        upload = UploadedEvidence(
+            filename=file.filename or "evidencia",
+            content_type=file.content_type or "application/octet-stream",
+            content=content,
+        )
+    await RegisterTaskProgressUseCase(
+        task_repo, progress_repo, ProjectFilesService(files_repo, storage)
+    ).execute(
+        task_id,
+        current_user,
+        progress_pct,
+        note,
+        ProgressEvidenceInput(
+            upload=upload,
+            file_id=file_id,
+            deliverable_version_id=deliverable_version_id,
+            attach_to_deliverable=attach_to_deliverable,
+        ),
+    )
+    return await GetTaskProgressUseCase(task_repo, progress_repo).execute(
+        task_id, current_user.id
     )
 
 

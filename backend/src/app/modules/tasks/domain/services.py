@@ -35,10 +35,14 @@ _STATUS_PROGRESS: dict[TaskStatus, int] = {
 }
 
 
+_TERMINAL_STATUSES = (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
+
+
 def compute_task_progress(
     status: TaskStatus,
     requires_approval: bool,
     child_pcts: list[int] | None = None,
+    manual_pct: int | None = None,
 ) -> int:
     """Avance (0-100) de una tarea.
 
@@ -46,13 +50,18 @@ def compute_task_progress(
       específico pesa lo mismo). Una tarea padre es un ENTREGABLE, así que no
       llega a 100 mientras necesite aprobación y no esté COMPLETADA: entregar el
       resultado es el último paso, no la suma de las subtareas.
-    - Sin subtareas (incluidas las propias subtareas): por estado.
+    - Sin subtareas (incluidas las propias subtareas): el porcentaje que su
+      responsable declaró con evidencia (`manual_pct`) mientras la tarea siga
+      abierta; si nunca declaró uno, el que corresponde al estado. COMPLETADA
+      siempre es 100 y CANCELADA 0: el estado terminal manda sobre lo declarado.
     """
     if child_pcts:
         avg = round(sum(child_pcts) / len(child_pcts))
         if avg >= 100 and requires_approval and status != TaskStatus.COMPLETADA:
             return 99
         return min(avg, 100)
+    if manual_pct is not None and status not in _TERMINAL_STATUSES:
+        return max(0, min(manual_pct, 100))
     return _STATUS_PROGRESS.get(status, 0)
 
 
@@ -82,7 +91,11 @@ def progress_by_id(tasks) -> dict[UUID, int]:
                 status, node.requires_approval, [resolve(k) for k in kids]
             )
         else:
-            pct = compute_task_progress(status, node.requires_approval)
+            pct = compute_task_progress(
+                status,
+                node.requires_approval,
+                manual_pct=getattr(node, "manual_progress_pct", None),
+            )
         out[node.id] = pct
         return pct
 
@@ -173,6 +186,7 @@ class TaskService:
                     compute_task_progress(
                         s.status or TaskStatus.PENDIENTE_POR_INICIAR,
                         s.requires_approval,
+                        manual_pct=getattr(s, "manual_progress_pct", None),
                     )
                     for s in subtasks
                     if not s.is_deleted
@@ -239,6 +253,7 @@ class TaskService:
                 node.status,
                 node.requires_approval,
                 [resolve(k) for k in kids] if kids else None,
+                manual_pct=node.manual_progress_pct,
             )
             return node.progress_pct
 
@@ -331,6 +346,7 @@ class TaskService:
         # `task.assignee` puede no estar cargado (rutas que no hacen el join):
         # leerlo por `__dict__` no dispara lazy-load (rompería en async).
         assignee = task.__dict__.get("assignee")
+        manual = getattr(task, "manual_progress_pct", None)
         assignee_name = (
             f"{assignee.name} {assignee.last_name}".strip()
             if assignee is not None
@@ -363,7 +379,9 @@ class TaskService:
             progress_pct=compute_task_progress(
                 task.status or TaskStatus.PENDIENTE_POR_INICIAR,
                 task.requires_approval,
+                manual_pct=manual,
             ),
+            manual_progress_pct=manual,
             depends_on_third_party=depends_on_third_party,
         )
 

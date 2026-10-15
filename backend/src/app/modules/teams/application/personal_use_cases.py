@@ -289,6 +289,7 @@ class PersonalDeliverableService:
             filename=filename,
             content_type=content_type,
             content=content,
+            task_id=task.id,
         )
         await self._repo.add_version(
             DeliverableVersion(

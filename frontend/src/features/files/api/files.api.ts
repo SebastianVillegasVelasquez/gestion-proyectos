@@ -23,6 +23,9 @@ export interface ApiProjectFile {
   created_at: string;
   /** Presente solo si el archivo llegó por una entrega (V1, V2…). */
   delivery: ApiFileDelivery | null;
+  /** Tarea a la que da soporte (entrega o evidencia de avance); null = archivo suelto. */
+  task_id: string | null;
+  task_title: string | null;
 }
 
 /** Carpeta del archivador, con sus hijas y sus archivos ya anidados. */

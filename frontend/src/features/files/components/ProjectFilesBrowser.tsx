@@ -597,6 +597,17 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
           <span className="truncate text-[13px] text-foreground group-hover:text-brand-gold-dark group-hover:underline dark:group-hover:text-brand-gold">
             {file.name}
           </span>
+          {!delivery && file.task_title && (
+            <span
+              title={`Evidencia de la tarea «${file.task_title}»`}
+              className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-teal/10 px-2 py-0.5 text-[10px] font-bold text-brand-teal-dark dark:text-brand-teal sm:inline-flex"
+            >
+              Tarea
+              <span className="max-w-[120px] truncate font-medium opacity-80">
+                {file.task_title}
+              </span>
+            </span>
+          )}
           {delivery && (
             <span
               title={`Entrega V${String(delivery.version_number)} de «${delivery.task_title}»`}

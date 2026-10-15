@@ -45,6 +45,10 @@ class FileResponse(BaseModelConfig):
     created_at: datetime
     # Presente solo si el archivo llegó por una entrega (V1, V2…).
     delivery: Optional[FileDelivery] = None
+    # Tarea a la que da soporte (entrega o evidencia de avance): la trazabilidad
+    # archivo ⇄ tarea. Ausente en archivos sueltos del archivador.
+    task_id: Optional[UUID] = None
+    task_title: Optional[str] = None
 
 
 class FolderResponse(BaseModelConfig):

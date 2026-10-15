@@ -111,3 +111,37 @@ def earlier_phase_blocks(tasks_in_earlier_phases) -> bool:
 
 def is_self_dependency(task_id: UUID, depends_on_id: UUID) -> bool:
     return task_id == depends_on_id
+
+
+# ── Avance declarado por el responsable ──────────────────────────────────────
+
+# El 100 % no se declara: se alcanza entregando (o aprobándose) la tarea. Así un
+# porcentaje manual nunca puede contradecir el estado COMPLETADA.
+MANUAL_PROGRESS_MAX = 99
+
+PROGRESS_LOCKED_BY_SUBTASKS = (
+    "El avance de esta tarea se calcula con sus subtareas: edita el de cada subtarea."
+)
+PROGRESS_LOCKED_NOT_STARTED = "Inicia la tarea antes de reportar avance."
+PROGRESS_LOCKED_IN_REVIEW = "La tarea está en revisión: espera la decisión del revisor."
+PROGRESS_LOCKED_CLOSED = "La tarea ya está cerrada."
+
+_PROGRESS_EDITABLE = (TaskStatus.EN_PROGRESO, TaskStatus.DEVUELTA)
+
+
+def progress_edit_block_reason(status: TaskStatus, has_subtasks: bool) -> str | None:
+    """Motivo por el que el avance NO se puede editar ahora, o None si se puede.
+
+    Una tarea con subtareas es un entregable cuyo avance es el promedio de las
+    suyas; editarlo a mano crearía dos verdades. Solo se edita mientras la
+    persona está trabajando (en progreso o devuelta para corregir).
+    """
+    if has_subtasks:
+        return PROGRESS_LOCKED_BY_SUBTASKS
+    if status in _PROGRESS_EDITABLE:
+        return None
+    if status == TaskStatus.PENDIENTE_POR_INICIAR:
+        return PROGRESS_LOCKED_NOT_STARTED
+    if status == TaskStatus.EN_REVISION:
+        return PROGRESS_LOCKED_IN_REVIEW
+    return PROGRESS_LOCKED_CLOSED
