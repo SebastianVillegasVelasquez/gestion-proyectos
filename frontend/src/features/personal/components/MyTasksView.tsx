@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { ProjectMark } from "@/components/common/EntityBadge";
+import { useActiveProject } from "@/features/projects/hooks/use-active-project";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
 import { TaskDurationBadge } from "@/features/projects/components/TaskDurationBadge";
 import type { ApiMyTask } from "../api/personal.api";
@@ -150,6 +152,14 @@ export function MyTasksView({
   }, [tasks]);
   const [projectId, setProjectId] = useState<string | null>(null);
 
+  // El proyecto activo del menú lateral manda sobre la selección local.
+  const { projectId: scopeProjectId } = useActiveProject();
+  useEffect(() => {
+    if (scopeProjectId && projectOptions.some((p) => p.id === scopeProjectId)) {
+      setProjectId(scopeProjectId);
+    }
+  }, [scopeProjectId, projectOptions]);
+
   // Si el proyecto elegido deja de existir en el conjunto (cambia el filtro
   // de estado/alcance) o todavía no hay ninguno elegido, cae al primero.
   useEffect(() => {
@@ -223,9 +233,10 @@ export function MyTasksView({
   }, [tasks, today]);
 
   const byProject = useMemo(() => {
-    const groups = new Map<string, { name: string; items: typeof rows }>();
+    const groups = new Map<string, { id: string; name: string; items: typeof rows }>();
     for (const row of rows) {
       const g = groups.get(row.task.project_id) ?? {
+        id: row.task.project_id,
         name: row.task.project_name,
         items: [],
       };
@@ -382,9 +393,10 @@ export function MyTasksView({
             </p>
           ) : (
             byProject.map((group) => (
-              <section key={group.name} className="mb-3 last:mb-0">
-                <h3 className="px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {group.name}
+              <section key={group.id} className="mb-3 last:mb-0">
+                <h3 className="flex items-center gap-2 px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <ProjectMark name={group.name} seed={group.id} />
+                  <span className="truncate">{group.name}</span>
                 </h3>
                 <ul className="flex flex-col gap-2">
                   {group.items.map(({ task, status }) => {

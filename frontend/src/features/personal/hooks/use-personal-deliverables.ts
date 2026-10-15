@@ -22,8 +22,12 @@ export function useMyPersonalDeliverables() {
 }
 
 /** «Mis tareas»: todo lo asignado a mí, individual o de equipo. */
-export function useMyTasks() {
-  return useQuery({ queryKey: keys.myTasks, queryFn: personalApi.myTasks });
+export function useMyTasks(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.myTasks,
+    queryFn: personalApi.myTasks,
+    enabled: options.enabled ?? true,
+  });
 }
 
 /** Entregas personales que me toca revisar (soy coordinador/supervisor del

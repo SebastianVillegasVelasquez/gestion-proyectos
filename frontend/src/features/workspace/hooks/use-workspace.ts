@@ -21,8 +21,12 @@ const keys = {
   notifications: (teamId: string) => ["workspace", "notifications", teamId] as const,
 };
 
-export function useMyTeams() {
-  return useQuery({ queryKey: keys.myTeams, queryFn: workspaceApi.myTeams });
+export function useMyTeams(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.myTeams,
+    queryFn: workspaceApi.myTeams,
+    enabled: options.enabled ?? true,
+  });
 }
 
 export function useTeamMembers(teamId: string | null) {

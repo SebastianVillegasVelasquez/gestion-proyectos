@@ -7,6 +7,8 @@ import {
   type Session,
 } from "@/features/auth/utils/session.utils";
 import { decodeJwt } from "@/features/auth/utils/jwt.utils";
+import { previewableRoles, readViewAsRole, writeViewAsRole } from "@/features/auth/utils/view-as";
+import type { Role } from "@/features/auth/types";
 import { SESSION_REFRESHED_EVENT, refreshAccessToken } from "@/features/auth/api/refresh";
 import { USER_REVALIDATED_EVENT, revalidateUser } from "@/features/auth/api/revalidate";
 
@@ -18,6 +20,12 @@ export { AuthContext } from "./auth-context";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => readSession());
+  const [requestedViewAs, setRequestedViewAs] = useState<Role | null>(() => readViewAsRole());
+
+  const setViewAsRole = useCallback((role: Role | null) => {
+    writeViewAsRole(role);
+    setRequestedViewAs(role);
+  }, []);
 
   const login = useCallback((next: Session) => {
     writeSession(next);
@@ -25,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    writeViewAsRole(null);
     clearSession();
     setSession(null);
   }, []);
@@ -116,21 +125,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session, logout]);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user: session?.user ?? null,
+  const value = useMemo<AuthContextValue>(() => {
+    const realRole = session?.user.role ?? null;
+    const allowed = previewableRoles(realRole);
+    // Un rol guardado que ya no corresponde (p. ej. te bajaron de rango) se ignora.
+    const viewAsRole =
+      requestedViewAs && allowed.includes(requestedViewAs) ? requestedViewAs : null;
+    const effectiveRole = viewAsRole ?? realRole;
+    return {
+      // Con vista previa, la app entera —navegación, guards, pantallas— se
+      // comporta como el rol elegido; la API sigue aplicando el rol real.
+      user: session ? { ...session.user, role: effectiveRole ?? session.user.role } : null,
       isAuthenticated: session !== null,
       // Jerarquía: developer (rol técnico) es el tope y satisface cualquier guard
       // de rol, igual que en el backend (role_satisfies).
       hasRole: (roles) =>
         Boolean(
-          session && (session.user.role === "developer" || roles.includes(session.user.role)),
+          session &&
+          effectiveRole &&
+          (effectiveRole === "developer" || roles.includes(effectiveRole)),
         ),
+      realRole,
+      viewAsRole,
+      previewableRoles: allowed,
+      setViewAsRole,
       login,
       logout,
-    }),
-    [session, login, logout],
-  );
+    };
+  }, [session, requestedViewAs, setViewAsRole, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

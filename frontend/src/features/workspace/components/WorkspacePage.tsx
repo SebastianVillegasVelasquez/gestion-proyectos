@@ -20,6 +20,7 @@ import { useChangeTaskStatus } from "@/features/projects/hooks/use-tasks";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import type { CommentType, DeliverableVersion } from "../types";
+import { useActiveProject } from "@/features/projects/hooks/use-active-project";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { TeamTasksView } from "./TeamTasksView";
 import { DeliverableList } from "./DeliverableList";
@@ -289,9 +290,23 @@ function MemberWorkspace() {
   const [searchParams] = useSearchParams();
 
   const teamsQuery = useMyTeams();
-  const teams = teamsQuery.data ?? [];
+  const allTeams = teamsQuery.data ?? [];
+  const { projectId: scopeProjectId } = useActiveProject();
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(searchParams.get("team"));
+
+  // Con un proyecto activo solo se ofrecen los equipos de ese proyecto. Dos
+  // excepciones para no dejar la pantalla vacía: si no tengo ningún equipo en
+  // él, o si llegué con un equipo concreto (`?team=`) de otro proyecto.
+  const scopedTeams = scopeProjectId
+    ? allTeams.filter((t) => t.project_id === scopeProjectId)
+    : allTeams;
+  const selectedOutsideScope =
+    selectedTeamId !== null &&
+    allTeams.some((t) => t.id === selectedTeamId) &&
+    !scopedTeams.some((t) => t.id === selectedTeamId);
+  const teams = scopedTeams.length > 0 && !selectedOutsideScope ? scopedTeams : allTeams;
+
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("tareas");
   const [showNew, setShowNew] = useState(false);

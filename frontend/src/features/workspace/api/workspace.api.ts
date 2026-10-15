@@ -18,6 +18,8 @@ export interface ApiMyTeam {
   // los endpoints /projects/{project_id}/teams/... para renombrar, cambiar
   // roles y archivar, en vez de duplicar esas rutas en el workspace.
   project_id: string;
+  /** Proyecto al que pertenece: distingue equipos que se llaman igual. */
+  project_name: string | null;
 }
 
 export interface ApiTeamMember {

@@ -27,12 +27,8 @@ import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 
-const ROLE_LABELS: Record<Role, string> = {
-  [Role.DEVELOPER]: "Developer",
-  [Role.SUPER_ADMIN]: "Super administrador",
-  [Role.ADMIN]: "Administrador",
-  [Role.USER]: "Usuario",
-};
+import { ProjectScopeSelect } from "./ProjectScopeSelect";
+import { ROLE_LABELS, ViewAsSwitcher } from "./ViewAsSwitcher";
 
 interface NavItem {
   id: string;
@@ -268,6 +264,8 @@ export function Sidebar({
         </button>
       </div>
 
+      <ProjectScopeSelect collapsed={collapsed} />
+
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto py-1", collapsed ? "md:px-2" : "px-3")}>
         {sections.map((section) => (
@@ -373,6 +371,8 @@ export function Sidebar({
           </div>
         </div>
 
+        <ViewAsSwitcher collapsed={collapsed} />
+
         {/* Cerrar sesión: limpia los tokens y vuelve al login */}
         <button
           type="button"
@@ -382,7 +382,7 @@ export function Sidebar({
           disabled={logout.isPending}
           title={collapsed ? "Cerrar sesión" : undefined}
           className={cn(
-            "mt-3 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60",
+            "mt-1 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60",
             collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
           )}
         >
