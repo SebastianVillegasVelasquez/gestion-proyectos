@@ -9,11 +9,12 @@ import type {
   UpdateProjectPayload,
 } from "@/features/projects/types/api.types";
 
-export function useProjects() {
+export function useProjects(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: projectKeys.list(),
     queryFn: projectsApi.list,
     staleTime: 30_000,
+    enabled: options.enabled ?? true,
   });
 }
 

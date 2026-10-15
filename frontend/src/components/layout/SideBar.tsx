@@ -27,6 +27,7 @@ import { initialsFromName } from "@/features/dashboard/utils/greeting";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 
+import { ProjectScopeSelect } from "./ProjectScopeSelect";
 import { ROLE_LABELS, ViewAsSwitcher } from "./ViewAsSwitcher";
 
 interface NavItem {
@@ -262,6 +263,8 @@ export function Sidebar({
           {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
         </button>
       </div>
+
+      <ProjectScopeSelect collapsed={collapsed} />
 
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto py-1", collapsed ? "md:px-2" : "px-3")}>
