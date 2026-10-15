@@ -250,6 +250,9 @@ class MyTeamResponse(BaseModelConfig):
     # roles, archivar) cuelga de /projects/{project_id}/teams/... Exponer el
     # project_id evita que la Configuracion del Grupo tenga que adivinarlo.
     project_id: UUID
+    # Nombre del proyecto: con varios proyectos es común tener equipos que se
+    # llaman igual («Contenidos»), y sin esto no hay forma de distinguirlos.
+    project_name: Optional[str] = None
 
 
 class TeamNotificationSettingsResponse(BaseModelConfig):

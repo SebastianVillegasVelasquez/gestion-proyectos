@@ -73,12 +73,19 @@ class WorkspaceService:
 
     async def list_my_teams(self, current_user) -> list[MyTeamResponse]:
         teams = await self._repo.list_member_teams(current_user.id)
+        # Un nombre por proyecto, no por equipo: pocos proyectos, varias consultas
+        # evitadas.
+        project_names = {
+            pid: await self._repo.get_project_name(pid)
+            for pid in {t.project_id for t in teams}
+        }
         return [
             MyTeamResponse(
                 id=t.id,
                 name=t.name,
                 description=t.description,
                 project_id=t.project_id,
+                project_name=project_names.get(t.project_id),
             )
             for t in teams
         ]
