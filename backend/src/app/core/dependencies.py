@@ -65,7 +65,7 @@ from app.shared.broadcasting.broadcaster import Broadcaster
 from app.shared.email.sender import build_email_sender
 from app.shared.events import EventBus
 from app.shared.events.events import UserCreated
-from app.shared.exceptions import ForbiddenError, NotFoundError
+from app.shared.exceptions import ForbiddenError, UnauthorizedError
 
 
 def project_repo_dependency(db: AsyncSession = Depends(get_db)) -> ProjectRepository:
@@ -239,21 +239,31 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
+    # Todo fallo de AUTENTICACIÓN responde 401 (no 403/404): es la única señal
+    # con la que el cliente sabe que debe renovar el token o volver al login.
+    # El 403 queda reservado para fallos de AUTORIZACIÓN —estás identificado,
+    # pero no te corresponde— que el cliente no puede resolver reintentando.
     try:
         payload = decode_token(token)
     except JWTError:
-        raise ForbiddenError("Token inválido o expirado")
+        raise UnauthorizedError("Token inválido o expirado")
 
     if payload.get("type") != "access":
-        raise ForbiddenError("Token inválido")
+        raise UnauthorizedError("Token inválido")
 
-    user_id = UUID(payload["sub"])
+    try:
+        user_id = UUID(payload["sub"])
+    except (KeyError, ValueError):
+        raise UnauthorizedError("Token inválido")
 
     repo = UserRepository(db)
     user = await repo.get_by_id(user_id)
 
+    # La cuenta ya no existe o fue desactivada: la sesión dejó de ser válida.
+    # No es un 404 —el recurso pedido no es el usuario— y el mensaje no debe
+    # llegar a la pantalla como «Usuario no encontrado».
     if not user or not user.is_active:
-        raise NotFoundError("Usuario no encontrado")
+        raise UnauthorizedError("La sesión ya no es válida")
 
     return UserResponse(
         id=user.id,
