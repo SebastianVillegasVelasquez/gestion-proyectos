@@ -1,35 +1,20 @@
 /**
- * Indicador de carga único de la app.
+ * Indicador de carga que ocupa el espacio disponible: el fallback de una ruta
+ * que todavía descarga su chunk, o de una sesión que se está comprobando.
  *
- * Había ocho versiones a mano repartidas por las pantallas, cada una con su
- * tamaño y su color: unas doradas, otras grises, unas con borde y otras con un
- * SVG girando. Esta es la que vale.
+ * Los spinners DENTRO de un botón no pasan por aquí a propósito: usan
+ * `<Loader2 className="animate-spin" />` y heredan el color del botón con
+ * `currentColor`, que es lo que hace que se vean bien tanto en el botón dorado
+ * como en el destructivo. Un anillo de color fijo ahí quedaría peor.
  */
-export function Spinner({
-  size = "md",
-  label = "Cargando",
-  className = "",
-}: {
-  size?: "sm" | "md" | "lg";
-  /** Lo lee un lector de pantalla; no se pinta. */
-  label?: string;
-  className?: string;
-}) {
-  const sizes = { sm: "size-4 border-2", md: "size-6 border-2", lg: "size-8 border-[3px]" };
-  return (
-    <span
-      role="status"
-      aria-label={label}
-      className={`inline-block animate-spin rounded-full border-brand-gold border-t-transparent ${sizes[size]} ${className}`}
-    />
-  );
-}
-
-/** Spinner centrado que ocupa el espacio disponible (fallback de una ruta). */
 export function SpinnerScreen({ label = "Cargando" }: { label?: string }) {
   return (
     <div className="flex h-full w-full flex-1 items-center justify-center p-10">
-      <Spinner size="md" label={label} />
+      <span
+        role="status"
+        aria-label={label}
+        className="inline-block size-6 animate-spin rounded-full border-2 border-brand-gold border-t-transparent"
+      />
     </div>
   );
 }
