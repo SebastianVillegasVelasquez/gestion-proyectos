@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
 from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
+from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.models import Task
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
@@ -158,6 +159,44 @@ class ProjectFilesRepository:
                     result.add(child_id)
                     stack.append(child_id)
         return result
+
+    # ── estructura ───────────────────────────────────────────────────────────
+
+    async def list_work_items(self, project_id: UUID) -> list[WorkItem]:
+        """Elementos vivos de la estructura, en el orden en que se muestran."""
+        rows = await self._session.execute(
+            select(WorkItem)
+            .where(
+                WorkItem.proyecto_id == project_id,
+                WorkItem.deleted_at.is_(None),
+            )
+            .order_by(WorkItem.orden, WorkItem.nombre)
+        )
+        return list(rows.scalars().all())
+
+    async def task_element_ids(self, project_id: UUID) -> set[UUID]:
+        """Elementos que SON una tarea (`represents_work_item`): el trabajo en sí,
+        no un contenedor. Su carpeta rara vez hace falta."""
+        rows = await self._session.execute(
+            select(Task.work_item_id).where(
+                Task.project_id == project_id,
+                Task.represents_work_item.is_(True),
+                Task.work_item_id.is_not(None),
+                Task.deleted_at.is_(None),
+            )
+        )
+        return {wid for (wid,) in rows.all() if wid is not None}
+
+    async def task_work_item(self, task_id: UUID) -> tuple[UUID, UUID | None] | None:
+        """`(project_id, work_item_id)` de una tarea, o None si no existe."""
+        row = (
+            await self._session.execute(
+                select(Task.project_id, Task.work_item_id).where(
+                    Task.id == task_id, Task.deleted_at.is_(None)
+                )
+            )
+        ).first()
+        return (row[0], row[1]) if row is not None else None
 
     # ── archivos ─────────────────────────────────────────────────────────────
 

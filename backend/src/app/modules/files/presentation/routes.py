@@ -16,6 +16,8 @@ from app.modules.files.presentation.schemas import (
     CreateFolderRequest,
     FileResponse,
     FolderResponse,
+    GenerateStructureFoldersRequest,
+    GenerateStructureFoldersResponse,
     MoveFileRequest,
     MoveFolderRequest,
     ProjectFilesResponse,
@@ -57,6 +59,32 @@ async def create_folder(
     por equipo, la abre su líder o supervisor); más abajo, cualquier integrante
     del equipo dueño organiza como quiera."""
     return await _service(repo, storage).create_folder(project_id, data, current_user)
+
+
+@router.post(
+    "/structure-folders",
+    response_model=GenerateStructureFoldersResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_structure_folders(
+    project_id: UUID,
+    data: GenerateStructureFoldersRequest,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Genera la jerarquía de carpetas de la estructura (padre → hijo → nieto),
+    compartida por todos los equipos. Idempotente: reutiliza las ya creadas."""
+    result = await _service(repo, storage).generate_structure_folders(
+        project_id,
+        include_task_elements=data.include_task_elements,
+        current_user=current_user,
+    )
+    return GenerateStructureFoldersResponse(
+        created=result.created,
+        existing=result.existing,
+        skipped_task_elements=result.skipped_task_elements,
+    )
 
 
 @router.delete("/folders/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)

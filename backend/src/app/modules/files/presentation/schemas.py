@@ -57,13 +57,32 @@ class FolderResponse(BaseModelConfig):
     name: str
     team_id: Optional[UUID] = None
     team_name: Optional[str] = None
+    # Elemento de la estructura que refleja (carpeta compartida por todos los
+    # equipos). Ausente en carpetas de equipo y de persona.
+    work_item_id: Optional[UUID] = None
     is_root: bool
     # Permisos ya resueltos por el servidor para ESTA carpeta: la UI no vuelve a
     # deducir la política (y así no puede contradecirla).
     can_write: bool
+    # Reorganizar la carpeta (crear subcarpetas, renombrar, mover, borrar). Igual
+    # que `can_write` salvo en las carpetas de la estructura, donde subir
+    # archivos es de todos pero organizarlas es de quien administra.
+    can_organize: bool = True
     created_at: datetime
     children: list["FolderResponse"] = []
     files: list[FileResponse] = []
+
+
+class GenerateStructureFoldersRequest(BaseModelConfig):
+    # Las tareas-elemento (elementos que SON una tarea) no suelen necesitar una
+    # carpeta propia: por defecto se omiten.
+    include_task_elements: bool = False
+
+
+class GenerateStructureFoldersResponse(BaseModelConfig):
+    created: int
+    existing: int
+    skipped_task_elements: int
 
 
 class RenameFolderRequest(BaseModelConfig):

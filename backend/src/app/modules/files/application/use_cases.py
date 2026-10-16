@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.modules.files.domain.policy import FilesAccess, FolderOwner, NO_OWNER
+from app.modules.files.application.structure_folders import (
+    StructureFolderGenerator,
+    StructureFoldersResult,
+)
+from app.modules.files.domain.policy import (
+    FilesAccess,
+    FolderOwner,
+    NO_OWNER,
+    SHARED_OWNER,
+)
 from app.modules.files.infrastructure.models import ProjectFile, ProjectFolder
 from app.modules.files.infrastructure.repository import ProjectFilesRepository
 from app.modules.files.presentation.schemas import (
@@ -75,6 +84,8 @@ class ProjectFilesService:
         current = folder
         seen: set[UUID] = set()
         while current is not None and current.id not in seen:
+            if current.work_item_id is not None:
+                return SHARED_OWNER
             if current.team_id is not None or current.user_id is not None:
                 return FolderOwner(current.team_id, current.user_id)
             seen.add(current.id)
@@ -82,6 +93,47 @@ class ProjectFilesService:
                 by_id.get(current.parent_id) if current.parent_id is not None else None
             )
         return NO_OWNER
+
+    def _can_write(
+        self,
+        access: FilesAccess,
+        folder: ProjectFolder | None,
+        by_id: dict[UUID, ProjectFolder],
+    ) -> bool:
+        """Subir archivos dentro de la carpeta."""
+        return access.can_write_in(self._owner(folder, by_id))
+
+    def _can_organize(
+        self,
+        access: FilesAccess,
+        folder: ProjectFolder | None,
+        by_id: dict[UUID, ProjectFolder],
+    ) -> bool:
+        """Crear/renombrar/mover/borrar carpetas dentro de ella o ella misma.
+
+        En una carpeta de la estructura (compartida) subir archivos lo puede
+        hacer cualquier miembro, pero reorganizarla solo quien administra: es lo
+        que la mantiene idéntica a la estructura del proyecto.
+        """
+        owner = self._owner(folder, by_id)
+        if owner.shared:
+            return access.can_manage_structure_folders
+        return access.can_write_in(owner)
+
+    def _can_modify_file(
+        self,
+        access: FilesAccess,
+        file: ProjectFile,
+        folder: ProjectFolder | None,
+        by_id: dict[UUID, ProjectFolder],
+        user_id: UUID,
+    ) -> bool:
+        """Renombrar, mover o borrar un archivo. En una carpeta compartida cada
+        quien toca solo lo que subió; quien administra, todo."""
+        owner = self._owner(folder, by_id)
+        if owner.shared:
+            return access.can_manage_structure_folders or file.uploaded_by == user_id
+        return access.can_write_in(owner)
 
     # ── lectura ──────────────────────────────────────────────────────────────
 
@@ -108,7 +160,7 @@ class ProjectFilesService:
         children: dict[UUID | None, list[ProjectFolder]] = {}
         for folder in folders:
             if folder.parent_id == root.id and not access.can_see(
-                FolderOwner(folder.team_id, folder.user_id)
+                self._owner(folder, by_id)
             ):
                 continue
             children.setdefault(folder.parent_id, []).append(folder)
@@ -154,8 +206,10 @@ class ProjectFilesService:
                 name=folder.name,
                 team_id=folder.team_id,
                 team_name=teams.get(folder.team_id) if folder.team_id else None,
+                work_item_id=folder.work_item_id,
                 is_root=folder.parent_id is None,
-                can_write=access.can_write_in(self._owner(folder, by_id)),
+                can_write=self._can_write(access, folder, by_id),
+                can_organize=self._can_organize(access, folder, by_id),
                 created_at=folder.created_at,
                 children=[to_response(c) for c in children.get(folder.id, [])],
                 files=[to_file(f) for f in files_by_folder.get(folder.id, [])],
@@ -171,6 +225,22 @@ class ProjectFilesService:
                 for tid, name in teams.items()
                 if tid not in claimed and access.can_create_team_folder(tid)
             ],
+        )
+
+    # ── estructura ───────────────────────────────────────────────────────────
+
+    async def generate_structure_folders(
+        self, project_id: UUID, *, include_task_elements: bool, current_user
+    ) -> StructureFoldersResult:
+        """Crea la jerarquía de carpetas a partir de la estructura del proyecto."""
+        access = await self._require_view(project_id, current_user)
+        root = await self._ensure_root(project_id)
+        return await StructureFolderGenerator(self._repo).generate(
+            project_id,
+            root,
+            access=access,
+            include_task_elements=include_task_elements,
+            created_by=current_user.id,
         )
 
     # ── escritura ────────────────────────────────────────────────────────────
@@ -206,7 +276,7 @@ class ProjectFilesService:
             team_id = data.team_id
         else:
             by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-            if not access.can_write_in(self._owner(parent, by_id)):
+            if not self._can_organize(access, parent, by_id):
                 raise ForbiddenError("No puedes crear carpetas aquí")
             # Dentro de la carpeta de un equipo el dueño ya está definido por el
             # ancestro: marcarlo otra vez crearía dos dueños para un mismo rama.
@@ -247,7 +317,6 @@ class ProjectFilesService:
             raise ForbiddenError("La carpeta raíz del proyecto no se borra")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        owner = self._owner(folder, by_id)
         # Borrar la carpeta DE un equipo es un acto de organización, como
         # crearla; borrar algo de dentro basta con pertenecer al equipo. La
         # carpeta de una persona la borra ella misma (o administración), que es
@@ -255,7 +324,7 @@ class ProjectFilesService:
         allowed = (
             access.can_create_team_folder(folder.team_id)
             if folder.team_id is not None
-            else access.can_write_in(owner)
+            else self._can_organize(access, folder, by_id)
         )
         if not allowed:
             raise ForbiddenError("No puedes borrar esta carpeta")
@@ -284,7 +353,7 @@ class ProjectFilesService:
             raise ForbiddenError("La carpeta raíz del proyecto no se renombra")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(self._owner(folder, by_id)):
+        if not self._can_organize(access, folder, by_id):
             raise ForbiddenError("No puedes renombrar esta carpeta")
 
         name = name.strip()
@@ -336,9 +405,9 @@ class ProjectFilesService:
             raise ForbiddenError("En la raíz del proyecto solo hay carpetas de equipo")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(
-            self._owner(folder, by_id)
-        ) or not access.can_write_in(self._owner(target, by_id)):
+        if not self._can_organize(access, folder, by_id) or not self._can_organize(
+            access, target, by_id
+        ):
             raise ForbiddenError("No puedes mover contenido aquí")
         if self._owner(folder, by_id) != self._owner(target, by_id):
             # Mover entre carpetas de dueños distintos cruzaría el archivo de un
@@ -372,7 +441,7 @@ class ProjectFilesService:
             raise NotFoundError("Archivo no encontrado")
         folder = await self._repo.get_folder(project_id, file.folder_id)
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(self._owner(folder, by_id)):
+        if not self._can_modify_file(access, file, folder, by_id, current_user.id):
             raise ForbiddenError("No puedes renombrar este archivo")
 
         name = sanitize_filename(name)
@@ -405,9 +474,9 @@ class ProjectFilesService:
             raise NotFoundError("La carpeta destino no existe")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(
-            self._owner(source_folder, by_id)
-        ) or not access.can_write_in(self._owner(target_folder, by_id)):
+        if not self._can_modify_file(
+            access, file, source_folder, by_id, current_user.id
+        ) or not self._can_write(access, target_folder, by_id):
             raise ForbiddenError("No puedes mover este archivo")
         if self._owner(source_folder, by_id) != self._owner(target_folder, by_id):
             raise ForbiddenError("No puedes mover un archivo fuera de su propio equipo")
@@ -443,7 +512,7 @@ class ProjectFilesService:
             raise NotFoundError("Carpeta no encontrada")
 
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(self._owner(folder, by_id)):
+        if not self._can_write(access, folder, by_id):
             raise ForbiddenError("No puedes subir archivos aquí")
 
         name = sanitize_filename(filename)
@@ -657,7 +726,7 @@ class ProjectFilesService:
             raise NotFoundError("Archivo no encontrado")
         folder = await self._repo.get_folder(project_id, file.folder_id)
         by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
-        if not access.can_write_in(self._owner(folder, by_id)):
+        if not self._can_modify_file(access, file, folder, by_id, current_user.id):
             raise ForbiddenError("No puedes borrar este archivo")
         # Solo borrado lógico, igual que al borrar una carpeta: el byte se queda
         # en disco. Borrarlo aquí dejaba una incoherencia fea —la fila decía
