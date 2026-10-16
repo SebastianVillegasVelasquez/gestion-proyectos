@@ -30,7 +30,15 @@ async function doRevalidate(): Promise<void> {
     // el interceptor de `http` (refresh silencioso o cierre de sesión).
     return;
   }
-  const current = session.user;
+  // Re-leemos la sesión DESPUÉS de la petición: el interceptor pudo renovar el
+  // token mientras esperábamos. Guardar la copia de antes machacaría el access
+  // token nuevo con el vencido y volveríamos al punto de partida.
+  const fresh = readSession();
+  if (!fresh) {
+    // La sesión se cerró durante la petición: no la resucitamos.
+    return;
+  }
+  const current = fresh.user;
   const changed =
     user.role !== current.role ||
     user.name !== current.name ||
@@ -44,7 +52,7 @@ async function doRevalidate(): Promise<void> {
   if (!changed) {
     return;
   }
-  writeSession({ ...session, user });
+  writeSession({ ...fresh, user });
   window.dispatchEvent(new Event(USER_REVALIDATED_EVENT));
 }
 

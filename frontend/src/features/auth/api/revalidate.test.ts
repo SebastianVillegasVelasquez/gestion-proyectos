@@ -34,6 +34,43 @@ async function loadModule() {
   return import("./revalidate");
 }
 
+describe("revalidateUser y la renovación en paralelo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("no machaca un token renovado mientras la petición estaba en vuelo", async () => {
+    seedSession();
+    const tokenRenovado = fakeToken(Math.floor(Date.now() / 1000) + 7200);
+    getMock.mockImplementation(() => {
+      // Lo que hace el interceptor cuando el token caducó a mitad de camino.
+      localStorage.setItem("access_token", tokenRenovado);
+      return Promise.resolve({ data: { ...USER, role: "admin" } });
+    });
+
+    const { revalidateUser } = await loadModule();
+    await revalidateUser(true);
+
+    // El usuario se actualiza, pero el access token sigue siendo el nuevo.
+    expect(localStorage.getItem("access_token")).toBe(tokenRenovado);
+    expect(JSON.parse(localStorage.getItem("auth_user")!)).toMatchObject({ role: "admin" });
+  });
+
+  it("no resucita una sesión que se cerró durante la petición", async () => {
+    seedSession();
+    getMock.mockImplementation(() => {
+      localStorage.clear();
+      return Promise.resolve({ data: { ...USER, role: "admin" } });
+    });
+
+    const { revalidateUser } = await loadModule();
+    await revalidateUser(true);
+
+    expect(localStorage.getItem("auth_user")).toBeNull();
+  });
+});
+
 describe("revalidateUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
