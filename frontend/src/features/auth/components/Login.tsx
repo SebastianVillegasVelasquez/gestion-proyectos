@@ -1,5 +1,8 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Navigate } from "react-router";
 import type { LoginRequest } from "@/features/auth/types";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { SpinnerScreen } from "@/components/common/Spinner";
 import { type FieldName, validateField } from "@/features/auth/utils/security.utils.ts";
 import { useLogin } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
@@ -8,6 +11,7 @@ import { AuthPanel } from "./AuthPanel";
 type Errors = Partial<Record<FieldName, string>>;
 
 export default function LoginPage() {
+  const { isAuthenticated, isBootstrapping } = useAuth();
   const [dark, setDark] = useState(() => {
     const stored = localStorage.getItem("obj-theme");
     if (stored) {
@@ -37,6 +41,18 @@ export default function LoginPage() {
   useEffect((): void => {
     firstFieldRef.current?.focus();
   }, []);
+
+  // Se está renovando la sesión en silencio: esperamos antes de pedir
+  // credenciales a alguien que ya está dentro.
+  if (isBootstrapping) {
+    return <SpinnerScreen label="Comprobando tu sesión" />;
+  }
+
+  // Ya hay sesión (se renovó al arrancar, o se volvió al login con el botón
+  // atrás): no tiene sentido mostrar el formulario.
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const setField = (name: FieldName, value: string): void => {
     setLoginForm((f) => ({ ...f, [name]: value }));
