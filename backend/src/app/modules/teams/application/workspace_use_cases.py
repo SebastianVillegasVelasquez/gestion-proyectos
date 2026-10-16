@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from app.modules.tasks.infrastructure.enums import TaskStatus
+from app.modules.files.application.archive_approved import link_approved_deliverable
 from app.modules.teams.application._task_sync import cascade_after_completion
 from app.modules.teams.domain.workspace import WorkspaceAccess, WorkspaceRepository
 from app.modules.teams.infrastructure.workspace_enums import (
@@ -65,6 +66,12 @@ class WorkspaceService:
         await cascade_after_completion(
             getattr(self._repo, "_session", None), self._bus, task, None
         )
+
+    async def _archive_approved(self, deliverable) -> None:
+        """Al aprobarse, deja el archivo final enlazado en la carpeta de su elemento."""
+        session = getattr(self._repo, "_session", None)
+        if session is not None:
+            await link_approved_deliverable(session, deliverable)
 
     # ── acceso ───────────────────────────────────────────────────────────────
     async def _access(self, team_id: UUID, current_user) -> WorkspaceAccess:
@@ -327,6 +334,8 @@ class WorkspaceService:
             else DeliverableStatus.EN_REVISION
         )
         await self._repo.save_deliverable(deliverable)
+        if auto_complete:
+            await self._archive_approved(deliverable)
 
         if auto_complete and task is not None:
             # Fase 2 + toggle: sin revisión obligatoria, entregar ES completar.
@@ -447,6 +456,7 @@ class WorkspaceService:
                 await self._sync_task_status(
                     deliverable, _TASK_STATUS_ON_APPROVE, current_user
                 )
+                await self._archive_approved(deliverable)
             elif data.type in (CommentType.SOLICITUD_CAMBIO, CommentType.RECHAZO):
                 # Ambos devuelven la tarea al integrante; el motivo del rechazo
                 # viaja al historial (los jefes leen el porque en Trazabilidad).
