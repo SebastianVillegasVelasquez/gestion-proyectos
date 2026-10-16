@@ -69,6 +69,13 @@ export interface StructureFoldersResult {
   skipped_task_elements: number;
 }
 
+/** Carpeta de la estructura donde quedará el archivo final de una tarea. */
+export interface TaskDestination {
+  folder_id: string;
+  /** Curso › Módulo › …, sin la raíz del proyecto. */
+  path: string[];
+}
+
 export interface CreateFolderBody {
   name: string;
   parent_id?: string | null;
@@ -82,6 +89,11 @@ export const filesApi = {
 
   createFolder: (projectId: string, body: CreateFolderBody) =>
     http.post<ApiProjectFolder>(`${base(projectId)}/folders`, body).then((r) => r.data),
+
+  taskDestination: (projectId: string, taskId: string) =>
+    http
+      .get<TaskDestination | null>(`${base(projectId)}/task-destination/${taskId}`)
+      .then((r) => r.data),
 
   generateStructureFolders: (projectId: string, includeTaskElements: boolean) =>
     http

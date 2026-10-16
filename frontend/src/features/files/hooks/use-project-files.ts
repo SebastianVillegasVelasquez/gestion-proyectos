@@ -27,6 +27,14 @@ function useTreeMutation<TVars, TData>(projectId: string, fn: (vars: TVars) => P
   });
 }
 
+export function useTaskDestination(projectId: string, taskId: string) {
+  return useQuery({
+    queryKey: [...key(projectId), "task-destination", taskId] as const,
+    queryFn: () => filesApi.taskDestination(projectId, taskId),
+    enabled: Boolean(projectId) && Boolean(taskId),
+  });
+}
+
 export function useCreateFolder(projectId: string) {
   return useTreeMutation(projectId, (body: CreateFolderBody) =>
     filesApi.createFolder(projectId, body),
