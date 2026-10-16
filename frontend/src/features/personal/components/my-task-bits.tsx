@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ArrowUpRight, FolderTree, Lock } from "lucide-react";
+import { FolderTree, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS } from "@/features/projects/types/labels";
 import { tipoStyle } from "@/features/projects/utils/tipo-style";
@@ -154,40 +154,30 @@ export function BlockedPopover({ task }: { task: ApiMyTask }) {
  * Acción de entrega de una tarea en «Mis tareas», idéntica en la Lista y en la
  * Estructura:
  *  - completada → nada
- *  - de equipo  → enlace al espacio del equipo
  *  - bloqueada  → popover con el porqué
- *  - individual → botón Entregar / Ver entrega, y —si aún no hay entrega y es
- *    una tarea principal (sin tarea padre)— «Entregar sin adjunto», que la
- *    completa al 100% sin registrar entregable y avisa a quien coordina.
+ *  - resto      → botón Entregar (en equipo abre el mismo diálogo que el espacio
+ *    del equipo; en individual, su entrega personal / Ver entrega) y —si aún no
+ *    hay entrega y es una tarea principal (sin tarea padre)— «Entregar sin
+ *    adjunto», que la completa al 100% sin registrar entregable y avisa a quien
+ *    coordina.
  */
 export function MyTaskDeliverAction({
   task,
   isDone,
   hasDeliverable,
-  onOpenIndividual,
+  onDeliver,
   onDeliverWithoutEvidence,
   deliverWithoutEvidencePending = false,
 }: {
   task: ApiMyTask;
   isDone: boolean;
   hasDeliverable: boolean;
-  onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliver: (task: ApiMyTask) => void;
   onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
   deliverWithoutEvidencePending?: boolean;
 }) {
   if (isDone) {
     return null;
-  }
-  if (task.team_id) {
-    return (
-      <Link
-        to={`/workspace?team=${task.team_id}`}
-        className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
-        title={task.delivery_blocked_reason ?? undefined}
-      >
-        Entregar en el equipo <ArrowUpRight className="inline size-3" />
-      </Link>
-    );
   }
   if (!hasDeliverable && Boolean(task.delivery_blocked_reason)) {
     return <BlockedPopover task={task} />;
@@ -199,7 +189,7 @@ export function MyTaskDeliverAction({
       <button
         type="button"
         onClick={() => {
-          onOpenIndividual(task);
+          onDeliver(task);
         }}
         className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
       >

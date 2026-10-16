@@ -24,7 +24,7 @@ interface TipoMeta {
 interface LeafCbs {
   today: string;
   deliverableTaskIds: Set<string>;
-  onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliver: (task: ApiMyTask) => void;
   onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
   deliverWithoutEvidencePending?: boolean;
 }
@@ -69,7 +69,7 @@ function TaskLeaf({ task, cbs }: { task: ApiMyTask; cbs: LeafCbs }) {
             task={task}
             isDone={isDone}
             hasDeliverable={cbs.deliverableTaskIds.has(task.id)}
-            onOpenIndividual={cbs.onOpenIndividual}
+            onDeliver={cbs.onDeliver}
             onDeliverWithoutEvidence={cbs.onDeliverWithoutEvidence}
             deliverWithoutEvidencePending={cbs.deliverWithoutEvidencePending}
           />
@@ -258,14 +258,14 @@ export function PersonalStructureView({
   tasks,
   today,
   deliverableTaskIds,
-  onOpenIndividual,
+  onDeliver,
   onDeliverWithoutEvidence,
   deliverWithoutEvidencePending,
 }: {
   tasks: ApiMyTask[];
   today: string;
   deliverableTaskIds: Set<string>;
-  onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliver: (task: ApiMyTask) => void;
   onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
   deliverWithoutEvidencePending?: boolean;
 }) {
@@ -284,7 +284,7 @@ export function PersonalStructureView({
   const cbs: LeafCbs = {
     today,
     deliverableTaskIds,
-    onOpenIndividual,
+    onDeliver,
     onDeliverWithoutEvidence,
     deliverWithoutEvidencePending,
   };

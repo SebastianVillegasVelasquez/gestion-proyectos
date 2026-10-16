@@ -34,6 +34,7 @@ import {
 import { ManualHint } from "@/features/manual/components/ManualHint";
 import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { MyTasksView } from "./MyTasksView";
+import { TeamTaskDeliveryDialog } from "@/features/workspace/components/TeamTaskDeliveryDialog";
 
 const AVATAR_COLORS = [
   "bg-violet-600",
@@ -280,7 +281,15 @@ export function PersonalDeliverablesPage() {
 
   // Desde «Mis tareas»: abrir (o crear) la entrega personal de una tarea
   // individual y saltar a la pestaña de entregas con ella seleccionada.
-  const openIndividual = (task: ApiMyTask) => {
+  const [teamDeliveryTask, setTeamDeliveryTask] = useState<ApiMyTask | null>(null);
+
+  // Una tarea de equipo se entrega con las mismas opciones que en el espacio del
+  // equipo (diálogo compartido); una individual abre su entrega personal.
+  const openDelivery = (task: ApiMyTask) => {
+    if (task.team_id) {
+      setTeamDeliveryTask(task);
+      return;
+    }
     const existing = (mineQuery.data ?? []).find((d) => d.task_id === task.id);
     if (existing) {
       setTab("mias");
@@ -460,12 +469,24 @@ export function PersonalDeliverablesPage() {
         </button>
       </div>
 
+      {teamDeliveryTask?.team_id && (
+        <TeamTaskDeliveryDialog
+          teamId={teamDeliveryTask.team_id}
+          projectId={teamDeliveryTask.project_id}
+          userId={meId}
+          task={teamDeliveryTask}
+          onClose={() => {
+            setTeamDeliveryTask(null);
+          }}
+        />
+      )}
+
       {tab === "tareas" ? (
         <MyTasksView
           tasks={myTasksQuery.data ?? []}
           loading={myTasksQuery.isLoading}
           deliverableTaskIds={deliverableTaskIds}
-          onOpenIndividual={openIndividual}
+          onDeliver={openDelivery}
           onDeliverWithoutEvidence={(task) => {
             completeWithoutEvidence.mutate(task.id);
           }}

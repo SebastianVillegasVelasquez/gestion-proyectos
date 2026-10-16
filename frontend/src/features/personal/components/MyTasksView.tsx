@@ -115,7 +115,7 @@ export function MyTasksView({
   tasks,
   loading,
   deliverableTaskIds,
-  onOpenIndividual,
+  onDeliver,
   onDeliverWithoutEvidence,
   deliverWithoutEvidencePending,
 }: {
@@ -123,7 +123,7 @@ export function MyTasksView({
   loading: boolean;
   /** ids de tareas que ya tienen una entrega personal (para el texto del botón). */
   deliverableTaskIds: Set<string>;
-  onOpenIndividual: (task: ApiMyTask) => void;
+  onDeliver: (task: ApiMyTask) => void;
   /** "Entregar sin adjunto": completa la tarea individual al 100% sin entregable. */
   onDeliverWithoutEvidence?: (task: ApiMyTask) => void;
   deliverWithoutEvidencePending?: boolean;
@@ -381,7 +381,7 @@ export function MyTasksView({
           tasks={filteredTasks}
           today={today}
           deliverableTaskIds={deliverableTaskIds}
-          onOpenIndividual={onOpenIndividual}
+          onDeliver={onDeliver}
           onDeliverWithoutEvidence={onDeliverWithoutEvidence}
           deliverWithoutEvidencePending={deliverWithoutEvidencePending}
         />
@@ -455,7 +455,7 @@ export function MyTasksView({
                             task={task}
                             isDone={status === "done"}
                             hasDeliverable={hasDeliverable}
-                            onOpenIndividual={onOpenIndividual}
+                            onDeliver={onDeliver}
                             onDeliverWithoutEvidence={onDeliverWithoutEvidence}
                             deliverWithoutEvidencePending={deliverWithoutEvidencePending}
                           />
