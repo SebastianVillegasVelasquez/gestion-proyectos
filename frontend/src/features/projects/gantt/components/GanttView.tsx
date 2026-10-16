@@ -36,6 +36,7 @@ import {
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
+import { routeDependencyArrows } from "../arrows";
 import { AssigneeCardModal } from "./AssigneeCardModal";
 import { useTeams } from "../../hooks/use-teams";
 import { tipoStyle } from "../../utils/tipo-style";
@@ -672,40 +673,12 @@ export function GanttView({
     if (!showDeps) {
       return [];
     }
-    const out: { id: string; d: string }[] = [];
-    const outLane = new Map<string, number>();
-    const inLane = new Map<string, number>();
-    for (const dep of dependencies) {
+    const edges = dependencies.flatMap((dep) => {
       // El predecesor puede ser otra tarea o un elemento del árbol.
       const fromKey = dep.depends_on_id ?? dep.depends_on_work_item_id;
-      if (!fromKey) {
-        continue;
-      }
-      const from = layout.positions.get(fromKey);
-      const to = layout.positions.get(dep.task_id);
-      if (!from || !to) {
-        continue;
-      }
-      const k = outLane.get(fromKey) ?? 0;
-      outLane.set(fromKey, k + 1);
-      const j = inLane.get(dep.task_id) ?? 0;
-      inLane.set(dep.task_id, j + 1);
-      const x1 = from.left + from.width;
-      const y1 = from.yTop + ROW_H / 2;
-      const x2 = to.left;
-      const y2 = to.yTop + ROW_H / 2;
-      const exit = x1 + 12 + k * 7;
-      const enter = x2 - (12 + j * 7);
-      const end = x2 - 3;
-      out.push({
-        id: dep.id,
-        d:
-          exit < enter
-            ? `M ${x1} ${y1} H ${exit} V ${y2} H ${end}`
-            : `M ${x1} ${y1} H ${exit} V ${y2 + (y2 >= y1 ? -ROW_H / 2 : ROW_H / 2)} H ${enter} V ${y2} H ${end}`,
-      });
-    }
-    return out;
+      return fromKey ? [{ id: dep.id, fromKey, toKey: dep.task_id }] : [];
+    });
+    return routeDependencyArrows(edges, layout.positions, ROW_H);
   }, [showDeps, dependencies, layout]);
 
   const toggleStatus = (s: TaskStatus) => {
@@ -1438,11 +1411,19 @@ export function GanttView({
                         <path
                           d={a.d}
                           fill="none"
-                          stroke="currentColor"
+                          stroke={a.conflict ? "var(--color-rose-500)" : "currentColor"}
                           strokeWidth={1.5}
+                          strokeDasharray={a.conflict ? "4 3" : undefined}
                           strokeLinejoin="round"
                           markerEnd={`url(#gantt-arrow-${project.id})`}
-                        />
+                        >
+                          {a.conflict && (
+                            <title>
+                              Las fechas se contradicen: esta tarea empieza antes de que termine su
+                              predecesora.
+                            </title>
+                          )}
+                        </path>
                       </g>
                     ))}
                   </svg>
