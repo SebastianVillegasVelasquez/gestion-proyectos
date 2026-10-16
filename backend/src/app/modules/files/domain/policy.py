@@ -23,13 +23,17 @@ class FolderOwner:
 
     team_id: UUID | None = None
     user_id: UUID | None = None
+    # Carpetas generadas desde la estructura: son de TODO el proyecto. Es un
+    # tercer tipo de dueño (ni equipo ni persona) y no se confunde con la raíz.
+    shared: bool = False
 
     @property
     def is_root(self) -> bool:
-        return self.team_id is None and self.user_id is None
+        return self.team_id is None and self.user_id is None and not self.shared
 
 
 NO_OWNER = FolderOwner()
+SHARED_OWNER = FolderOwner(shared=True)
 
 
 @dataclass(frozen=True)
@@ -103,7 +107,7 @@ class FilesAccess:
         impide), pero si la hubiera solo la ve quien ve el proyecto entero,
         nunca un equipo ni una persona por accidente.
         """
-        if self.sees_whole_project:
+        if self.sees_whole_project or owner.shared:
             return True
         if owner.team_id is not None:
             return owner.team_id in self.team_roles
@@ -130,6 +134,21 @@ class FilesAccess:
             return False
         if self.is_admin:
             return True
+        if owner.shared:
+            # Quien trabaja en el proyecto deposita sus entregas en la
+            # jerarquía común; organizarla es otra cosa (ver
+            # `can_manage_structure_folders`).
+            return self.is_project_member or bool(self.team_roles)
         if owner.team_id is not None:
             return owner.team_id in self.team_roles
         return owner.user_id == self.user_id
+
+    @property
+    def can_manage_structure_folders(self) -> bool:
+        """Generar, renombrar, mover o borrar las carpetas de la estructura.
+
+        Son la forma común del archivador: si cualquier integrante las tocara,
+        dejarían de coincidir con la estructura del proyecto. Las organiza la
+        administración o quien coordina el proyecto.
+        """
+        return self.is_admin or self.project_role == ProjectRole.COORDINADOR
