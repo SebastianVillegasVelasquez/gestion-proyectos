@@ -20,6 +20,7 @@ from app.modules.files.presentation.schemas import (
     FileResponse,
     FolderResponse,
     ProjectFilesResponse,
+    TaskDestinationResponse,
     TeamOption,
 )
 from app.shared.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -243,6 +244,26 @@ class ProjectFilesService:
             include_task_elements=include_task_elements,
             created_by=current_user.id,
         )
+
+    async def task_destination(
+        self, project_id: UUID, task_id: UUID, current_user
+    ) -> TaskDestinationResponse | None:
+        """Carpeta de la estructura donde irá el archivo final de la tarea, o
+        None si su elemento aún no tiene carpeta (o la tarea no tiene elemento)."""
+        await self._require_view(project_id, current_user)
+        located = await self._repo.task_work_item(task_id)
+        if located is None or located[0] != project_id or located[1] is None:
+            return None
+        folder = await self._repo.get_folder_for_work_item(project_id, located[1])
+        if folder is None:
+            return None
+        by_id = {f.id: f for f in await self._repo.list_folders(project_id)}
+        path: list[str] = []
+        current: ProjectFolder | None = folder
+        while current is not None and current.parent_id is not None:
+            path.append(current.name)
+            current = by_id.get(current.parent_id)
+        return TaskDestinationResponse(folder_id=folder.id, path=path[::-1])
 
     # ── escritura ────────────────────────────────────────────────────────────
 

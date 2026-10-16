@@ -23,6 +23,7 @@ from app.modules.files.presentation.schemas import (
     ProjectFilesResponse,
     RenameFileRequest,
     RenameFolderRequest,
+    TaskDestinationResponse,
 )
 from app.shared.exceptions import ValidationError
 
@@ -59,6 +60,22 @@ async def create_folder(
     por equipo, la abre su líder o supervisor); más abajo, cualquier integrante
     del equipo dueño organiza como quiera."""
     return await _service(repo, storage).create_folder(project_id, data, current_user)
+
+
+@router.get(
+    "/task-destination/{task_id}", response_model=TaskDestinationResponse | None
+)
+async def get_task_destination(
+    project_id: UUID,
+    task_id: UUID,
+    repo=Depends(project_files_repo_dependency),
+    storage=Depends(file_storage_dependency),
+    current_user=Depends(get_current_user),
+):
+    """Carpeta de la estructura donde quedará el archivo final de la tarea."""
+    return await _service(repo, storage).task_destination(
+        project_id, task_id, current_user
+    )
 
 
 @router.post(

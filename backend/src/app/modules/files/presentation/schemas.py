@@ -85,6 +85,14 @@ class GenerateStructureFoldersResponse(BaseModelConfig):
     skipped_task_elements: int
 
 
+class TaskDestinationResponse(BaseModelConfig):
+    """Carpeta de la estructura donde quedará el archivo final de una tarea."""
+
+    folder_id: UUID
+    # Nombres de la raíz a la carpeta (sin la raíz del proyecto): Curso › Módulo.
+    path: list[str]
+
+
 class RenameFolderRequest(BaseModelConfig):
     name: FolderName
 

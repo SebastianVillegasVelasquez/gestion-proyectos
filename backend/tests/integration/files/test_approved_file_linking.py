@@ -154,3 +154,19 @@ async def test_without_generated_folders_the_delivery_just_stays_put(
         await client.get(f"{BASE}/{project.id}/files", headers=_headers(owner))
     ).json()
     assert [f["name"] for f in tree["root"]["children"][0]["files"]] == ["guion.pdf"]
+
+
+async def test_the_task_destination_is_the_element_folder_path(client, db_session):
+    owner = await _user(db_session)
+    admin = await _user(db_session, SystemRole.ADMIN)
+    project, task = await _setup(db_session, owner)
+    url = f"{BASE}/{project.id}/files/task-destination/{task.id}"
+
+    before = await client.get(url, headers=_headers(owner))
+    await client.post(
+        f"{BASE}/{project.id}/files/structure-folders", json={}, headers=_headers(admin)
+    )
+    after = await client.get(url, headers=_headers(owner))
+
+    assert before.status_code == 200 and before.json() is None
+    assert after.json()["path"] == ["Módulo 1"]
