@@ -31,7 +31,6 @@ export default function LoginPage() {
     : null;
 
   useEffect((): void => {
-    console.error("Probando hot reload!!");
     localStorage.setItem("obj-theme", dark ? "dark" : "light");
   }, [dark]);
 
