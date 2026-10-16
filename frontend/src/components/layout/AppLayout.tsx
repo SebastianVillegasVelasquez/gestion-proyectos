@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
+import { SpinnerScreen } from "@/components/common/Spinner";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 import { ActiveProjectProvider } from "@/features/projects/context/ActiveProjectProvider";
@@ -9,16 +10,6 @@ import { WhatsNewProvider } from "@/features/whats-new/WhatsNewProvider";
 import { ViewAsBanner } from "@/components/layout/ViewAsSwitcher";
 import { FirstLoginPasswordGate } from "@/features/auth/components/FirstLoginPasswordGate";
 import { useNotificationsSocket } from "@/features/notifications/hooks/use-notification-socket.ts";
-
-// Fallback mientras se descarga el chunk de la ruta (solo el área de contenido;
-// el sidebar permanece visible).
-function RouteFallback() {
-  return (
-    <div className="flex h-full w-full items-center justify-center p-10">
-      <span className="size-6 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
-    </div>
-  );
-}
 
 export interface AppOutletContext {
   dark: boolean;
@@ -128,7 +119,7 @@ export const AppLayout = () => {
 
             {/* Page content — scrollable on mobile, fixed on desktop. */}
             <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
-              <Suspense fallback={<RouteFallback />}>
+              <Suspense fallback={<SpinnerScreen />}>
                 <Outlet context={context} />
               </Suspense>
             </main>
