@@ -220,6 +220,7 @@ class ProjectFilesService:
             project_id=project_id,
             root=to_response(root),
             sees_whole_project=access.sees_whole_project,
+            can_generate_structure_folders=access.can_manage_structure_folders,
             teams_without_folder=[
                 TeamOption(id=tid, name=name)
                 for tid, name in teams.items()

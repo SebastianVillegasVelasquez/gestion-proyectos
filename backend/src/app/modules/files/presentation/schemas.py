@@ -122,6 +122,9 @@ class ProjectFilesResponse(BaseModelConfig):
     # de quien mira. La UI lo dice en pantalla en vez de dejar creer que el
     # proyecto solo tiene esas carpetas.
     sees_whole_project: bool = False
+    # Puede generar la jerarquía de carpetas de la estructura (administración o
+    # coordinación del proyecto). La UI muestra el botón solo si es true.
+    can_generate_structure_folders: bool = False
     # Equipos del proyecto que aún no tienen carpeta y que el usuario podría
     # abrir. Vacío para quien no puede crear ninguna.
     teams_without_folder: list[TeamOption] = []
