@@ -33,6 +33,7 @@ import {
 } from "../hooks/use-personal-deliverables";
 import { ManualHint } from "@/features/manual/components/ManualHint";
 import { MANUAL_TOPIC } from "@/features/manual/manual-content";
+import { FileDestinationHint } from "@/features/files/components/FileDestinationHint";
 import { MyTasksView } from "./MyTasksView";
 import { TeamTaskDeliveryDialog } from "@/features/workspace/components/TeamTaskDeliveryDialog";
 
@@ -565,6 +566,15 @@ export function PersonalDeliverablesPage() {
                   onEditVersion={handleEditVersion}
                   onReview={handleReview}
                   onDelete={handleDelete}
+                  destination={
+                    selectedRaw.task_id && selectedRaw.project_id ? (
+                      <FileDestinationHint
+                        projectId={selectedRaw.project_id}
+                        taskId={selectedRaw.task_id}
+                        workingPlace="tu carpeta personal"
+                      />
+                    ) : undefined
+                  }
                 />
               </div>
               <div className="flex w-[380px] shrink-0 flex-col overflow-hidden">

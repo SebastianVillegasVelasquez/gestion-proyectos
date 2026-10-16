@@ -30,6 +30,7 @@ import { GroupSettingsView } from "./GroupSettingsView";
 import { MyInvitationsBanner } from "./MyInvitationsBanner";
 import { TeamGanttPanel } from "./TeamGanttPanel";
 import { TeamProgressView } from "./TeamProgressView";
+import { FileDestinationHint } from "@/features/files/components/FileDestinationHint";
 import { TeamTaskDeliveryDialog } from "./TeamTaskDeliveryDialog";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { WorkspaceStructureView } from "./WorkspaceStructureView";
@@ -692,6 +693,15 @@ function MemberWorkspace() {
                         onReview={handleReview}
                         onDelete={handleDelete}
                         folderOptions={folderOptions}
+                        destination={
+                          selectedDeliverable.taskId ? (
+                            <FileDestinationHint
+                              projectId={activeTeam.project_id}
+                              taskId={selectedDeliverable.taskId}
+                              workingPlace="la carpeta de tu equipo"
+                            />
+                          ) : undefined
+                        }
                       />
                     </div>
                     <div className="flex h-80 w-full shrink-0 flex-col overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[400px] lg:border-l lg:border-t-0 dark:border-slate-800">

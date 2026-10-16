@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { X } from "lucide-react";
+import { FileDestinationHint } from "@/features/files/components/FileDestinationHint";
 import { useProjectFiles } from "@/features/files/hooks/use-project-files";
 import type { DeliverableVersion } from "../types";
 import { teamFolderOptions } from "../utils/delivery-folders";
@@ -173,6 +174,13 @@ export function TeamTaskDeliveryDialog({
             currentVersion={0}
             uploadedBy=""
             folderOptions={folderOptions}
+            destination={
+              <FileDestinationHint
+                projectId={projectId}
+                taskId={task.id}
+                workingPlace="la carpeta de tu equipo"
+              />
+            }
           />
         </div>
       </div>

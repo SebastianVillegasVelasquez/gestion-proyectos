@@ -1,4 +1,4 @@
-import { type DragEvent, useRef, useState } from "react";
+import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import {
   Check,
   Clock,
@@ -400,6 +400,8 @@ export interface RegisterDeliveryProps {
   /** Subcarpetas del equipo donde elegir dónde cae el archivo. Vacío/omitido
    *  = el servidor decide (la carpeta del equipo tal cual). */
   folderOptions?: DeliveryFolderOption[];
+  /** Aviso de a qué carpeta irá el archivo (ver `FileDestinationHint`). */
+  destination?: ReactNode;
 }
 
 export function RegisterDelivery({
@@ -410,6 +412,7 @@ export function RegisterDelivery({
   uploadedBy,
   onDone,
   folderOptions = [],
+  destination,
 }: RegisterDeliveryProps) {
   const [type, setType] = useState<ResourceType>("enlace");
   const [typeTouchedByUser, setTypeTouchedByUser] = useState(false);
@@ -614,6 +617,7 @@ export function RegisterDelivery({
                 ))}
               </ul>
             )}
+            {destination}
             {folderOptions.length > 0 && (
               <div>
                 <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -737,6 +741,8 @@ interface DeliverableDetailViewProps {
   onDelete?: () => void;
   /** Subcarpetas del equipo donde elegir dónde cae el archivo entregado. */
   folderOptions?: DeliveryFolderOption[];
+  /** Aviso de la carpeta destino del archivo (ver `FileDestinationHint`). */
+  destination?: ReactNode;
 }
 
 export function DeliverableDetailView({
@@ -756,6 +762,7 @@ export function DeliverableDetailView({
   onReview,
   onDelete,
   folderOptions = [],
+  destination,
 }: DeliverableDetailViewProps) {
   const assignee = members.find((m) => m.id === deliverable.assigneeId);
   const [showRegister, setShowRegister] = useState(false);
@@ -875,6 +882,7 @@ export function DeliverableDetailView({
           onUploadFiles={onUploadFiles}
           uploading={uploadPending}
           folderOptions={folderOptions}
+          destination={destination}
           onClose={() => {
             setShowRegister(false);
           }}
@@ -910,6 +918,7 @@ function RegisterDeliveryModal({
   onUploadFiles,
   uploading,
   folderOptions,
+  destination,
   onClose,
 }: {
   currentVersion: number;
@@ -927,6 +936,7 @@ function RegisterDeliveryModal({
   ) => void;
   uploading: boolean;
   folderOptions?: DeliveryFolderOption[];
+  destination?: ReactNode;
   onClose: () => void;
 }) {
   return (
@@ -965,6 +975,7 @@ function RegisterDeliveryModal({
             uploadedBy={uploadedBy}
             onDone={onClose}
             folderOptions={folderOptions}
+            destination={destination}
           />
         </div>
       </div>

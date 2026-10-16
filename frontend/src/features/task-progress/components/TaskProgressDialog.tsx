@@ -1,3 +1,4 @@
+import { FileDestinationHint } from "@/features/files/components/FileDestinationHint";
 import { useState } from "react";
 import { FileText, Link2, Lock, Paperclip, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -257,6 +258,11 @@ export function TaskProgressDialog({
                         setFile(e.target.files?.[0] ?? null);
                       }}
                       className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-medium"
+                    />
+                    <FileDestinationHint
+                      projectId={progress.project_id}
+                      taskId={taskId}
+                      workingPlace="la carpeta de trabajo de tu equipo o tu carpeta personal"
                     />
                     {progress.has_deliverable && (
                       <label className="flex items-center gap-2 text-xs text-foreground">
