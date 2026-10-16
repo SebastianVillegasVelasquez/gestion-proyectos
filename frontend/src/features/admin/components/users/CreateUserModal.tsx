@@ -93,7 +93,7 @@ export function CreateUserModal({
           </button>
         </div>
         <div className="flex flex-col gap-3 px-5 py-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               className={inputCls}
               placeholder="Nombre"
@@ -127,7 +127,7 @@ export function CreateUserModal({
             que se la entregues a la persona; deberá cambiarla en su primer ingreso.
           </p>
           {/* Documento de identidad (opcional): tipo + número */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">Tipo de documento</span>
               <select

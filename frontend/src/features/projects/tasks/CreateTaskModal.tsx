@@ -507,7 +507,7 @@ export function CreateTaskModal({
           {/* Fechas: inicio + (fin o duración). Opcionales: la tarea puede
               crearse sin planificar y ajustarse después. La duración en días
               queda además como estimación de esfuerzo aunque no haya fecha. */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Inicio (opcional)">
               <input
                 type="date"

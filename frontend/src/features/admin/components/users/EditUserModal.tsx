@@ -78,7 +78,7 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
           </button>
         </div>
         <div className="flex flex-col gap-3 px-5 py-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">Nombre</span>
               <input

@@ -233,7 +233,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         </header>
 
         <div className="flex flex-col gap-4 px-5 py-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Nombre</span>
               <input
@@ -339,7 +339,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(mode === "fechas" || mode === "inicio_dur") && (
                   <label className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
