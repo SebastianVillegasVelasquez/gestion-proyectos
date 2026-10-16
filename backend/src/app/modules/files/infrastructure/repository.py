@@ -11,6 +11,7 @@ from app.modules.project.infrastructure.enums import ProjectRole
 from app.modules.project.infrastructure.models import ProjectMember
 from app.modules.project.structure.infrastructure.models import WorkItem
 from app.modules.tasks.infrastructure.models import Task
+from app.shared.exceptions import ConflictError
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_models import (
@@ -187,6 +188,18 @@ class ProjectFilesRepository:
         )
         return {wid for (wid,) in rows.all() if wid is not None}
 
+    async def get_folder_for_work_item(
+        self, project_id: UUID, work_item_id: UUID
+    ) -> ProjectFolder | None:
+        """La carpeta generada para un elemento de la estructura (si la hay)."""
+        return await self._session.scalar(
+            select(ProjectFolder).where(
+                ProjectFolder.project_id == project_id,
+                ProjectFolder.work_item_id == work_item_id,
+                ProjectFolder.deleted_at.is_(None),
+            )
+        )
+
     async def task_work_item(self, task_id: UUID) -> tuple[UUID, UUID | None] | None:
         """`(project_id, work_item_id)` de una tarea, o None si no existe."""
         row = (
@@ -236,6 +249,48 @@ class ProjectFilesRepository:
         return (
             await self._session.scalar(
                 select(func.count()).select_from(ProjectFile).where(*conditions)
+            )
+            or 0
+        ) > 0
+
+    async def free_file_name(self, folder_id: UUID, name: str) -> str:
+        """`informe.pdf` → `informe (2).pdf` si el nombre ya está ocupado."""
+        if not await self.file_name_taken(folder_id, name):
+            return name
+        stem, dot, ext = name.rpartition(".")
+        stem, ext = (stem, f"{dot}{ext}") if dot else (name, "")
+        for n in range(2, 100):
+            candidate = f"{stem} ({n}){ext}"
+            if not await self.file_name_taken(folder_id, candidate):
+                return candidate
+        raise ConflictError("Demasiados archivos con ese nombre en esta carpeta")
+
+    async def latest_delivered_file_id(self, deliverable_id: UUID) -> UUID | None:
+        """Archivo de la última versión del entregable que trae uno (la «final»).
+        Se consulta en vez de leer `deliverable.versions`: al cerrar una entrega
+        la colección puede estar desactualizada respecto de la versión recién
+        guardada."""
+        return await self._session.scalar(
+            select(DeliverableVersion.file_id)
+            .where(
+                DeliverableVersion.deliverable_id == deliverable_id,
+                DeliverableVersion.file_id.is_not(None),
+            )
+            .order_by(DeliverableVersion.version_number.desc())
+            .limit(1)
+        )
+
+    async def has_file_with_storage(self, folder_id: UUID, storage_key: str) -> bool:
+        """¿Ya hay en la carpeta un archivo que apunta a ese mismo contenido?"""
+        return (
+            await self._session.scalar(
+                select(func.count())
+                .select_from(ProjectFile)
+                .where(
+                    ProjectFile.folder_id == folder_id,
+                    ProjectFile.storage_key == storage_key,
+                    ProjectFile.deleted_at.is_(None),
+                )
             )
             or 0
         ) > 0

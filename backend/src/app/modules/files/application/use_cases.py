@@ -684,22 +684,11 @@ class ProjectFilesService:
         )
 
     async def _free_name(self, folder_id: UUID, name: str) -> str:
-        """`informe.pdf` → `informe (2).pdf` si el nombre ya está ocupado.
-
-        Al subir a mano un choque de nombres es un error que conviene avisar;
-        al entregar NO lo es: la segunda versión de un entregable suele traer
-        el mismo archivo corregido, y fallar ahí obligaría a renombrar en el
-        disco antes de poder entregar.
-        """
-        if not await self._repo.file_name_taken(folder_id, name):
-            return name
-        stem, dot, ext = name.rpartition(".")
-        stem, ext = (stem, f"{dot}{ext}") if dot else (name, "")
-        for n in range(2, 100):
-            candidate = f"{stem} ({n}){ext}"
-            if not await self._repo.file_name_taken(folder_id, candidate):
-                return candidate
-        raise ConflictError("Demasiados archivos con ese nombre en esta carpeta")
+        """Al subir a mano un choque de nombres es un error que conviene avisar;
+        al entregar NO lo es: la segunda versión de un entregable suele traer el
+        mismo archivo corregido, y fallar ahí obligaría a renombrar en el disco
+        antes de poder entregar. Por eso aquí se numera (ver `free_file_name`)."""
+        return await self._repo.free_file_name(folder_id, name)
 
     async def get_file_for_download(
         self, project_id: UUID, file_id: UUID, current_user
