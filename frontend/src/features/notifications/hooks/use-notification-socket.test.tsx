@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { useNotificationsSocket } from "./use-notification-socket";
+import { refreshAccessToken } from "@/features/auth/api/refresh";
 
 // ── Mocks de auth: controlamos si hay sesión y qué token se lee ──
 interface MockAuthState {
@@ -24,6 +25,10 @@ vi.mock("@/features/auth/hooks/use-auth", () => ({
 
 vi.mock("@/features/auth/utils/session.utils", () => ({
   readSession: () => ({ accessToken: "token-123" }),
+}));
+
+vi.mock("@/features/auth/api/refresh", () => ({
+  refreshAccessToken: vi.fn(() => Promise.resolve("token-renovado")),
 }));
 
 // ── Mock de la API WebSocket del navegador ──
@@ -119,6 +124,69 @@ describe("useNotificationsSocket", () => {
     );
 
     expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
+  it("renueva el token y reconecta cuando el servidor lo rechaza (4401)", async () => {
+    // El token de acceso vive una hora; cuando caduca, la WS se cierra con
+    // 4401. Antes se daba por vencida y la campanita quedaba muda el resto de
+    // la sesión.
+    const client = makeClient();
+    renderHook(
+      () => {
+        useNotificationsSocket();
+      },
+      { wrapper: makeWrapper(client) },
+    );
+
+    MockWebSocket.instances[0].onclose?.({ code: 4401 });
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(2);
+    });
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("no insiste si el token recién renovado también es rechazado", async () => {
+    const client = makeClient();
+    renderHook(
+      () => {
+        useNotificationsSocket();
+      },
+      { wrapper: makeWrapper(client) },
+    );
+
+    MockWebSocket.instances[0].onclose?.({ code: 4401 });
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    MockWebSocket.instances[1].onclose?.({ code: 4401 });
+    await Promise.resolve();
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("vuelve a permitir una renovación tras una conexión buena", async () => {
+    const client = makeClient();
+    renderHook(
+      () => {
+        useNotificationsSocket();
+      },
+      { wrapper: makeWrapper(client) },
+    );
+
+    MockWebSocket.instances[0].onclose?.({ code: 4401 });
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    // La reconexión funciona: el candado se suelta para la próxima caducidad.
+    MockWebSocket.instances[1].onopen?.();
+    MockWebSocket.instances[1].onclose?.({ code: 4401 });
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(3);
+    });
+    expect(refreshAccessToken).toHaveBeenCalledTimes(2);
   });
 
   it("cierra la conexión al desmontar", () => {

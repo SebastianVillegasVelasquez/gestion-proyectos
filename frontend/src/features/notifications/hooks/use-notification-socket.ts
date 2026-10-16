@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { readSession } from "@/features/auth/utils/session.utils";
+import { refreshAccessToken } from "@/features/auth/api/refresh";
 
 const WS_URL_ENV = import.meta.env.VITE_WS_URL as string | undefined;
 const MAX_BACKOFF_MS = 30_000;
@@ -40,6 +41,10 @@ export function useNotificationsSocket(): void {
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const isUnmountedRef = useRef(false);
+  // Una sola renovación por token rechazado: si el servidor sigue diciendo que
+  // no con un token recién emitido, el problema no es la caducidad y reintentar
+  // solo haría girar la rueda.
+  const renewedForAuthRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -61,6 +66,7 @@ export function useNotificationsSocket(): void {
 
       ws.onopen = () => {
         reconnectAttemptsRef.current = 0;
+        renewedForAuthRef.current = false;
       };
 
       ws.onmessage = (evt) => {
@@ -80,9 +86,23 @@ export function useNotificationsSocket(): void {
         if (isUnmountedRef.current) {
           return;
         }
+        // 4401 = el servidor rechazó el token. Lo normal es que simplemente
+        // haya caducado (vive una hora): se renueva y se vuelve a conectar. Sin
+        // esto, la campanita se quedaba muda el resto de la sesión, en silencio
+        // y sin que nada lo delatara, porque las dependencias del efecto no
+        // cambian cuando se renueva el token.
         if (evt.code === 4401) {
+          if (renewedForAuthRef.current) {
+            return;
+          }
+          renewedForAuthRef.current = true;
+          void refreshAccessToken().then((token) => {
+            if (token && !isUnmountedRef.current) {
+              connect();
+            }
+          });
           return;
-        } // token inválido → no insistir
+        }
 
         const attempt = reconnectAttemptsRef.current;
         const delay = Math.min(2 ** attempt * 1000, MAX_BACKOFF_MS);
