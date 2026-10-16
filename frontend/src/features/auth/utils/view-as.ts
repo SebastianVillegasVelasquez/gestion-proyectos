@@ -1,4 +1,5 @@
 import { Role, roleRank } from "@/features/auth/types";
+import { readViewAsTeamRole } from "./view-as-team-role";
 
 const KEY = "view_as_role";
 
@@ -43,5 +44,5 @@ export function writeViewAsRole(role: Role | null): void {
 /** ¿Hay una vista previa activa? Lo consulta el cliente HTTP para impedir
  *  escrituras: previsualizar es mirar, no actuar con otro sombrero. */
 export function isPreviewing(): boolean {
-  return readViewAsRole() !== null;
+  return readViewAsRole() !== null || readViewAsTeamRole() !== null;
 }

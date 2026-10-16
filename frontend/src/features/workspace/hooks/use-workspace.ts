@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { applyTeamRolePreview, useViewAsTeamRole } from "@/features/auth/utils/view-as-team-role";
 import { projectKeys, taskKeys } from "@/features/projects/hooks/query-keys";
 import type { Task } from "@/features/projects/types/api.types";
 import {
@@ -37,11 +38,18 @@ export function useTeamMembers(teamId: string | null) {
   });
 }
 
+/**
+ * Permisos del usuario en el equipo. Es el único punto donde se calculan, así
+ * que la vista previa de «rol en el equipo» se aplica aquí y todas las pantallas
+ * (revisión, reasignación, filtros por persona) la respetan sin enterarse.
+ */
 export function useWorkspaceAccess(teamId: string | null) {
+  const previewRole = useViewAsTeamRole();
   return useQuery({
     queryKey: keys.access(teamId ?? ""),
     queryFn: () => workspaceApi.access(teamId!),
     enabled: Boolean(teamId),
+    select: (access) => applyTeamRolePreview(access, previewRole),
   });
 }
 

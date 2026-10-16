@@ -8,6 +8,7 @@ import {
 } from "@/features/auth/utils/session.utils";
 import { decodeJwt } from "@/features/auth/utils/jwt.utils";
 import { previewableRoles, readViewAsRole, writeViewAsRole } from "@/features/auth/utils/view-as";
+import { writeViewAsTeamRole } from "@/features/auth/utils/view-as-team-role";
 import type { Role } from "@/features/auth/types";
 import { SESSION_REFRESHED_EVENT, refreshAccessToken } from "@/features/auth/api/refresh";
 import { USER_REVALIDATED_EVENT, revalidateUser } from "@/features/auth/api/revalidate";
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     writeViewAsRole(null);
+    writeViewAsTeamRole(null);
     clearSession();
     setSession(null);
   }, []);
