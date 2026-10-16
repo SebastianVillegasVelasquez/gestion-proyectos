@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDismissOnOutsideClick } from "@/hooks/use-dismiss-on-outside-click";
 import { ProjectMark } from "@/components/common/EntityBadge";
 import { useActiveProject } from "@/features/projects/hooks/use-active-project";
 import { useProjectScopeOptions } from "@/features/projects/hooks/use-project-scope-options";
@@ -16,20 +17,9 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [open]);
+  useDismissOnOutsideClick(ref, open, () => {
+    setOpen(false);
+  });
 
   // Con un solo proyecto no hay qué elegir.
   if (options.length < 2) {
