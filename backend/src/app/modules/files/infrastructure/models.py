@@ -55,6 +55,15 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
             unique=True,
             postgresql_where=("user_id IS NOT NULL AND deleted_at IS NULL"),
         ),
+        # Un elemento de la estructura, una carpeta: generar la jerarquía dos
+        # veces reutiliza las existentes en lugar de duplicarlas.
+        Index(
+            "uq_project_folders_work_item_alive",
+            "project_id",
+            "work_item_id",
+            unique=True,
+            postgresql_where=("work_item_id IS NOT NULL AND deleted_at IS NULL"),
+        ),
         Index("ix_project_folders_project_parent", "project_id", "parent_id"),
     )
 
@@ -87,6 +96,16 @@ class ProjectFolder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+
+    # Elemento de la estructura que esta carpeta refleja. Las carpetas así son
+    # COMPARTIDAS: no tienen dueño (ni equipo ni persona) y las ven todos los
+    # equipos del proyecto. `SET NULL`: borrar el elemento deja la carpeta (y
+    # sus archivos) en su sitio como una carpeta normal.
+    work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("work_items.id", ondelete="SET NULL"),
         nullable=True,
     )
 
