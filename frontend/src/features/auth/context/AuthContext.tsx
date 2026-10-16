@@ -23,9 +23,23 @@ const REFRESH_SKEW_MS = 30_000;
 
 export { AuthContext } from "./auth-context";
 
+// Tope de espera del arranque: si `/auth/refresh` no contesta (red caída, API
+// abajo), no dejamos la app clavada en el spinner para siempre. Al cumplirse,
+// se sigue como invitado y el login decide.
+const BOOTSTRAP_TIMEOUT_MS = 8_000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => readSession());
   const [requestedViewAs, setRequestedViewAs] = useState<Role | null>(() => readViewAsRole());
+  // ¿Estamos todavía averiguando si hay sesión? Es el caso de recargar con el
+  // access token vencido pero el refresh token vivo: `readSession()` devuelve
+  // null, así que en el primer render la app parece deslogueada y el
+  // ProtectedRoute mandaba al login aunque la renovación fuese a funcionar un
+  // instante después. Mientras esto sea true, los guards esperan en vez de
+  // redirigir.
+  const [isBootstrapping, setIsBootstrapping] = useState(
+    () => readSession() === null && localStorage.getItem("refresh_token") !== null,
+  );
 
   const setViewAsRole = useCallback((role: Role | null) => {
     writeViewAsRole(role);
@@ -98,14 +112,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // refresh token, renovamos en silencio en vez de exigir un nuevo login. Cubre
   // recargar la página tras más de una hora inactivo.
   useEffect(() => {
-    if (session || !localStorage.getItem("refresh_token")) {
+    if (!isBootstrapping) {
       return;
     }
-    void refreshAccessToken().then((token) => {
-      if (token) {
-        setSession(readSession());
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        setIsBootstrapping(false);
       }
-    });
+    };
+    const timer = setTimeout(finish, BOOTSTRAP_TIMEOUT_MS);
+    void refreshAccessToken()
+      .then((token) => {
+        if (token) {
+          setSession(readSession());
+        }
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        finish();
+      });
+    return () => {
+      clearTimeout(timer);
+    };
     // Solo al montar: el resto del ciclo lo maneja el temporizador de renovación.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -147,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // comporta como el rol elegido; la API sigue aplicando el rol real.
       user: session ? { ...session.user, role: effectiveRole ?? session.user.role } : null,
       isAuthenticated: session !== null,
+      isBootstrapping,
       // Jerarquía: developer (rol técnico) es el tope y satisface cualquier guard
       // de rol, igual que en el backend (role_satisfies).
       hasRole: (roles) =>
@@ -162,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
     };
-  }, [session, requestedViewAs, setViewAsRole, login, logout]);
+  }, [session, isBootstrapping, requestedViewAs, setViewAsRole, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
