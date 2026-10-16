@@ -140,6 +140,10 @@ class CreateTaskUseCase:
                 data.team_id = parent.team_id
             if data.work_item_id is None and parent.work_item_id is not None:
                 data.work_item_id = parent.work_item_id
+            if rules.subtask_due_exceeds_parent(data.due_date, parent.due_date):
+                raise ValidationError(
+                    rules.subtask_past_parent_message(parent.due_date)
+                )
 
         created = await self.service.add_task(data)
         if data.depends_on_id is not None:
@@ -887,6 +891,8 @@ class UpdateTaskUseCase:
             if not user or user.is_deleted:
                 raise NotFoundError("El usuario asignado no existe")
 
+        await self._check_dates_against_family(task, data)
+
         previous_assignee_id = task.assignee_id
         team_id = task.team_id
         project_id = getattr(task, "project_id", None)
@@ -933,6 +939,32 @@ class UpdateTaskUseCase:
             )
 
         return updated
+
+    async def _check_dates_against_family(self, task, data: UpdateTaskRequest) -> None:
+        """La fecha de fin de una subtarea nunca pasa de la de su padre.
+
+        Se valida en los dos sentidos —la subtarea contra su padre y el padre
+        contra sus subtareas— y se RECHAZA en vez de corregir por detrás: mover
+        un fin no debe reescribir en silencio las fechas de otras tareas.
+        """
+        if "due_date" not in data.model_dump(exclude_unset=True):
+            return
+        new_due = data.due_date
+        if new_due is None or new_due == task.due_date:
+            return
+        if task.parent_task_id is not None:
+            parent = await self.task_repo.get_by_id(task.parent_task_id)
+            if (
+                parent is not None
+                and not parent.is_deleted
+                and rules.subtask_due_exceeds_parent(new_due, parent.due_date)
+            ):
+                raise ValidationError(
+                    rules.subtask_past_parent_message(parent.due_date)
+                )
+        latest = rules.latest_subtask_due(await self.task_repo.get_subtasks(task.id))
+        if latest is not None and new_due < latest:
+            raise ValidationError(rules.parent_before_subtasks_message(latest))
 
     async def _authorize_team_lead_edit(
         self, task, data: UpdateTaskRequest, actor_id: UUID | None

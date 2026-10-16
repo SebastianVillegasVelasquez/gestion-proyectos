@@ -145,3 +145,34 @@ def progress_edit_block_reason(status: TaskStatus, has_subtasks: bool) -> str | 
     if status == TaskStatus.EN_REVISION:
         return PROGRESS_LOCKED_IN_REVIEW
     return PROGRESS_LOCKED_CLOSED
+
+
+# ── Fechas entre tarea padre y subtareas ─────────────────────────────────────
+
+
+def subtask_due_exceeds_parent(subtask_due, parent_due) -> bool:
+    """Una subtarea no puede vencer DESPUÉS de su tarea padre. Sin una de las
+    dos fechas no hay nada que comparar."""
+    return (
+        subtask_due is not None and parent_due is not None and subtask_due > parent_due
+    )
+
+
+def latest_subtask_due(subtasks):
+    """Fecha de fin más tardía entre las subtareas vivas (None si ninguna tiene)."""
+    dues = [s.due_date for s in subtasks if s.due_date is not None]
+    return max(dues) if dues else None
+
+
+def subtask_past_parent_message(parent_due) -> str:
+    return (
+        "La subtarea no puede terminar después de su tarea padre "
+        f"({parent_due.isoformat()}). Acorta su duración o mueve primero la tarea padre."
+    )
+
+
+def parent_before_subtasks_message(latest_due) -> str:
+    return (
+        "No puedes terminar la tarea padre antes de que acabe su última subtarea "
+        f"({latest_due.isoformat()}). Mueve o acorta primero las subtareas."
+    )
