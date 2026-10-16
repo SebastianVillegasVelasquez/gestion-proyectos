@@ -11,6 +11,7 @@ import {
   FileVideo,
   Folder,
   FolderPlus,
+  FolderTree,
   FolderInput,
   Grid2x2,
   Home,
@@ -41,6 +42,7 @@ import { formatFileSize } from "../utils/format-size";
 import { ManualHint } from "@/features/manual/components/ManualHint";
 import { MANUAL_TOPIC } from "@/features/manual/manual-content";
 import { FilePreviewModal, type PreviewableFile } from "./FilePreviewModal";
+import { StructureFoldersDialog } from "./StructureFoldersDialog";
 import { UploadQueuePanel, useUploadQueue } from "./UploadQueuePanel";
 
 /** Lo que se arrastra: una carpeta o un archivo, identificados por su id. */
@@ -445,7 +447,7 @@ function RenameInput({
 }
 
 function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions: RowActions }) {
-  const draggable = actions.canWrite && !folder.is_root;
+  const draggable = folder.can_organize && !folder.is_root;
   const isRenaming = actions.renaming?.kind === "folder" && actions.renaming.id === folder.id;
   const isDropTarget = actions.dropTargetId === folder.id;
   return (
@@ -521,7 +523,7 @@ function FolderListRow({ folder, actions }: { folder: ApiProjectFolder; actions:
         <span className="hidden text-[11px] tabular-nums text-muted-foreground sm:inline">
           {countLabel(folder)}
         </span>
-        {actions.canWrite && !folder.is_root && !isRenaming && (
+        {folder.can_organize && !folder.is_root && !isRenaming && (
           <>
             <button
               type="button"
@@ -680,7 +682,7 @@ function FileListRow({ file, actions }: { file: ApiProjectFile; actions: RowActi
 }
 
 function FolderCard({ folder, actions }: { folder: ApiProjectFolder; actions: RowActions }) {
-  const draggable = actions.canWrite && !folder.is_root;
+  const draggable = folder.can_organize && !folder.is_root;
   const isRenaming = actions.renaming?.kind === "folder" && actions.renaming.id === folder.id;
   const isDropTarget = actions.dropTargetId === folder.id;
   return (
@@ -720,7 +722,7 @@ function FolderCard({ folder, actions }: { folder: ApiProjectFolder; actions: Ro
         isDropTarget && "border-brand-gold bg-brand-gold/10 ring-1 ring-brand-gold/40",
       )}
     >
-      {actions.canWrite && !folder.is_root && !isRenaming && (
+      {folder.can_organize && !folder.is_root && !isRenaming && (
         <div className="absolute right-2 top-2 flex items-center gap-0.5">
           <button
             type="button"
@@ -898,6 +900,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
   const [term, setTerm] = useState("");
   const [preview, setPreview] = useState<PreviewableFile | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showStructureFolders, setShowStructureFolders] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [pendingFolderDelete, setPendingFolderDelete] = useState<ApiProjectFolder | null>(null);
   const [pendingFileDelete, setPendingFileDelete] = useState<ApiProjectFile | null>(null);
@@ -1151,6 +1154,14 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
           }}
         />
       )}
+      {showStructureFolders && (
+        <StructureFoldersDialog
+          projectId={projectId}
+          onClose={() => {
+            setShowStructureFolders(false);
+          }}
+        />
+      )}
       {showNewFolder && (
         <NewFolderDialog
           parentName={current.is_root ? "el proyecto" : current.name}
@@ -1336,18 +1347,34 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
 
           <ManualHint topic={MANUAL_TOPIC.archivos} />
 
+          {query.data.can_generate_structure_folders && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowStructureFolders(true);
+              }}
+              title="Crear las carpetas a partir de la estructura del proyecto"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <FolderTree className="size-3.5" />{" "}
+              <span className="hidden sm:inline">Carpetas de la estructura</span>
+            </button>
+          )}
+
           {canWrite && (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNewFolder(true);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
-              >
-                <FolderPlus className="size-3.5" />{" "}
-                <span className="hidden sm:inline">Nueva carpeta</span>
-              </button>
+              {current.can_organize && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewFolder(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <FolderPlus className="size-3.5" />{" "}
+                  <span className="hidden sm:inline">Nueva carpeta</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
