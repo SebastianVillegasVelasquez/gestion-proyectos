@@ -10,7 +10,11 @@ import { decodeJwt } from "@/features/auth/utils/jwt.utils";
 import { previewableRoles, readViewAsRole, writeViewAsRole } from "@/features/auth/utils/view-as";
 import { writeViewAsTeamRole } from "@/features/auth/utils/view-as-team-role";
 import type { Role } from "@/features/auth/types";
-import { SESSION_REFRESHED_EVENT, refreshAccessToken } from "@/features/auth/api/refresh";
+import {
+  SESSION_ENDED_EVENT,
+  SESSION_REFRESHED_EVENT,
+  refreshAccessToken,
+} from "@/features/auth/api/refresh";
 import { USER_REVALIDATED_EVENT, revalidateUser } from "@/features/auth/api/revalidate";
 
 // Margen para renovar el token ANTES de que expire y no dejar una ventana en la
@@ -48,17 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     // El interceptor renueva el token de forma silenciosa (misma pestaña);
     // re-leemos la sesión para reiniciar el temporizador de expiración. El mismo
-    // gesto sirve cuando la revalidación de usuario detecta un cambio (p. ej. de rol).
-    const onRefreshed = () => {
+    // gesto sirve cuando la revalidación de usuario detecta un cambio (p. ej. de
+    // rol) y cuando la renovación falla y la sesión queda cerrada: ahí
+    // `readSession()` devuelve null y el ProtectedRoute lleva al login.
+    const onSessionChanged = () => {
       setSession(readSession());
     };
     window.addEventListener("storage", onStorage);
-    window.addEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
-    window.addEventListener(USER_REVALIDATED_EVENT, onRefreshed);
+    window.addEventListener(SESSION_REFRESHED_EVENT, onSessionChanged);
+    window.addEventListener(USER_REVALIDATED_EVENT, onSessionChanged);
+    window.addEventListener(SESSION_ENDED_EVENT, onSessionChanged);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
-      window.removeEventListener(USER_REVALIDATED_EVENT, onRefreshed);
+      window.removeEventListener(SESSION_REFRESHED_EVENT, onSessionChanged);
+      window.removeEventListener(USER_REVALIDATED_EVENT, onSessionChanged);
+      window.removeEventListener(SESSION_ENDED_EVENT, onSessionChanged);
     };
   }, []);
 

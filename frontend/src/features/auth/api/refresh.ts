@@ -6,6 +6,11 @@ import type { LoginResponse } from "@/features/auth/types";
 // (el evento `storage` solo se dispara entre pestañas distintas).
 export const SESSION_REFRESHED_EVENT = "auth:refreshed";
 
+// La renovación falló (refresh token vencido o revocado): la sesión quedó
+// cerrada. Avisamos para que el AuthContext lo refleje y el ProtectedRoute
+// lleve al login, en vez de recargar la página a mano desde el interceptor.
+export const SESSION_ENDED_EVENT = "auth:ended";
+
 // Single-flight: si varias peticiones fallan con 401 a la vez, comparten un
 // único intento de refresco en lugar de disparar N llamadas.
 let refreshPromise: Promise<string | null> | null = null;
@@ -30,6 +35,7 @@ async function doRefresh(): Promise<string | null> {
     return res.data.access_token;
   } catch {
     clearSession();
+    window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
     return null;
   }
 }
