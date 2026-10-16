@@ -6,6 +6,12 @@ interface Props {
   /** Mensaje claro y específico para el usuario cuando algo falla. */
   fallbackTitle?: string;
   fallbackHint?: string;
+  /**
+   * Recargar la página en vez de reintentar el render. En la raíz de la app hay
+   * que hacer esto: si el fallo viene de una versión vieja en la pestaña o de un
+   * error al arrancar, volver a renderizar lo mismo falla otra vez.
+   */
+  reloadOnRetry?: boolean;
 }
 
 interface State {
@@ -30,6 +36,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleRetry = (): void => {
+    if (this.props.reloadOnRetry) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false });
   };
 
@@ -60,7 +70,8 @@ export class ErrorBoundary extends Component<Props, State> {
           onClick={this.handleRetry}
           className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
         >
-          <RotateCcw className="size-3.5" /> Reintentar
+          <RotateCcw className="size-3.5" />
+          {this.props.reloadOnRetry ? "Recargar" : "Reintentar"}
         </button>
       </div>
     );
