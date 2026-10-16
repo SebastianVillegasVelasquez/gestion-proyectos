@@ -58,17 +58,17 @@ export class ErrorBoundary extends Component<Props, State> {
         role="alert"
         className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center"
       >
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-950/40">
-          <AlertTriangle className="size-7 text-red-500" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-red-light">
+          <AlertTriangle className="size-7 text-brand-red" />
         </div>
         <div className="max-w-sm">
-          <p className="font-semibold text-slate-800 dark:text-slate-200">{title}</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
+          <p className="font-semibold text-foreground">{title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
         </div>
         <button
           type="button"
           onClick={this.handleRetry}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <RotateCcw className="size-3.5" />
           {this.props.reloadOnRetry ? "Recargar" : "Reintentar"}
