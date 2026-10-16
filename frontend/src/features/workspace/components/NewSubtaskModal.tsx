@@ -48,14 +48,19 @@ export function NewSubtaskModal({
   // El padre puede estar sin planificar: precargamos sus fechas si existen,
   // pero dejamos que el líder las complete cuando falten.
   const [startDate, setStartDate] = useState(parent.start_date ?? "");
-  const [durationDays, setDurationDays] = useState(
-    parent.start_date && parent.due_date
-      ? String(daysBetween(parent.start_date, parent.due_date))
-      : "1",
-  );
+  // Un día por defecto: heredar todo el plazo del padre hacía que cada subtarea
+  // venciera el mismo día que él. El líder ajusta la duración real.
+  const [durationDays, setDurationDays] = useState("1");
   const [error, setError] = useState<string | null>(null);
   // Desactivado por defecto, igual que al crear cualquier otra tarea.
   const [requiresApproval, setRequiresApproval] = useState(false);
+
+  // Días disponibles entre el inicio elegido y el fin del padre: la subtarea no
+  // puede pasarse de ahí (el backend también lo exige).
+  const maxDuration =
+    startDate && parent.due_date && startDate <= parent.due_date
+      ? daysBetween(startDate, parent.due_date)
+      : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +72,18 @@ export function NewSubtaskModal({
     const duration = Number(durationDays);
     if (startDate && (!Number.isFinite(duration) || duration <= 0)) {
       setError("La duración debe ser mayor a 0 días.");
+      return;
+    }
+    if (startDate && parent.due_date && startDate > parent.due_date) {
+      setError(
+        `La subtarea no puede empezar después de que termine la tarea padre (${parent.due_date}).`,
+      );
+      return;
+    }
+    if (maxDuration !== null && duration > maxDuration) {
+      setError(
+        `La tarea padre termina el ${parent.due_date ?? ""}: la duración máxima es ${String(maxDuration)} día(s).`,
+      );
       return;
     }
     try {
@@ -191,12 +208,18 @@ export function NewSubtaskModal({
               <input
                 type="number"
                 min={1}
+                max={maxDuration ?? undefined}
                 value={durationDays}
                 onChange={(e) => {
                   setDurationDays(e.target.value);
                 }}
                 className={inputCls}
               />
+              {maxDuration !== null && (
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                  Máximo {maxDuration} día(s): el padre termina el {parent.due_date}.
+                </p>
+              )}
             </div>
           </div>
 
