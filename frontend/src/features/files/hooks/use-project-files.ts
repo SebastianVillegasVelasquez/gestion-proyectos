@@ -33,6 +33,12 @@ export function useCreateFolder(projectId: string) {
   );
 }
 
+export function useGenerateStructureFolders(projectId: string) {
+  return useTreeMutation(projectId, (includeTaskElements: boolean) =>
+    filesApi.generateStructureFolders(projectId, includeTaskElements),
+  );
+}
+
 export function useDeleteFolder(projectId: string) {
   return useTreeMutation(projectId, (folderId: string) =>
     filesApi.deleteFolder(projectId, folderId),

@@ -39,6 +39,12 @@ export interface ApiProjectFolder {
   /** Permiso ya resuelto por el servidor para ESTA carpeta. La UI no vuelve a
    *  deducir la política: la muestra. */
   can_write: boolean;
+  /** Reorganizarla (subcarpetas, renombrar, mover, borrar). Distinto de
+   *  `can_write` en las carpetas de la estructura: subir es de todos, organizar
+   *  de quien administra. */
+  can_organize: boolean;
+  /** Elemento de la estructura que refleja (carpeta compartida por todos los equipos). */
+  work_item_id: string | null;
   created_at: string;
   children: ApiProjectFolder[];
   files: ApiProjectFile[];
@@ -53,6 +59,14 @@ export interface ApiProjectFiles {
    *  coordinación o supervisión). `false` = recortado a los equipos de quien
    *  mira, y la vista lo dice para no dar a entender que no hay más. */
   sees_whole_project: boolean;
+  /** Puede generar las carpetas de la estructura (administración o coordinación). */
+  can_generate_structure_folders: boolean;
+}
+
+export interface StructureFoldersResult {
+  created: number;
+  existing: number;
+  skipped_task_elements: number;
 }
 
 export interface CreateFolderBody {
@@ -68,6 +82,13 @@ export const filesApi = {
 
   createFolder: (projectId: string, body: CreateFolderBody) =>
     http.post<ApiProjectFolder>(`${base(projectId)}/folders`, body).then((r) => r.data),
+
+  generateStructureFolders: (projectId: string, includeTaskElements: boolean) =>
+    http
+      .post<StructureFoldersResult>(`${base(projectId)}/structure-folders`, {
+        include_task_elements: includeTaskElements,
+      })
+      .then((r) => r.data),
 
   deleteFolder: (projectId: string, folderId: string) =>
     http.delete(`${base(projectId)}/folders/${folderId}`).then(() => undefined),
