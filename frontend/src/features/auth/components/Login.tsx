@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import type { LoginRequest } from "@/features/auth/types";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { SpinnerScreen } from "@/components/common/Spinner";
+import { applyTheme, readStoredTheme } from "@/lib/theme";
 import { type FieldName, validateField } from "@/features/auth/utils/security.utils.ts";
 import { useLogin } from "@/features/auth/hooks/use-auth";
 import { getErrorMessage } from "@/utils/get-error-message";
@@ -13,13 +14,7 @@ type Errors = Partial<Record<FieldName, string>>;
 
 export default function LoginPage() {
   const { isAuthenticated, isBootstrapping } = useAuth();
-  const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem("obj-theme");
-    if (stored) {
-      return stored === "dark";
-    }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const [dark, setDark] = useState(readStoredTheme);
   const [loginForm, setLoginForm] = useState<LoginRequest>({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
@@ -36,7 +31,7 @@ export default function LoginPage() {
     : null;
 
   useEffect((): void => {
-    localStorage.setItem("obj-theme", dark ? "dark" : "light");
+    applyTheme(dark);
   }, [dark]);
 
   useEffect((): void => {
@@ -96,7 +91,7 @@ export default function LoginPage() {
     }`;
 
   return (
-    <div className={dark ? "dark" : ""}>
+    <div>
       <div className="relative min-h-screen w-full flex flex-col md:flex-row-reverse">
         {/* Toggle dark mode */}
         <button
