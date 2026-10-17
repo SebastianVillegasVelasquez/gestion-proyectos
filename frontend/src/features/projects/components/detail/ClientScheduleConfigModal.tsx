@@ -70,18 +70,18 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <header className="flex items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <header className="flex items-start justify-between border-b border-border px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
               <GanttChartSquare className="size-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+              <h3 className="text-base font-semibold text-foreground">
                 Configurar cronograma del cliente
               </h3>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 Hasta qué nivel de la estructura ve el cliente el Gantt.
               </p>
             </div>
@@ -90,7 +90,7 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -99,13 +99,13 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
         <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
           {/* ── Profundidad de elementos ─────────────────────────────────── */}
           <div className="flex flex-col gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Layers className="size-3.5" /> Profundidad de elementos
             </span>
             {treeQuery.isLoading ? (
-              <div className="h-9 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div className="h-9 animate-pulse rounded-lg bg-muted" />
             ) : maxDepth === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 El proyecto aún no tiene estructura. El cliente verá el cronograma completo cuando
                 la haya.
               </p>
@@ -124,7 +124,7 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
                         "min-w-9 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
                         depth === n
                           ? "border-brand-blue bg-brand-blue/10 text-brand-blue-dark dark:text-brand-blue"
-                          : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400",
+                          : "border-border text-muted-foreground hover:text-foreground",
                       )}
                     >
                       Nivel {String(n)}
@@ -140,13 +140,13 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
                       "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
                       depth === 0
                         ? "border-brand-blue bg-brand-blue/10 text-brand-blue-dark dark:text-brand-blue"
-                        : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400",
+                        : "border-border text-muted-foreground hover:text-foreground",
                     )}
                   >
                     Todos
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                <p className="text-[11px] text-muted-foreground">
                   {depth === 0
                     ? `Se muestran los ${String(maxDepth)} niveles de la estructura.`
                     : `Se muestran los elementos hasta el nivel ${String(
@@ -159,30 +159,30 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
 
           {/* ── Tareas y subtareas ───────────────────────────────────────── */}
           <div className="flex flex-col gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <ListTree className="size-3.5" /> Detalle
             </span>
-            <label className="flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm dark:border-slate-700">
+            <label className="flex items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm">
               <input
                 type="checkbox"
                 checked={includeTasks}
                 onChange={(e) => {
                   setIncludeTasks(e.target.checked);
                 }}
-                className="mt-0.5 size-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+                className="mt-0.5 size-4 rounded border-border text-brand-blue focus:ring-brand-blue"
               />
               <span>
-                <span className="font-medium text-slate-700 dark:text-slate-200">
+                <span className="font-medium text-foreground">
                   Incluir las tareas de cada elemento
                 </span>
-                <span className="block text-[11px] text-slate-400 dark:text-slate-500">
+                <span className="block text-[11px] text-muted-foreground">
                   Sin responsables ni equipos: solo el nombre, las fechas y el avance.
                 </span>
               </span>
             </label>
             <label
               className={cn(
-                "flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm dark:border-slate-700",
+                "flex items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm",
                 !includeTasks && "opacity-50",
               )}
             >
@@ -193,13 +193,11 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
                 onChange={(e) => {
                   setSubtasksChecked(e.target.checked);
                 }}
-                className="mt-0.5 size-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue disabled:cursor-not-allowed"
+                className="mt-0.5 size-4 rounded border-border text-brand-blue focus:ring-brand-blue disabled:cursor-not-allowed"
               />
               <span>
-                <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Incluir también las subtareas
-                </span>
-                <span className="block text-[11px] text-slate-400 dark:text-slate-500">
+                <span className="font-medium text-foreground">Incluir también las subtareas</span>
+                <span className="block text-[11px] text-muted-foreground">
                   Un nivel más de detalle, colgando de su tarea.
                 </span>
               </span>
@@ -209,10 +207,10 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
           {/* ── Vista previa del recorte ─────────────────────────────────── */}
           {maxDepth > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Vista previa
               </span>
-              <div className="max-h-52 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <div className="max-h-52 overflow-auto rounded-lg border border-border bg-muted/50 p-3">
                 <PreviewTree
                   nodes={treeQuery.data ?? []}
                   cutDepth={effectiveDepth}
@@ -230,11 +228,11 @@ export function ClientScheduleConfigModal({ projectId, access, onClose }: Props)
           </p>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+        <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Cancelar
           </button>
@@ -276,16 +274,14 @@ function PreviewTree({
             <div
               className={cn(
                 "flex items-center gap-1.5 text-xs",
-                hidden
-                  ? "text-slate-300 line-through dark:text-slate-600"
-                  : "text-slate-600 dark:text-slate-300",
+                hidden ? "text-muted-foreground/60 line-through" : "text-muted-foreground",
               )}
               style={{ paddingLeft: (depth - 1) * 14 }}
             >
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
-                  hidden ? "bg-slate-300 dark:bg-slate-600" : "bg-brand-blue",
+                  hidden ? "bg-muted-foreground/30" : "bg-brand-blue",
                 )}
               />
               {n.nombre}
@@ -303,11 +299,11 @@ function PreviewTree({
                 elemento cuando esté dentro del corte. */}
             {includeTasks && !n.children.length && depth <= cutDepth && (
               <div
-                className="flex items-center gap-1.5 text-[11px] italic text-slate-400 dark:text-slate-500"
+                className="flex items-center gap-1.5 text-[11px] italic text-muted-foreground"
                 style={{ paddingLeft: depth * 14 }}
               >
-                <span className="size-1.5 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
-                tareas{includeSubtasks ? " y subtareas" : ""} del elemento
+                <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground/30" />
+                tareas{includeSubtasks ? "y subtareas" : ""} del elemento
               </div>
             )}
           </li>
