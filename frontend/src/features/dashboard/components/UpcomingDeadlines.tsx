@@ -11,26 +11,20 @@ const MAX_VISIBLE = 3;
  *  el proyecto va debajo, en gris. */
 function DeadlineRow({ deadline }: { deadline: Deadline }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-      <div className="flex w-8 shrink-0 flex-col items-center rounded border border-slate-200 bg-slate-100 py-0.5 dark:border-slate-700 dark:bg-slate-800">
-        <span className="text-[12px] font-bold leading-none text-slate-900 dark:text-slate-50">
-          {deadline.day}
-        </span>
-        <span className="text-[8px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+    <div className="flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-accent">
+      <div className="flex w-8 shrink-0 flex-col items-center rounded border border-border bg-muted py-0.5">
+        <span className="text-[12px] font-bold leading-none text-foreground">{deadline.day}</span>
+        <span className="text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
           {deadline.month}
         </span>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
-            {deadline.title}
-          </p>
+          <p className="truncate text-[12px] font-medium text-foreground">{deadline.title}</p>
           <StatusBadge variant={deadline.priority} className="shrink-0" />
         </div>
-        <p className="truncate text-[10px] text-slate-400 dark:text-slate-500">
-          {deadline.project}
-        </p>
+        <p className="truncate text-[10px] text-muted-foreground">{deadline.project}</p>
       </div>
     </div>
   );
@@ -72,7 +66,7 @@ export function UpcomingDeadlines({ deadlines, deliveredLast7d }: UpcomingDeadli
             onClick={() => {
               setExpanded((v) => !v);
             }}
-            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 py-1 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground"
           >
             {expanded ? "Ver menos" : `Ver ${String(deadlines.length - MAX_VISIBLE)} más`}
             {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
@@ -80,7 +74,7 @@ export function UpcomingDeadlines({ deadlines, deliveredLast7d }: UpcomingDeadli
         )}
 
         {deadlines.length === 0 && (
-          <p className="py-3 text-center text-[12px] text-slate-400 dark:text-slate-600">
+          <p className="py-3 text-center text-[12px] text-muted-foreground">
             Sin vencimientos próximos
           </p>
         )}
