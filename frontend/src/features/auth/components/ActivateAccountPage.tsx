@@ -62,10 +62,10 @@ export default function ActivateAccountPage() {
   };
 
   const fieldClass =
-    "w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-slate-900";
+    "w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-brand-gold focus:bg-card focus:ring-4 focus:ring-brand-gold/20";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-6 py-12 dark:bg-slate-950">
+    <div className="flex min-h-screen items-center justify-center bg-card px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-7 flex items-center gap-3">
           <img
@@ -74,17 +74,15 @@ export default function ActivateAccountPage() {
             className="h-11 w-11 shrink-0 rounded-lg object-contain"
           />
           <div className="leading-tight">
-            <p className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-              Bitácora OBJ
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Activa tu cuenta</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Bitácora OBJ</p>
+            <p className="text-xs text-muted-foreground">Activa tu cuenta</p>
           </div>
         </div>
 
         {!token ? (
           <LinkProblem message="El enlace no trae un token de activación." />
         ) : infoQuery.isLoading ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Comprobando el enlace…</p>
+          <p className="text-sm text-muted-foreground">Comprobando el enlace…</p>
         ) : infoQuery.isError ? (
           <LinkProblem
             message={getErrorMessage(
@@ -94,15 +92,13 @@ export default function ActivateAccountPage() {
           />
         ) : (
           <>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Crea tu contraseña
             </h1>
-            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-              Estás activando la cuenta de{" "}
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
-                {infoQuery.data?.name}
-              </span>{" "}
-              ({infoQuery.data?.email}).
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Estás activando la cuenta de{""}
+              <span className="font-semibold text-foreground">{infoQuery.data?.name}</span>
+              {""}({infoQuery.data?.email}).
             </p>
 
             {serverError && (
@@ -118,7 +114,7 @@ export default function ActivateAccountPage() {
               <div>
                 <label
                   htmlFor="new-password"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   Nueva contraseña
                 </label>
@@ -138,7 +134,7 @@ export default function ActivateAccountPage() {
               <div>
                 <label
                   htmlFor="confirm-password"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   Repite la contraseña
                 </label>
@@ -174,8 +170,8 @@ export default function ActivateAccountPage() {
           </>
         )}
 
-        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
-          ¿Ya tienes acceso?{" "}
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          ¿Ya tienes acceso?{""}
           <Link to="/login" className="font-medium text-brand-teal hover:text-brand-teal-dark">
             Inicia sesión
           </Link>
@@ -188,11 +184,9 @@ export default function ActivateAccountPage() {
 function LinkProblem({ message }: { message: string }) {
   return (
     <div className="space-y-3">
-      <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Enlace no válido
-      </h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
-      <p className="text-sm text-slate-500 dark:text-slate-400">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">Enlace no válido</h1>
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm text-muted-foreground">
         Pide a quien te dio de alta que te reenvíe un enlace nuevo.
       </p>
     </div>
