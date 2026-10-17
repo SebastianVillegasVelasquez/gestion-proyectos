@@ -6,16 +6,16 @@ import type { WorkItemTree } from "@/features/projects/types/api.types";
 import { useCreateTeamTask, useTeamMembers } from "../hooks/use-workspace";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30";
 
 const labelCls =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
+  "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
 
 /** Aplana el árbol a opciones con sangría por profundidad para un <select>. */
 function flattenTree(nodes: WorkItemTree[], depth = 0): { id: string; label: string }[] {
   const out: { id: string; label: string }[] = [];
   for (const n of nodes) {
-    out.push({ id: n.id, label: `${"  ".repeat(depth)}${n.nombre}` });
+    out.push({ id: n.id, label: `${"".repeat(depth)}${n.nombre}` });
     if (n.children.length > 0) {
       out.push(...flattenTree(n.children, depth + 1));
     }
@@ -83,14 +83,14 @@ export function NewTeamTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Nueva tarea</h2>
+          <h2 className="text-base font-bold text-foreground">Nueva tarea</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
@@ -175,7 +175,7 @@ export function NewTeamTaskModal({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+          <label className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs">
             <input
               type="checkbox"
               checked={requiresApproval}
@@ -184,7 +184,7 @@ export function NewTeamTaskModal({
               }}
               className="size-4 accent-brand-gold"
             />
-            <span className="text-slate-600 dark:text-slate-300">
+            <span className="text-muted-foreground">
               Requiere aprobación del líder o supervisor para darse por completada
             </span>
           </label>
@@ -195,11 +195,11 @@ export function NewTeamTaskModal({
             </p>
           )}
 
-          <div className="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="flex gap-2 border-t border-border pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-accent"
             >
               Cancelar
             </button>
