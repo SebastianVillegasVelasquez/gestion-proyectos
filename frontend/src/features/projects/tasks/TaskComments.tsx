@@ -121,7 +121,7 @@ export function TaskComments({ taskId }: { taskId: string }) {
                       }}
                       disabled={deleteComment.isPending}
                       aria-label="Borrar comentario"
-                      className="ml-auto rounded p-1 text-muted-foreground opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 disabled:opacity-50 dark:hover:bg-rose-950/30"
+                      className="ml-auto flex items-center justify-center rounded p-1 text-muted-foreground opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 disabled:opacity-50 dark:hover:bg-rose-950/30 max-lg:flex max-lg:size-[44px] max-lg:items-center max-lg:justify-center max-lg:p-0 max-lg:opacity-100"
                     >
                       <Trash2 className="size-3" />
                     </button>

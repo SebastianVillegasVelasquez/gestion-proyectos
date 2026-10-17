@@ -804,7 +804,7 @@ function TaskCard({
         <div className="flex shrink-0 items-center gap-1">
           <UrgencyBadge task={task} />
           {canReview && (
-            <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+            <span className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-lg:opacity-100">
               <button
                 type="button"
                 onClick={() => {
@@ -812,7 +812,7 @@ function TaskCard({
                 }}
                 title="Editar tarea"
                 aria-label={`Editar ${task.title}`}
-                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground max-lg:flex max-lg:size-[44px] max-lg:items-center max-lg:justify-center max-lg:p-0 max-lg:opacity-100"
               >
                 <Pencil className="size-3" />
               </button>
@@ -823,7 +823,7 @@ function TaskCard({
                 }}
                 title="Eliminar tarea"
                 aria-label={`Eliminar ${task.title}`}
-                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 max-lg:flex max-lg:size-[44px] max-lg:items-center max-lg:justify-center max-lg:p-0 max-lg:opacity-100"
               >
                 <Trash2 className="size-3" />
               </button>

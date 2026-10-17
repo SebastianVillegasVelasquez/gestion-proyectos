@@ -105,7 +105,7 @@ function ProjectRow({
           }}
           title="Eliminar proyecto"
           aria-label={`Eliminar proyecto ${project.name}`}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 max-lg:size-[44px] max-lg:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>

@@ -112,7 +112,7 @@ function Row({
             onClick={() => {
               onRead(n.id);
             }}
-            className="flex size-7 items-center justify-center rounded-full text-brand-teal opacity-0 transition hover:bg-brand-teal/10 focus-visible:opacity-100 group-hover/row:opacity-100"
+            className="flex size-7 items-center justify-center rounded-full text-brand-teal opacity-0 transition hover:bg-brand-teal/10 focus-visible:opacity-100 group-hover/row:opacity-100 max-lg:size-[44px] max-lg:opacity-100"
           >
             <Check className="size-4" />
           </button>
@@ -124,7 +124,7 @@ function Row({
           onClick={() => {
             onDelete(n.id);
           }}
-          className="flex size-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/row:opacity-100"
+          className="flex size-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/row:opacity-100 max-lg:size-[44px] max-lg:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>

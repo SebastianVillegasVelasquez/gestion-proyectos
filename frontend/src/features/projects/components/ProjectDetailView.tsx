@@ -260,7 +260,7 @@ export function ProjectDetailView({
                     onClick={startEditName}
                     aria-label="Editar nombre del proyecto"
                     title="Editar nombre"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground focus:opacity-100 group-hover:opacity-100 max-lg:size-[44px] max-lg:opacity-100"
                   >
                     <Pencil className="size-4" />
                   </button>
