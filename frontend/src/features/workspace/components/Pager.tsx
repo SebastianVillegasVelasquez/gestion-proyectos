@@ -24,7 +24,7 @@ export function Pager({ page, totalPages, onPrev, onNext, summary, className }: 
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-slate-500",
+        "flex items-center justify-between gap-2 text-[11px] text-muted-foreground",
         className,
       )}
     >
@@ -36,7 +36,7 @@ export function Pager({ page, totalPages, onPrev, onNext, summary, className }: 
             disabled={page <= 1}
             aria-label="Página anterior"
             onClick={onPrev}
-            className="flex size-7 items-center justify-center rounded-md border border-slate-200 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="flex size-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -48,7 +48,7 @@ export function Pager({ page, totalPages, onPrev, onNext, summary, className }: 
             disabled={page >= totalPages}
             aria-label="Página siguiente"
             onClick={onNext}
-            className="flex size-7 items-center justify-center rounded-md border border-slate-200 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="flex size-7 items-center justify-center rounded-md border border-border transition hover:bg-accent disabled:opacity-40"
           >
             <ChevronRight className="size-4" />
           </button>
