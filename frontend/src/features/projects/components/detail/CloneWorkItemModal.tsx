@@ -37,7 +37,7 @@ function flatten(
     const disabled = forbidden.has(n.id);
     acc.push({
       id: n.id,
-      label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}`,
+      label: `${"".repeat(depth)}${depth > 0 ? "└" : ""}${n.nombre}`,
       disabled,
       reason: disabled ? "Pertenece al contenido que vas a copiar" : undefined,
     });
@@ -96,25 +96,23 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
               <Copy className="size-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-                Duplicar elemento
-              </h3>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <h3 className="text-base font-semibold text-foreground">Duplicar elemento</h3>
+              <p className="text-xs text-muted-foreground">
                 Copia “{source.nombre}” con todo lo que contiene dentro.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -122,32 +120,30 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
 
         <div className="flex flex-col gap-4 px-5 py-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Pegar bajo
-            </span>
+            <span className="text-xs font-medium text-muted-foreground">Pegar bajo</span>
             <select
               value={targetParentId}
               onChange={(e) => {
                 setTargetParentId(e.target.value);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
             >
               <option value="">Nivel principal del proyecto</option>
               {options.map((o) => (
                 <option key={o.id} value={o.id} disabled={o.disabled}>
                   {o.label}
-                  {o.disabled ? " — no disponible" : ""}
+                  {o.disabled ? "— no disponible" : ""}
                 </option>
               ))}
             </select>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-muted-foreground">
               Los elementos del contenido a copiar están deshabilitados (no se puede pegar dentro de
               sí mismo).
             </span>
           </label>
 
           <div className="flex flex-col gap-1">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <CalendarPlus className="size-3.5" /> Desplazamiento de fechas
             </span>
             <div className="flex gap-2">
@@ -157,20 +153,20 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 onChange={(e) => {
                   setOffsetValue(e.target.value);
                 }}
-                className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="w-24 rounded-lg border border-border bg-card px-3 py-2 text-sm tabular-nums text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
               />
               <select
                 value={offsetUnidad}
                 onChange={(e) => {
                   setOffsetUnidad(e.target.value as DuracionUnidad);
                 }}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="flex-1 rounded-lg border border-border bg-card px-2 py-2 text-sm text-foreground outline-none"
               >
                 <option value="dias">días</option>
                 <option value="semanas">semanas</option>
               </select>
             </div>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-muted-foreground">
               Se suma a todas las fechas plan del contenido duplicado. Usa
               <span className="font-medium"> 0</span> para mantenerlas iguales, o un valor negativo
               para adelantarlas.
@@ -178,7 +174,7 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Repeat className="size-3.5" /> Cantidad de copias
             </span>
             <input
@@ -189,16 +185,16 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               onChange={(e) => {
                 setTimes(e.target.value);
               }}
-              className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-28 rounded-lg border border-border bg-card px-3 py-2 text-sm tabular-nums text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
             />
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-muted-foreground">
               Pega el contenido varias veces de una sola acción (p. ej. 32 cursos idénticos). Con
               más de una copia se numera el nombre («{renameTo.trim() || source.nombre} 1», « 2»…).
             </span>
           </div>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium text-muted-foreground">
               Nombre del elemento copiado
             </span>
             <input
@@ -207,11 +203,11 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
                 setRenameTo(e.target.value);
               }}
               placeholder={source.nombre}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
             />
           </label>
 
-          <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50">
+          <label className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
             <input
               type="checkbox"
               checked={includeTasks}
@@ -221,10 +217,10 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
               className="mt-0.5 size-4 accent-violet-600"
             />
             <span className="flex flex-col gap-0.5">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <ListChecks className="size-3.5" /> Copiar también las tareas
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-muted-foreground">
                 Copia profunda: tareas y todas sus subtareas con su responsable o equipo, estimación
                 de días, orden y dependencias internas. El estado y las fechas reales se reinician;
                 las fechas plan se desplazan igual. No se envían avisos a los responsables.
@@ -232,15 +228,15 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
             </span>
           </label>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <div className="rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <ArrowDown className="size-3" /> qué se copia
             </p>
-            <ul className="mt-1 space-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
               <li>
-                <span className="font-medium text-slate-700 dark:text-slate-200">Sí</span>:
-                jerarquía completa, fechas plan (desplazadas), duraciones, tipos y dependencias FtS
-                internas al contenido copiado
+                <span className="font-medium text-foreground">Sí</span>: jerarquía completa, fechas
+                plan (desplazadas), duraciones, tipos y dependencias FtS internas al contenido
+                copiado
                 {includeTasks &&
                   ", y las tareas y subtareas con su responsable o equipo, estimación de días, orden y dependencias internas"}
                 .
@@ -260,10 +256,10 @@ export function CloneWorkItemModal({ projectId, source, tree, onClose }: Props) 
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+        <footer className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
           >
             Cancelar
           </button>
