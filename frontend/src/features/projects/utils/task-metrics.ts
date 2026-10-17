@@ -76,7 +76,9 @@ const STATUS_META: Record<TaskStatus, { label: string; color: string; soft: stri
   },
   cancelada: {
     label: "Canceladas",
-    color: "#94a3b8", // slate-400
+    // Mismo gris del tema que "Por iniciar" pero rebajado, para que sigan
+    // distinguiéndose en el mismo gráfico sin salirse de la paleta.
+    color: "color-mix(in srgb, var(--color-muted-foreground) 55%, transparent)",
     soft: "bg-muted-foreground/15 text-muted-foreground",
   },
 };
