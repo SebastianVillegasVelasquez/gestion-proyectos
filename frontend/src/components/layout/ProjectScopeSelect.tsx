@@ -33,7 +33,7 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
   };
 
   return (
-    <div ref={ref} className={cn("relative pb-2", collapsed ? "md:px-2" : "px-3")}>
+    <div ref={ref} className={cn("relative pb-2", collapsed ? "lg:px-2" : "px-3")}>
       <button
         type="button"
         onClick={() => {
@@ -45,7 +45,7 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
         title={collapsed ? (current?.name ?? "Todos los proyectos") : undefined}
         className={cn(
           "flex w-full items-center gap-2.5 rounded-lg border py-2 text-left text-sm transition-colors duration-150",
-          collapsed ? "px-3 md:justify-center md:px-0" : "px-3",
+          collapsed ? "px-3 lg:justify-center lg:px-0" : "px-3",
           current
             ? "border-brand-gold/40 bg-brand-gold/10 text-sidebar-foreground"
             : "border-sidebar-border text-sidebar-foreground/70 hover:bg-white/10",
@@ -56,7 +56,7 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
         ) : (
           <FolderKanban className="size-4 shrink-0" />
         )}
-        <span className={cn("min-w-0 flex-1", collapsed && "md:hidden")}>
+        <span className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
           <span className="block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
             Proyecto activo
           </span>
@@ -64,7 +64,7 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
             {current?.name ?? "Todos los proyectos"}
           </span>
         </span>
-        <ChevronsUpDown className={cn("size-3.5 shrink-0 opacity-60", collapsed && "md:hidden")} />
+        <ChevronsUpDown className={cn("size-3.5 shrink-0 opacity-60", collapsed && "lg:hidden")} />
       </button>
 
       {open && (

@@ -85,16 +85,16 @@ describe("Sidebar collapse (modo riel)", () => {
 
     const aside = screen.getByRole("complementary");
     // Riel angosto y SIEMPRE visible (no se desliza fuera de la pantalla).
-    expect(aside.className).toContain("md:w-16");
-    expect(aside.className).toContain("md:translate-x-0");
-    expect(aside.className).not.toContain("md:-translate-x-full");
+    expect(aside.className).toContain("lg:w-16");
+    expect(aside.className).toContain("lg:translate-x-0");
+    expect(aside.className).not.toContain("lg:-translate-x-full");
   });
 
   it("uses the full width on desktop when expanded", () => {
     renderSidebar({ collapsed: false });
 
     const aside = screen.getByRole("complementary");
-    expect(aside.className).toContain("md:w-64");
+    expect(aside.className).toContain("lg:w-64");
   });
 
   it("keeps nav icons usable (interactive) when collapsed", () => {

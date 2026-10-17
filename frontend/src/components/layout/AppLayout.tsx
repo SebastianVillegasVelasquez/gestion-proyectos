@@ -53,10 +53,10 @@ export const AppLayout = () => {
           modal cubre toda la app hasta que la persona cree la suya. */}
         <FirstLoginPasswordGate />
         <div className="flex h-screen overflow-hidden bg-background text-foreground">
-          {/* Mobile backdrop */}
+          {/* Fondo del cajón — móvil y tablet (por debajo de lg) */}
           {sidebarOpen && (
             <div
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
               onClick={() => {
                 setSidebarOpen(false);
               }}
@@ -76,8 +76,8 @@ export const AppLayout = () => {
 
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <ViewAsBanner />
-            {/* Mobile-only topbar */}
-            <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 md:hidden">
+            {/* Barra superior — móvil y tablet (por debajo de lg) */}
+            <header className="flex shrink-0 items-center justify-between border-b border-brand-gold/30 bg-card px-4 py-3 lg:hidden">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -114,7 +114,7 @@ export const AppLayout = () => {
               </div>
             </header>
 
-            {/* Page content — scrollable on mobile, fixed on desktop. */}
+            {/* Page content — scrollable on mobile and tablet, fixed on desktop. */}
             <main className="flex flex-1 flex-col overflow-y-auto lg:overflow-hidden">
               <Suspense fallback={<SpinnerScreen />}>
                 <Outlet context={context} />

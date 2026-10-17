@@ -93,14 +93,14 @@ export function ViewAsSwitcher({ collapsed }: { collapsed: boolean }) {
         title={collapsed ? "Ver como otro rol" : undefined}
         className={cn(
           "flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150",
-          collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+          collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
           active
             ? "bg-brand-gold/15 text-brand-gold"
             : "text-sidebar-foreground/60 hover:bg-white/10 hover:text-sidebar-foreground",
         )}
       >
         <Eye className="size-4 shrink-0" />
-        <span className={cn("flex-1 truncate text-left", collapsed && "md:hidden")}>
+        <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>
           {active ? `Viendo como ${label}` : "Ver como…"}
         </span>
       </button>

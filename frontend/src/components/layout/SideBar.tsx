@@ -210,25 +210,25 @@ export function Sidebar({
     <aside
       data-collapsed={collapsed}
       className={cn(
-        // Base layout (ancho de cajón en móvil)
+        // Base layout (ancho de cajón en móvil y tablet)
         "fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col",
         // Superficie de marca: sidebar oscuro en ambos modos
         "border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
-        // Animación: en móvil desliza (transform); en escritorio cambia el ancho.
+        // Animación: hasta tablet desliza (transform); en escritorio cambia el ancho.
         "transition-[transform,width] duration-300 ease-in-out",
-        // Móvil: panel deslizante controlado por isOpen
+        // Móvil y tablet: panel deslizante controlado por isOpen
         isOpen ? "translate-x-0" : "-translate-x-full",
         // Escritorio: siempre visible y en flujo; colapsado = riel angosto
         // que solo muestra iconos (sin desaparecer).
-        "md:sticky md:top-0 md:translate-x-0",
-        collapsed ? "md:w-16" : "md:w-64",
+        "lg:sticky lg:top-0 lg:translate-x-0",
+        collapsed ? "lg:w-16" : "lg:w-64",
       )}
     >
       {/* Logo + controles de colapso */}
       <div
         className={cn(
           "flex items-center gap-3 px-3 py-5",
-          collapsed ? "md:flex-col md:gap-2 md:px-2" : "justify-between px-5",
+          collapsed ? "lg:flex-col lg:gap-2 lg:px-2" : "justify-between px-5",
         )}
       >
         <div className="flex items-center gap-3">
@@ -237,19 +237,19 @@ export function Sidebar({
             alt="Bitácora OBJ"
             className="h-9 w-9 shrink-0 rounded-lg object-contain"
           />
-          <div className={cn("leading-tight", collapsed && "md:hidden")}>
+          <div className={cn("leading-tight", collapsed && "lg:hidden")}>
             <p className="text-sm font-bold tracking-tight text-sidebar-foreground">Bitácora OBJ</p>
             <p className="text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/45">
               Gestión de proyectos
             </p>
           </div>
         </div>
-        {/* Móvil: cerrar el panel deslizante */}
+        {/* Móvil y tablet: cerrar el panel deslizante */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar menú"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground md:hidden"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground lg:hidden"
         >
           <X className="size-4" />
         </button>
@@ -258,7 +258,7 @@ export function Sidebar({
           type="button"
           onClick={onToggleCollapsed}
           aria-label={collapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
-          className="hidden h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground md:flex"
+          className="hidden h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground lg:flex"
         >
           {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
         </button>
@@ -267,13 +267,13 @@ export function Sidebar({
       <ProjectScopeSelect collapsed={collapsed} />
 
       {/* Navigation */}
-      <nav className={cn("flex-1 overflow-y-auto py-1", collapsed ? "md:px-2" : "px-3")}>
+      <nav className={cn("flex-1 overflow-y-auto py-1", collapsed ? "lg:px-2" : "px-3")}>
         {sections.map((section) => (
           <div key={section.id} className="mb-5">
             <p
               className={cn(
                 "px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45",
-                collapsed && "md:hidden",
+                collapsed && "lg:hidden",
               )}
             >
               {section.title}
@@ -296,7 +296,7 @@ export function Sidebar({
                       aria-label={item.label}
                       className={cn(
                         "group flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150",
-                        collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+                        collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
                         isActive
                           ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-sidebar-foreground",
@@ -309,14 +309,14 @@ export function Sidebar({
                       ) : (
                         <Icon className="size-4 shrink-0" />
                       )}
-                      <span className={cn("flex-1 truncate text-left", collapsed && "md:hidden")}>
+                      <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>
                         {item.label}
                       </span>
                       {item.badge != null && (
                         <span
                           className={cn(
                             "rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-sidebar-foreground",
-                            collapsed && "md:hidden",
+                            collapsed && "lg:hidden",
                           )}
                         >
                           {item.badge}
@@ -332,8 +332,8 @@ export function Sidebar({
       </nav>
 
       {/* Footer: user + dark toggle */}
-      <div className={cn("border-t border-sidebar-border py-4", collapsed ? "md:px-2" : "px-4")}>
-        <div className={cn("flex items-center gap-3", collapsed && "md:flex-col md:gap-2")}>
+      <div className={cn("border-t border-sidebar-border py-4", collapsed ? "lg:px-2" : "px-4")}>
+        <div className={cn("flex items-center gap-3", collapsed && "lg:flex-col lg:gap-2")}>
           {/* La foto de perfil, si la hay; si no, las iniciales de siempre.
               Subirla en Configuración se ve aquí sin recargar: la sesión local
               se actualiza al guardar. */}
@@ -348,7 +348,7 @@ export function Sidebar({
               {user ? initialsFromName(user.name) : "?"}
             </div>
           )}
-          <div className={cn("min-w-0 flex-1 leading-tight", collapsed && "md:hidden")}>
+          <div className={cn("min-w-0 flex-1 leading-tight", collapsed && "lg:hidden")}>
             <p className="truncate text-sm font-medium text-sidebar-foreground">
               {user?.name ?? "Invitado"}
             </p>
@@ -356,8 +356,8 @@ export function Sidebar({
               {user ? ROLE_LABELS[user.role] : ""}
             </p>
           </div>
-          {/* Notificaciones + tema — solo escritorio (en móvil están en la barra superior) */}
-          <div className={cn("hidden items-center gap-0.5 md:flex", collapsed && "md:flex-col")}>
+          {/* Notificaciones + tema — solo escritorio (hasta tablet están en la barra superior) */}
+          <div className={cn("hidden items-center gap-0.5 lg:flex", collapsed && "lg:flex-col")}>
             <RemindersBell placement="up" />
             <NotificationBell placement="up" />
             <button
@@ -383,11 +383,11 @@ export function Sidebar({
           title={collapsed ? "Cerrar sesión" : undefined}
           className={cn(
             "mt-1 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+            collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
           )}
         >
           <LogOut className="size-4 shrink-0" />
-          <span className={cn("truncate", collapsed && "md:hidden")}>
+          <span className={cn("truncate", collapsed && "lg:hidden")}>
             {logout.isPending ? "Cerrando sesión…" : "Cerrar sesión"}
           </span>
         </button>
