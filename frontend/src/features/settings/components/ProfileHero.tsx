@@ -89,7 +89,7 @@ export function ProfileHero({ user }: { user: AuthUser }) {
             disabled={busy}
             aria-label="Cambiar la foto de perfil"
             className={cn(
-              "absolute -bottom-1 -right-1 flex size-8 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow transition-colors hover:bg-brand-gold-dark",
+              "absolute -bottom-1 -right-1 flex size-8 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow transition-colors hover:bg-brand-gold-dark max-lg:size-[44px]",
               busy && "opacity-60",
             )}
           >

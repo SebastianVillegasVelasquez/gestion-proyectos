@@ -219,7 +219,7 @@ export function NotificationsPage() {
   };
 
   const selectClass =
-    "rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand-gold";
+    "rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none max-lg:min-h-[44px] focus:border-brand-gold";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4 sm:p-5">
@@ -234,7 +234,7 @@ export function NotificationsPage() {
             onClick={() => {
               markAll.mutate();
             }}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:text-muted-foreground"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:text-muted-foreground max-lg:min-h-[44px]"
           >
             <CheckCheck className="size-4" />
             Marcar todas
@@ -252,7 +252,7 @@ export function NotificationsPage() {
               setText(e.target.value);
             }}
             placeholder="Buscar en el mensaje…"
-            className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-2 text-sm outline-none focus:border-brand-gold"
+            className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-2 text-sm max-lg:min-h-[44px] outline-none focus:border-brand-gold"
           />
         </div>
 

@@ -22,7 +22,7 @@ import { ProfileHero } from "./ProfileHero";
 import { BioEditor } from "./BioEditor";
 
 const fieldCls =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 max-lg:min-h-[44px]";
 
 function ChangePasswordForm() {
   const [current, setCurrent] = useState("");
@@ -96,7 +96,7 @@ function ChangePasswordForm() {
           type="button"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60 max-lg:min-h-[44px]"
         >
           {changePassword.isPending ? "Guardando…" : "Cambiar contraseña"}
         </button>
@@ -223,17 +223,23 @@ export function SettingsPage() {
               aria-checked={dark}
               aria-label="Alternar tema oscuro"
               onClick={toggleDark}
-              className={cn(
-                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors",
-                dark ? "bg-brand-gold" : "bg-muted-foreground/30",
-              )}
+              className="flex shrink-0 items-center max-lg:h-[44px]"
             >
+              {/* El carril mantiene su tamaño; el botón que lo envuelve es el
+                  que llega a 44px de alto en pantallas táctiles. */}
               <span
                 className={cn(
-                  "inline-block size-5 rounded-full bg-white shadow transition-transform",
-                  dark ? "translate-x-5" : "translate-x-0",
+                  "relative inline-flex h-6 w-11 items-center rounded-full px-0.5 transition-colors",
+                  dark ? "bg-brand-gold" : "bg-muted-foreground/30",
                 )}
-              />
+              >
+                <span
+                  className={cn(
+                    "inline-block size-5 rounded-full bg-white shadow transition-transform",
+                    dark ? "translate-x-5" : "translate-x-0",
+                  )}
+                />
+              </span>
             </button>
           </div>
         </SettingsCard>

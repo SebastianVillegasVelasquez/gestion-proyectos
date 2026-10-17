@@ -47,7 +47,7 @@ export function BioEditor({ initial }: { initial: string }) {
               save.mutate(text.trim());
             }}
             disabled={!dirty || save.isPending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60 max-lg:min-h-[44px]"
           >
             {save.isPending ? "Guardando…" : "Guardar"}
           </button>
