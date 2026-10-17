@@ -66,7 +66,7 @@ export function UpcomingDeadlines({ deadlines, deliveredLast7d }: UpcomingDeadli
             onClick={() => {
               setExpanded((v) => !v);
             }}
-            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground"
+            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground max-lg:min-h-[44px]"
           >
             {expanded ? "Ver menos" : `Ver ${String(deadlines.length - MAX_VISIBLE)} más`}
             {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}

@@ -180,7 +180,7 @@ function ActivityCard({
                 onClick={() => {
                   setExpanded((v) => !v);
                 }}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground"
+                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground max-lg:min-h-[44px]"
               >
                 {expanded ? "Ver menos" : "Ver más"}
                 {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}

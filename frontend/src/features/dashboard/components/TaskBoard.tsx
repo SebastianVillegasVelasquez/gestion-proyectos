@@ -138,7 +138,7 @@ function Column({
             onClick={() => {
               setVisibleCount((n) => n + (pageSize ?? 0));
             }}
-            className="mt-1 shrink-0 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand-gold/50 hover:text-foreground"
+            className="mt-1 shrink-0 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand-gold/50 hover:text-foreground max-lg:min-h-[44px]"
           >
             Ver {Math.min(remaining, pageSize ?? 0)} más
           </button>

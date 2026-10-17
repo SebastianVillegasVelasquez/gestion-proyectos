@@ -89,7 +89,7 @@ export function WhatsNewModal({
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className="flex size-8 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/15 hover:text-white"
+              className="flex size-8 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/15 hover:text-white max-lg:size-[44px]"
             >
               <X className="size-4" />
             </button>
@@ -134,7 +134,7 @@ export function WhatsNewModal({
                 }}
                 disabled={isFirst}
                 aria-label="Anterior"
-                className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 max-lg:size-[44px]"
               >
                 <ArrowLeft className="size-4" />
               </button>
@@ -148,13 +148,17 @@ export function WhatsNewModal({
                       setPage(i);
                     }}
                     aria-label={`Ir a la novedad ${i + 1}`}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all",
-                      i === safePage
-                        ? "w-5 bg-brand-gold"
-                        : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50",
-                    )}
-                  />
+                    className="group flex h-[44px] items-center justify-center px-1 max-lg:px-2.5"
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 rounded-full transition-all",
+                        i === safePage
+                          ? "w-5 bg-brand-gold"
+                          : "w-1.5 bg-muted-foreground/30 group-hover:bg-muted-foreground/50",
+                      )}
+                    />
+                  </button>
                 ))}
               </div>
             </div>
@@ -166,7 +170,7 @@ export function WhatsNewModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark"
+              className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark max-lg:min-h-[44px]"
             >
               Entendido
             </button>
@@ -176,7 +180,7 @@ export function WhatsNewModal({
               onClick={() => {
                 setPage((p) => Math.min(p + 1, total - 1));
               }}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark"
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark max-lg:min-h-[44px]"
             >
               Siguiente <ArrowRight className="size-4" />
             </button>

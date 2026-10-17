@@ -63,7 +63,7 @@ export function DashboardHeader({
           type="button"
           onClick={onToggleDark}
           aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground max-lg:size-[44px]"
         >
           {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
