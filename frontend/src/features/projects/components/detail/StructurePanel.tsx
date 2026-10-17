@@ -197,7 +197,7 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
           <div
             role="menu"
             style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right }}
-            className="z-50 flex max-h-[70vh] w-48 flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100 dark:border-slate-700 dark:bg-slate-900"
+            className="z-50 flex max-h-[70vh] w-48 flex-col overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100"
           >
             {actions.map(({ label, icon: Icon, onClick, danger }) => (
               <button
@@ -212,7 +212,7 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
                   "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
                   danger
                     ? "text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/30"
-                    : "text-slate-700 hover:bg-accent dark:text-slate-200",
+                    : "text-foreground hover:bg-accent",
                 )}
               >
                 <Icon className="size-4 shrink-0" />
@@ -246,9 +246,7 @@ function DateBadge({
     const milestone = delivered ?? node.fecha_inicio_plan ?? node.fecha_fin_plan;
     if (!milestone) {
       return (
-        <span className="text-[11px] italic text-slate-300 dark:text-slate-600">
-          sin fecha de entrega
-        </span>
+        <span className="text-[11px] italic text-muted-foreground/60">sin fecha de entrega</span>
       );
     }
     return (
@@ -269,9 +267,7 @@ function DateBadge({
 
   const hasRange = node.fecha_inicio_plan ?? node.fecha_fin_plan;
   if (!hasRange && node.duracion_valor == null) {
-    return (
-      <span className="text-[11px] italic text-slate-300 dark:text-slate-600">sin fechas</span>
-    );
+    return <span className="text-[11px] italic text-muted-foreground/60">sin fechas</span>;
   }
   return (
     <span className="flex items-center gap-1.5">
@@ -284,7 +280,7 @@ function DateBadge({
             // decisión de planificación, no un requisito para reorganizar.
             node.conflicto_fechas
               ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+              : "bg-muted text-muted-foreground",
           )}
         >
           {formatShortDate(node.fecha_inicio_plan)} → {formatShortDate(node.fecha_fin_plan)}
@@ -1892,17 +1888,17 @@ function ThirdPartyDeliverDialog({
         className="absolute inset-0 bg-black/40"
         onClick={onCancel}
       />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card shadow-xl">
         <div className="p-5">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+          <h3 className="text-base font-semibold text-foreground">
             {delivered ? "Corregir la entrega" : "Marcar como entregada"}
           </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             “{node.nombre}”. La fecha de entrega será el inicio de sus elementos hijos y de las
             tareas que dependen de esta actividad; el fin se recalcula con la duración estimada de
             cada uno.
           </p>
-          <label className="mt-4 block text-xs font-medium text-slate-600 dark:text-slate-300">
+          <label className="mt-4 block text-xs font-medium text-muted-foreground">
             Fecha de entrega
             <input
               type="date"
@@ -1910,7 +1906,7 @@ function ThirdPartyDeliverDialog({
               onChange={(e) => {
                 setDate(e.target.value);
               }}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
             />
           </label>
           {errorMessage && (
@@ -1922,7 +1918,7 @@ function ThirdPartyDeliverDialog({
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
           {delivered ? (
             <button
               type="button"
@@ -1940,7 +1936,7 @@ function ThirdPartyDeliverDialog({
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent disabled:opacity-60"
             >
               Cancelar
             </button>
