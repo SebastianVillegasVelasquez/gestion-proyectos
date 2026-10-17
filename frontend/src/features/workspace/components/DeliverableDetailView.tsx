@@ -90,7 +90,7 @@ function VersionEditor({
 
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Corregir entrega V{version.versionNumber}
       </p>
 
@@ -110,7 +110,7 @@ function VersionEditor({
                 "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
                 selected
                   ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400",
+                  : "border-border text-muted-foreground hover:border-brand-gold/50",
               )}
             >
               <Icon className={cn("size-3", selected ? "text-brand-gold-dark" : m.color)} />
@@ -127,7 +127,7 @@ function VersionEditor({
           setUrl(e.target.value);
         }}
         placeholder={RESOURCE_META[type].placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
       />
       <input
         type="text"
@@ -136,7 +136,7 @@ function VersionEditor({
           setNote(e.target.value);
         }}
         placeholder="Detalles de la entrega"
-        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
       />
       <textarea
         value={observations}
@@ -145,14 +145,14 @@ function VersionEditor({
         }}
         rows={2}
         placeholder="Observaciones para el siguiente rol (interno del equipo)"
-        className="w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        className="w-full resize-y rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
       />
 
       <div className="flex items-center justify-end gap-1.5">
         <button
           type="button"
           onClick={onCancel}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
           <X className="size-3" /> Cancelar
         </button>
@@ -200,19 +200,19 @@ function DeliveryTimeline({
           }}
         />
       )}
-      <div className="flex items-center gap-1.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <div className="flex items-center gap-1.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Clock className="size-3.5" />
         Línea de tiempo de entregas ({versions.length})
       </div>
 
       {versions.length === 0 ? (
-        <p className="mt-2 rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-[12px] text-slate-400 dark:border-slate-700 dark:text-slate-500">
+        <p className="mt-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
           Aún no hay entregas. Registra la primera con el recurso correspondiente.
         </p>
       ) : (
         <div className="relative ml-3 mt-3">
           {/* connector line */}
-          <div className="absolute left-[13px] top-0 bottom-3 w-px bg-slate-200 dark:bg-slate-700" />
+          <div className="absolute left-[13px] top-0 bottom-3 w-px bg-muted-foreground/20" />
 
           <div className="flex flex-col gap-3">
             {sorted.map((v, idx) => {
@@ -229,7 +229,7 @@ function DeliveryTimeline({
                       "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                       isLatest
                         ? "bg-primary text-primary-foreground"
-                        : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+                        : "bg-muted-foreground/20 text-muted-foreground",
                     )}
                   >
                     V{v.versionNumber}
@@ -241,7 +241,7 @@ function DeliveryTimeline({
                       "flex-1 rounded-lg border p-3",
                       isLatest
                         ? "border-brand-gold/40 bg-brand-gold-light"
-                        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60",
+                        : "border-border bg-card",
                     )}
                   >
                     {onEditVersion && editingId === v.id ? (
@@ -270,7 +270,7 @@ function DeliveryTimeline({
                               <Icon className="size-3 shrink-0" />
                               {meta.label}
                             </span>
-                            <span className="truncate text-[12px] font-medium text-slate-700 dark:text-slate-200">
+                            <span className="truncate text-[12px] font-medium text-foreground">
                               {resourceDisplayName(v.type, v.url, v.fileName)}
                             </span>
                             {isLatest && (
@@ -287,7 +287,7 @@ function DeliveryTimeline({
                                 onClick={() => {
                                   setEditingId(v.id);
                                 }}
-                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark"
                               >
                                 <Pencil className="size-2.5" /> Editar
                               </button>
@@ -304,7 +304,7 @@ function DeliveryTimeline({
                                     sizeBytes: v.fileSizeBytes,
                                   });
                                 }}
-                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark"
                               >
                                 Abrir
                               </button>
@@ -314,7 +314,7 @@ function DeliveryTimeline({
                                 href={v.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark dark:border-slate-700"
+                                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-brand-gold/40 hover:text-brand-gold-dark"
                               >
                                 Abrir <ExternalLink className="size-2.5" />
                               </a>
@@ -323,7 +323,7 @@ function DeliveryTimeline({
                         </div>
 
                         {v.note && (
-                          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                          <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                             {v.note}
                           </p>
                         )}
@@ -350,7 +350,7 @@ function DeliveryTimeline({
                               {uploader.initials}
                             </span>
                           )}
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                          <span className="text-[10px] text-muted-foreground">
                             {uploader?.name ?? "Desconocido"} · {formatDate(v.uploadedAt)}
                           </span>
                         </div>
@@ -532,7 +532,7 @@ export function RegisterDelivery({
   return (
     <div className="relative space-y-3" {...dragHandlers}>
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-gold bg-brand-gold-light/80 text-[13px] font-medium text-brand-gold-dark backdrop-blur-[1px] dark:bg-slate-900/80 dark:text-brand-gold">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-gold bg-brand-gold-light/80 text-[13px] font-medium text-brand-gold-dark backdrop-blur-[1px] dark:text-brand-gold">
           <Paperclip className="size-4" /> Suelta el archivo para adjuntarlo
         </div>
       )}
@@ -555,7 +555,7 @@ export function RegisterDelivery({
                 "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors",
                 selected
                   ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400",
+                  : "border-border text-muted-foreground hover:border-brand-gold/50",
               )}
             >
               <Icon className={cn("size-3.5", selected ? "text-brand-gold-dark" : m.color)} />
@@ -566,7 +566,7 @@ export function RegisterDelivery({
       </div>
 
       {/* Recurso + nota */}
-      <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+      <div className="space-y-2 rounded-lg border border-border p-3">
         {isFile ? (
           <>
             <input
@@ -584,7 +584,7 @@ export function RegisterDelivery({
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-[13px] text-slate-600 transition-colors hover:border-brand-gold hover:text-brand-gold-dark dark:border-slate-600 dark:text-slate-300"
+              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-[13px] text-muted-foreground transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
             >
               <Paperclip className="size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
@@ -598,10 +598,10 @@ export function RegisterDelivery({
                 {files.map((f, i) => (
                   <li
                     key={`${f.name}-${String(i)}`}
-                    className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-[12px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
+                    className="flex items-center justify-between gap-2 rounded-md bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground"
                   >
                     <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                       {formatFileSize(f.size)}
                     </span>
                     <button
@@ -609,7 +609,7 @@ export function RegisterDelivery({
                       onClick={() => {
                         setFiles((prev) => prev.filter((_, j) => j !== i));
                       }}
-                      className="shrink-0 rounded-md p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700"
+                      className="shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       <X className="size-3" />
                     </button>
@@ -620,7 +620,7 @@ export function RegisterDelivery({
             {destination}
             {folderOptions.length > 0 && (
               <div>
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Carpeta de destino
                 </label>
                 <select
@@ -628,7 +628,7 @@ export function RegisterDelivery({
                   onChange={(e) => {
                     setFolderId(e.target.value);
                   }}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
                 >
                   <option value="">Carpeta del equipo (por defecto)</option>
                   {folderOptions.map((f) => (
@@ -648,7 +648,7 @@ export function RegisterDelivery({
               handleUrlChange(e.target.value);
             }}
             placeholder={meta.placeholder}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
           />
         )}
         <input
@@ -658,7 +658,7 @@ export function RegisterDelivery({
             setNote(e.target.value);
           }}
           placeholder="Detalles de la entrega (ej: prototipo mobile actualizado, incluye estado vacío)"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
         />
         <textarea
           value={observations}
@@ -667,9 +667,9 @@ export function RegisterDelivery({
           }}
           rows={2}
           placeholder="Observaciones para el siguiente rol (ej: falta revisar el minuto 3). Solo lo ve el equipo, nunca el cliente."
-          className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
         />
-        <label className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[12px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+        <label className="flex items-start gap-2 rounded-lg bg-muted/60 px-2.5 py-2 text-[12px] text-muted-foreground">
           <input
             type="checkbox"
             checked={markDelivered}
@@ -685,7 +685,7 @@ export function RegisterDelivery({
           </span>
         </label>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] text-slate-400 dark:text-slate-500">{meta.hint}</p>
+          <p className="text-[10px] text-muted-foreground">{meta.hint}</p>
           <button
             type="button"
             onClick={handleAdd}
@@ -781,14 +781,12 @@ export function DeliverableDetailView({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Entregable
           </p>
-          <h2 className="mt-0.5 text-base font-bold text-slate-800 dark:text-slate-100">
-            {deliverable.taskTitle}
-          </h2>
+          <h2 className="mt-0.5 text-base font-bold text-foreground">{deliverable.taskTitle}</h2>
           {deliverable.taskId && (
             <span
               title="Este entregable mueve el estado de una tarea real del proyecto"
@@ -807,9 +805,7 @@ export function DeliverableDetailView({
               >
                 {assignee.initials}
               </span>
-              <span className="text-[12px] text-slate-500 dark:text-slate-400">
-                {assignee.name}
-              </span>
+              <span className="text-[12px] text-muted-foreground">{assignee.name}</span>
             </div>
           )}
         </div>
@@ -830,7 +826,7 @@ export function DeliverableDetailView({
               }}
               aria-label="Eliminar entregable"
               title="Eliminar entregable"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -860,7 +856,7 @@ export function DeliverableDetailView({
           un modal, así el panel no reserva espacio para él cuando no se usa
           (antes dejaba un bloque alto y medio vacío bajo la última versión). */}
       {canRegister && (
-        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <div className="shrink-0 border-t border-border bg-card px-5 py-3">
           <button
             type="button"
             onClick={() => {
@@ -952,16 +948,16 @@ function RegisterDeliveryModal({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="text-sm font-semibold text-foreground">
             Registrar nueva entrega (V{currentVersion + 1})
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
