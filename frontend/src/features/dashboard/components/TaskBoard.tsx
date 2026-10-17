@@ -61,7 +61,7 @@ function TaskCard({ task }: { task: Task }) {
         <p
           className={cn(
             "text-[13px] leading-snug text-foreground",
-            isCompleted && "line-through decoration-slate-400 dark:decoration-slate-500",
+            isCompleted && "line-through decoration-muted-foreground",
           )}
         >
           {task.title}
