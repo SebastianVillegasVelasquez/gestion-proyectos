@@ -77,8 +77,8 @@ const KIND_META: Record<TraceabilityEventKind, { icon: LucideIcon; dot: string; 
   },
   cancelacion: {
     icon: Ban,
-    dot: "bg-slate-400",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    dot: "bg-muted-foreground",
+    badge: "bg-muted text-muted-foreground",
   },
   comentario: {
     icon: MessageSquare,
@@ -87,8 +87,8 @@ const KIND_META: Record<TraceabilityEventKind, { icon: LucideIcon; dot: string; 
   },
   cambio_estado: {
     icon: RefreshCw,
-    dot: "bg-slate-400",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    dot: "bg-muted-foreground",
+    badge: "bg-muted text-muted-foreground",
   },
   equipo: {
     icon: UsersRound,
@@ -159,10 +159,8 @@ function SummaryCard({
           <Icon className="size-4" />
         </div>
         <div>
-          <p className="text-lg font-semibold leading-tight text-slate-900 dark:text-slate-50">
-            {value}
-          </p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">{label}</p>
+          <p className="text-lg font-semibold leading-tight text-foreground">{value}</p>
+          <p className="text-[11px] text-muted-foreground">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -195,19 +193,17 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", badge)}>
             {event.is_delay ? "Retraso" : TRACE_EVENT_LABELS[event.kind]}
           </span>
-          <span className="text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             {formatTime(event.created_at)}
           </span>
         </div>
 
-        <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-          {event.task_title}
-        </p>
+        <p className="mt-1 text-sm font-medium text-foreground">{event.task_title}</p>
 
         {(event.work_item_name ?? event.team_name) && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             {event.work_item_name && (
-              <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <FolderOpen className="size-3 shrink-0" />
                 {event.work_item_name}
               </span>
@@ -221,27 +217,27 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           </div>
         )}
 
-        <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <User className="size-3 shrink-0" />
             {event.actor_name ?? "Sistema"}
           </span>
           {event.assignee_name && event.assignee_name !== event.actor_name && (
-            <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+            <span className="text-muted-foreground/60">&middot;</span>
           )}
           {event.assignee_name && event.assignee_name !== event.actor_name && (
-            <span className="text-slate-400 dark:text-slate-500">
-              {"responsable: "}
+            <span className="text-muted-foreground">
+              {"responsable:"}
               {event.assignee_name}
             </span>
           )}
           {event.old_value && event.new_value && (
             <span className="inline-flex flex-wrap items-center gap-1 align-middle">
-              <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+              <span className="text-muted-foreground/60">&middot;</span>
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {event.old_value}
               </span>
-              <ArrowRight className="size-3 shrink-0 text-slate-400" />
+              <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground">
                 {event.new_value}
               </span>
@@ -249,7 +245,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
           )}
           {event.old_status && event.new_status && (
             <span className="inline-flex flex-wrap items-center gap-1 align-middle">
-              <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+              <span className="text-muted-foreground/60">&middot;</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -258,7 +254,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
               >
                 {TASK_STATUS_LABELS[event.old_status]}
               </span>
-              <span className="text-slate-400">{">"}</span>
+              <span className="text-muted-foreground">{">"}</span>
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px]",
@@ -272,7 +268,7 @@ function TimelineEvent({ event }: { event: TraceabilityEvent }) {
         </p>
 
         {event.change_reason && (
-          <p className="mt-1 rounded-md bg-slate-50 px-2 py-1 text-xs italic text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+          <p className="mt-1 rounded-md bg-muted/60 px-2 py-1 text-xs italic text-muted-foreground">
             &ldquo;{event.change_reason}&rdquo;
           </p>
         )}
@@ -447,7 +443,7 @@ export function TraceabilityPanel({
           icon={History}
           label="Eventos"
           value={summary?.total_events ?? 0}
-          tone="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          tone="bg-muted text-muted-foreground"
         />
         <SummaryCard
           icon={AlertTriangle}
@@ -482,7 +478,7 @@ export function TraceabilityPanel({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
           <History className="size-4 text-brand-teal" /> Línea de tiempo
           {isFiltered && (
             <span className="text-[11px] font-normal text-muted-foreground">
@@ -539,7 +535,7 @@ export function TraceabilityPanel({
                     ? group === "retrasos"
                       ? "bg-rose-600 text-white"
                       : "bg-primary text-primary-foreground"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {TRACE_FILTER_LABELS[group]}
