@@ -27,7 +27,7 @@ function flattenOptions(
   acc: { id: string; label: string }[] = [],
 ): { id: string; label: string }[] {
   nodes.forEach((n) => {
-    acc.push({ id: n.id, label: `${"  ".repeat(depth)}${depth > 0 ? "└ " : ""}${n.nombre}` });
+    acc.push({ id: n.id, label: `${"".repeat(depth)}${depth > 0 ? "└" : ""}${n.nombre}` });
     flattenOptions(n.children, depth + 1, acc);
   });
   return acc;
@@ -71,25 +71,23 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
               <Link2 className="size-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-                Dependencias
-              </h3>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <h3 className="text-base font-semibold text-foreground">Dependencias</h3>
+              <p className="text-xs text-muted-foreground">
                 “{item.nombre}” no podrá iniciar hasta que terminen los elementos previos.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -97,13 +95,13 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
 
         <div className="flex flex-col gap-4 px-5 py-4">
           <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Depende de
             </p>
             {depsQuery.isLoading ? (
-              <div className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div className="h-10 animate-pulse rounded-lg bg-muted" />
             ) : deps.length === 0 ? (
-              <p className="text-sm italic text-slate-400 dark:text-slate-500">
+              <p className="text-sm italic text-muted-foreground">
                 Sin dependencias. Empieza cuando quiera (según sus fechas o el elemento que lo
                 contiene).
               </p>
@@ -112,10 +110,10 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                 {deps.map((d) => (
                   <li
                     key={d.id}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2"
                   >
                     <ArrowRight className="size-3.5 shrink-0 text-amber-500" />
-                    <span className="flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
+                    <span className="flex-1 truncate text-sm text-foreground">
                       {nameById.get(d.depends_on_id) ?? "Elemento"}
                     </span>
                     <button
@@ -123,7 +121,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                         removeDep.mutate({ itemId: item.id, dependsOnId: d.depends_on_id });
                       }}
                       title="Quitar dependencia"
-                      className="rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -133,8 +131,8 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Añadir elemento previo
             </p>
             <div className="flex gap-2">
@@ -143,7 +141,7 @@ export function DependenciesModal({ projectId, item, tree, onClose }: Props) {
                 onChange={(e) => {
                   setPick(e.target.value);
                 }}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
               >
                 <option value="">Selecciona un elemento…</option>
                 {options.map((o) => (
