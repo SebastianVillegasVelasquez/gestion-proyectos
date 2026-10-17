@@ -77,7 +77,7 @@ const STATUS_META: Record<TaskStatus, { label: string; color: string; soft: stri
   cancelada: {
     label: "Canceladas",
     color: "#94a3b8", // slate-400
-    soft: "bg-slate-400/15 text-slate-500 dark:text-slate-400",
+    soft: "bg-muted-foreground/15 text-muted-foreground",
   },
 };
 
