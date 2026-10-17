@@ -40,7 +40,7 @@ export function ConfirmDialog({
         className="absolute inset-0 bg-black/40"
         onClick={onCancel}
       />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card shadow-xl">
         <div className="flex items-start gap-3 p-5">
           <div
             className={
@@ -52,14 +52,14 @@ export function ConfirmDialog({
             <AlertTriangle className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">{title}</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{message}</p>
           </div>
           <button
             type="button"
             onClick={onCancel}
             aria-label="Cerrar"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
@@ -74,12 +74,12 @@ export function ConfirmDialog({
           </p>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent disabled:opacity-60"
           >
             {cancelLabel}
           </button>
