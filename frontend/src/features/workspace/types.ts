@@ -16,8 +16,7 @@ export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
 };
 
 export const DELIVERABLE_STATUS_BADGE: Record<DeliverableStatus, string> = {
-  borrador:
-    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+  borrador: "bg-muted text-muted-foreground border-border",
   // Azul, no ambar: con cinco estados el ambar queda reservado para "cambios
   // solicitados" y asi los cinco se distinguen sin leer la etiqueta.
   en_revision:
