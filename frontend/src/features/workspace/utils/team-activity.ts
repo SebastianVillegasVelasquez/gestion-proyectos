@@ -71,7 +71,7 @@ export function buildTeamActivity(
         events.push({
           id: `c-${c.id}`,
           at: c.createdAt,
-          dot: "bg-slate-300 dark:bg-slate-600",
+          dot: "bg-muted-foreground/30",
           text: `${who} comentó en "${d.taskTitle}"`,
         });
       }
