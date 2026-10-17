@@ -351,7 +351,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
   }, [range, rows, hasChildren, styleOf, schedule.project_name, pxPerDay, presentTipos]);
 
   const inputCls =
-    "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:border-brand-gold dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+    "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none transition focus:border-brand-gold";
 
   return (
     <div className="flex flex-col gap-4">
@@ -359,7 +359,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
           interno: mismos colores que la Estructura. */}
       {presentTipos.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             <Tag className="size-3" /> Tipos
           </span>
           {presentTipos.map((t) => {
@@ -406,8 +406,8 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                   className={cn(
                     "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition",
                     active
-                      ? "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                      : "border-transparent text-slate-300 line-through dark:text-slate-600",
+                      ? "border-border text-muted-foreground"
+                      : "border-transparent text-muted-foreground/60 line-through",
                   )}
                 >
                   <span
@@ -423,7 +423,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
         <div className="flex flex-wrap items-center gap-2">
           {/* Búsqueda por nombre del elemento */}
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => {
@@ -446,7 +446,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
               onlyAtRisk
                 ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-                : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400",
+                : "border-border text-muted-foreground hover:text-foreground",
             )}
           >
             <AlertTriangle className="size-3.5" /> Solo en riesgo
@@ -459,14 +459,14 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
               scrollToToday();
             }}
             disabled={todayPct == null}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             title="Centrar el cronograma en la fecha actual"
           >
             <Crosshair className="size-3.5" /> Hoy
           </button>
 
           {/* Zoom */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
             {(Object.keys(ZOOM_CFG) as Zoom[]).map((z) => (
               <button
                 key={z}
@@ -479,7 +479,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                   "rounded-md px-2 py-1 text-xs font-medium transition",
                   zoom === z
                     ? "bg-primary text-primary-foreground"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {ZOOM_CFG[z].label}
@@ -493,7 +493,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
             type="button"
             onClick={handleExport}
             disabled={rows.length === 0 || !range}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             title="Descargar el cronograma como un archivo HTML autónomo"
           >
             <Download className="size-3.5" /> Exportar HTML
@@ -502,9 +502,9 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
       </div>
 
       {items.length === 0 || !range ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center dark:border-slate-700">
-          <GanttChartSquare className="size-8 text-slate-300 dark:text-slate-600" />
-          <p className="text-sm text-slate-400 dark:text-slate-500">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-center">
+          <GanttChartSquare className="size-8 text-muted-foreground/60" />
+          <p className="text-sm text-muted-foreground">
             El cronograma aún no tiene componentes planificados.
             <br />
             Aparecerán aquí a medida que el equipo defina la estructura y sus fechas.
@@ -514,18 +514,18 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
         <div
           ref={scrollRef}
           className={cn(
-            "relative max-h-[80vh] min-h-[28rem] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950",
+            "relative max-h-[80vh] min-h-[28rem] overflow-auto overscroll-x-contain rounded-xl border border-border bg-card shadow-sm",
             resizing && "cursor-col-resize select-none",
           )}
         >
           <div className="relative" style={{ width: labelW + trackWidth, minWidth: "100%" }}>
             {/* ── Encabezado sticky: banda de meses + marcas del eje ── */}
-            <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="sticky top-0 z-30 flex border-b border-border bg-card">
               <div
                 style={{ width: labelW }}
-                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-slate-200 bg-white px-3 pb-1.5 dark:border-slate-800 dark:bg-slate-950"
+                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-card px-3 pb-1.5"
               >
-                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Cronograma · {rows.length}
                 </span>
                 {/* Tirador para ensanchar/estrechar la columna de nombres. */}
@@ -555,18 +555,18 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                   {months.map((b) => (
                     <div
                       key={b.key}
-                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-slate-200 pl-1.5 dark:border-slate-700"
+                      className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border pl-1.5"
                       style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                     >
                       {pctToPx(b.widthPct) >= 48 && (
-                        <span className="truncate text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className="truncate text-[10px] font-semibold text-muted-foreground">
                           {b.label}
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="relative h-5 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="relative h-5 border-t border-border">
                   {ticks.map((t) => {
                     if (t.offsetPct > 97) {
                       return null;
@@ -576,7 +576,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                       <span
                         key={t.key}
                         className={cn(
-                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-slate-400 dark:text-slate-500",
+                          "absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground",
                           centered && "-translate-x-1/2",
                         )}
                         style={{ left: pctToPx(t.offsetPct) + (centered ? pxPerDay / 2 : 4) }}
@@ -607,21 +607,21 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                 {weekends.map((b) => (
                   <div
                     key={b.key}
-                    className="absolute inset-y-0 bg-slate-100/70 dark:bg-slate-900/60"
+                    className="absolute inset-y-0 bg-muted/70"
                     style={{ left: pctToPx(b.startPct), width: pctToPx(b.widthPct) }}
                   />
                 ))}
                 {ticks.map((t) => (
                   <div
                     key={`grid-${t.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-100 dark:bg-slate-800/60"
+                    className="absolute inset-y-0 w-px bg-muted"
                     style={{ left: pctToPx(t.offsetPct) }}
                   />
                 ))}
                 {months.slice(1).map((b) => (
                   <div
                     key={`mline-${b.key}`}
-                    className="absolute inset-y-0 w-px bg-slate-200 dark:bg-slate-700/70"
+                    className="absolute inset-y-0 w-px bg-muted-foreground/20"
                     style={{ left: pctToPx(b.startPct) }}
                   />
                 ))}
@@ -637,7 +637,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
 
               {rows.length === 0 ? (
                 <div className="flex h-32 items-center justify-center">
-                  <p className="sticky left-0 px-4 text-sm italic text-slate-400 dark:text-slate-500">
+                  <p className="sticky left-0 px-4 text-sm italic text-muted-foreground">
                     No hay componentes que coincidan con los filtros.
                   </p>
                 </div>
@@ -657,12 +657,12 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                   return (
                     <div
                       key={item.key}
-                      className="group/row flex items-stretch border-b border-slate-50 last:border-b-0 dark:border-slate-900"
+                      className="group/row flex items-stretch border-b border-border last:border-b-0"
                       style={{ height: ROW_H }}
                     >
                       <div
                         style={{ width: labelW }}
-                        className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-slate-200 bg-white pr-2 text-left transition-colors group-hover/row:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:group-hover/row:bg-slate-900"
+                        className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-border bg-card pr-2 text-left transition-colors group-hover/row:bg-muted/50"
                       >
                         {/* Sangría por nivel + chevron si el componente tiene hijos */}
                         <div
@@ -677,7 +677,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                               }}
                               aria-expanded={!isCollapsed}
                               aria-label={isCollapsed ? "Expandir" : "Colapsar"}
-                              className="shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+                              className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <ChevronDown
                                 className={cn(
@@ -705,24 +705,24 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                               </span>
                             )
                           ) : (
-                            <span className="shrink-0 rounded bg-slate-100 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
                               {item.kind === "subtarea" ? "Subtarea" : "Tarea"}
                             </span>
                           )}
                           <p
                             className={cn(
-                              "min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300",
-                              isParent && "font-semibold text-slate-700 dark:text-slate-200",
+                              "min-w-0 flex-1 truncate text-xs text-muted-foreground",
+                              isParent && "font-semibold text-foreground",
                             )}
                           >
                             {item.name}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-medium tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
                           {progress}%
                         </span>
                       </div>
-                      <div className="relative flex-1 transition-colors group-hover/row:bg-slate-50/60 dark:group-hover/row:bg-slate-900/40">
+                      <div className="relative flex-1 transition-colors group-hover/row:bg-muted/60">
                         <div
                           title={[
                             item.name,
@@ -749,9 +749,7 @@ export function ClientScheduleView({ schedule }: { schedule: PublicProjectSchedu
                         <span
                           className={cn(
                             "pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] tabular-nums",
-                            overdue
-                              ? "font-medium text-rose-500"
-                              : "text-slate-400 dark:text-slate-500",
+                            overdue ? "font-medium text-rose-500" : "text-muted-foreground",
                           )}
                           style={
                             labelFitsRight
