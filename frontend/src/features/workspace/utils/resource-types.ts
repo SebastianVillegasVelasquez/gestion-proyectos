@@ -32,7 +32,7 @@ export const RESOURCE_META: Record<ResourceType, ResourceMeta> = {
     color: "text-sky-500",
     chip: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800",
     available: true,
-    placeholder: "https://figma.com/proto/…   ·   https://drive.google.com/…",
+    placeholder: "https://figma.com/proto/… · https://drive.google.com/…",
     hint: "Figma, Google Drive, Notion o documento publicado.",
   },
   repositorio: {
@@ -65,8 +65,8 @@ export const RESOURCE_META: Record<ResourceType, ResourceMeta> = {
   sin_adjunto: {
     label: "Sin adjunto",
     Icon: Ban,
-    color: "text-slate-400",
-    chip: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+    color: "text-muted-foreground",
+    chip: "bg-muted text-muted-foreground border-border",
     // No se elige en el formulario de subida: se genera al "entregar sin adjunto".
     available: false,
     placeholder: "",
