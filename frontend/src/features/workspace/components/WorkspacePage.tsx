@@ -94,15 +94,13 @@ function NewDeliverableModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-            Nuevo entregable
-          </h2>
+          <h2 className="text-base font-bold text-foreground">Nuevo entregable</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
@@ -119,7 +117,7 @@ function NewDeliverableModal({
         >
           {tasks.length > 0 && (
             <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Tarea del proyecto
               </label>
               <select
@@ -127,7 +125,7 @@ function NewDeliverableModal({
                 onChange={(e) => {
                   selectTask(e.target.value);
                 }}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none"
               >
                 <option value="">Sin vincular (entrega suelta)</option>
                 {tasks.map((t) => (
@@ -136,14 +134,14 @@ function NewDeliverableModal({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 Solo tus tareas asignadas y abiertas. Al aprobar o rechazar, se actualiza la tarea
                 vinculada y queda en la trazabilidad del proyecto.
               </p>
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Título del entregable *
             </label>
             <input
@@ -154,14 +152,14 @@ function NewDeliverableModal({
               }}
               placeholder="Ej: Prototipo de Interfaz — Módulo 2"
               autoFocus
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
             />
           </div>
-          <div className="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="flex gap-2 border-t border-border pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-accent"
             >
               Cancelar
             </button>
@@ -182,11 +180,11 @@ function NewDeliverableModal({
 function NoDeliverableSelected() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
-        <Package className="size-6 text-slate-400 dark:text-slate-500" />
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+        <Package className="size-6 text-muted-foreground" />
       </div>
-      <p className="font-semibold text-slate-600 dark:text-slate-300">Selecciona un entregable</p>
-      <p className="max-w-xs text-sm text-slate-400 dark:text-slate-500">
+      <p className="font-semibold text-muted-foreground">Selecciona un entregable</p>
+      <p className="max-w-xs text-sm text-muted-foreground">
         Elige un entregable de la izquierda para ver su línea de tiempo y el hilo de
         retroalimentación.
       </p>
@@ -534,12 +532,12 @@ function MemberWorkspace() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-full flex-col overflow-hidden bg-background">
       <MyInvitationsBanner />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Columna principal: cabecera + sección activa, a todo el ancho. */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
           <WorkspaceHeader
             name={activeTeam.name}
             description={activeTeam.description ?? ""}
@@ -555,7 +553,7 @@ function MemberWorkspace() {
 
           <div className="flex min-h-0 flex-1 overflow-hidden">
             {activeTab === "tareas" && (
-              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+              <div className="flex-1 overflow-hidden bg-background">
                 <TeamTasksView
                   teamId={activeTeam.id}
                   projectId={activeTeam.project_id}
@@ -581,7 +579,7 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "estructura" && (
-              <div className="flex-1 overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+              <div className="flex-1 overflow-y-auto bg-background p-4 sm:p-6">
                 <WorkspaceStructureView
                   tree={treeQuery.data ?? []}
                   tasks={scopedTasks}
@@ -611,7 +609,7 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "cronograma" && (
-              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+              <div className="flex-1 overflow-hidden bg-background">
                 <TeamGanttPanel
                   projectId={activeTeam.project_id}
                   teamId={activeTeam.id}
@@ -621,7 +619,7 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "archivos" && (
-              <div className="flex flex-1 flex-col overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+              <div className="flex flex-1 flex-col overflow-y-auto bg-background p-4 sm:p-6">
                 {/* El archivador es del PROYECTO, pero desde el espacio de
                     trabajo cada quien ve solo la raíz y la carpeta de sus
                     equipos (la jerarquía completa es del panel de
@@ -639,7 +637,7 @@ function MemberWorkspace() {
               <div className="flex w-full flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
                 <div
                   className={cn(
-                    "w-full shrink-0 overflow-hidden border-b border-slate-200 lg:w-72 lg:border-b-0 lg:border-r dark:border-slate-800",
+                    "w-full shrink-0 overflow-hidden border-b border-border lg:w-72 lg:border-b-0 lg:border-r",
                     selectedDeliverable && "hidden lg:block",
                   )}
                 >
@@ -659,13 +657,13 @@ function MemberWorkspace() {
 
                 {selectedDeliverable ? (
                   <>
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-slate-200 lg:border-r dark:border-slate-800">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-border lg:border-r">
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedDeliverableId(null);
                         }}
-                        className="flex shrink-0 items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 text-[13px] font-medium text-slate-500 hover:bg-slate-50 lg:hidden dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
+                        className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-2.5 text-[13px] font-medium text-muted-foreground hover:bg-accent lg:hidden"
                       >
                         <ArrowLeft className="size-3.5" /> Volver a entregables
                       </button>
@@ -704,7 +702,7 @@ function MemberWorkspace() {
                         }
                       />
                     </div>
-                    <div className="flex h-80 w-full shrink-0 flex-col overflow-hidden border-t border-slate-200 lg:h-auto lg:w-[400px] lg:border-l lg:border-t-0 dark:border-slate-800">
+                    <div className="flex h-80 w-full shrink-0 flex-col overflow-hidden border-t border-border lg:h-auto lg:w-[400px] lg:border-l lg:border-t-0">
                       <FeedbackThread
                         comments={selectedDeliverable.comments}
                         members={members}
@@ -720,7 +718,7 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "progreso" && (
-              <div className="flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+              <div className="flex-1 overflow-hidden bg-background">
                 <TeamProgressView
                   tasks={tasksQuery.data ?? []}
                   deliverables={deliverables}
@@ -731,7 +729,7 @@ function MemberWorkspace() {
             )}
 
             {activeTab === "configuracion" && (
-              <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+              <div className="flex-1 overflow-y-auto bg-background">
                 <GroupSettingsView
                   projectId={activeTeam.project_id}
                   teamId={activeTeam.id}
