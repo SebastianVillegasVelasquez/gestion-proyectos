@@ -32,7 +32,7 @@ function CopyField({
 
   return (
     <div>
-      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Icon className="size-3.5" />
         {label}
       </p>
@@ -43,14 +43,14 @@ function CopyField({
           onFocus={(e) => {
             e.target.select();
           }}
-          className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          className="min-w-0 flex-1 truncate rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground outline-none"
         />
         <button
           type="button"
           onClick={() => void copy()}
           title={`Copiar ${label.toLowerCase()}`}
           aria-label={`Copiar ${label.toLowerCase()}`}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
         >
           {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
         </button>
@@ -61,7 +61,7 @@ function CopyField({
             rel="noreferrer"
             title="Abrir en una pestaña nueva"
             aria-label="Abrir en una pestaña nueva"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
           >
             <ExternalLink className="size-4" />
           </a>
@@ -92,7 +92,7 @@ export function ClientAccessFields({
       <CopyField icon={KeyRound} label="Token de acceso" value={token} />
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="text-[11px] text-muted-foreground">
           Comparte el enlace y el token por separado. El cliente introduce el token para ver el
           avance en solo lectura, sin iniciar sesión.
         </p>
@@ -101,7 +101,7 @@ export function ClientAccessFields({
             type="button"
             onClick={onRegenerate}
             disabled={regenerating}
-            className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-rose-600 disabled:opacity-50 dark:text-slate-400"
+            className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-rose-600 disabled:opacity-50"
           >
             <RefreshCw className={regenerating ? "size-3 animate-spin" : "size-3"} />
             Regenerar
