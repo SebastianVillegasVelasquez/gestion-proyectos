@@ -38,28 +38,26 @@ function ProjectRow({ project, href }: { project: Project; href?: string }) {
     <>
       {/* Name + tech badge */}
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
-          {project.name}
-        </span>
-        <span className="inline-flex shrink-0 items-center rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+        <span className="truncate text-[12px] font-medium text-foreground">{project.name}</span>
+        <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           {project.techBadge}
         </span>
       </div>
 
       <div className="flex items-center justify-between gap-2">
         <StatusBadge variant={project.status} />
-        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+        <span className="text-[10px] text-muted-foreground">
           {project.tasksCompleted}/{project.tasksTotal}
         </span>
       </div>
 
-      <p className="text-[10px] text-slate-400 dark:text-slate-500">
-        <span className="text-slate-500 dark:text-slate-400">{project.coordinator}</span>
+      <p className="text-[10px] text-muted-foreground">
+        <span className="text-muted-foreground">{project.coordinator}</span>
       </p>
 
       {/* Progress bar */}
       <div className="flex items-center gap-2">
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted-foreground/20">
           <div
             className={cn(
               "h-full transition-all duration-300",
@@ -116,7 +114,7 @@ export function ProjectsPanel({ projects, getProjectHref }: ProjectsPanelProps) 
             onClick={() => {
               setExpanded((v) => !v);
             }}
-            className="mt-1 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+            className="mt-1 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground"
           >
             {expanded ? "Ver menos" : "Ver más"}
             {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
