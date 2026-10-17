@@ -58,7 +58,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
   cancelacion: {
     verb: "canceló la tarea",
     icon: XCircle,
-    tone: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    tone: "bg-muted-foreground/10 text-muted-foreground",
   },
   comentario: {
     verb: "comentó en la tarea",
@@ -68,7 +68,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
   cambio_estado: {
     verb: "actualizó la tarea",
     icon: Activity,
-    tone: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    tone: "bg-muted-foreground/10 text-muted-foreground",
   },
   equipo: {
     verb: "cambió de equipo la tarea",
@@ -98,19 +98,21 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   const actor = item.actor_name ?? "El sistema";
 
   return (
-    <div className="flex items-start gap-3 rounded-md p-2 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-800/50">
+    <div className="flex items-start gap-3 rounded-md p-2 transition-colors duration-150 hover:bg-accent">
       <span
         className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${meta.tone}`}
       >
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[12px] leading-snug text-slate-700 dark:text-slate-200">
-          <span className="font-semibold text-slate-900 dark:text-slate-50">{actor}</span>{" "}
-          {meta.verb}{" "}
-          <span className="font-medium text-slate-800 dark:text-slate-100">{item.task_title}</span>
+        <p className="text-[12px] leading-snug text-foreground">
+          <span className="font-semibold text-foreground">{actor}</span>
+          {""}
+          {meta.verb}
+          {""}
+          <span className="font-medium text-foreground">{item.task_title}</span>
         </p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+        <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
           {item.project_name && <span className="truncate">{item.project_name}</span>}
           {item.project_name && <span aria-hidden>·</span>}
           <span className="shrink-0">{formatRelativeTime(item.created_at)}</span>
@@ -152,10 +154,7 @@ function ActivityCard({
         {isLoading ? (
           <div className="flex flex-col gap-2 py-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-10 animate-pulse rounded-md bg-slate-100 dark:bg-slate-800"
-              />
+              <div key={i} className="h-10 animate-pulse rounded-md bg-muted" />
             ))}
           </div>
         ) : isError ? (
@@ -164,13 +163,11 @@ function ActivityCard({
           </p>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <Activity className="size-5" />
             </div>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Aún no hay movimientos
-            </p>
-            <p className="max-w-xs text-xs text-slate-400 dark:text-slate-500">{emptyHint}</p>
+            <p className="text-sm font-medium text-muted-foreground">Aún no hay movimientos</p>
+            <p className="max-w-xs text-xs text-muted-foreground">{emptyHint}</p>
           </div>
         ) : (
           <>
@@ -183,7 +180,7 @@ function ActivityCard({
                 onClick={() => {
                   setExpanded((v) => !v);
                 }}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-brand-gold/50 hover:text-foreground"
               >
                 {expanded ? "Ver menos" : "Ver más"}
                 {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
