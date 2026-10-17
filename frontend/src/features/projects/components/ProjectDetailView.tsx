@@ -89,14 +89,14 @@ const SECTIONS: {
     label: "Trazabilidad",
     meta: "Historial de cambios y eventos",
     icon: History,
-    accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    accent: "bg-muted-foreground/10 text-muted-foreground",
   },
   {
     to: "analiticas",
     label: "Analíticas",
     meta: "Rendimiento del proyecto en el tiempo y exportación",
     icon: FileSpreadsheet,
-    accent: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    accent: "bg-muted-foreground/10 text-muted-foreground",
   },
 ];
 
