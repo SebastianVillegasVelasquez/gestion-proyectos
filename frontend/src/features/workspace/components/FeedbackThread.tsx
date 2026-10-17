@@ -31,7 +31,7 @@ const COMMENT_TYPE_CONFIG: Record<
   comentario: {
     label: "",
     Icon: MessageSquare,
-    cardCls: "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
+    cardCls: "border-border bg-card",
     labelCls: "",
   },
   solicitud_cambio: {
@@ -60,7 +60,7 @@ function highlightMentions(text: string, members: WorkspaceMember[]) {
   const parts = text.split(/(@\w[\w\s]*)/g);
   return parts.map((part, i) => {
     const isMention = members.some((m) =>
-      part.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase()),
+      part.toLowerCase().includes(m.name.toLowerCase().split("")[0].toLowerCase()),
     );
     if (isMention && part.startsWith("@")) {
       return (
@@ -121,7 +121,7 @@ function CommentItem({ comment, members }: CommentItemProps) {
           </span>
         )}
         <div className="flex-1 min-w-0">
-          <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+          <span className="text-[12px] font-semibold text-foreground">
             {author?.name ?? "Desconocido"}
           </span>
           {author && author.role !== "integrante" && (
@@ -130,13 +130,13 @@ function CommentItem({ comment, members }: CommentItemProps) {
             </span>
           )}
         </div>
-        <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
+        <span className="shrink-0 text-[10px] text-muted-foreground">
           {relativeTime(comment.createdAt)}
         </span>
       </div>
 
       {/* Content */}
-      <p className="mt-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
+      <p className="mt-2 text-[13px] leading-relaxed text-foreground">
         {highlightMentions(comment.content, members)}
       </p>
     </div>
@@ -159,7 +159,7 @@ function ComposeArea({ members, currentUserId, onSubmit }: ComposeAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const addMention = (member: WorkspaceMember) => {
-    const mention = `@${member.name} `;
+    const mention = `@${member.name}`;
     setText((prev) => prev + mention);
     textareaRef.current?.focus();
   };
@@ -167,7 +167,7 @@ function ComposeArea({ members, currentUserId, onSubmit }: ComposeAreaProps) {
   const extractMentions = (content: string): string[] =>
     members
       .filter((m) =>
-        content.toLowerCase().includes(m.name.toLowerCase().split(" ")[0].toLowerCase()),
+        content.toLowerCase().includes(m.name.toLowerCase().split("")[0].toLowerCase()),
       )
       .map((m) => m.id);
 
@@ -182,12 +182,12 @@ function ComposeArea({ members, currentUserId, onSubmit }: ComposeAreaProps) {
   const others = members.filter((m) => m.id !== currentUserId);
 
   return (
-    <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
+    <div className="shrink-0 border-t border-border bg-card px-5 py-4">
       {/* Mention bar */}
       {others.length > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <AtSign className="size-3 text-slate-400" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500">Mencionar:</span>
+          <AtSign className="size-3 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">Mencionar:</span>
           {others.map((m) => (
             <button
               key={m.id}
@@ -221,7 +221,7 @@ function ComposeArea({ members, currentUserId, onSubmit }: ComposeAreaProps) {
         }}
         rows={3}
         placeholder="Escribe tu comentario… (Ctrl+Enter para enviar)"
-        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 outline-none transition-colors focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
+        className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-[13px] leading-relaxed text-foreground outline-none transition-colors focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 placeholder:text-muted-foreground"
       />
 
       {/* Action buttons */}
@@ -266,12 +266,12 @@ export function FeedbackThread({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Thread header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
-        <MessageSquare className="size-4 text-slate-400 dark:text-slate-500" />
-        <span className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-3">
+        <MessageSquare className="size-4 text-muted-foreground" />
+        <span className="text-[12px] font-semibold text-muted-foreground">
           Hilo de retroalimentación
         </span>
-        <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {comments.length}
         </span>
       </div>
@@ -279,7 +279,7 @@ export function FeedbackThread({
       {/* Messages list */}
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
         {comments.length === 0 && (
-          <p className="py-6 text-center text-[12px] text-slate-400 dark:text-slate-500 italic">
+          <p className="py-6 text-center text-[12px] text-muted-foreground italic">
             Sin comentarios aún. Sé el primero en comentar.
           </p>
         )}
