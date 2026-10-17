@@ -33,11 +33,11 @@ export function MyInvitationsBanner() {
         {invitations.map((inv) => (
           <li
             key={inv.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900/40 dark:bg-slate-900"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-amber-200 bg-card px-3 py-2 dark:border-amber-900/40"
           >
-            <span className="min-w-0 flex-1 text-[13px] text-slate-700 dark:text-slate-200">
+            <span className="min-w-0 flex-1 text-[13px] text-foreground">
               <span className="font-semibold">{inv.team_name}</span>
-              <span className="text-slate-400"> · te invitó {inv.invited_by_name}</span>
+              <span className="text-muted-foreground"> · te invitó {inv.invited_by_name}</span>
             </span>
             <div className="flex shrink-0 gap-1.5">
               <button
@@ -57,7 +57,7 @@ export function MyInvitationsBanner() {
                 onClick={() => {
                   reject.mutate(inv.id);
                 }}
-                className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[12px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-accent disabled:opacity-40"
               >
                 <X className="size-3.5" />
                 Rechazar
