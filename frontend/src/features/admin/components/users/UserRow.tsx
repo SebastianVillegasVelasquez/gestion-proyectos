@@ -105,14 +105,14 @@ export function UserRow({
               "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
               user.is_active
                 ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
-                : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300",
+                : "bg-muted text-muted-foreground hover:bg-accent",
             )}
           >
             <span
               aria-hidden
               className={cn(
                 "size-1.5 rounded-full",
-                user.is_active ? "bg-emerald-500" : "bg-slate-400",
+                user.is_active ? "bg-emerald-500" : "bg-muted-foreground",
               )}
             />
             {user.is_active ? "Activo" : "Inactivo"}
