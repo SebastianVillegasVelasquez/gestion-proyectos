@@ -7,7 +7,7 @@ import type { DirectoryUser, TeamRole } from "../../types/api.types";
 import { DirectoryUserPicker } from "../DirectoryUserPicker";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-violet-500/20";
+  "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-500/20";
 
 // Agrega un usuario del directorio a un equipo, con su rol dentro del equipo.
 // El selector de usuario (búsqueda + lista paginada) vive en DirectoryUserPicker.
@@ -41,23 +41,23 @@ export function AddTeamMemberModal({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <UserPlus className="size-4 text-violet-600" /> Agregar integrante
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
         </div>
 
         <div className="flex flex-col gap-3 px-5 py-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Solo puedes agregar personas que ya sean integrantes del proyecto.
           </p>
           <DirectoryUserPicker
@@ -67,9 +67,7 @@ export function AddTeamMemberModal({
           />
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Rol en el equipo
-            </span>
+            <span className="text-xs font-medium text-muted-foreground">Rol en el equipo</span>
             <select
               className={inputCls}
               value={role}
@@ -93,15 +91,15 @@ export function AddTeamMemberModal({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
-          <span className="truncate text-xs text-slate-400">
+        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
+          <span className="truncate text-xs text-muted-foreground">
             {selected ? `Seleccionado: ${selected.name} ${selected.last_name}` : "Elige un usuario"}
           </span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent"
             >
               Cancelar
             </button>
