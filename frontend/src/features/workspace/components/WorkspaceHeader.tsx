@@ -42,7 +42,7 @@ export function WorkspaceHeader({
   const teamLabel = (t: HeaderTeam) => (t.project_name ? `${t.name} · ${t.project_name}` : t.name);
 
   return (
-    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-card px-6 py-4">
       <div className="min-w-0">
         {teams.length > 1 ? (
           <div className="relative inline-flex items-center">
@@ -54,7 +54,7 @@ export function WorkspaceHeader({
               }}
               // `appearance-none`: sin esto el <select> pinta SU flecha nativa
               // además de la <ChevronDown> de abajo — se veían dos.
-              className="max-w-[60vw] cursor-pointer appearance-none truncate rounded-md bg-transparent py-0.5 pr-7 text-lg font-bold text-slate-900 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800 dark:focus:bg-slate-800"
+              className="max-w-[60vw] cursor-pointer appearance-none truncate rounded-md bg-transparent py-0.5 pr-7 text-lg font-bold text-foreground outline-none hover:bg-accent focus:bg-accent"
             >
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -62,22 +62,20 @@ export function WorkspaceHeader({
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-1.5 size-4 text-slate-400" />
+            <ChevronDown className="pointer-events-none absolute right-1.5 size-4 text-muted-foreground" />
           </div>
         ) : (
-          <h1 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50">{name}</h1>
+          <h1 className="truncate text-lg font-bold text-foreground">{name}</h1>
         )}
         {activeTeam?.project_name && (
           <ProjectBadge
             name={activeTeam.project_name}
             seed={activeTeam.project_id}
-            className="mt-1 text-[12px] font-medium text-slate-500 dark:text-slate-400"
+            className="mt-1 text-[12px] font-medium text-muted-foreground"
           />
         )}
         {description && (
-          <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">
-            {description}
-          </p>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
         )}
       </div>
 
@@ -87,7 +85,7 @@ export function WorkspaceHeader({
             <div className="relative" title={`${leader.name} (Líder)`}>
               <span
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-white dark:ring-slate-900",
+                  "flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-card",
                   leader.avatarColor,
                 )}
               >
@@ -101,7 +99,7 @@ export function WorkspaceHeader({
             <span
               key={m.id}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900",
+                "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-card",
                 m.avatarColor,
               )}
               style={{ marginLeft: i === 0 && leader ? "-4px" : "-10px" }}
@@ -113,7 +111,7 @@ export function WorkspaceHeader({
 
           {hiddenCount > 0 && (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-900"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-muted-foreground ring-2 ring-card"
               style={{ marginLeft: "-10px" }}
               title={`${hiddenCount} integrantes más`}
             >
@@ -121,7 +119,7 @@ export function WorkspaceHeader({
             </span>
           )}
 
-          <span className="ml-3 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <span className="ml-3 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             {members.length} integrantes
           </span>
         </div>
