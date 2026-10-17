@@ -29,7 +29,7 @@ type StatusFilter = "todas" | "no_leidas" | "leidas";
 const PRIORITY_DOT: Record<NotificationPriority, string> = {
   alta: "bg-rose-500",
   media: "bg-amber-400",
-  baja: "bg-slate-300 dark:bg-slate-600",
+  baja: "bg-muted-foreground/30",
 };
 
 /** Los tipos presentes en la ventana cargada, para poblar el selector. */
@@ -124,7 +124,7 @@ function Row({
           onClick={() => {
             onDelete(n.id);
           }}
-          className="flex size-7 items-center justify-center rounded-full text-slate-400 opacity-0 transition hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/row:opacity-100"
+          className="flex size-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/row:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>
