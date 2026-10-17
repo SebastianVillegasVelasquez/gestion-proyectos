@@ -307,7 +307,7 @@ function DateBadge({
               : `«${node.nombre}» termina más tarde de lo que lo contiene. Click para ajustar las fechas.`
           }
           aria-label={`Resolver conflicto de fechas de ${node.nombre}`}
-          className="flex shrink-0 items-center rounded-md p-0.5 text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+          className="flex shrink-0 items-center rounded-md p-0.5 text-rose-500 transition-colors max-lg:min-h-[44px] hover:bg-rose-50 dark:hover:bg-rose-950/40"
         >
           <CalendarClock className="size-3.5" />
         </button>
@@ -979,7 +979,7 @@ function TypeChip({
           setShowActions((prev) => !prev);
         }}
         title="Editar o eliminar este tipo"
-        className="relative z-50 flex items-center gap-1"
+        className="relative z-50 flex items-center gap-1 max-lg:min-h-[44px]"
       >
         {tipo.es_dependencia_externa && (
           <Link2 className="size-2.5 shrink-0" aria-label="Dependencia de terceros" />
@@ -1152,7 +1152,7 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           onClick={() => {
             setAdding(true);
           }}
-          className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-border bg-transparent px-3 py-1 text-[12.5px] font-bold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-border bg-transparent px-3 py-1 text-[12.5px] font-bold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground max-lg:min-h-[44px]"
         >
           <Plus className="size-3" /> nuevo
         </button>
@@ -1171,7 +1171,7 @@ function NodeTypesBar({ projectId, types }: { projectId: string; types: TipoNodo
           }}
           disabled={createType.isPending}
           title="Crea un tipo para el trabajo que depende de un tercero"
-          className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-brand-blue/40 bg-transparent px-3 py-1 text-[12.5px] font-bold text-brand-blue transition-colors hover:border-brand-blue hover:bg-brand-blue/5 disabled:opacity-50"
+          className="flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-brand-blue/40 bg-transparent px-3 py-1 text-[12.5px] font-bold text-brand-blue transition-colors hover:border-brand-blue hover:bg-brand-blue/5 disabled:opacity-50 max-lg:min-h-[44px]"
         >
           <Plus className="size-3" /> añadir actividad de terceros
         </button>
@@ -1463,7 +1463,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
             }}
             placeholder="Buscar elemento…"
             aria-label="Buscar elemento de la estructura"
-            className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
+            className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-foreground outline-none max-lg:min-h-[44px] transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
           />
         </div>
 
@@ -1474,7 +1474,7 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               prev.size > 0 ? new Set() : new Set(collapsibleIdsBelowRoot(tree)),
             );
           }}
-          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-muted-foreground max-lg:min-h-[44px] transition-colors hover:bg-accent hover:text-foreground"
         >
           {collapsedIds.size > 0 ? (
             <>
@@ -1504,14 +1504,14 @@ export function StructurePanel({ projectId }: { projectId: string }) {
               setShowTrash(true);
             }}
             title="Ver y restaurar elementos borrados"
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold max-lg:min-h-[44px] text-foreground transition-colors hover:bg-accent"
           >
             <Trash2 className="size-4 text-muted-foreground" /> Papelera
           </button>
           <button
             type="button"
             onClick={() => void navigate(`/projects/${projectId}/gantt`)}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold max-lg:min-h-[44px] text-foreground transition-colors hover:bg-accent"
           >
             <GanttChartSquare className="size-4 text-brand-teal" /> Cronograma
           </button>
