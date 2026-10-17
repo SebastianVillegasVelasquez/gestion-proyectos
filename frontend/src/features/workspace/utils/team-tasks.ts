@@ -16,8 +16,8 @@ export interface StatusMeta {
 export const STATUS_META: Record<ProjectTaskStatus, StatusMeta> = {
   pendiente_por_iniciar: {
     label: "Por iniciar",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-    bar: "bg-slate-400",
+    badge: "bg-muted text-muted-foreground",
+    bar: "bg-muted-foreground",
   },
   en_progreso: {
     label: "En progreso",
@@ -41,8 +41,8 @@ export const STATUS_META: Record<ProjectTaskStatus, StatusMeta> = {
   },
   cancelada: {
     label: "Cancelada",
-    badge: "bg-slate-100 text-slate-400 line-through dark:bg-slate-800 dark:text-slate-500",
-    bar: "bg-slate-300",
+    badge: "bg-muted text-muted-foreground line-through",
+    bar: "bg-muted-foreground/30",
   },
 };
 
@@ -77,11 +77,11 @@ export interface UrgencyMeta {
 export const URGENCY_META: Record<TaskPriority, UrgencyMeta> = {
   no_definida: {
     label: "Sin definir",
-    badge: "bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500",
+    badge: "bg-muted/60 text-muted-foreground",
   },
   baja: {
     label: "Baja",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    badge: "bg-muted text-muted-foreground",
   },
   media: {
     label: "Media",
