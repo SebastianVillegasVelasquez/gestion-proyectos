@@ -46,8 +46,7 @@ function TaskCard({ task }: { task: Task }) {
     <div
       className={cn(
         "rounded-md border p-3 transition-colors duration-150",
-        "border-slate-200 bg-slate-50 hover:border-slate-300",
-        "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
+        "border-border bg-background hover:border-muted-foreground/40",
         isCompleted && "opacity-50",
       )}
     >
