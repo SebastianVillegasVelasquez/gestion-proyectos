@@ -209,14 +209,14 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+            <h3 className="text-base font-semibold text-foreground">
               {isEdit ? "Editar elemento" : "Nuevo elemento"}
             </h3>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-muted-foreground">
               {isEdit
                 ? `Editando “${editItem!.nombre}”`
                 : parent
@@ -226,7 +226,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -235,7 +235,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
         <div className="flex flex-col gap-4 px-5 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Nombre</span>
+              <span className="text-xs font-medium text-muted-foreground">Nombre</span>
               <input
                 autoFocus
                 value={nombre}
@@ -243,19 +243,17 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                   setNombre(e.target.value);
                 }}
                 placeholder="Ej. Módulo 1 — Fundamentos"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-blue/25"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:focus:ring-brand-blue/25"
               />
             </label>
             <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Tipo de elemento
-              </span>
+              <span className="text-xs font-medium text-muted-foreground">Tipo de elemento</span>
               <select
                 value={tipoId}
                 onChange={(e) => {
                   setTipoId(e.target.value);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
               >
                 {nodeTypes.length === 0 && <option value="">Crea un tipo primero</option>}
                 {nodeTypes.map((t) => (
@@ -264,7 +262,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                   </option>
                 ))}
               </select>
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="text-[11px] text-muted-foreground">
                 Categoría dentro de tu proyecto (p. ej. Módulo, Curso, Fase, Tema). La creas y
                 nombras tú desde la fila de <span className="font-medium">Tipos</span>.
               </span>
@@ -273,7 +271,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
 
           {isThirdParty ? (
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium text-muted-foreground">
                 Fecha del tercero (opcional)
               </span>
               <input
@@ -282,9 +280,9 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                 onChange={(e) => {
                   setTerceroFecha(e.target.value);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
               />
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="text-[11px] text-muted-foreground">
                 Lo entrega un tercero: una fecha exacta o ninguna. No se planifica con duración.
               </span>
             </label>
@@ -292,7 +290,7 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
             <>
               {/* Motor de fechas — 3 modos */}
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-medium text-muted-foreground">
                   ¿Cómo defines su tiempo?
                 </span>
                 <div className="grid grid-cols-2 gap-2">
@@ -309,13 +307,15 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                           "flex items-start gap-2 rounded-xl border px-3 py-2 text-left transition-all",
                           active
                             ? "border-brand-blue bg-brand-blue/10 ring-2 ring-brand-blue/30"
-                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800",
+                            : "border-border bg-card hover:border-brand-gold/50",
                         )}
                       >
                         <Icon
                           className={cn(
                             "mt-0.5 size-4",
-                            active ? "text-brand-blue-dark dark:text-brand-blue" : "text-slate-400",
+                            active
+                              ? "text-brand-blue-dark dark:text-brand-blue"
+                              : "text-muted-foreground",
                           )}
                         />
                         <span className="flex flex-col">
@@ -324,14 +324,12 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                               "text-xs font-semibold",
                               active
                                 ? "text-brand-blue-dark dark:text-brand-blue"
-                                : "text-slate-700 dark:text-slate-200",
+                                : "text-foreground",
                             )}
                           >
                             {m.label}
                           </span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            {m.hint}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground">{m.hint}</span>
                         </span>
                       </button>
                     );
@@ -342,38 +340,34 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(mode === "fechas" || mode === "inicio_dur") && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      Inicio
-                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Inicio</span>
                     <input
                       type="date"
                       value={inicio}
                       onChange={(e) => {
                         setInicio(e.target.value);
                       }}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
                     />
                   </label>
                 )}
                 {(mode === "fechas" || mode === "fin_dur") && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      Fin
-                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Fin</span>
                     <input
                       type="date"
                       value={fin}
                       onChange={(e) => {
                         setFin(e.target.value);
                       }}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
                     />
                   </label>
                 )}
                 {needsDur && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      Duración{durRequired ? "" : " (opcional)"}
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Duración{durRequired ? "" : "(opcional)"}
                     </span>
                     <div className="flex gap-2">
                       <input
@@ -384,14 +378,14 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
                           setDurValor(e.target.value);
                         }}
                         placeholder="0"
-                        className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="w-20 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
                       />
                       <select
                         value={durUnidad}
                         onChange={(e) => {
                           setDurUnidad(e.target.value as DuracionUnidad);
                         }}
-                        className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="flex-1 rounded-lg border border-border bg-card px-2 py-2 text-sm text-foreground"
                       >
                         <option value="dias">días</option>
                         <option value="semanas">semanas</option>
@@ -420,9 +414,9 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
               onChange={(e) => {
                 setEsTransversal(e.target.checked);
               }}
-              className="mt-0.5 size-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+              className="mt-0.5 size-4 rounded border-border text-brand-blue focus:ring-brand-blue"
             />
-            <span className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
+            <span className="flex flex-col gap-0.5 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Frente transversal</span>
               <span className="text-[11px] text-muted-foreground">
                 Trabajo continuo que acompaña al proyecto sin un entregable puntual (p. ej. QA,
@@ -439,10 +433,10 @@ export function WorkItemModal({ projectId, editItem, parent, nodeTypes, onClose 
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+        <footer className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
           >
             Cancelar
           </button>
