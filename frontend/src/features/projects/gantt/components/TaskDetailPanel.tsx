@@ -148,9 +148,9 @@ export function TaskDetailPanel({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" aria-label="Cerrar" className="flex-1 bg-black/30" onClick={onClose} />
-      <aside className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <aside className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-card p-5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{task.title}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{task.title}</h2>
           <div className="flex shrink-0 items-center gap-1">
             {!editing && (
               <button
@@ -160,7 +160,7 @@ export function TaskDetailPanel({
                 }}
                 aria-label="Editar tarea"
                 title="Editar tarea"
-                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <Pencil className="size-4" />
               </button>
@@ -168,7 +168,7 @@ export function TaskDetailPanel({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
             >
               <X className="size-4" />
             </button>
@@ -197,39 +197,39 @@ export function TaskDetailPanel({
             </span>
 
             {task.description && (
-              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{task.description}</p>
+              <p className="mt-4 text-sm text-muted-foreground">{task.description}</p>
             )}
 
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-xs text-slate-400">Inicio</dt>
-                <dd className="text-slate-700 dark:text-slate-200">{task.start_date}</dd>
+                <dt className="text-xs text-muted-foreground">Inicio</dt>
+                <dd className="text-foreground">{task.start_date}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">Entrega</dt>
-                <dd className="text-slate-700 dark:text-slate-200">{task.due_date}</dd>
+                <dt className="text-xs text-muted-foreground">Entrega</dt>
+                <dd className="text-foreground">{task.due_date}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">Prioridad</dt>
-                <dd className="text-slate-700 dark:text-slate-200">
-                  {TASK_PRIORITY_LABELS[task.priority]}
-                </dd>
+                <dt className="text-xs text-muted-foreground">Prioridad</dt>
+                <dd className="text-foreground">{TASK_PRIORITY_LABELS[task.priority]}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">Aprobación</dt>
-                <dd className="text-slate-700 dark:text-slate-200">
+                <dt className="text-xs text-muted-foreground">Aprobación</dt>
+                <dd className="text-foreground">
                   {task.requires_approval ? "Requiere líder/supervisor" : "Entrega directa"}
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-xs text-slate-400">Responsable</dt>
-                <dd className="text-slate-700 dark:text-slate-200">
-                  {assigneeName ?? <span className="italic text-slate-400">Sin asignar</span>}
+                <dt className="text-xs text-muted-foreground">Responsable</dt>
+                <dd className="text-foreground">
+                  {assigneeName ?? (
+                    <span className="italic text-muted-foreground">Sin asignar</span>
+                  )}
                 </dd>
               </div>
               {teamName && (
                 <div className="col-span-2">
-                  <dt className="text-xs text-slate-400">Equipo delegado</dt>
+                  <dt className="text-xs text-muted-foreground">Equipo delegado</dt>
                   <dd className="mt-0.5 w-fit rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                     {teamName}
                   </dd>
@@ -253,7 +253,7 @@ export function TaskDetailPanel({
                 un modal grande y no en un desplegable: con cuatro niveles, una
                 lista aplanada no deja ver el contexto. */}
             <div className="mt-5">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <FolderTree className="size-3.5" /> Ubicación en la estructura
               </p>
               <button
@@ -262,9 +262,9 @@ export function TaskDetailPanel({
                 onClick={() => {
                   setPickingLocation(true);
                 }}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm transition hover:border-brand-teal dark:border-slate-700 dark:bg-slate-800/50"
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-left text-sm transition hover:border-brand-teal"
               >
-                <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">
+                <span className="min-w-0 truncate text-foreground">
                   {currentNodePath ?? "Sin ubicación (tarea independiente)"}
                 </span>
                 <span className="shrink-0 text-xs font-medium text-brand-teal">
@@ -284,7 +284,7 @@ export function TaskDetailPanel({
             {/* Acciones de flujo — sólo visibles para responsable o líder. El admin
             no puede pisar el estado sin ver el avance real. */}
             <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {actorRole === "assignee"
                   ? "Tu tarea"
                   : actorRole === "leader"
@@ -316,8 +316,8 @@ export function TaskDetailPanel({
                   ))}
                 </div>
               ) : (
-                <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                   <p>
                     {actorRole === "none"
                       ? "El cambio de estado lo hacen el responsable (al entregar) y el líder (al aprobar o devolver). Un administrador no puede pisar el estado sin ver el avance."
@@ -331,10 +331,10 @@ export function TaskDetailPanel({
               )}
 
               {isManagement && (
-                <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-2.5 dark:border-slate-700">
+                <div className="mt-3 rounded-lg border border-dashed border-border p-2.5">
                   <label
                     htmlFor="mgmt-status"
-                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                   >
                     Cambiar estado (gestión)
                   </label>
@@ -348,7 +348,7 @@ export function TaskDetailPanel({
                         status: e.target.value as TaskStatus,
                       });
                     }}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 disabled:opacity-60"
                   >
                     {ALL_STATUSES.map((s) => (
                       <option key={s} value={s}>
@@ -356,7 +356,7 @@ export function TaskDetailPanel({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     Como administrador puedes corregir el estado directamente, sin pasar por el
                     flujo.
                   </p>
@@ -372,7 +372,7 @@ export function TaskDetailPanel({
 
             {/* Dependencias */}
             <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Dependencias
               </p>
               <TaskDependencyEditor
