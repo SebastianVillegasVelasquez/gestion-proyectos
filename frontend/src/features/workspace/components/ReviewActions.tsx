@@ -73,9 +73,9 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
 
   if (!canReview) {
     return (
-      <div className="flex items-start gap-2 rounded-lg border border-dashed border-slate-200 px-4 py-3 dark:border-slate-700">
-        <Lock className="mt-0.5 size-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
-        <p className="text-[12px] leading-relaxed text-slate-400 dark:text-slate-500">
+      <div className="flex items-start gap-2 rounded-lg border border-dashed border-border px-4 py-3">
+        <Lock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
           Solo el líder o supervisor puede solicitar cambios o aprobar.
         </p>
       </div>
@@ -85,7 +85,7 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
   // Un entregable sin ninguna versión aún no es revisable: no hay qué mirar.
   if (deliverable.versions.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-[12px] text-slate-400 dark:border-slate-700 dark:text-slate-500">
+      <p className="rounded-lg border border-dashed border-border px-4 py-3 text-[12px] text-muted-foreground">
         Aún no hay ninguna entrega que revisar.
       </p>
     );
@@ -143,7 +143,7 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Revisión
         </p>
         <ManualHint topic={MANUAL_TOPIC.revisar} label="Cómo revisar" />
@@ -179,8 +179,8 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
       </div>
 
       {meta && (
-        <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{meta.helper}</p>
+        <div className="space-y-2 rounded-lg border border-border p-3">
+          <p className="text-[11px] text-muted-foreground">{meta.helper}</p>
           <textarea
             value={reason}
             onChange={(e) => {
@@ -189,10 +189,10 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
             rows={3}
             autoFocus
             placeholder={meta.placeholder}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 outline-none transition-colors focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
+            className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-[13px] leading-relaxed text-foreground outline-none transition-colors focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 placeholder:text-muted-foreground"
           />
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            <p className="text-[11px] text-muted-foreground">
               {meta.requiresReason
                 ? "El motivo es obligatorio y queda en la trazabilidad."
                 : "La nota es opcional."}
@@ -201,7 +201,7 @@ export function ReviewActions({ deliverable, canReview, pending, onDecide }: Rev
               <button
                 type="button"
                 onClick={reset}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-accent"
               >
                 Cancelar
               </button>
