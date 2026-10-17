@@ -2,21 +2,26 @@
 
 Crea de forma consistente:
   * 50 integrantes con roles (SystemRole) y cargos (UserPosition) distribuidos.
-  * 7 equipos de trabajo; CADA integrante pertenece a exactamente un equipo
-    (nadie queda fuera de un grupo de trabajo).
-  * 5 proyectos; a cada uno se le asignan varios equipos (snapshot Opción A,
-    con `source_team_id`), de modo que cada proyecto tiene una permutación
-    distinta de integrantes y TODOS los equipos quedan asignados a algún
-    proyecto (así todo integrante pertenece al menos a un proyecto).
+  * 5 proyectos. Un equipo VIVE DENTRO DE UN PROYECTO (`teams.project_id`), así
+    que cada proyecto crea los suyos a partir de las plantillas de `TEAM_SPECS`;
+    el reparto de `PROJECT_TEAMS` cubre las 7 plantillas, de modo que todo
+    integrante acaba en al menos un proyecto y en un equipo de ese proyecto.
+  * Los integrantes de esos equipos se copian al proyecto (snapshot Opción A,
+    con `source_team_id` apuntando al equipo del propio proyecto).
   * Una tarea por cada integrante y una tarea por cada equipo (asignada a su
-    líder), desde hoy. Una buena parte se crea VENCIDA (fecha de fin en el
-    pasado) o venciendo HOY para ver esos estados en las vistas.
+    líder, con `team_id`), desde hoy. Una buena parte se crea VENCIDA (fecha de
+    fin en el pasado) o venciendo HOY para ver esos estados en las vistas.
+
+Las cuentas quedan listas para entrar: se crean con el modelo directamente, así
+que `must_change_password` se queda en su default False y no aparece el modal de
+primer ingreso (eso solo lo activa el alta por la API, `UserService.create_user`).
+Todas comparten la contraseña `PASSWORD` de aquí abajo.
 
 Idempotente: identifica su propia data con marcadores y la borra antes de
 recrearla, así puedes ejecutarlo varias veces.
 
 Uso:
-    cd backend && poetry run python scripts/seed_load_test.py
+    cd backend && poetry run python scripts/seed_load.py
 """
 
 from __future__ import annotations
@@ -118,8 +123,10 @@ POSITION_COUNTS: list[tuple[UserPosition, int]] = [
     (UserPosition.SIN_CARGO, 3),
 ]
 
-# Cada equipo agrupa uno o más cargos. La unión cubre TODOS los cargos, por lo
-# que todo integrante cae exactamente en un equipo.
+# Plantillas de equipo: cada una agrupa uno o más cargos. La unión cubre TODOS
+# los cargos, así que todo integrante cae en exactamente una plantilla. Como un
+# equipo pertenece a un proyecto, cada proyecto instancia las plantillas que le
+# toquen en PROJECT_TEAMS.
 TEAM_SPECS: list[tuple[str, str, list[UserPosition]]] = [
     (
         "Equipo de Desarrollo",
@@ -166,8 +173,8 @@ PROJECT_NAMES = [
     "Especialización en Inteligencia Artificial",
 ]
 
-# Qué equipos (por índice en TEAM_SPECS) se asignan a cada proyecto. La unión
-# cubre los 7 equipos -> todo integrante termina en al menos un proyecto.
+# Qué plantillas (por índice en TEAM_SPECS) instancia cada proyecto. La unión
+# cubre las 7 -> todo integrante termina en al menos un proyecto.
 PROJECT_TEAMS: list[list[int]] = [
     [0, 1, 2],
     [2, 3, 4],
@@ -211,20 +218,26 @@ async def reset(session) -> None:
         # Las dependencias/historial de tareas tienen ON DELETE CASCADE.
         await session.execute(delete(Task).where(Task.assignee_id.in_(user_ids)))
     if project_ids:
-        # Las tareas cuelgan de WorkItems del proyecto: hay que borrarlas antes
-        # de tumbar los nodos. El resto (WorkItems, TiposNodo, ProjectMembers)
-        # cae por ON DELETE CASCADE al eliminar el proyecto, pero lo hacemos
-        # explícito para no depender del orden que decida SQLAlchemy.
+        # Orden: primero lo que apunta al proyecto, al final el proyecto. El
+        # resto caería por ON DELETE CASCADE, pero lo hacemos explícito para no
+        # depender del orden que decida SQLAlchemy.
+        # Una tarea lleva `project_id` (NOT NULL), así que ya no hace falta
+        # buscarlas por el WorkItem del que cuelgan.
+        await session.execute(delete(Task).where(Task.project_id.in_(project_ids)))
+        # Los equipos del proyecto: sus miembros primero.
         await session.execute(
-            delete(Task).where(
-                Task.work_item_id.in_(
-                    select(WorkItem.id).where(WorkItem.proyecto_id.in_(project_ids))
+            delete(TeamMember).where(
+                TeamMember.team_id.in_(
+                    select(Team.id).where(Team.project_id.in_(project_ids))
                 )
             )
         )
+        # `project_members.source_team_id` referencia al equipo: hay que soltar
+        # a los integrantes del proyecto antes de borrar sus equipos.
         await session.execute(
             delete(ProjectMember).where(ProjectMember.project_id.in_(project_ids))
         )
+        await session.execute(delete(Team).where(Team.project_id.in_(project_ids)))
         await session.execute(
             delete(WorkItem).where(WorkItem.proyecto_id.in_(project_ids))
         )
@@ -233,8 +246,13 @@ async def reset(session) -> None:
         )
         await session.execute(delete(Project).where(Project.id.in_(project_ids)))
     if team_ids:
+        # Equipos de una corrida anterior cuyo proyecto ya no está (o que se
+        # crearon cuando los equipos eran globales).
         await session.execute(
             delete(TeamMember).where(TeamMember.team_id.in_(team_ids))
+        )
+        await session.execute(
+            delete(ProjectMember).where(ProjectMember.source_team_id.in_(team_ids))
         )
         await session.execute(delete(Team).where(Team.id.in_(team_ids)))
     if user_ids:
@@ -273,7 +291,10 @@ def _build_users() -> list[User]:
                 name=first,
                 last_name=last,
                 role=role,
-                position=position,
+                # `users.position` ya no es un enum nativo: es la `key` de la
+                # tabla mutable `positions` (poblada con estos mismos valores),
+                # así que se guarda el string, no el miembro del enum.
+                position=position.value,
                 is_active=True,
             )
         )
@@ -333,42 +354,26 @@ async def seed() -> dict:
         session.add_all(users)
         await session.flush()
 
-        by_position: dict[UserPosition, list[User]] = {}
+        by_position: dict[str, list[User]] = {}
         for u in users:
             by_position.setdefault(u.position, []).append(u)
 
-        # ── 2. Equipos (todo integrante en exactamente un equipo) ─────────────
-        teams: list[Team] = []
-        team_members: list[list[User]] = []  # miembros ordenados por equipo
-        for name, desc, positions in TEAM_SPECS:
+        # ── 2. Miembros de cada plantilla de equipo ───────────────────────────
+        # Los equipos ya no son globales: se instancian dentro de cada proyecto
+        # (paso 3). Aquí solo se resuelve QUIÉN va en cada plantilla.
+        spec_members: list[list[User]] = []
+        for _name, _desc, positions in TEAM_SPECS:
             members: list[User] = []
             for position in positions:
-                members.extend(by_position.get(position, []))
-            team = Team(
-                id=uuid.uuid4(),
-                name=name,
-                description=f"{desc} {TEAM_TAG}",
-            )
-            session.add(team)
-            teams.append(team)
-            team_members.append(members)
-        await session.flush()
+                members.extend(by_position.get(position.value, []))
+            spec_members.append(members)
 
-        for team, members in zip(teams, team_members):
-            for pos, user in enumerate(members):
-                if pos == 0:
-                    role = TeamRole.LIDER
-                elif pos == 1:
-                    role = TeamRole.SUPERVISOR
-                else:
-                    role = TeamRole.INTEGRANTE
-                session.add(
-                    TeamMember(team_id=team.id, user_id=user.id, team_role=role)
-                )
-        await session.flush()
-
-        # ── 3. Proyectos + asignación de equipos (snapshot) ───────────────────
+        # ── 3. Proyectos, sus equipos y el snapshot de integrantes ────────────
         projects: list[Project] = []
+        # Equipos creados, por proyecto: `project_teams[p_idx][t_idx]` es el
+        # equipo que ese proyecto instanció de la plantilla `t_idx`.
+        project_teams: list[dict[int, Team]] = []
+        teams_created = 0
         # Reemplazo semántico de las antiguas fases fijas: cada proyecto tiene
         # un TipoNodo "Fase" y tres WorkItems (Planeación / Producción /
         # Publicación) colgando de él. La lista aquí abajo cumple el mismo rol
@@ -416,17 +421,48 @@ async def seed() -> dict:
             project_phases.append(phases)
             await session.flush()
 
-            # Snapshot: copia los integrantes de los equipos asignados.
+            # Los equipos del proyecto: una instancia por plantilla asignada.
             assigned_team_idxs = PROJECT_TEAMS[p_idx]
+            teams_here: dict[int, Team] = {}
+            for t_idx in assigned_team_idxs:
+                name, desc, _positions = TEAM_SPECS[t_idx]
+                team = Team(
+                    id=uuid.uuid4(),
+                    project_id=project.id,
+                    name=name,
+                    description=f"{desc} {TEAM_TAG}",
+                )
+                session.add(team)
+                teams_here[t_idx] = team
+                teams_created += 1
+            await session.flush()
+
+            for t_idx, team in teams_here.items():
+                for pos, member in enumerate(spec_members[t_idx]):
+                    if pos == 0:
+                        team_role = TeamRole.LIDER
+                    elif pos == 1:
+                        team_role = TeamRole.SUPERVISOR
+                    else:
+                        team_role = TeamRole.INTEGRANTE
+                    session.add(
+                        TeamMember(
+                            team_id=team.id, user_id=member.id, team_role=team_role
+                        )
+                    )
+            project_teams.append(teams_here)
+            await session.flush()
+
+            # Snapshot: copia al proyecto los integrantes de sus equipos.
             roles: dict[uuid.UUID, tuple[ProjectRole, uuid.UUID]] = {}
             for t_idx in assigned_team_idxs:
-                team = teams[t_idx]
-                for member in team_members[t_idx]:
+                team = teams_here[t_idx]
+                for member in spec_members[t_idx]:
                     roles.setdefault(member.id, (ProjectRole.INTEGRANTE, team.id))
             # El líder del primer equipo asignado coordina el proyecto.
             first_team_idx = assigned_team_idxs[0]
-            coord = team_members[first_team_idx][0]
-            roles[coord.id] = (ProjectRole.COORDINADOR, teams[first_team_idx].id)
+            coord = spec_members[first_team_idx][0]
+            roles[coord.id] = (ProjectRole.COORDINADOR, teams_here[first_team_idx].id)
 
             for user_id, (member_role, source_team_id) in roles.items():
                 session.add(
@@ -457,10 +493,11 @@ async def seed() -> dict:
             session.add(
                 Task(
                     id=uuid.uuid4(),
-                    title=f"Entregable de {user.position.value.replace('_', ' ')} — {user.name}",
+                    title=f"Entregable de {user.position.replace('_', ' ')} — {user.name}",
                     description="Tarea generada para pruebas de volumen.",
                     status=status,
                     priority=PRIORITIES[i % len(PRIORITIES)],
+                    project_id=project.id,
                     work_item_id=phases[1].id,  # Producción
                     assignee_id=user.id,
                     start_date=start,
@@ -474,21 +511,20 @@ async def seed() -> dict:
             elif due == TODAY:
                 due_today += 1
 
-        # Una tarea por equipo, asignada a su líder, en un proyecto del equipo.
-        team_to_project: dict[int, tuple[Project, list[WorkItem]]] = {}
-        for p_idx, team_idxs in enumerate(PROJECT_TEAMS):
-            for t_idx in team_idxs:
-                team_to_project.setdefault(
-                    t_idx, (projects[p_idx], project_phases[p_idx])
-                )
+        # Una tarea por equipo, asignada a su líder. El equipo ya pertenece a un
+        # proyecto, así que la tarea se cuelga de ESE proyecto.
+        team_slots: list[tuple[int, Team, Project, list[WorkItem]]] = []
+        for p_idx, teams_here in enumerate(project_teams):
+            for t_idx, team in teams_here.items():
+                team_slots.append((t_idx, team, projects[p_idx], project_phases[p_idx]))
 
-        for t_idx, (team, members) in enumerate(zip(teams, team_members)):
+        for slot_idx, (t_idx, team, project, phases) in enumerate(team_slots):
+            members = spec_members[t_idx]
             if not members:
                 continue
             lider = members[0]
-            project, phases = team_to_project[t_idx]
             # Las tareas de equipo vencen HOY (o están vencidas para los primeros).
-            if t_idx % 2 == 0:
+            if slot_idx % 2 == 0:
                 start, due, status = (
                     TODAY - datetime.timedelta(days=6),
                     TODAY - datetime.timedelta(days=1),
@@ -509,8 +545,10 @@ async def seed() -> dict:
                     description="Tarea de coordinación del equipo (pruebas de volumen).",
                     status=status,
                     priority=TaskPriority.ALTA,
+                    project_id=project.id,
                     work_item_id=phases[0].id,  # Planeación
                     assignee_id=lider.id,
+                    team_id=team.id,
                     start_date=start,
                     due_date=due,
                     completed_at=None,
@@ -522,7 +560,7 @@ async def seed() -> dict:
 
         return {
             "users": len(users),
-            "teams": len(teams),
+            "teams": teams_created,
             "projects": len(projects),
             "project_members": sum(len(v) for v in user_projects.values()),
             "tasks": tasks_created,
