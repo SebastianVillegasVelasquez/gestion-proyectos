@@ -35,11 +35,11 @@ export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
 
 // Acento por estado (mismo lenguaje visual que TASK_STATUS_COLORS).
 export const FEEDBACK_STATUS_COLORS: Record<FeedbackStatus, string> = {
-  pendiente: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  pendiente: "bg-muted text-muted-foreground",
   realizado: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   imposible: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
   mas_tarde: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  descartado: "bg-slate-100 text-slate-400 line-through dark:bg-slate-800 dark:text-slate-500",
+  descartado: "bg-muted text-muted-foreground line-through",
 };
 
 export const FEEDBACK_STATUS_ORDER: FeedbackStatus[] = [
