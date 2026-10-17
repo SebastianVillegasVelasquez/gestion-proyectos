@@ -68,8 +68,8 @@ export const DUE_STATUS_CLASSES: Record<DueStatus, string> = {
   done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   overdue: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
   due_soon: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  on_track: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  no_date: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  on_track: "bg-muted text-muted-foreground",
+  no_date: "bg-muted text-muted-foreground",
 };
 
 // ── Estado de ENTREGA ───────────────────────────────────────────────────────
@@ -139,5 +139,5 @@ export const DELIVERY_STATUS_CLASSES: Record<DeliveryStatus, string> = {
   // Ámbar es "corre"; el riesgo es un aviso más frío, todavía sin urgencia.
   en_riesgo: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   a_tiempo: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-  sin_fecha: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  sin_fecha: "bg-muted text-muted-foreground",
 };
