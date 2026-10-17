@@ -89,10 +89,10 @@ export default function LoginPage() {
   };
 
   const fieldClasses = (hasError: boolean) =>
-    `w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 ${
+    `w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:bg-card focus:ring-4 ${
       hasError
         ? "border-red-400 focus:border-red-500 focus:ring-red-100 dark:border-red-500/60 dark:focus:ring-red-500/20"
-        : "border-slate-200 hover:border-slate-300 focus:border-brand-gold focus:ring-brand-gold/20 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-brand-gold dark:focus:ring-brand-gold/25"
+        : "border-border hover:border-muted-foreground/40 focus:border-brand-gold focus:ring-brand-gold/20"
     }`;
 
   return (
@@ -105,7 +105,7 @@ export default function LoginPage() {
             setDark((d) => !d);
           }}
           aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          className="absolute top-5 right-5 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/80 text-slate-600 backdrop-blur transition hover:bg-white hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          className="absolute top-5 right-5 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card/80 text-muted-foreground backdrop-blur transition hover:bg-card hover:text-foreground"
         >
           {dark ? (
             <svg
@@ -143,7 +143,7 @@ export default function LoginPage() {
         <AuthPanel />
 
         {/* Panel formulario */}
-        <main className="flex w-full md:w-1/2 items-center justify-center bg-white px-6 py-12 md:px-14 dark:bg-slate-950">
+        <main className="flex w-full md:w-1/2 items-center justify-center bg-card px-6 py-12 md:px-14">
           <div className="w-full max-w-sm">
             <div className="mb-8">
               {/* Marca */}
@@ -154,18 +154,14 @@ export default function LoginPage() {
                   className="h-11 w-11 shrink-0 rounded-lg object-contain"
                 />
                 <div className="leading-tight">
-                  <p className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                    Bitácora OBJ
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Sistema de gestión de proyectos
-                  </p>
+                  <p className="text-lg font-bold tracking-tight text-foreground">Bitácora OBJ</p>
+                  <p className="text-xs text-muted-foreground">Sistema de gestión de proyectos</p>
                 </div>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
                 Acceso al sistema
               </h1>
-              <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 Plataforma privada de gestión de proyectos
               </p>
             </div>
@@ -196,12 +192,12 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   Correo electrónico
                 </label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">
                     <svg
                       className="h-4 w-4"
                       fill="none"
@@ -253,12 +249,12 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   Contraseña
                 </label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">
                     <svg
                       className="h-4 w-4"
                       fill="none"
@@ -299,7 +295,7 @@ export default function LoginPage() {
                       setShowPassword((s) => !s);
                     }}
                     aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-300"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                   >
                     {showPassword ? (
                       <svg
@@ -393,7 +389,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-6 text-center text-xs text-muted-foreground">
               Plataforma privada. Si necesitas una cuenta, contacta a tu administrador.
             </p>
           </div>
