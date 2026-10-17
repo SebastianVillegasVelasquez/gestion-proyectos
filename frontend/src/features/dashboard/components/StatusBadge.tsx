@@ -31,10 +31,9 @@ const statusBadge = cva(
         high: "bg-brand-red-light text-brand-red-dark border-brand-red/30 dark:text-brand-red dark:border-brand-red/40",
         medium:
           "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
-        low: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+        low: "bg-muted text-muted-foreground border-border",
         // Task status
-        pending:
-          "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+        pending: "bg-muted text-muted-foreground border-border",
         "in-progress":
           "bg-brand-teal-light text-brand-teal-dark border-brand-teal/30 dark:text-brand-teal dark:border-brand-teal/40",
         completed:
