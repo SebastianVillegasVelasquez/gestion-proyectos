@@ -19,7 +19,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
 ];
 
 const selectClass =
-  "rounded-md border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-600 outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  "rounded-md border border-border bg-card px-2 py-1 text-[12px] text-muted-foreground outline-none focus:border-brand-gold";
 
 /** Opción de los filtros por elemento / rama: id + ruta legible + color del tipo. */
 export interface ElementFilterOption {
@@ -66,7 +66,7 @@ function AssigneeChip({
         "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors",
         active
           ? "border-brand-gold bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold"
-          : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800",
+          : "border-border text-muted-foreground hover:bg-accent",
       )}
     >
       {color !== undefined && (
@@ -100,10 +100,10 @@ export function TeamTaskFilterBar({
   const members = teamMembers.map(mapMember);
 
   return (
-    <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+    <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-card px-4 py-2.5 sm:px-6">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={filters.text}
@@ -111,7 +111,7 @@ export function TeamTaskFilterBar({
               onChange({ text: e.target.value });
             }}
             placeholder="Buscar tarea…"
-            className="w-44 rounded-md border border-slate-200 bg-white py-1 pl-7 pr-2 text-[12px] text-slate-700 outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="w-44 rounded-md border border-border bg-card py-1 pl-7 pr-2 text-[12px] text-foreground outline-none focus:border-brand-gold"
           />
         </div>
 
@@ -183,7 +183,7 @@ export function TeamTaskFilterBar({
             "flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors",
             filters.onlyBlocked
               ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
-              : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800",
+              : "border-border text-muted-foreground hover:bg-accent",
           )}
         >
           <Link2Off className="size-3.5" />
@@ -194,7 +194,7 @@ export function TeamTaskFilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" />
             Limpiar
@@ -203,7 +203,7 @@ export function TeamTaskFilterBar({
 
         <div className="flex-1" />
 
-        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+        <span className="text-[11px] text-muted-foreground">
           {active > 0 && shown !== totalTasks
             ? `${String(shown)} de ${String(totalTasks)} tareas`
             : `${String(totalTasks)} tarea${totalTasks === 1 ? "" : "s"}`}
@@ -244,7 +244,7 @@ export function TeamTaskFilterBar({
           ))}
         </div>
       ) : (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="text-[11px] text-muted-foreground">
           Estás viendo solo tus tareas en este equipo.
         </p>
       )}
