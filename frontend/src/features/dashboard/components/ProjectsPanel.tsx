@@ -31,8 +31,7 @@ function getTextColor(pct: number): string {
 function ProjectRow({ project, href }: { project: Project; href?: string }) {
   const className = cn(
     "flex flex-col gap-1.5 rounded-md border p-2.5 transition-colors duration-150",
-    "border-slate-200 bg-slate-50 hover:border-slate-300",
-    "dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600",
+    "border-border bg-background hover:border-muted-foreground/40",
     href && "hover:border-brand-gold/50 dark:hover:border-brand-gold/50",
   );
   const inner = (
