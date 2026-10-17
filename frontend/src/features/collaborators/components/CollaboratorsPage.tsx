@@ -26,26 +26,24 @@ function CollaboratorRow({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === "Enter" || e.key === "") {
           e.preventDefault();
           onOpen();
         }
       }}
       aria-label={`Ver actividad de ${fullName}`}
-      className="cursor-pointer border-t border-slate-100 transition-colors hover:bg-accent focus:outline-none focus-visible:bg-accent dark:border-slate-800"
+      className="cursor-pointer border-t border-border transition-colors hover:bg-accent focus:outline-none focus-visible:bg-accent"
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-xs font-semibold text-brand-teal-dark dark:bg-brand-teal/15 dark:text-brand-teal">
             {personInitials(collaborator.name, collaborator.last_name)}
           </span>
-          <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-            {fullName}
-          </span>
+          <span className="truncate text-sm font-medium text-foreground">{fullName}</span>
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {positionLabel(collaborator.position)}
         </span>
       </td>
@@ -95,10 +93,10 @@ export function CollaboratorsPage() {
     <div className="flex flex-col gap-5 p-4 sm:p-5 lg:h-full lg:overflow-hidden">
       <header className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             <Users className="size-6 text-brand-teal" /> Colaboradores
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {total > 0
               ? `${total} usuario${total !== 1 ? "s" : ""} en el sistema`
               : "Usuarios del sistema y su avance de tareas"}
@@ -108,7 +106,7 @@ export function CollaboratorsPage() {
           type="button"
           onClick={toggleDark}
           aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
         >
           {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
@@ -116,7 +114,7 @@ export function CollaboratorsPage() {
 
       {/* Búsqueda por nombre, apellido o correo */}
       <div className="relative max-w-md shrink-0">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
           value={search}
@@ -125,7 +123,7 @@ export function CollaboratorsPage() {
           }}
           placeholder="Buscar por nombre o correo…"
           aria-label="Buscar colaborador"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25"
+          className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25"
         />
       </div>
 
@@ -149,9 +147,9 @@ export function CollaboratorsPage() {
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:bg-slate-800/60 dark:text-slate-500">
+              <thead className="sticky top-0 bg-muted/60 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5">Colaborador</th>
                   <th className="px-4 py-2.5">Cargo</th>
@@ -172,7 +170,7 @@ export function CollaboratorsPage() {
           </div>
 
           {/* Paginación */}
-          <div className="flex shrink-0 items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex shrink-0 items-center justify-between text-xs text-muted-foreground">
             <span>
               Página {page} de {pages}
             </span>
@@ -184,7 +182,7 @@ export function CollaboratorsPage() {
                   setPage((p) => Math.max(1, p - 1));
                 }}
                 aria-label="Página anterior"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -195,7 +193,7 @@ export function CollaboratorsPage() {
                   setPage((p) => Math.min(pages, p + 1));
                 }}
                 aria-label="Página siguiente"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight className="size-4" />
               </button>
