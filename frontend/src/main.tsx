@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { clearStaleChunkLock, watchForStaleChunks } from "@/lib/stale-chunk-reload";
+import { applyTheme, readStoredTheme } from "@/lib/theme";
 
 // Defaults globales de cache: sin staleTime, cada montaje de un componente
 // re-pide sus datos al backend aunque acaben de llegar. 30 s de frescura
@@ -26,6 +27,9 @@ const queryClient = new QueryClient({
 // recargamos una vez para traer la versión nueva.
 watchForStaleChunks();
 clearStaleChunkLock();
+
+// Antes de montar: la clase `dark` debe estar puesta en el primer pintado.
+applyTheme(readStoredTheme());
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

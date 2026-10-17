@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Sidebar } from "@/components/layout/SideBar";
 import { SpinnerScreen } from "@/components/common/Spinner";
+import { applyTheme, readStoredTheme } from "@/lib/theme";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { RemindersBell } from "@/features/reminders/components/RemindersBell";
 import { ActiveProjectProvider } from "@/features/projects/context/ActiveProjectProvider";
@@ -20,22 +21,18 @@ export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Colapso del menú lateral en escritorio (se desliza para abrir/cerrar).
   const [collapsed, setCollapsed] = useState(false);
-  const [dark, setDark] = useState(true);
+  // El tema ya lo aplicó el arranque (main.tsx) antes del primer pintado; aquí
+  // solo se lee para que el interruptor muestre el estado correcto.
+  const [dark, setDark] = useState(readStoredTheme);
 
   useEffect(() => {
-    const stored = localStorage.getItem("obj-theme");
-    const isDark = stored ? stored === "dark" : true;
-    setDark(isDark);
-    document.documentElement.classList.toggle("dark", isDark);
-
     setCollapsed(localStorage.getItem("obj-sidebar-collapsed") === "true");
   }, []);
 
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
-    localStorage.setItem("obj-theme", next ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", next);
+    applyTheme(next);
   };
 
   const toggleCollapsed = () => {
