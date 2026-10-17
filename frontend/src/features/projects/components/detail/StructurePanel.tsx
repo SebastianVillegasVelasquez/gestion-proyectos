@@ -139,6 +139,16 @@ interface NodeAction {
 /** Menú de opciones por nodo (kebab). Concentra todas las acciones en un solo
  * botón para no saturar cada fila —clave con muchos elementos—. Se posiciona
  * con `fixed` anclado al botón, así no lo recorta el scroll del contenedor. */
+/*
+ * Acciones de fila en pantallas táctiles. Hasta `lg` no hay hover, así que las
+ * acciones rápidas (editar, eliminar, sacar un nivel, añadir dentro) quedarían
+ * invisibles y sin forma de alcanzarlas; aquí se muestran siempre y con un
+ * área de 44px. El px es intencional: la raíz encoge en móvil (index.css) y
+ * cualquier medida en `rem` se encogería con ella.
+ */
+const TOUCH_ROW_ACTION =
+  "max-lg:flex max-lg:size-[44px] max-lg:items-center max-lg:justify-center max-lg:p-0 max-lg:opacity-100";
+
 function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
@@ -178,6 +188,7 @@ function NodeActionsMenu({ actions }: { actions: NodeAction[] }) {
         aria-expanded={open}
         className={cn(
           "rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          TOUCH_ROW_ACTION,
           open && "bg-accent text-foreground",
         )}
       >
@@ -499,6 +510,7 @@ function TreeNode({
           }}
           className={cn(
             "flex size-5 shrink-0 items-center justify-center text-muted-foreground",
+            "max-lg:size-[44px]",
             !hasChildren && "invisible",
           )}
         >
@@ -651,7 +663,10 @@ function TreeNode({
             }}
             title="Editar tipo y datos del elemento"
             aria-label={`Editar ${node.nombre}`}
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100"
+            className={cn(
+              "rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100",
+              TOUCH_ROW_ACTION,
+            )}
           >
             <Pencil className="size-3.5" />
           </button>
@@ -661,7 +676,10 @@ function TreeNode({
             }}
             title="Eliminar elemento"
             aria-label={`Eliminar ${node.nombre}`}
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+            className={cn(
+              "rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-900/30 dark:hover:text-rose-400",
+              TOUCH_ROW_ACTION,
+            )}
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -681,7 +699,10 @@ function TreeNode({
                   : "Sacar un nivel, con todo su contenido"
               }
               aria-label={`Sacar ${node.nombre} un nivel`}
-              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-teal/10 hover:text-brand-teal-dark group-hover:opacity-100 dark:hover:text-brand-teal"
+              className={cn(
+                "rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-teal/10 hover:text-brand-teal-dark group-hover:opacity-100 dark:hover:text-brand-teal",
+                TOUCH_ROW_ACTION,
+              )}
             >
               <CornerLeftUp className="size-3.5" />
             </button>
@@ -693,7 +714,10 @@ function TreeNode({
               onAddChild(node);
             }}
             title="Añadir un elemento dentro de este"
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100"
+            className={cn(
+              "rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-brand-blue/10 hover:text-brand-blue-dark group-hover:opacity-100",
+              TOUCH_ROW_ACTION,
+            )}
           >
             <Plus className="size-3.5" />
           </button>

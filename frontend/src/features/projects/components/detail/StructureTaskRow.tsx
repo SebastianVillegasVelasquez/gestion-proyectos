@@ -168,7 +168,7 @@ function StructureTaskRow({
       >
         {/* Flechas para subir/bajar la prioridad. Además del arrastre: con
             muchas tareas es más preciso, y no depende de acertar la zona. */}
-        <span className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover/row:opacity-100">
+        <span className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover/row:opacity-100 max-lg:opacity-100">
           <button
             type="button"
             disabled={!canMoveUp}
@@ -179,7 +179,7 @@ function StructureTaskRow({
             }}
             title="Subir en la prioridad"
             aria-label={`Subir ${task.title} en la prioridad`}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
+            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent max-lg:flex max-lg:min-h-[28px] max-lg:w-[44px] max-lg:items-center max-lg:justify-center"
           >
             <ChevronUp className="size-3" />
           </button>
@@ -193,7 +193,7 @@ function StructureTaskRow({
             }}
             title="Bajar en la prioridad"
             aria-label={`Bajar ${task.title} en la prioridad`}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
+            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent max-lg:flex max-lg:min-h-[28px] max-lg:w-[44px] max-lg:items-center max-lg:justify-center"
           >
             <ChevronDown className="size-3" />
           </button>
@@ -351,7 +351,7 @@ function StructureTaskRow({
             }}
             title={`Eliminar la tarea «${task.title}»`}
             aria-label={`Eliminar la tarea ${task.title}`}
-            className="ml-1 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-500/15 hover:text-rose-600 focus-visible:opacity-100 group-hover/row:opacity-100 dark:hover:text-rose-400"
+            className="ml-1 flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-rose-500/15 hover:text-rose-600 focus-visible:opacity-100 group-hover/row:opacity-100 dark:hover:text-rose-400 max-lg:size-[44px] max-lg:p-0 max-lg:opacity-100"
           >
             <Trash2 className="size-3.5" />
           </button>
