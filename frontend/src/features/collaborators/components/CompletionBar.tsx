@@ -20,13 +20,13 @@ export function CompletionBar({
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className={cn("font-semibold", tone.text)}>{pct}%</span>
         {showFraction && (
-          <span className="text-slate-400 dark:text-slate-500">
+          <span className="text-muted-foreground">
             {completed}/{assigned} tareas
           </span>
         )}
       </div>
       <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
