@@ -1,8 +1,9 @@
 """Seed del espacio de trabajo de un equipo (datos reales para el front).
 
-Crea (idempotente) un equipo con líder, supervisor e integrante, y entregables
-con su línea de tiempo de entregas (enlace, repositorio, SCORM) e hilo de
-retroalimentación (comentarios, solicitud de cambios y aprobación).
+Crea (idempotente) un proyecto con un equipo dentro —un equipo no existe fuera
+de un proyecto— con líder, supervisor e integrante, y entregables con su línea
+de tiempo de entregas (enlace, repositorio, SCORM) e hilo de retroalimentación
+(comentarios, solicitud de cambios y aprobación).
 
 El integrante es `usuario.demo@obj.com` (la cuenta de prueba), para que al entrar
 vea el espacio con permisos de integrante.
@@ -20,6 +21,8 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
 from app.modules.identity.infrastructure.enums import SystemRole, UserPosition
 from app.modules.identity.infrastructure.models import User
+from app.modules.project.infrastructure.enums import ProjectRole
+from app.modules.project.infrastructure.models import Project, ProjectMember
 from app.modules.teams.infrastructure.enums import TeamRole
 from app.modules.teams.infrastructure.models import Team, TeamMember
 from app.modules.teams.infrastructure.workspace_enums import (
@@ -34,6 +37,7 @@ from app.modules.teams.infrastructure.workspace_models import (
 )
 
 TEAM_NAME = "Célula de Diseño Instruccional (Demo)"
+PROJECT_NAME = "OVA de Competencias Digitales (Demo)"
 INTEGRANTE_EMAIL = "usuario.demo@obj.com"
 
 
@@ -87,11 +91,52 @@ async def main() -> None:
             UserPosition.DESARROLLADOR_FRONTEND,
         )
 
+        # El equipo vive dentro de un proyecto (`teams.project_id`), así que se
+        # crea (o se reutiliza) el proyecto que lo contiene.
+        project = (
+            await session.execute(select(Project).where(Project.name == PROJECT_NAME))
+        ).scalar_one_or_none()
+        if project is None:
+            project = Project(
+                name=PROJECT_NAME,
+                description="Proyecto de demostración del espacio de trabajo.",
+                client_name="Universidad OBJ",
+            )
+            session.add(project)
+            await session.flush()
+
         team = Team(
+            project_id=project.id,
             name=TEAM_NAME,
             description="Diseño pedagógico y creación de contenidos del OVA.",
         )
         session.add(team)
+        await session.flush()
+
+        # Para entrar al espacio hay que ser integrante del proyecto, no solo
+        # del equipo: el backend valida la membresía del proyecto.
+        for member, project_role in (
+            (lider, ProjectRole.COORDINADOR),
+            (supervisor, ProjectRole.REVISOR),
+            (integrante, ProjectRole.INTEGRANTE),
+        ):
+            exists = (
+                await session.execute(
+                    select(ProjectMember.id).where(
+                        ProjectMember.project_id == project.id,
+                        ProjectMember.user_id == member.id,
+                    )
+                )
+            ).first()
+            if exists is None:
+                session.add(
+                    ProjectMember(
+                        project_id=project.id,
+                        user_id=member.id,
+                        project_role=project_role,
+                        source_team_id=team.id,
+                    )
+                )
         await session.flush()
         session.add_all(
             [
