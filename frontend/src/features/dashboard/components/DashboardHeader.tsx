@@ -29,27 +29,25 @@ export function DashboardHeader({
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
       {/* Greeting */}
       <div className="min-w-[180px] flex-1">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
           {greeting}, <span className="text-brand-gold-dark dark:text-brand-gold">{name}</span>
         </h1>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{date}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{date}</p>
       </div>
 
       {/* Right side: progreso real de tareas + dark toggle */}
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {hasProgress && (
           <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 Tareas
               </span>
-              <span className="text-[13px] font-semibold text-slate-900 dark:text-slate-50">
-                {tasksCompleted}
-              </span>
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">/ {tasksTotal}</span>
+              <span className="text-[13px] font-semibold text-foreground">{tasksCompleted}</span>
+              <span className="text-[11px] text-muted-foreground">/ {tasksTotal}</span>
             </div>
             <div
-              className="w-28 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+              className="w-28 overflow-hidden rounded-full bg-muted-foreground/20"
               style={{ height: "3px" }}
             >
               <div
@@ -65,7 +63,7 @@ export function DashboardHeader({
           type="button"
           onClick={onToggleDark}
           aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
         >
           {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
