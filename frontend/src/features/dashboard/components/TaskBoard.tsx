@@ -35,9 +35,8 @@ const columns: ColumnConfig[] = [
 ];
 
 const tagVariantClasses = {
-  project:
-    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  date: "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700",
+  project: "bg-muted text-muted-foreground border-border",
+  date: "bg-background text-muted-foreground border-border",
 };
 
 function TaskCard({ task }: { task: Task }) {
@@ -61,7 +60,7 @@ function TaskCard({ task }: { task: Task }) {
         />
         <p
           className={cn(
-            "text-[13px] leading-snug text-slate-700 dark:text-slate-200",
+            "text-[13px] leading-snug text-foreground",
             isCompleted && "line-through decoration-slate-400 dark:decoration-slate-500",
           )}
         >
@@ -110,9 +109,7 @@ function Column({
       {/* Column header — fixed */}
       <div className="flex shrink-0 items-center gap-2 pb-1">
         <span className={cn("size-2 rounded-full", config.dotClass)} />
-        <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-          {config.label}
-        </span>
+        <span className="text-[13px] font-medium text-foreground">{config.label}</span>
         <span
           className={cn(
             "ml-auto inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
@@ -134,16 +131,14 @@ function Column({
         {shown.map((task) => (
           <TaskCard key={task.id} task={task} />
         ))}
-        {tasks.length === 0 && (
-          <p className="text-[12px] text-slate-400 dark:text-slate-600">Sin tareas</p>
-        )}
+        {tasks.length === 0 && <p className="text-[12px] text-muted-foreground">Sin tareas</p>}
         {remaining > 0 && (
           <button
             type="button"
             onClick={() => {
               setVisibleCount((n) => n + (pageSize ?? 0));
             }}
-            className="mt-1 shrink-0 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+            className="mt-1 shrink-0 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand-gold/50 hover:text-foreground"
           >
             Ver {Math.min(remaining, pageSize ?? 0)} más
           </button>
