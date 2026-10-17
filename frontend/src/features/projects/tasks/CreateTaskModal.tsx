@@ -23,14 +23,14 @@ import {
 } from "./build-task-payload";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
+  "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25";
 
 const PRIORITIES: TaskPriority[] = ["no_definida", "baja", "media", "alta", "urgente"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </label>
   );
@@ -104,7 +104,7 @@ export function CreateTaskModal({
   // un atajo de un clic, sin forzarlo (el campo sigue siendo libre).
   const selectedElementName = useMemo(() => {
     const path = workItemPath(treeQuery.data ?? [], form.workItemId || null);
-    return path ? (path.split(" / ").pop() ?? null) : null;
+    return path ? (path.split("/").pop() ?? null) : null;
   }, [treeQuery.data, form.workItemId]);
 
   // Elementos que se comportan como dependencia de terceros: una tarea puede
@@ -185,9 +185,9 @@ export function CreateTaskModal({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
             {isEdit ? (
               <>
                 <Pencil className="size-4 text-brand-teal" /> Editar tarea
@@ -205,7 +205,7 @@ export function CreateTaskModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
@@ -250,7 +250,7 @@ export function CreateTaskModal({
               niveles de estructura, elegir a ciegas en una lista aplanada es
               justo lo que hacía fallar la ubicación. */}
           {isSubtask ? (
-            <p className="flex items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2 text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <p className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
               <CornerDownRight className="size-3.5 shrink-0 text-brand-teal" />
               Subtarea de «{parentTask.title}»: hereda su elemento y su equipo.
             </p>
@@ -278,7 +278,7 @@ export function CreateTaskModal({
               a su bolsa y el líder reparte; "integrante" = directo a alguien del
               equipo, sin que el líder tenga que repartirla. */}
           <Field label="Asignar a">
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/50 p-1 sm:grid-cols-4">
               {(
                 [
                   ["none", "Nadie aún"],
@@ -301,8 +301,8 @@ export function CreateTaskModal({
                   aria-pressed={form.assignmentMode === mode}
                   className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
                     form.assignmentMode === mode
-                      ? "bg-white text-brand-teal-dark shadow-sm dark:bg-slate-900 dark:text-brand-teal"
-                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                      ? "bg-card text-brand-teal-dark shadow-sm dark:text-brand-teal"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {label}
@@ -366,7 +366,7 @@ export function CreateTaskModal({
                 ))}
               </select>
               {teams.length === 0 && (
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-muted-foreground">
                   Este proyecto aún no tiene equipos. Créalos en la sección «Equipos de trabajo».
                 </span>
               )}
@@ -410,7 +410,7 @@ export function CreateTaskModal({
                 </select>
               </div>
               {teams.length === 0 && (
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-muted-foreground">
                   Este proyecto aún no tiene equipos. Créalos en la sección «Equipos de trabajo».
                 </span>
               )}
@@ -420,7 +420,7 @@ export function CreateTaskModal({
           {/* Aprobación: desactivada por defecto (entrega directo, sin
               revisión). Activarla exige que el líder/supervisor del proyecto
               apruebe o devuelva la entrega antes de darla por completada. */}
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+          <label className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs">
             <input
               type="checkbox"
               checked={form.requiresApproval}
@@ -429,7 +429,7 @@ export function CreateTaskModal({
               }}
               className="size-4 accent-brand-gold"
             />
-            <span className="text-slate-600 dark:text-slate-300">
+            <span className="text-muted-foreground">
               Requiere aprobación del líder o supervisor para darse por completada
             </span>
           </label>
@@ -437,7 +437,7 @@ export function CreateTaskModal({
           {/* Dependencia: solo al CREAR. Al editar, las dependencias se
               gestionan en la ficha de la tarea (pueden ser varias). */}
           {isEdit ? (
-            <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-[11px] text-slate-400 dark:border-slate-700 dark:text-slate-500">
+            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
               Las dependencias de esta tarea se editan en su ficha.
             </p>
           ) : (
@@ -479,7 +479,7 @@ export function CreateTaskModal({
                 onClick={() => {
                   setSearchingDep(true);
                 }}
-                className="mt-1 flex items-center gap-1.5 self-start rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="mt-1 flex items-center gap-1.5 self-start rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-accent"
               >
                 <Search className="size-3" />
                 Buscar en todas las tareas del proyecto
@@ -548,7 +548,7 @@ export function CreateTaskModal({
                   onClick={() => {
                     set("dateMode", form.dateMode === "duration" ? "end" : "duration");
                   }}
-                  className="shrink-0 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="shrink-0 rounded-lg border border-border px-2 py-2 text-xs text-muted-foreground hover:bg-accent"
                 >
                   {form.dateMode === "duration" ? "📅" : "⏱"}
                 </button>
@@ -567,11 +567,11 @@ export function CreateTaskModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent"
           >
             Cancelar
           </button>
