@@ -10,7 +10,7 @@ export function ProjectTrazabilidadPage() {
       projectId={projectId!}
       title="Trazabilidad"
       icon={History}
-      accentClass="bg-slate-500/10 text-slate-600 dark:text-slate-300"
+      accentClass="bg-muted-foreground/10 text-muted-foreground"
       wide
     >
       <TraceabilityPanel projectId={projectId!} />
