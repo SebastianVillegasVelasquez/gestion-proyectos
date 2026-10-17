@@ -113,8 +113,8 @@ export function TaskEditForm({
   };
 
   const fieldClass =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-  const labelClass = "mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400";
+    "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+  const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
 
   return (
     <div className="mt-4 flex flex-col gap-3">
@@ -217,7 +217,7 @@ export function TaskEditForm({
       {/* Reasignación: persona / equipo / sin asignar (excluyentes). */}
       <div>
         <span className={labelClass}>Responsable</span>
-        <div className="mb-2 flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="mb-2 flex gap-1 rounded-lg border border-border bg-muted/50 p-1">
           {(
             [
               { id: "person", label: "Persona" },
@@ -235,7 +235,7 @@ export function TaskEditForm({
                 "flex-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors",
                 assignment === opt.id
                   ? "bg-primary text-primary-foreground"
-                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100",
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {opt.label}
@@ -280,7 +280,7 @@ export function TaskEditForm({
         )}
       </div>
 
-      <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+      <label className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs">
         <input
           type="checkbox"
           checked={requiresApproval}
@@ -289,7 +289,7 @@ export function TaskEditForm({
           }}
           className="size-4 accent-brand-gold"
         />
-        <span className="text-slate-600 dark:text-slate-300">
+        <span className="text-muted-foreground">
           Requiere aprobación del líder o supervisor para darse por completada
         </span>
       </label>
@@ -313,7 +313,7 @@ export function TaskEditForm({
           type="button"
           onClick={onDone}
           disabled={updateTask.isPending}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
         >
           <X className="size-4" /> Cancelar
         </button>
