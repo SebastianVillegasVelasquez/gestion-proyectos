@@ -20,7 +20,7 @@ export function AuthPanel() {
       </div>
 
       <div className="relative z-10 mt-10">
-        <p className="text-xs text-slate-600">Plataforma privada · Acceso solo autorizado</p>
+        <p className="text-xs text-muted-foreground">Plataforma privada · Acceso solo autorizado</p>
       </div>
     </aside>
   );
