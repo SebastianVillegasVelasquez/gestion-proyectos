@@ -52,7 +52,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
     <nav
       aria-label="Secciones del equipo"
       className={cn(
-        "flex shrink-0 flex-col gap-0.5 border-l border-slate-200 bg-white p-2 transition-[width] duration-150 dark:border-slate-800 dark:bg-slate-900",
+        "flex shrink-0 flex-col gap-0.5 border-l border-border bg-card p-2 transition-[width] duration-150",
         collapsed ? "w-14" : "w-52",
       )}
     >
@@ -64,7 +64,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
         aria-label={collapsed ? "Expandir el menú" : "Colapsar el menú"}
         aria-expanded={!collapsed}
         className={cn(
-          "mb-1 flex items-center rounded-lg px-2 py-1.5 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300",
+          "mb-1 flex items-center rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           collapsed ? "justify-center" : "justify-end",
         )}
       >
@@ -87,7 +87,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
               collapsed ? "justify-center px-0" : "gap-2.5 px-3",
               isActive
                 ? "bg-brand-gold-light text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
             )}
           >
             <span className="relative">
@@ -108,7 +108,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{label}</span>
                   {hint && (
-                    <span className="block truncate text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                    <span className="block truncate text-[11px] font-normal text-muted-foreground">
                       {hint}
                     </span>
                   )}
@@ -118,8 +118,8 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
                     className={cn(
                       "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
                       isActive
-                        ? "bg-white/70 text-brand-gold-dark dark:bg-slate-900/50 dark:text-brand-gold"
-                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                        ? "bg-card/70 text-brand-gold-dark dark:text-brand-gold"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     {count}
