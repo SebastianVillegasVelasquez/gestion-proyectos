@@ -51,7 +51,7 @@ function NotificationRow({
           onActivate(notification);
         }}
         className={cn(
-          "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 pr-16 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
+          "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 pr-16 text-left transition-colors hover:bg-accent",
           unread && "bg-brand-teal/[0.06] dark:bg-brand-teal/10",
         )}
       >
@@ -66,14 +66,14 @@ function NotificationRow({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              "block text-sm leading-snug text-slate-700 dark:text-slate-200",
-              unread && "font-medium text-slate-900 dark:text-slate-50",
+              "block text-sm leading-snug text-foreground",
+              unread && "font-medium text-foreground",
             )}
           >
             {notification.message}
           </span>
-          <span className="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-            {notificationTypeLabel(notification.notification_type)} ·{" "}
+          <span className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+            {notificationTypeLabel(notification.notification_type)} ·{""}
             {formatRelativeTime(notification.created_at)}
             {hasTarget && (
               <span className="ml-1 inline-flex items-center gap-0.5 text-brand-teal opacity-0 transition-opacity group-hover/item:opacity-100">
@@ -112,7 +112,7 @@ function NotificationRow({
           onClick={() => {
             onDelete(notification.id);
           }}
-          className="flex size-7 items-center justify-center rounded-full text-slate-400 opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/item:opacity-100"
+          className="flex size-7 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-500 focus-visible:opacity-100 group-hover/item:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>
@@ -167,7 +167,7 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
         aria-label="Notificaciones"
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
       >
         <Bell className="size-4" />
         {badge && (
@@ -192,14 +192,14 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
             role="dialog"
             aria-label="Notificaciones"
             className={cn(
-              "absolute z-50 flex max-h-[28rem] w-96 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl animate-in fade-in-0 zoom-in-95 duration-150 dark:border-slate-700 dark:bg-slate-900",
+              "absolute z-50 flex max-h-[28rem] w-96 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in fade-in-0 zoom-in-95 duration-150",
               placement === "up"
                 ? "bottom-full left-0 mb-2 slide-in-from-bottom-1"
                 : "right-0 top-full mt-2 slide-in-from-top-1",
             )}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 Notificaciones
                 {unread > 0 && (
                   <span className="rounded-full bg-brand-teal/10 px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-teal-dark dark:text-brand-teal">
@@ -213,14 +213,14 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                 onClick={() => {
                   markAll.mutate();
                 }}
-                className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-brand-teal transition hover:bg-brand-teal/10 hover:text-brand-teal-dark disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent dark:disabled:text-slate-600"
+                className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-brand-teal transition hover:bg-brand-teal/10 hover:text-brand-teal-dark disabled:cursor-not-allowed disabled:text-muted-foreground/60 disabled:hover:bg-transparent"
               >
                 <CheckCheck className="size-3.5" /> Marcar todas
               </button>
             </div>
 
             {/* Pestañas: todas / solo no leídas */}
-            <div className="flex shrink-0 gap-1 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+            <div className="flex shrink-0 gap-1 border-b border-border px-3 py-2">
               {(
                 [
                   { key: "todas", label: "Todas" },
@@ -237,8 +237,8 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                   className={cn(
                     "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
                     tab === t.key
-                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   {t.label}
@@ -250,14 +250,11 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
               {listQuery.isLoading ? (
                 <div className="flex flex-col gap-2 p-3">
                   {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="h-14 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
-                    />
+                    <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
                   ))}
                 </div>
               ) : listQuery.isError ? (
-                <p className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500">
+                <p className="px-4 py-10 text-center text-sm text-muted-foreground">
                   Las notificaciones no están disponibles por ahora.
                 </p>
               ) : visible.length === 0 ? (
@@ -265,14 +262,12 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
                   {tab === "no_leidas" ? (
                     <>
                       <CheckCircle2 className="size-7 text-emerald-400" />
-                      <p className="text-sm text-slate-400 dark:text-slate-500">Estás al día.</p>
+                      <p className="text-sm text-muted-foreground">Estás al día.</p>
                     </>
                   ) : (
                     <>
-                      <Bell className="size-7 text-slate-300 dark:text-slate-600" />
-                      <p className="text-sm text-slate-400 dark:text-slate-500">
-                        No tienes notificaciones.
-                      </p>
+                      <Bell className="size-7 text-muted-foreground/60" />
+                      <p className="text-sm text-muted-foreground">No tienes notificaciones.</p>
                     </>
                   )}
                 </div>
@@ -299,12 +294,12 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
             <button
               type="button"
               onClick={openFullView}
-              className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand-teal transition-colors hover:bg-brand-teal/5 hover:text-brand-teal-dark dark:border-slate-800"
+              className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border px-4 py-2.5 text-[12px] font-medium text-brand-teal transition-colors hover:bg-brand-teal/5 hover:text-brand-teal-dark"
             >
               <Maximize2 className="size-3.5" />
               Ver todas
               {total > items.length && (
-                <span className="text-slate-400 dark:text-slate-500">
+                <span className="text-muted-foreground">
                   · {items.length} de {total}
                 </span>
               )}
