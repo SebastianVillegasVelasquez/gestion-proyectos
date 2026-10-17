@@ -87,14 +87,12 @@ function Crumb({ path, max }: { path: string[]; max?: number }) {
   const shown = max && path.length > max ? path.slice(-max) : path;
   const clipped = shown.length < path.length;
   return (
-    <span title={path.join(" › ")}>
+    <span title={path.join("›")}>
       {clipped && <span>… › </span>}
       {shown.slice(0, -1).map((name, i) => (
         <span key={`${name}-${String(i)}`}>{name} › </span>
       ))}
-      <span className="font-semibold text-slate-500 dark:text-slate-400">
-        {shown[shown.length - 1]}
-      </span>
+      <span className="font-semibold text-muted-foreground">{shown[shown.length - 1]}</span>
     </span>
   );
 }
@@ -115,7 +113,7 @@ function Avatar({ member, name }: { member?: WorkspaceMember; name: string }) {
       title={name}
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white",
-        member?.avatarColor ?? "bg-slate-400",
+        member?.avatarColor ?? "bg-muted-foreground",
       )}
     >
       {initials}
@@ -129,13 +127,13 @@ function ProgressBar({ task, className }: { task: ApiTeamTask; className?: strin
   const pct = task.progress_pct ?? taskProgressPct(task.status);
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
         <div
           className={cn("h-full rounded-full transition-all", STATUS_META[task.status].bar)}
           style={{ width: `${String(pct)}%` }}
         />
       </div>
-      <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
+      <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
         {pct}%
       </span>
     </div>
@@ -268,7 +266,7 @@ function DeliverActions({
             cbs.onMarkDelivered?.(task);
           }}
           title="Entregar sin adjunto: la tarea pasa al 100% y se avisa a quien coordina, sin registrar un entregable"
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-accent"
         >
           <Check className="size-3.5" />
           Entregar sin adjunto
@@ -334,7 +332,7 @@ function BlockedBy({ task }: { task: ApiTeamTask }) {
   }
   const [first] = blockers;
   const extra = blockers.length - 1;
-  const full = blockers.map((b) => b.title).join(" · ");
+  const full = blockers.map((b) => b.title).join("·");
 
   return (
     <span
@@ -366,9 +364,7 @@ function DueDate({ task, today }: { task: ApiTeamTask; today: string }) {
       title={task.due_date ? `Fecha de entrega: ${formatDueDate(task.due_date)}` : "Sin planificar"}
       className={cn(
         "text-[11px] tabular-nums",
-        overdue
-          ? "font-semibold text-rose-600 dark:text-rose-400"
-          : "text-slate-400 dark:text-slate-500",
+        overdue ? "font-semibold text-rose-600 dark:text-rose-400" : "text-muted-foreground",
       )}
     >
       {/* `soon` ya implica que `days` no es null; TS lo estrecha por el alias. */}
@@ -434,10 +430,10 @@ function TaskRow({
         // franja que envuelve. De `md` en adelante vuelve a ser la fila de
         // siempre — el estilo de escritorio no cambia, solo se le achican
         // algunas columnas hasta `xl` para darle aire al título/ruta.
-        "group relative flex flex-col gap-2 border-t border-slate-100 py-2.5 pr-4 first:border-t-0 dark:border-slate-800 md:flex-row md:items-center md:gap-3",
+        "group relative flex flex-col gap-2 border-t border-border py-2.5 pr-4 first:border-t-0 md:flex-row md:items-center md:gap-3",
         // Las subtareas se tiñen para que el bloque padre+hijas se lea como una
         // unidad aunque la indentación sea sutil.
-        depth > 0 && "bg-slate-50/60 dark:bg-slate-800/20",
+        depth > 0 && "bg-muted/60",
       )}
       // Indentación por nivel: la misma lectura que la estructura del proyecto.
       style={{ paddingLeft: `${String(1 + depth * 1.4)}rem` }}
@@ -450,13 +446,13 @@ function TaskRow({
       {/* Columna elástica: es la única que cede espacio, por eso lleva min-w-0. */}
       <div className="min-w-0 md:flex-1">
         <p
-          className="flex items-start gap-1.5 text-sm text-slate-700 dark:text-slate-200 md:items-center"
+          className="flex items-start gap-1.5 text-sm text-foreground md:items-center"
           title={task.title}
         >
           {depth > 0 && (
             <CornerDownRight
               aria-label="Subtarea"
-              className="mt-0.5 size-3.5 shrink-0 text-slate-300 dark:text-slate-600 md:mt-0"
+              className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/60 md:mt-0"
             />
           )}
           {hasChildren && (
@@ -465,7 +461,7 @@ function TaskRow({
               onClick={onToggleCollapse}
               aria-expanded={!collapsed}
               title={collapsed ? "Ver subtareas" : "Ocultar subtareas"}
-              className="mt-0.5 flex shrink-0 items-center rounded text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300 md:mt-0"
+              className="mt-0.5 flex shrink-0 items-center rounded text-muted-foreground transition-colors hover:text-foreground md:mt-0"
             >
               {collapsed ? (
                 <ChevronRight className="size-3.5" />
@@ -479,13 +475,13 @@ function TaskRow({
               línea con "…" — el `title` de arriba siempre lleva el texto entero. */}
           <span className="break-words md:truncate">{task.title}</span>
           {hasChildren && collapsed && (
-            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <span className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] font-bold text-muted-foreground">
               subtareas ocultas
             </span>
           )}
           {isDeliverableReady(task) && <DeliverableReadyBadge />}
         </p>
-        <p className="flex flex-wrap items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 md:flex-nowrap md:truncate">
+        <p className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground md:flex-nowrap md:truncate">
           {color && (
             <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />
           )}
@@ -493,11 +489,11 @@ function TaskRow({
             {/* Cuando el padre cayó en otro grupo, decimos de cuál cuelga: sin
                 esto la subtarea aparecería suelta y sin contexto. */}
             {detachedParentTitle !== null && (
-              <span className="text-slate-400 dark:text-slate-500">
-                Subtarea de «{detachedParentTitle}» ·{" "}
+              <span className="text-muted-foreground">
+                Subtarea de «{detachedParentTitle}» ·{""}
               </span>
             )}
-            <Crumb path={pathOf(task)} /> ·{" "}
+            <Crumb path={pathOf(task)} /> ·{""}
             <ProjectMark
               name={task.project_name}
               seed={task.project_id}
@@ -546,7 +542,7 @@ function TaskRow({
                 onDone={onReassigned}
               />
             ) : (
-              <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="block truncate text-[11px] text-muted-foreground">
                 {task.assignee_name ?? "Sin responsable"}
               </span>
             )}
@@ -587,7 +583,7 @@ function TaskRow({
                 }}
                 title="Agregar subtarea"
                 aria-label={`Agregar subtarea a ${task.title}`}
-                className="rounded-md p-1 text-slate-400 transition-colors hover:bg-brand-teal/10 hover:text-brand-teal-dark dark:hover:text-brand-teal"
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-brand-teal/10 hover:text-brand-teal-dark dark:hover:text-brand-teal"
               >
                 <Plus className="size-4" />
               </button>
@@ -599,7 +595,7 @@ function TaskRow({
               }}
               title="Editar tarea"
               aria-label={`Editar ${task.title}`}
-              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Pencil className="size-3.5" />
             </button>
@@ -610,7 +606,7 @@ function TaskRow({
               }}
               title="Eliminar tarea"
               aria-label={`Eliminar ${task.title}`}
-              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -690,23 +686,21 @@ function ListView({
               // disponible y su `overflow-hidden` (el que redondea las
               // esquinas) recorta en silencio las tareas que sobran: el padre
               // nunca desborda, asi que tampoco muestra barra.
-              className="shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              className="shrink-0 overflow-hidden rounded-xl border border-border bg-card"
             >
-              <header className="flex items-center justify-between gap-2 bg-slate-50 px-4 py-2.5 dark:bg-slate-800/50">
+              <header className="flex items-center justify-between gap-2 bg-muted/50 px-4 py-2.5">
                 <div className="flex min-w-0 items-center gap-2">
                   {grouping === "integrante" ? (
                     <Avatar member={member} name={group.label} />
                   ) : (
                     <FolderKanban className="size-4 shrink-0 text-brand-teal" />
                   )}
-                  <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    {group.label}
-                  </p>
-                  <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+                  <p className="truncate text-sm font-semibold text-foreground">{group.label}</p>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
                     · {group.tasks.length} tarea{group.tasks.length === 1 ? "" : "s"}
                   </span>
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                   {group.doneCount}/{group.tasks.length}
                 </span>
               </header>
@@ -795,13 +789,13 @@ function TaskCard({
     // aplastaba y su `overflow-hidden` recortaba el contenido (título pisando la
     // urgencia, "Comenzar" encima…). Ahora cada tarjeta conserva su alto y la
     // columna scrollea.
-    <article className="group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <article className="group relative shrink-0 overflow-hidden rounded-lg border border-border bg-card p-3 pl-3.5 shadow-sm transition-shadow hover:shadow-md">
       {/* Acento de color del elemento de origen: de un vistazo, de qué
           componente viene la tarjeta (distingue clones del original). */}
       {color && <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", color.bar)} />}
       <div className="flex items-start justify-between gap-2">
         <p
-          className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-slate-700 dark:text-slate-200"
+          className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground"
           title={task.title}
         >
           {task.title}
@@ -818,7 +812,7 @@ function TaskCard({
                 }}
                 title="Editar tarea"
                 aria-label={`Editar ${task.title}`}
-                className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Pencil className="size-3" />
               </button>
@@ -829,7 +823,7 @@ function TaskCard({
                 }}
                 title="Eliminar tarea"
                 aria-label={`Eliminar ${task.title}`}
-                className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
               >
                 <Trash2 className="size-3" />
               </button>
@@ -840,7 +834,7 @@ function TaskCard({
 
       {parentTitle !== null && (
         <p
-          className="mt-1 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500"
+          className="mt-1 flex items-center gap-1 truncate text-[11px] text-muted-foreground"
           title={`Subtarea de ${parentTitle}`}
         >
           <CornerDownRight className="size-3 shrink-0" />
@@ -848,7 +842,7 @@ function TaskCard({
         </p>
       )}
       {/* De dónde viene: elemento › padre › padre del padre (3 niveles finales). */}
-      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-slate-500">
+      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
         {color && <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", color.dot)} />}
         <span className="truncate">
           <Crumb path={path} max={3} />
@@ -874,7 +868,7 @@ function TaskCard({
         ) : (
           <div className="flex min-w-0 items-center gap-1.5">
             <Avatar member={member} name={task.assignee_name ?? "Sin responsable"} />
-            <span className="truncate text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="truncate text-[11px] text-muted-foreground">
               {task.assignee_name ?? "Sin responsable"}
             </span>
           </div>
@@ -883,7 +877,7 @@ function TaskCard({
       </div>
 
       {canReview && teamMembers.length > 0 && (
-        <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+        <div className="mt-2 border-t border-border pt-2">
           <ReassignTaskButton
             compact={hideAssignee}
             projectId={projectId}
@@ -946,19 +940,19 @@ function KanbanColumn({
           "flex items-center justify-between gap-2 rounded-t-lg border px-3 py-2",
           col.atRisk
             ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40"
-            : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50",
+            : "border-border bg-muted/50",
         )}
       >
         <p
           className={cn(
             "flex items-center gap-1 truncate text-[12px] font-semibold",
-            col.atRisk ? "text-rose-700 dark:text-rose-300" : "text-slate-600 dark:text-slate-300",
+            col.atRisk ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
           )}
         >
           {col.atRisk && <AlertTriangle className="size-3.5 shrink-0" />}
           {col.label}
         </p>
-        <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+        <span className="shrink-0 rounded-full bg-card px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
           {col.tasks.length}
         </span>
       </header>
@@ -967,13 +961,11 @@ function KanbanColumn({
           "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-b-lg border border-t-0 p-2",
           col.atRisk
             ? "border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20"
-            : "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30",
+            : "border-border bg-muted/50",
         )}
       >
         {col.tasks.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
-            Sin tareas
-          </p>
+          <p className="px-2 py-6 text-center text-[11px] text-muted-foreground/60">Sin tareas</p>
         ) : (
           <>
             {shown.map((task) => (
@@ -1006,7 +998,7 @@ function KanbanColumn({
                 onClick={() => {
                   setVisible((n) => n + KANBAN_PAGE);
                 }}
-                className="shrink-0 rounded-md border border-slate-200 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+                className="shrink-0 rounded-md border border-border py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand-gold/50 hover:text-foreground"
               >
                 Ver {Math.min(remaining, KANBAN_PAGE)} más
               </button>
@@ -1099,7 +1091,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: Segmen
     <div
       role="group"
       aria-label={label}
-      className="flex items-center gap-0.5 rounded-full bg-slate-100 p-0.5 dark:bg-slate-800"
+      className="flex items-center gap-0.5 rounded-full bg-muted p-0.5"
     >
       {options.map((opt) => {
         const active = opt.value === value;
@@ -1115,8 +1107,8 @@ function Segmented<T extends string>({ value, options, onChange, label }: Segmen
             className={cn(
               "flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
               active
-                ? "bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-100"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {Icon && <Icon className="size-3.5" />}
@@ -1276,8 +1268,8 @@ export function TeamTasksView({
     return [...ids]
       .map((id) => ({
         id,
-        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Elemento"]).join(" › "),
-        dot: styleForItemId(id)?.dot ?? "bg-slate-400",
+        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Elemento"]).join("›"),
+        dot: styleForItemId(id)?.dot ?? "bg-muted-foreground",
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [allTasks, pathById, elementInfo, styleForItemId]);
@@ -1301,8 +1293,8 @@ export function TeamTasksView({
     return [...branchIds]
       .map((id) => ({
         id,
-        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Rama"]).join(" › "),
-        dot: styleForItemId(id)?.dot ?? "bg-slate-400",
+        label: (pathById.get(id) ?? [elementInfo.get(id)?.name ?? "Rama"]).join("›"),
+        dot: styleForItemId(id)?.dot ?? "bg-muted-foreground",
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [allTasks, ancestorsById, pathById, elementInfo, styleForItemId]);
@@ -1405,7 +1397,7 @@ export function TeamTasksView({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Barra de controles */}
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2.5 sm:px-6">
         <Segmented
           label="Modo de vista"
           value={view}
@@ -1440,7 +1432,7 @@ export function TeamTasksView({
         <ManualHint topic={MANUAL_TOPIC.entregar} label="Cómo entregar" />
 
         {!showFilterBar && (
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+          <span className="text-[11px] text-muted-foreground">
             {allTasks.length} tarea{allTasks.length === 1 ? "" : "s"}
           </span>
         )}
@@ -1479,18 +1471,16 @@ export function TeamTasksView({
 
       {/* `relative` + hijos `absolute inset-0`: el scroll interno funciona sin
           depender de que `h-full` en cadena resuelva contra un alto definido. */}
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-background">
         {showFilterBar && emptyBag && (
           <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-border p-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <Filter className="size-6" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  No hay tareas sin asignar
-                </p>
-                <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
+                <p className="text-sm font-semibold text-foreground">No hay tareas sin asignar</p>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Todo el trabajo de este equipo ya está repartido. Usa los filtros de arriba —por
                   integrante o por estado— para ver las tareas en curso.
                 </p>
@@ -1518,11 +1508,11 @@ export function TeamTasksView({
         )}
         {showFilterBar && emptyForSelectedPerson && selectedPerson && (
           <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+            <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-border p-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <ListTodo className="size-6" />
               </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <p className="text-sm font-semibold text-foreground">
                 {selectedPerson.name} no tiene tareas asignadas actualmente
               </p>
               <button
