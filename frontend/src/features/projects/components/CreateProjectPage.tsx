@@ -24,7 +24,7 @@ import { ClientAccessFields } from "./detail/ClientAccessFields";
 import type { CreateProjectPayload } from "../types/api.types";
 
 const inputCls =
-  "w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25";
+  "w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground max-lg:min-h-[44px] outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25";
 
 /** Texto recortado, o null si queda vacío (para enviar campos opcionales). */
 function blank(value?: string | null): string | null {
@@ -161,13 +161,13 @@ export function CreateProjectPage() {
         <div className="flex items-center justify-end gap-3">
           <button
             onClick={() => navigate("/projects")}
-            className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors max-lg:min-h-[44px] hover:text-foreground"
           >
             Ir a proyectos
           </button>
           <button
             onClick={() => navigate(`/projects/${created.id}`)}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand-gold-dark"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground max-lg:min-h-[44px] shadow-sm transition-colors hover:bg-brand-gold-dark"
           >
             Configurar el proyecto <ArrowRight className="size-4" />
           </button>
@@ -180,7 +180,7 @@ export function CreateProjectPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <button
         onClick={() => navigate("/projects")}
-        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors max-lg:min-h-[44px] hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Todos los proyectos
       </button>
@@ -287,14 +287,14 @@ export function CreateProjectPage() {
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
             <button
               onClick={() => navigate("/projects")}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors max-lg:min-h-[44px] hover:text-foreground"
             >
               Cancelar
             </button>
             <button
               onClick={submit}
               disabled={createProject.isPending}
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
+              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground max-lg:min-h-[44px] shadow-sm transition-colors hover:bg-brand-gold-dark disabled:opacity-60"
             >
               {createProject.isPending ? "Creando…" : "Crear proyecto"}
             </button>

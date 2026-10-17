@@ -849,7 +849,7 @@ export function GanttView({
         : `${remaining} d`;
 
   const inputCls =
-    "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+    "rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground outline-none max-lg:min-h-[44px] transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
 
   return (
     <div
@@ -886,14 +886,14 @@ export function GanttView({
             <button
               type="button"
               onClick={() => void navigate(`/projects/${project.id}/estructura`)}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium max-lg:min-h-[44px] text-foreground transition hover:bg-accent"
             >
               <FolderTree className="size-4 text-brand-teal" /> Estructura
             </button>
             <button
               type="button"
               onClick={() => void navigate(`/projects/${project.id}/tareas`)}
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium max-lg:min-h-[44px] text-primary-foreground transition hover:bg-brand-gold-dark"
             >
               <Plus className="size-4" /> Tarea
             </button>
@@ -901,7 +901,7 @@ export function GanttView({
               type="button"
               onClick={onToggleDark}
               aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card max-lg:size-[44px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>
@@ -992,7 +992,7 @@ export function GanttView({
                 aria-pressed={active}
                 title="Filtrar por este tipo de elemento"
                 className={cn(
-                  "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition",
+                  "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition max-lg:min-h-[44px]",
                   style.chip,
                   active ? "border-current" : "border-transparent",
                   activeTypeIds.size > 0 && !active && "opacity-40",
@@ -1021,7 +1021,7 @@ export function GanttView({
                 }}
                 aria-pressed={active}
                 className={cn(
-                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition",
+                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition max-lg:min-h-[44px]",
                   active
                     ? "border-border text-foreground"
                     : "border-transparent text-muted-foreground/50 line-through",
@@ -1103,7 +1103,7 @@ export function GanttView({
             }}
             aria-pressed={onlyAtRisk}
             className={cn(
-              "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+              "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition max-lg:min-h-[44px]",
               onlyAtRisk
                 ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
                 : "border-border text-muted-foreground hover:text-foreground",
@@ -1121,7 +1121,7 @@ export function GanttView({
             aria-pressed={showTasks}
             title="Mostrar u ocultar las tareas bajo cada elemento"
             className={cn(
-              "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+              "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition max-lg:min-h-[44px]",
               showTasks
                 ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
                 : "border-border text-muted-foreground hover:text-foreground",
@@ -1141,7 +1141,7 @@ export function GanttView({
               aria-pressed={showSubtasks}
               title="Mostrar u ocultar las subtareas"
               className={cn(
-                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition max-lg:min-h-[44px]",
                 showSubtasks
                   ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
                   : "border-border text-muted-foreground hover:text-foreground",
@@ -1158,7 +1158,7 @@ export function GanttView({
               scrollToToday();
             }}
             disabled={todayPct == null}
-            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground max-lg:min-h-[44px] transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             title="Centrar el cronograma en la fecha actual"
           >
             <Crosshair className="size-3.5" /> Hoy
@@ -1175,7 +1175,7 @@ export function GanttView({
                 }}
                 aria-pressed={zoom === z}
                 className={cn(
-                  "rounded-md px-2 py-1 text-xs font-medium transition",
+                  "rounded-md px-2 py-1 text-xs font-medium transition max-lg:min-h-[44px]",
                   zoom === z
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground",
@@ -1192,7 +1192,7 @@ export function GanttView({
             onClick={toggleAllNodes}
             disabled={collapsibleIds.length === 0}
             title={allCollapsed ? "Expandir toda la estructura" : "Colapsar toda la estructura"}
-            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground max-lg:min-h-[44px] transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             {allCollapsed ? (
               <ChevronsUpDown className="size-3.5" />
@@ -1212,7 +1212,7 @@ export function GanttView({
               aria-pressed={showDeps}
               title="Mostrar u ocultar las flechas de dependencia"
               className={cn(
-                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition max-lg:min-h-[44px]",
                 showDeps
                   ? "border-brand-teal/40 bg-brand-teal-light text-brand-teal-dark dark:bg-brand-teal/10 dark:text-brand-teal"
                   : "border-border text-muted-foreground hover:text-foreground",
@@ -1227,7 +1227,7 @@ export function GanttView({
             <button
               type="button"
               onClick={clearFilters}
-              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground max-lg:min-h-[44px] transition hover:text-foreground"
             >
               <FilterX className="size-3.5" /> Limpiar filtros
             </button>

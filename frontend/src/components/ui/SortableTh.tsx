@@ -35,7 +35,7 @@ export function SortableTh<K extends string>({
         }}
         aria-label={`Ordenar por ${label}`}
         className={cn(
-          "flex items-center gap-1 transition-colors hover:text-foreground",
+          "flex items-center gap-1 transition-colors hover:text-foreground max-lg:min-h-[44px]",
           align === "right" && "ml-auto flex-row-reverse",
           isActive && "text-foreground",
         )}

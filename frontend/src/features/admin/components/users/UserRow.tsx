@@ -102,7 +102,7 @@ export function UserRow({
                 : "Activar: la cuenta vuelve a poder iniciar sesión"
             }
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-40",
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-40 max-lg:min-h-[44px]",
               user.is_active
                 ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300"
                 : "bg-muted text-muted-foreground hover:bg-accent",

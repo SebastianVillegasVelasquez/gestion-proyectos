@@ -498,7 +498,7 @@ export function TraceabilityPanel({
               }}
               placeholder="Tarea o persona…"
               aria-label="Buscar en la línea de tiempo"
-              className="h-8 w-44 rounded-lg border border-border bg-card pl-8 pr-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-brand-teal"
+              className="h-8 w-44 rounded-lg border border-border bg-card pl-8 pr-2 text-xs text-foreground max-lg:min-h-[44px] outline-none transition-colors placeholder:text-muted-foreground focus:border-brand-teal"
             />
           </div>
 
@@ -509,7 +509,7 @@ export function TraceabilityPanel({
                 patch({ teamId: e.target.value || null });
               }}
               aria-label="Filtrar por equipo"
-              className="h-8 rounded-lg border border-border bg-card px-2 text-xs text-foreground outline-none transition-colors focus:border-brand-teal"
+              className="h-8 rounded-lg border border-border bg-card px-2 text-xs text-foreground max-lg:min-h-[44px] outline-none transition-colors focus:border-brand-teal"
             >
               <option value="">Todos los equipos</option>
               {teams.map((team) => (
@@ -530,7 +530,7 @@ export function TraceabilityPanel({
                 }}
                 aria-pressed={filters.group === group}
                 className={cn(
-                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-[44px]",
                   filters.group === group
                     ? group === "retrasos"
                       ? "bg-rose-600 text-white"

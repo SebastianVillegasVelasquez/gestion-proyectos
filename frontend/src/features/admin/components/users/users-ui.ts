@@ -25,4 +25,4 @@ export const ROLE_LABEL: Record<string, string> = {
 };
 
 export const inputCls =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 max-lg:min-h-[44px]";

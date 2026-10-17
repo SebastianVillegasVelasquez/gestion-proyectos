@@ -91,7 +91,7 @@ export function AdminUsersPage() {
               onClick={() => {
                 setShowBulkUpload(true);
               }}
-              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium max-lg:min-h-[44px] text-foreground transition hover:bg-accent"
             >
               <Upload className="size-4" /> Cargar CSV
             </button>
@@ -100,7 +100,7 @@ export function AdminUsersPage() {
               onClick={() => {
                 setShowCreate(true);
               }}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-brand-gold-dark"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium max-lg:min-h-[44px] text-primary-foreground transition hover:bg-brand-gold-dark"
             >
               <UserPlus className="size-4" /> Nuevo usuario
             </button>
@@ -131,7 +131,7 @@ export function AdminUsersPage() {
             setShowInactive((v) => !v);
           }}
           className={cn(
-            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition",
+            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition max-lg:min-h-[44px]",
             showInactive
               ? "border-brand-teal bg-brand-teal/10 text-brand-teal"
               : "border-border text-muted-foreground hover:bg-accent",

@@ -44,7 +44,7 @@ export function SortableHeader({
           onSort(field);
         }}
         className={cn(
-          "inline-flex items-center gap-1 rounded transition hover:text-foreground",
+          "inline-flex items-center gap-1 rounded transition hover:text-foreground max-lg:min-h-[44px]",
           align === "center" && "justify-center",
           active && "text-foreground",
         )}

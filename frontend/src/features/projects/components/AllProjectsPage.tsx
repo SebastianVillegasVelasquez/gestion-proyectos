@@ -188,14 +188,14 @@ export function AllProjectsPage() {
             type="button"
             onClick={toggleDark}
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card max-lg:size-[44px] text-muted-foreground transition-colors hover:bg-accent"
           >
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
           <button
             type="button"
             onClick={() => navigate("/projects/builder")}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium max-lg:min-h-[44px] text-primary-foreground transition-colors hover:bg-brand-gold-dark"
           >
             <Plus className="size-4" />
             Nuevo proyecto
@@ -234,7 +234,7 @@ export function AllProjectsPage() {
               }}
               placeholder="Buscar por nombre, cliente o ID…"
               aria-label="Buscar proyecto"
-              className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25"
+              className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground max-lg:min-h-[44px] outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25"
             />
           </div>
 
