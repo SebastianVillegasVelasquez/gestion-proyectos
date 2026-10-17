@@ -155,6 +155,7 @@ async def main() -> None:
                         id=uuid.uuid4(),
                         title=title,
                         status=status,
+                        project_id=project.id,
                         work_item_id=work_item.id,
                         assignee_id=user.id if mine else None,
                         start_date=_d(-20),
