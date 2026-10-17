@@ -186,7 +186,7 @@ export function TasksPage() {
             icon={ListChecks}
             label={hasFilters ? "Tareas (filtradas)" : "Tareas"}
             value={counters.total}
-            tone="bg-slate-500/10 text-slate-600 dark:text-slate-300"
+            tone="bg-muted-foreground/10 text-muted-foreground"
           />
           <StatTile
             icon={UserX}
@@ -292,7 +292,7 @@ export function TasksPage() {
           <div className="flex shrink-0 items-center justify-between text-xs text-muted-foreground">
             <span>
               {filtered.length} tarea{filtered.length === 1 ? "" : "s"}
-              {hasFilters && tasks.length !== filtered.length && ` de ${String(tasks.length)}`}
+              {hasFilters && tasks.length !== filtered.length && `de ${String(tasks.length)}`}
             </span>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
