@@ -51,7 +51,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
   cancelacion: {
     verb: "canceló la tarea",
     icon: XCircle,
-    tone: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    tone: "bg-muted-foreground/10 text-muted-foreground",
   },
   comentario: {
     verb: "comentó en la tarea",
@@ -61,7 +61,7 @@ const KIND_META: Record<ActivityKind, { verb: string; icon: LucideIcon; tone: st
   cambio_estado: {
     verb: "actualizó la tarea",
     icon: Activity,
-    tone: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    tone: "bg-muted-foreground/10 text-muted-foreground",
   },
 
   equipo: {
@@ -139,7 +139,8 @@ export function ProjectActivityCard({ projectId }: { projectId: string }) {
                   </span>
                   <div className="min-w-0 flex-1 pt-1">
                     <p className="text-[13px] leading-snug text-foreground">
-                      <span className="font-semibold">{actor}</span> {meta.verb}{" "}
+                      <span className="font-semibold">{actor}</span> {meta.verb}
+                      {""}
                       <span className="font-medium">{item.task_title}</span>
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
