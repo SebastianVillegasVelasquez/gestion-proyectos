@@ -102,13 +102,13 @@ function NewPersonalDeliverableModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Nueva entrega</h2>
+          <h2 className="text-base font-bold text-foreground">Nueva entrega</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
             aria-label="Cerrar"
           >
             <X className="size-4" />
@@ -126,7 +126,7 @@ function NewPersonalDeliverableModal({
         >
           {tasks.length > 0 && (
             <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Tarea individual del proyecto
               </label>
               <select
@@ -134,17 +134,17 @@ function NewPersonalDeliverableModal({
                 onChange={(e) => {
                   selectTask(e.target.value);
                 }}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none"
               >
                 <option value="">Sin vincular (entrega suelta)</option>
                 {tasks.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.project_name ? `${t.project_name} · ` : ""}
+                    {t.project_name ? `${t.project_name} ·` : ""}
                     {t.title}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 Solo tareas asignadas a ti y sin equipo. Al vincularla, aprobar o rechazar mueve su
                 estado y queda en la trazabilidad del proyecto.
               </p>
@@ -152,7 +152,7 @@ function NewPersonalDeliverableModal({
           )}
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Título del entregable *
             </label>
             <input
@@ -163,11 +163,11 @@ function NewPersonalDeliverableModal({
               }}
               placeholder="Ej: Informe final — Fase 2"
               autoFocus
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/30"
             />
           </div>
 
-          <label className="flex items-start gap-2.5 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+          <label className="flex items-start gap-2.5 rounded-lg border border-border p-3 text-sm">
             <input
               type="checkbox"
               checked={requiresApproval}
@@ -177,10 +177,8 @@ function NewPersonalDeliverableModal({
               className="mt-0.5 size-4 accent-brand-gold"
             />
             <span>
-              <span className="font-medium text-slate-700 dark:text-slate-200">
-                Requiere revisión
-              </span>
-              <span className="mt-0.5 block text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="font-medium text-foreground">Requiere revisión</span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">
                 Si lo activas, la entrega pasa por un responsable del proyecto antes de darse por
                 completada. Si no, entregar completa la tarea directo.
               </span>
@@ -193,11 +191,11 @@ function NewPersonalDeliverableModal({
             </p>
           )}
 
-          <div className="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="flex gap-2 border-t border-border pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-accent"
             >
               Cancelar
             </button>
