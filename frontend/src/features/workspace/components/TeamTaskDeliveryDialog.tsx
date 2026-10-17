@@ -149,19 +149,17 @@ export function TeamTaskDeliveryDialog({
       aria-modal="true"
       aria-label="Entregar tarea"
     >
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Entregar</h2>
-            <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
-              {task.title}
-            </p>
+            <h2 className="text-base font-bold text-foreground">Entregar</h2>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.title}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
           >
             <X className="size-4" />
           </button>
