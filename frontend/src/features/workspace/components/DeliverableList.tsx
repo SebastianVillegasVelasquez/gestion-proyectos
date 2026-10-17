@@ -40,7 +40,7 @@ function StatusBadge({ status }: { status: DeliverableStatus }) {
 function DeliverableIcon({ d }: { d: Deliverable }) {
   const latest = d.versions.at(-1);
   if (!latest) {
-    return <Package className="size-4 text-slate-400" />;
+    return <Package className="size-4 text-muted-foreground" />;
   }
   const meta = RESOURCE_META[latest.type];
   const Icon = meta.Icon;
@@ -48,7 +48,7 @@ function DeliverableIcon({ d }: { d: Deliverable }) {
 }
 
 const selectClass =
-  "min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  "min-w-0 flex-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground outline-none focus:border-brand-gold";
 
 interface DeliverableListProps {
   deliverables: Deliverable[];
@@ -90,19 +90,19 @@ export function DeliverableList({
   return (
     <div className="flex h-full flex-col bg-card">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Entregables
         </span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {deliverables.length}
         </span>
       </div>
 
       {/* Filtros */}
-      <div className="flex shrink-0 flex-col gap-1.5 border-b border-slate-200 px-3 py-2.5 dark:border-slate-700">
+      <div className="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2.5">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={filters.text}
@@ -110,7 +110,7 @@ export function DeliverableList({
               patch({ text: e.target.value });
             }}
             placeholder="Buscar por título…"
-            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[12px] text-slate-700 outline-none focus:border-brand-gold dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-md border border-border bg-card py-1.5 pl-7 pr-7 text-[12px] text-foreground outline-none focus:border-brand-gold"
           />
           {filters.text && (
             <button
@@ -119,7 +119,7 @@ export function DeliverableList({
               onClick={() => {
                 patch({ text: "" });
               }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
@@ -162,7 +162,7 @@ export function DeliverableList({
       {/* List */}
       <div className="flex-1 overflow-y-auto py-2">
         {total === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
             {hasFilters ? "Ningún entregable coincide con el filtro." : "Sin entregables aún."}
           </p>
         ) : (
@@ -180,7 +180,7 @@ export function DeliverableList({
                   "group w-full border-l-2 px-4 py-3.5 text-left transition-colors duration-100",
                   isSelected
                     ? "border-l-brand-gold bg-brand-gold-light"
-                    : "border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40",
+                    : "border-l-transparent hover:bg-accent",
                 )}
               >
                 {/* Title row */}
@@ -188,7 +188,7 @@ export function DeliverableList({
                   <div
                     className={cn(
                       "mt-0.5 shrink-0 rounded-md p-1",
-                      isSelected ? "bg-brand-gold-light" : "bg-slate-100 dark:bg-slate-800",
+                      isSelected ? "bg-brand-gold-light" : "bg-muted",
                     )}
                   >
                     <DeliverableIcon d={d} />
@@ -199,7 +199,7 @@ export function DeliverableList({
                         "text-[13px] font-medium leading-snug",
                         isSelected
                           ? "text-brand-gold-dark dark:text-brand-gold"
-                          : "text-slate-700 dark:text-slate-200",
+                          : "text-foreground",
                       )}
                     >
                       {d.taskTitle}
@@ -216,9 +216,7 @@ export function DeliverableList({
                         >
                           {assignee.initials}
                         </span>
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                          {assignee.name}
-                        </span>
+                        <span className="text-[11px] text-muted-foreground">{assignee.name}</span>
                       </div>
                     )}
 
@@ -234,7 +232,7 @@ export function DeliverableList({
                         </span>
                       )}
                       {d.versions.length > 0 && (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                        <span className="text-[10px] text-muted-foreground">
                           {d.versions.length} versión{d.versions.length !== 1 ? "es" : ""}
                         </span>
                       )}
@@ -249,7 +247,7 @@ export function DeliverableList({
 
       {/* Paginación */}
       {total > 0 && (
-        <div className="shrink-0 border-t border-slate-200 px-3 py-2 dark:border-slate-700">
+        <div className="shrink-0 border-t border-border px-3 py-2">
           <Pager
             page={page}
             totalPages={totalPages}
