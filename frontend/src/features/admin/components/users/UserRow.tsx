@@ -79,7 +79,7 @@ export function UserRow({
               onChange={(e) => {
                 updateUser.mutate({ user, changes: { role: e.target.value as Role } });
               }}
-              className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold disabled:opacity-50"
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-brand-gold disabled:opacity-50 max-lg:min-h-[44px]"
             >
               {assignableRoles.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -132,7 +132,7 @@ export function UserRow({
                   setShowEdit(true);
                 }}
                 aria-label={`Editar ${user.name} ${user.last_name}`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent max-lg:min-h-[44px]"
               >
                 <Pencil className="size-3" /> Editar
               </button>
@@ -143,7 +143,7 @@ export function UserRow({
                 setConfirmReset(true);
               }}
               aria-label={`Restablecer contraseña de ${user.name}`}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground transition hover:bg-accent max-lg:min-h-[44px]"
             >
               <KeyRound className="size-3" /> Contraseña
             </button>

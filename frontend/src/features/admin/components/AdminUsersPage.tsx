@@ -218,7 +218,7 @@ export function AdminUsersPage() {
               onClick={() => {
                 setPage((p) => p - 1);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40 max-lg:size-[44px]"
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -232,7 +232,7 @@ export function AdminUsersPage() {
               onClick={() => {
                 setPage((p) => p + 1);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40 max-lg:size-[44px]"
             >
               <ChevronRight className="size-4" />
             </button>

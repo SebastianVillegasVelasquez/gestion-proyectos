@@ -107,7 +107,7 @@ function formatDate(iso: string | null): string {
 // texto (borde, fondo, foco dorado). `appearance-none` quita la flecha nativa
 // para dibujar una propia y que se vean idénticos en todos los navegadores.
 const cellSelect =
-  "w-full appearance-none rounded-md border border-border bg-card px-2 py-1 pr-6 text-xs text-foreground outline-none transition hover:border-brand-gold/60 focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20";
+  "w-full appearance-none rounded-md border border-border bg-card px-2 py-1 pr-6 text-xs text-foreground outline-none transition hover:border-brand-gold/60 focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 max-lg:min-h-[44px]";
 
 /** Select inline con la flecha personalizada, para igualar el estilo de los inputs. */
 function CellSelect({
@@ -527,13 +527,15 @@ export function TasksTable({
           <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs font-bold uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-3">
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={toggleAll}
-                  aria-label="Seleccionar todas"
-                  className="size-4 accent-brand-gold"
-                />
+                <label className="flex items-center justify-center max-lg:size-[44px]">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={toggleAll}
+                    aria-label="Seleccionar todas"
+                    className="size-4 accent-brand-gold max-lg:size-[22px]"
+                  />
+                </label>
               </th>
               <SortableTh
                 label="Tarea"
@@ -587,15 +589,17 @@ export function TasksTable({
                   )}
                 >
                   <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={isSel}
-                      onChange={() => {
-                        toggleOne(task.id);
-                      }}
-                      aria-label={`Seleccionar ${task.title}`}
-                      className="size-4 accent-brand-gold"
-                    />
+                    <label className="flex items-center justify-center max-lg:size-[44px]">
+                      <input
+                        type="checkbox"
+                        checked={isSel}
+                        onChange={() => {
+                          toggleOne(task.id);
+                        }}
+                        aria-label={`Seleccionar ${task.title}`}
+                        className="size-4 accent-brand-gold max-lg:size-[22px]"
+                      />
+                    </label>
                   </td>
                   <td className="px-3 py-2">
                     <button
@@ -750,7 +754,7 @@ export function TasksTable({
                           setDeletingTask(task);
                         }}
                         aria-label={`Eliminar ${task.title}`}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 max-lg:size-[44px]"
                       >
                         <Trash2 className="size-4" />
                       </button>

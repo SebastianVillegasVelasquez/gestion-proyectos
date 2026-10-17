@@ -182,7 +182,7 @@ function MemberRow({
               updateRole.mutate({ memberId: member.id, role: e.target.value as ProjectRole });
             }}
             className={cn(
-              "rounded-md border-0 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide outline-none ring-1 ring-inset ring-transparent transition focus:ring-brand-gold disabled:opacity-60",
+              "rounded-md border-0 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide outline-none ring-1 ring-inset ring-transparent transition focus:ring-brand-gold disabled:opacity-60 max-lg:min-h-[44px]",
               PROJECT_ROLE_ACCENT[member.project_role],
             )}
           >
@@ -243,7 +243,7 @@ function MemberRow({
                   });
                 }}
                 disabled={removeMember.isPending}
-                className="rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                className="rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700 disabled:opacity-60 max-lg:min-h-[44px]"
               >
                 {removeMember.isPending ? <Loader2 className="size-3.5 animate-spin" /> : "Quitar"}
               </button>
@@ -264,7 +264,7 @@ function MemberRow({
               onClick={() => {
                 setConfirmingRemove(true);
               }}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 max-lg:min-h-[44px]"
             >
               Quitar
             </button>
