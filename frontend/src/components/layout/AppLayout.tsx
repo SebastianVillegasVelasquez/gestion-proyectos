@@ -85,7 +85,7 @@ export const AppLayout = () => {
                     setSidebarOpen(true);
                   }}
                   aria-label="Abrir menú de navegación"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+                  className="flex size-[44px] items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
                 >
                   <Menu className="size-5" />
                 </button>
@@ -107,7 +107,7 @@ export const AppLayout = () => {
                   type="button"
                   onClick={toggleDark}
                   aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+                  className="flex size-[44px] items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
                 >
                   {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 </button>

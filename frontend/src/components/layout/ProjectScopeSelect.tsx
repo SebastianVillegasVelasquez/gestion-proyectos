@@ -44,7 +44,7 @@ export function ProjectScopeSelect({ collapsed }: { collapsed: boolean }) {
         aria-label="Proyecto activo"
         title={collapsed ? (current?.name ?? "Todos los proyectos") : undefined}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg border py-2 text-left text-sm transition-colors duration-150",
+          "flex w-full items-center gap-2.5 rounded-lg border py-2 text-left text-sm transition-colors duration-150 max-lg:min-h-[44px]",
           collapsed ? "px-3 lg:justify-center lg:px-0" : "px-3",
           current
             ? "border-brand-gold/40 bg-brand-gold/10 text-sidebar-foreground"

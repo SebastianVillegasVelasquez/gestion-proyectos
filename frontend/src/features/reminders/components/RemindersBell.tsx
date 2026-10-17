@@ -98,7 +98,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
         aria-label="Recordatorios"
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+        className="relative flex h-8 w-8 max-lg:size-[44px] items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
       >
         <AlarmClock className="size-4" />
         {pending.length > 0 && (

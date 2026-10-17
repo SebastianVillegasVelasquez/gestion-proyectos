@@ -92,7 +92,7 @@ export function ViewAsSwitcher({ collapsed }: { collapsed: boolean }) {
         aria-expanded={open}
         title={collapsed ? "Ver como otro rol" : undefined}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150",
+          "flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150 max-lg:min-h-[44px]",
           collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
           active
             ? "bg-brand-gold/15 text-brand-gold"

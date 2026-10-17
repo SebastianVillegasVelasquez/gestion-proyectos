@@ -167,7 +167,7 @@ export function NotificationBell({ placement = "down" }: { placement?: "down" | 
         aria-label="Notificaciones"
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+        className="relative flex h-8 w-8 max-lg:size-[44px] items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
       >
         <Bell className="size-4" />
         {badge && (

@@ -249,7 +249,7 @@ export function Sidebar({
           type="button"
           onClick={onClose}
           aria-label="Cerrar menú"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground lg:hidden"
+          className="flex size-[44px] items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-150 hover:bg-white/10 hover:text-sidebar-foreground lg:hidden"
         >
           <X className="size-4" />
         </button>
@@ -295,7 +295,7 @@ export function Sidebar({
                       title={collapsed ? item.label : undefined}
                       aria-label={item.label}
                       className={cn(
-                        "group flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150",
+                        "group flex w-full items-center gap-2.5 rounded-lg py-2 text-sm transition-colors duration-150 max-lg:min-h-[44px]",
                         collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
                         isActive
                           ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
@@ -382,7 +382,7 @@ export function Sidebar({
           disabled={logout.isPending}
           title={collapsed ? "Cerrar sesión" : undefined}
           className={cn(
-            "mt-1 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60",
+            "mt-1 flex w-full items-center gap-2.5 rounded-lg py-2 text-sm text-sidebar-foreground/60 transition-colors duration-150 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-60 max-lg:min-h-[44px]",
             collapsed ? "lg:justify-center lg:px-0 px-3" : "px-3",
           )}
         >
