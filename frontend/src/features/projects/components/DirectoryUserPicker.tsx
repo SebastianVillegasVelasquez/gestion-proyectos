@@ -7,7 +7,7 @@ import { USER_POSITION_LABELS, USER_POSITIONS } from "../types/labels";
 import type { DirectoryUser, UserPosition } from "../types/api.types";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-gold/25";
+  "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 dark:focus:ring-brand-gold/25";
 
 interface DirectoryUserPickerProps {
   selected: DirectoryUser | null;
@@ -59,7 +59,7 @@ export function DirectoryUserPicker({
     <div className="flex flex-col gap-3">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             className={`${inputCls} pl-9`}
             value={search}
@@ -89,11 +89,11 @@ export function DirectoryUserPicker({
         )}
       </div>
 
-      <div className="min-h-[16rem] rounded-lg border border-slate-200 dark:border-slate-700">
+      <div className="min-h-[16rem] rounded-lg border border-border">
         {query.isLoading ? (
           <div className="flex flex-col gap-1 p-2">
             {Array.from({ length: pageSize }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
             ))}
           </div>
         ) : query.isError ? (
@@ -101,7 +101,7 @@ export function DirectoryUserPicker({
             No se pudo cargar la lista de usuarios.
           </p>
         ) : (query.data?.items.length ?? 0) === 0 ? (
-          <p className="p-4 text-sm italic text-slate-400">Sin resultados.</p>
+          <p className="p-4 text-sm italic text-muted-foreground">Sin resultados.</p>
         ) : (
           <ul className="flex flex-col">
             {query.data?.items.map((u) => {
@@ -120,23 +120,23 @@ export function DirectoryUserPicker({
                       isExcluded && "cursor-not-allowed opacity-50",
                       isSel
                         ? "bg-brand-gold-light dark:bg-brand-gold/15"
-                        : !isExcluded && "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                        : !isExcluded && "hover:bg-accent",
                     )}
                   >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-foreground">
                       {(u.name[0] ?? "") + (u.last_name[0] ?? "")}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-800 dark:text-slate-100">
+                      <span className="block truncate font-medium text-foreground">
                         {u.name} {u.last_name}
                       </span>
-                      <span className="block truncate text-[11px] text-slate-400">
+                      <span className="block truncate text-[11px] text-muted-foreground">
                         {u.email} · {USER_POSITION_LABELS[u.position]}
-                        {u.document_number ? ` · ${u.document_number}` : ""}
+                        {u.document_number ? `· ${u.document_number}` : ""}
                       </span>
                     </span>
                     {isExcluded ? (
-                      <span className="shrink-0 text-[10px] text-slate-400">Ya está</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">Ya está</span>
                     ) : (
                       isSel && <Check className="size-4 shrink-0 text-brand-gold-dark" />
                     )}
@@ -148,7 +148,7 @@ export function DirectoryUserPicker({
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {query.data?.total ?? 0} usuario{(query.data?.total ?? 0) !== 1 ? "s" : ""}
         </span>
@@ -160,7 +160,7 @@ export function DirectoryUserPicker({
             onClick={() => {
               setPage((p) => p - 1);
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40 dark:border-slate-700"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -174,7 +174,7 @@ export function DirectoryUserPicker({
             onClick={() => {
               setPage((p) => p + 1);
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40 dark:border-slate-700"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-border disabled:opacity-40"
           >
             <ChevronRight className="size-4" />
           </button>
