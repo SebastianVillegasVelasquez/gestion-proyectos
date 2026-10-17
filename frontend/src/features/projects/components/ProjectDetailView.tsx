@@ -204,7 +204,7 @@ export function ProjectDetailView({
           <button
             type="button"
             onClick={() => void navigate("/projects")}
-            className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground max-lg:min-h-[44px]"
           >
             <ChevronLeft className="size-3.5" />
             Proyectos
@@ -291,7 +291,7 @@ export function ProjectDetailView({
                 type="button"
                 onClick={onToggleDark}
                 aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-                className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground max-lg:size-[44px]"
               >
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </button>

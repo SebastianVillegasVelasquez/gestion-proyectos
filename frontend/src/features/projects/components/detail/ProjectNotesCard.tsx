@@ -107,7 +107,7 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
               onClick={() => {
                 setAdding(true);
               }}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-brand-gold-dark max-lg:min-h-[44px]"
             >
               <Plus className="size-3.5" /> Añadir nota
             </button>
@@ -210,7 +210,7 @@ export function ProjectNotesCard({ projectId }: { projectId: string }) {
                         disabled={deleteNote.isPending}
                         aria-label="Borrar nota"
                         title="Borrar nota"
-                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover/note:opacity-100 disabled:opacity-50 dark:hover:text-rose-400 max-lg:size-[44px] max-lg:opacity-100"
                       >
                         <Trash2 className="size-3.5" />
                       </button>

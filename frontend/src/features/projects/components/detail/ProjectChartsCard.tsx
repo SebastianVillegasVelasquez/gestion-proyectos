@@ -79,7 +79,7 @@ const TREND_META = {
 // en teal). Se usa en el filtro de prioridad y en el de periodo.
 const pillClass = (active: boolean) =>
   cn(
-    "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+    "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors max-lg:min-h-[44px]",
     active ? "bg-brand-teal text-white" : "bg-accent text-muted-foreground hover:text-foreground",
   );
 
@@ -498,7 +498,7 @@ export function ProjectChartsCard({
                 title={label}
                 aria-pressed={view === key}
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-full transition-colors",
+                  "flex size-8 items-center justify-center rounded-full transition-colors max-lg:size-[44px]",
                   view === key
                     ? "bg-brand-teal text-white"
                     : "bg-accent text-muted-foreground hover:text-foreground",

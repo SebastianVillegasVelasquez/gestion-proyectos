@@ -163,7 +163,7 @@ export function AnalyticsFilters({
               set({ date_from: r.from, date_to: r.to });
             }}
             className={cn(
-              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-[44px]",
               preset === p.key
                 ? "border-brand-gold bg-brand-gold-light text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold"
                 : "border-border text-muted-foreground hover:text-foreground",

@@ -63,7 +63,7 @@ export function ProjectReportPage() {
           <button
             type="button"
             onClick={() => void navigate(`/projects/${projectId}`)}
-            className="mb-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="mb-3 text-sm text-muted-foreground transition-colors hover:text-foreground inline-flex items-center max-lg:min-h-[44px]"
           >
             ← {data?.project_name ?? "Proyecto"}
           </button>
@@ -107,7 +107,7 @@ export function ProjectReportPage() {
               setTab(t.id);
             }}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-3 text-[15px] font-medium transition-colors",
+              "shrink-0 whitespace-nowrap px-4 py-3 text-[15px] font-medium transition-colors max-lg:min-h-[44px]",
               tab === t.id
                 ? "border-b-2 border-brand-gold text-brand-gold-dark dark:text-brand-gold"
                 : "text-muted-foreground hover:text-foreground",

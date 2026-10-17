@@ -61,7 +61,7 @@ export function ClientAccessButton({ projectId }: { projectId: string }) {
         aria-expanded={open}
         aria-label="Compartir con el cliente"
         title="Compartir con el cliente"
-        className="flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+        className="flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground max-lg:min-h-[44px] transition-colors hover:bg-accent"
       >
         <Share2 className="size-4 text-brand-blue" />
         <span className="hidden sm:inline">Compartir</span>

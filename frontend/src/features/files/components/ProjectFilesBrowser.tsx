@@ -1275,7 +1275,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
                     }
                   }}
                   className={cn(
-                    "flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 transition-colors",
+                    "flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 transition-colors max-lg:min-h-[44px]",
                     isLast
                       ? "font-semibold text-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -1298,7 +1298,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
-          <label className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5">
+          <label className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 max-lg:min-h-[44px]">
             <Search className="size-3.5 text-muted-foreground" />
             <input
               value={term}
@@ -1319,7 +1319,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               }}
               title="Ver como lista"
               className={cn(
-                "rounded-md p-1.5 transition-colors",
+                "rounded-md p-1.5 transition-colors max-lg:size-[44px]",
                 view === "list"
                   ? "bg-accent text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -1335,7 +1335,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               }}
               title="Ver como cuadrícula"
               className={cn(
-                "rounded-md p-1.5 transition-colors",
+                "rounded-md p-1.5 transition-colors max-lg:size-[44px]",
                 view === "grid"
                   ? "bg-accent text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -1354,7 +1354,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
                 setShowStructureFolders(true);
               }}
               title="Crear las carpetas a partir de la estructura del proyecto"
-              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent max-lg:min-h-[44px]"
             >
               <FolderTree className="size-3.5" />{" "}
               <span className="hidden sm:inline">Carpetas de la estructura</span>
@@ -1369,7 +1369,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
                   onClick={() => {
                     setShowNewFolder(true);
                   }}
-                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent max-lg:min-h-[44px]"
                 >
                   <FolderPlus className="size-3.5" />{" "}
                   <span className="hidden sm:inline">Nueva carpeta</span>
@@ -1415,7 +1415,7 @@ export function ProjectFilesBrowser({ projectId }: { projectId: string }) {
               onClick={() => {
                 createFolder.mutate({ name: team.name, team_id: team.id });
               }}
-              className="flex items-center gap-1.5 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2.5 py-1 text-[12px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold"
+              className="flex items-center gap-1.5 rounded-lg border border-brand-gold/40 bg-brand-gold/10 px-2.5 py-1 text-[12px] font-semibold text-brand-gold-dark transition-colors hover:bg-brand-gold/20 dark:text-brand-gold max-lg:min-h-[44px]"
             >
               <FolderPlus className="size-3.5" /> Crear la de {team.name}
             </button>
