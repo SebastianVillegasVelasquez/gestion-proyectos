@@ -98,7 +98,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
         aria-label="Recordatorios"
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
       >
         <AlarmClock className="size-4" />
         {pending.length > 0 && (
@@ -122,27 +122,25 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
             role="dialog"
             aria-label="Recordatorios"
             className={cn(
-              "absolute z-50 flex max-h-[30rem] w-96 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900",
+              "absolute z-50 flex max-h-[30rem] w-96 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl",
               placement === "up" ? "bottom-full left-0 mb-2" : "right-0 top-full mt-2",
             )}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                Recordatorios
-              </span>
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <span className="text-sm font-semibold text-foreground">Recordatorios</span>
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
                 }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
               >
                 <X className="size-4" />
               </button>
             </div>
 
             {/* Alta rápida */}
-            <div className="flex shrink-0 flex-col gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-3">
               <input
                 value={title}
                 onChange={(e) => {
@@ -154,7 +152,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                   }
                 }}
                 placeholder="Recordarme…"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-brand-teal"
               />
               <div className="flex gap-2">
                 <input
@@ -163,7 +161,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                   onChange={(e) => {
                     setWhen(e.target.value);
                   }}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground outline-none focus:border-brand-teal"
                 />
                 <select
                   value={channel}
@@ -171,7 +169,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                     setChannel(e.target.value as ReminderChannel);
                   }}
                   aria-label="Canal del recordatorio"
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-brand-teal dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground outline-none focus:border-brand-teal"
                 >
                   <option value="notificacion">Notificación</option>
                   <option value="correo">Correo</option>
@@ -203,25 +201,20 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
               {listQuery.isLoading ? (
                 <div className="flex flex-col gap-2 p-2">
                   {[0, 1].map((i) => (
-                    <div
-                      key={i}
-                      className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
-                    />
+                    <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
                   ))}
                 </div>
               ) : pending.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-                  <Bell className="size-6 text-slate-300 dark:text-slate-600" />
-                  <p className="text-sm text-slate-400 dark:text-slate-500">
-                    Sin recordatorios pendientes.
-                  </p>
+                  <Bell className="size-6 text-muted-foreground/60" />
+                  <p className="text-sm text-muted-foreground">Sin recordatorios pendientes.</p>
                 </div>
               ) : (
                 <ul className="flex flex-col gap-0.5">
                   {pending.map((r) => (
                     <li
                       key={r.id}
-                      className="group flex items-start gap-2 rounded-lg px-2.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      className="group flex items-start gap-2 rounded-lg px-2.5 py-2 hover:bg-accent"
                     >
                       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-teal/10 text-brand-teal-dark dark:text-brand-teal">
                         {r.channel === "correo" ? (
@@ -231,10 +224,8 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-slate-700 dark:text-slate-200">
-                          {r.title}
-                        </span>
-                        <span className="block text-[11px] text-slate-400 dark:text-slate-500">
+                        <span className="block truncate text-sm text-foreground">{r.title}</span>
+                        <span className="block text-[11px] text-muted-foreground">
                           {formatUntil(r.remind_at, nowTs)} · {CHANNEL_LABEL[r.channel]}
                         </span>
                       </span>
@@ -244,7 +235,7 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                         onClick={() => {
                           deleteReminder.mutate(r.id);
                         }}
-                        className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-red-950/40"
+                        className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-red-50 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-red-950/40"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -253,13 +244,13 @@ export function RemindersBell({ placement = "down" }: { placement?: "down" | "up
                 </ul>
               )}
               {listQuery.isError && (
-                <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                   Los recordatorios no están disponibles por ahora.
                 </p>
               )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800 dark:text-slate-500">
+            <div className="flex shrink-0 items-center gap-1.5 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
               <Check className="size-3" /> Te avisamos por el canal que elijas cuando llegue la
               hora.
             </div>
