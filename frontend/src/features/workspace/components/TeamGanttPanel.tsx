@@ -44,10 +44,8 @@ export function TeamGanttPanel({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
         <AlertTriangle className="size-6 text-amber-500" />
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-          No se pudo cargar el cronograma
-        </p>
-        <p className="max-w-xs text-[12px] text-slate-400 dark:text-slate-500">
+        <p className="text-sm font-medium text-muted-foreground">No se pudo cargar el cronograma</p>
+        <p className="max-w-xs text-[12px] text-muted-foreground">
           El proyecto de este equipo no está disponible ahora mismo.
         </p>
       </div>
