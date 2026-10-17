@@ -52,8 +52,8 @@ function StatCard({
           <Icon className="size-5" />
         </div>
         <div>
-          <p className="text-xl font-semibold text-slate-900 dark:text-slate-50">{value}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
+          <p className="text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -75,10 +75,10 @@ function ActivityContent({
           {personInitials(activity.name, activity.last_name)}
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
             {activity.name} {activity.last_name}
           </h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <Briefcase className="size-3.5" /> {positionLabel(activity.position)}
             </span>
@@ -92,9 +92,7 @@ function ActivityContent({
       {/* Progreso general */}
       <Card className="shrink-0">
         <CardContent className="py-4">
-          <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Avance de tareas asignadas
-          </p>
+          <p className="mb-2 text-sm font-medium text-foreground">Avance de tareas asignadas</p>
           <CompletionBar
             pct={activity.completion_pct}
             completed={activity.completed_tasks}
@@ -141,24 +139,22 @@ function ActivityContent({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Tareas asignadas */}
         <section className="flex min-h-0 flex-col">
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <ClipboardList className="size-4 text-brand-teal" /> Tareas asignadas
-            <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500 dark:bg-slate-800">
+            <span className="rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">
               {activity.tasks.length}
             </span>
           </h2>
           {activity.tasks.length === 0 ? (
-            <p className="text-sm italic text-slate-400">Sin tareas asignadas.</p>
+            <p className="text-sm italic text-muted-foreground">Sin tareas asignadas.</p>
           ) : (
             <div className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1">
               {activity.tasks.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
-                    {t.title}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{t.title}</span>
                   <span
                     className={cn(
                       "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
@@ -167,7 +163,7 @@ function ActivityContent({
                   >
                     {TASK_STATUS_LABELS[t.status]}
                   </span>
-                  <span className="shrink-0 text-[11px] text-slate-400">
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
                     {formatDate(t.due_date)}
                   </span>
                 </div>
@@ -178,15 +174,15 @@ function ActivityContent({
 
         {/* Historial (TaskHistory) */}
         <section className="flex min-h-0 flex-col">
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            <History className="size-4 text-slate-400" /> Historial de actividad
-            <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500 dark:bg-slate-800">
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <History className="size-4 text-muted-foreground" /> Historial de actividad
+            <span className="rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">
               {activity.history.length}
             </span>
           </h2>
           {activity.history.length === 0 ? (
             <div className="flex flex-col items-start gap-2">
-              <p className="text-sm italic text-slate-400">Sin actividad registrada.</p>
+              <p className="text-sm italic text-muted-foreground">Sin actividad registrada.</p>
               {onPreview && (
                 <button
                   type="button"
@@ -200,24 +196,19 @@ function ActivityContent({
           ) : (
             <ol className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1">
               {activity.history.map((h) => (
-                <li
-                  key={h.id}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
-                >
+                <li key={h.id} className="rounded-lg border border-border bg-card px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                    <span className="text-xs font-medium text-foreground">
                       {HISTORY_ACTION_LABELS[h.action]}
                     </span>
-                    <span className="shrink-0 text-[11px] text-slate-400">
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
                       {formatDate(h.created_at)}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
-                    {h.task_title}
-                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{h.task_title}</p>
                   {h.old_status && h.new_status && (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <span className="rounded bg-muted px-1.5 py-0.5">
                         {TASK_STATUS_LABELS[h.old_status]}
                       </span>
                       →
@@ -229,7 +220,9 @@ function ActivityContent({
                     </p>
                   )}
                   {h.change_reason && (
-                    <p className="mt-1 text-[11px] italic text-slate-400">“{h.change_reason}”</p>
+                    <p className="mt-1 text-[11px] italic text-muted-foreground">
+                      “{h.change_reason}”
+                    </p>
                   )}
                 </li>
               ))}
@@ -255,7 +248,7 @@ export function CollaboratorActivityPage() {
         <button
           type="button"
           onClick={() => void navigate("/collaborators")}
-          className="text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           ← Colaboradores
         </button>
@@ -269,7 +262,7 @@ export function CollaboratorActivityPage() {
             "flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-colors",
             preview
               ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
-              : "border-slate-200 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+              : "border-border text-muted-foreground hover:text-foreground",
           )}
         >
           <Sparkles className="size-3.5" /> Datos de ejemplo
