@@ -1105,7 +1105,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: Segmen
               onChange(opt.value);
             }}
             className={cn(
-              "flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors max-lg:min-h-[44px]",
               active
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
@@ -1443,7 +1443,7 @@ export function TeamTasksView({
             onClick={() => {
               setShowNewTask(true);
             }}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark max-lg:min-h-[44px]"
           >
             <Plus className="size-3.5" />
             Nueva tarea
@@ -1490,7 +1490,7 @@ export function TeamTasksView({
                 onClick={() => {
                   setFilters(EMPTY_TEAM_TASK_FILTERS);
                 }}
-                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark max-lg:min-h-[44px]"
               >
                 Ver todas las tareas
               </button>
@@ -1520,7 +1520,7 @@ export function TeamTasksView({
                 onClick={() => {
                   patchFilters({ assignee: "all" });
                 }}
-                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+                className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark max-lg:min-h-[44px]"
               >
                 Ver todas las tareas
               </button>

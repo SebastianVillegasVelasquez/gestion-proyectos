@@ -28,7 +28,7 @@ export function ManualHint({
       title={label ? `Abrir el manual: ${label}` : "Abrir el manual"}
       aria-label={label ? `Manual: ${label}` : "Abrir el manual"}
       className={cn(
-        "flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        "flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground max-lg:min-h-[44px]",
         className,
       )}
     >

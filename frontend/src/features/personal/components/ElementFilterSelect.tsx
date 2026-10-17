@@ -145,7 +145,7 @@ export function ElementFilterSelect({
         aria-expanded={open}
         aria-label="Filtrar por elemento de la estructura"
         className={cn(
-          "flex h-[34px] min-w-[180px] max-w-[260px] items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm transition-colors",
+          "flex h-[34px] min-w-[180px] max-w-[260px] items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm transition-colors max-lg:h-[44px]",
           selected ? "border-brand-gold" : "border-border hover:bg-accent",
         )}
       >

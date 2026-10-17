@@ -282,7 +282,7 @@ export function MyTasksView({
               }}
               aria-pressed={view === v.key}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-[44px]",
                 view === v.key
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -304,7 +304,7 @@ export function MyTasksView({
               }}
               aria-pressed={filter === f.key}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-[44px]",
                 filter === f.key
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -332,7 +332,7 @@ export function MyTasksView({
               }}
               aria-pressed={scope === s.key}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors max-lg:min-h-[44px]",
                 scope === s.key
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -369,7 +369,7 @@ export function MyTasksView({
             setQuery(e.target.value);
           }}
           placeholder="Buscar por tarea o proyecto…"
-          className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
+          className="min-w-[160px] flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-brand-gold max-lg:min-h-[44px]"
         />
         <ElementFilterSelect options={elementOptions} value={elementKey} onChange={setElementKey} />
       </div>

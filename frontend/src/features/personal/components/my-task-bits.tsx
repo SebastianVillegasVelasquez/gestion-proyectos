@@ -191,7 +191,7 @@ export function MyTaskDeliverAction({
         onClick={() => {
           onDeliver(task);
         }}
-        className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+        className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-brand-gold-dark max-lg:min-h-[44px]"
       >
         {hasDeliverable ? "Ver entrega" : "Entregar"}
       </button>
@@ -203,7 +203,7 @@ export function MyTaskDeliverAction({
             onDeliverWithoutEvidence(task);
           }}
           title="Entregar sin adjunto: la tarea pasa al 100% y se avisa a quien coordina, sin registrar un entregable"
-          className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50 max-lg:min-h-[44px]"
         >
           {deliverWithoutEvidencePending ? "…" : "Entregar sin adjunto"}
         </button>

@@ -128,7 +128,7 @@ export function WorkspaceHeader({
           <button
             type="button"
             onClick={onNewDeliverable}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-brand-gold-dark max-lg:min-h-[44px]"
           >
             <Plus className="size-3.5" />
             Nuevo entregable

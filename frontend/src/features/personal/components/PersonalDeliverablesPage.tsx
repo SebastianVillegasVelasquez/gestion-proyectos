@@ -425,7 +425,7 @@ export function PersonalDeliverablesPage() {
             setTab("tareas");
             setSelectedId(null);
           }}
-          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors max-lg:min-h-[44px] ${
             tab === "tareas"
               ? "border-brand-gold text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -439,7 +439,7 @@ export function PersonalDeliverablesPage() {
             setTab("mias");
             setSelectedId(null);
           }}
-          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors max-lg:min-h-[44px] ${
             tab === "mias"
               ? "border-brand-gold text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -453,7 +453,7 @@ export function PersonalDeliverablesPage() {
             setTab("revisar");
             setSelectedId(null);
           }}
-          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors max-lg:min-h-[44px] ${
             tab === "revisar"
               ? "border-brand-gold text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"

@@ -64,7 +64,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
         aria-label={collapsed ? "Expandir el menú" : "Colapsar el menú"}
         aria-expanded={!collapsed}
         className={cn(
-          "mb-1 flex items-center rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          "mb-1 flex items-center rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground max-lg:min-h-[44px]",
           collapsed ? "justify-center" : "justify-end",
         )}
       >
@@ -83,7 +83,7 @@ export function WorkspaceNav<T extends string>({ items, active, onSelect }: Work
               onSelect(id);
             }}
             className={cn(
-              "flex items-center rounded-lg py-2 text-left text-[13px] font-medium transition-colors",
+              "flex items-center rounded-lg py-2 text-left text-[13px] font-medium transition-colors max-lg:min-h-[44px]",
               collapsed ? "justify-center px-0" : "gap-2.5 px-3",
               isActive
                 ? "bg-brand-gold-light text-brand-gold-dark dark:bg-brand-gold/15 dark:text-brand-gold"

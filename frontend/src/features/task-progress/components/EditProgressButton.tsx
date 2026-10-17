@@ -26,7 +26,7 @@ export function EditProgressButton({
         }}
         title="Actualizar el avance con evidencia"
         className={cn(
-          "inline-flex shrink-0 items-center gap-1 rounded-md border border-border font-semibold text-foreground transition-colors hover:bg-accent",
+          "inline-flex shrink-0 items-center gap-1 rounded-md border border-border font-semibold text-foreground transition-colors hover:bg-accent max-lg:min-h-[44px]",
           compact ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
           className,
         )}

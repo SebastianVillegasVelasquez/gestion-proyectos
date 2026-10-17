@@ -19,7 +19,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
 ];
 
 const selectClass =
-  "rounded-md border border-border bg-card px-2 py-1 text-[12px] text-muted-foreground outline-none focus:border-brand-gold";
+  "rounded-md border border-border bg-card px-2 py-1 text-[12px] text-muted-foreground outline-none focus:border-brand-gold max-lg:min-h-[44px]";
 
 /** Opción de los filtros por elemento / rama: id + ruta legible + color del tipo. */
 export interface ElementFilterOption {
@@ -63,7 +63,7 @@ function AssigneeChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors",
+        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors max-lg:min-h-[44px]",
         active
           ? "border-brand-gold bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold"
           : "border-border text-muted-foreground hover:bg-accent",
@@ -111,7 +111,7 @@ export function TeamTaskFilterBar({
               onChange({ text: e.target.value });
             }}
             placeholder="Buscar tarea…"
-            className="w-44 rounded-md border border-border bg-card py-1 pl-7 pr-2 text-[12px] text-foreground outline-none focus:border-brand-gold"
+            className="w-44 rounded-md border border-border bg-card py-1 pl-7 pr-2 text-[12px] text-foreground outline-none focus:border-brand-gold max-lg:min-h-[44px]"
           />
         </div>
 
@@ -180,7 +180,7 @@ export function TeamTaskFilterBar({
             onChange({ onlyBlocked: !filters.onlyBlocked });
           }}
           className={cn(
-            "flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors",
+            "flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors max-lg:min-h-[44px]",
             filters.onlyBlocked
               ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
               : "border-border text-muted-foreground hover:bg-accent",
@@ -194,7 +194,7 @@ export function TeamTaskFilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground max-lg:min-h-[44px]"
           >
             <X className="size-3.5" />
             Limpiar
