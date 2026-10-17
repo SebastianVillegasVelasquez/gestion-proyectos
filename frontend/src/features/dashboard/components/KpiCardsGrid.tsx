@@ -3,10 +3,10 @@ import { Card } from "@/components/ui/card";
 import type { AccentColor, KpiCard } from "../types";
 
 const accentBorderMap: Record<AccentColor, string> = {
-  amber: "border-b-amber-400   dark:border-b-amber-500",
+  amber: "border-b-amber-400 dark:border-b-amber-500",
   emerald: "border-b-emerald-500 dark:border-b-emerald-500",
   blue: "border-b-brand-teal dark:border-b-brand-teal",
-  red: "border-b-red-500     dark:border-b-red-500",
+  red: "border-b-red-500 dark:border-b-red-500",
 };
 
 function KpiCardItem({ card }: { card: KpiCard }) {
@@ -14,27 +14,27 @@ function KpiCardItem({ card }: { card: KpiCard }) {
     <Card
       className={cn(
         "border border-b-2 p-5 transition-colors duration-150",
-        "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700",
+        "border-border hover:border-brand-gold/50",
         accentBorderMap[card.accentColor],
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
         {card.label}
       </p>
-      <p className="mt-3 text-[36px] font-bold leading-none tracking-tight text-slate-900 dark:text-slate-50">
+      <p className="mt-3 text-[36px] font-bold leading-none tracking-tight text-foreground">
         {card.value}
       </p>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{card.subtitle}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{card.subtitle}</p>
     </Card>
   );
 }
 
 function KpiCardSkeleton() {
   return (
-    <Card className="border border-b-2 border-slate-200 p-5 dark:border-slate-800">
-      <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-      <div className="mt-3 h-9 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-      <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+    <Card className="border border-b-2 border-border p-5">
+      <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-9 w-16 animate-pulse rounded bg-muted" />
+      <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-muted" />
     </Card>
   );
 }
