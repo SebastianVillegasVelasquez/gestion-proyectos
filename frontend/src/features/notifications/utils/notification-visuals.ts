@@ -70,6 +70,6 @@ export const TYPE_TONE: Partial<Record<NotificationType, string>> = {
   recordatorio: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
-export const DEFAULT_TONE = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";
+export const DEFAULT_TONE = "bg-muted text-muted-foreground";
 
 export const FALLBACK_ICON = Bell;
