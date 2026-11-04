@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectKeys } from "../hooks/query-keys";
 import { incidentsApi } from "./incidents.api";
-import type { CreateIncidentPayload, UpdateIncidentPayload } from "./types";
+import type { CreateIncidentPayload, ProjectIncident, UpdateIncidentPayload } from "./types";
 
 /**
  * Bitácora de incidentes del proyecto. `enabled` permite pedirla solo a quien
@@ -77,4 +77,6 @@ export const useRevertIncident = (projectId: string) =>
   useScheduleMutation(projectId, (id: string) => incidentsApi.revert(projectId, id));
 
 export const useApplyPendingIncidents = (projectId: string) =>
-  useScheduleMutation(projectId, () => incidentsApi.applyPending(projectId));
+  useScheduleMutation<undefined, ProjectIncident[]>(projectId, () =>
+    incidentsApi.applyPending(projectId),
+  );

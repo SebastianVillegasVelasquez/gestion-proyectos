@@ -79,5 +79,5 @@ export function formatIncidentDate(iso: string): string {
 }
 
 export function pluralDays(days: number): string {
-  return `${days} día${days === 1 ? "" : "s"}`;
+  return `${String(days)} día${days === 1 ? "" : "s"}`;
 }
