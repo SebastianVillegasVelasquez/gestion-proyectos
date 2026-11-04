@@ -156,11 +156,13 @@ async def _serve(
     inline: bool,
 ):
     attachment = await service.get_attachment(project_id, incident_id, attachment_id)
-    can_inline = inline and attachment.content_type in _INLINE_SAFE
-    disposition = "inline" if can_inline else "attachment"
+    safe = attachment.content_type in _INLINE_SAFE
+    disposition = "inline" if inline and safe else "attachment"
     return FileDownloadResponse(
         path=storage.path(attachment.storage_key),
-        media_type=attachment.content_type,
+        # Un tipo no seguro (HTML, SVG…) se sirve como binario opaco: ni el
+        # navegador ni el visor de la app lo interpretan como documento.
+        media_type=attachment.content_type if safe else "application/octet-stream",
         filename=attachment.name,
         headers={
             "Content-Disposition": (
