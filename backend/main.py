@@ -28,6 +28,9 @@ from app.modules.notifications.presentation.routes import (
 )
 from app.modules.notifications.presentation.websocket import router as ws_router
 from app.modules.reminders.presentation.routes import router as reminders_router
+from app.modules.project.incidents.presentation.routes import (
+    router as incidents_router,
+)
 from app.modules.project.presentation.routes import router as projects_router
 from app.modules.project.structure.presentation.routes import router as worktree_router
 from app.modules.tasks.presentation.routes import router as tasks_router
@@ -195,6 +198,7 @@ async def health():
 app.include_router(worktree_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
+app.include_router(incidents_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(public_router, prefix="/api/v1")
