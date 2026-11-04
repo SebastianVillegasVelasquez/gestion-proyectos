@@ -36,6 +36,7 @@ import {
 import { useDragAutoScroll } from "../../utils/use-drag-auto-scroll";
 import { useProjectTasks, useUpdateTask, useProjectTaskDependencies } from "../../hooks/use-tasks";
 import { useProjectMembers } from "../../hooks/use-members";
+import { PendingDelayButton } from "../../incidents/components/PendingDelayButton";
 import { routeDependencyArrows } from "../arrows";
 import { AssigneeCardModal } from "./AssigneeCardModal";
 import { useTeams } from "../../hooks/use-teams";
@@ -879,7 +880,8 @@ export function GanttView({
               <GanttChartSquare className="size-5 text-brand-teal" /> Cronograma
             </h1>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-start gap-2">
+            <PendingDelayButton projectId={project.id} endDate={project.end_date} />
             {/* Atajo a la Estructura: es el viaje de ida y vuelta natural
               (allí ya existe el botón "Cronograma"), y las fechas se editan
               desde ese lado. */}
