@@ -12,6 +12,11 @@ export interface PreviewableFile {
   name: string;
   contentType?: string;
   sizeBytes?: number;
+  /** Fuente alternativa del contenido, para archivos que no son del archivador
+   *  (p. ej. evidencias de un incidente). Debe ser estable entre renders: el
+   *  objeto `file` se guarda en estado, así que basta con crearlo una vez. */
+  loadBlob?: () => Promise<Blob>;
+  download?: () => Promise<void>;
 }
 
 /** El contenido pedido con la sesión y publicado como URL de objeto local.
@@ -30,8 +35,11 @@ function useObjectUrl(file: PreviewableFile, enabled: boolean) {
     let objectUrl: string | null = null;
     let cancelled = false;
 
-    void filesApi
-      .blob(file.projectId, file.fileId, "view")
+    const request = file.loadBlob
+      ? file.loadBlob()
+      : filesApi.blob(file.projectId, file.fileId, "view");
+
+    void request
       .then((blob) => {
         if (cancelled) {
           return;
@@ -52,7 +60,7 @@ function useObjectUrl(file: PreviewableFile, enabled: boolean) {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [file.projectId, file.fileId, enabled]);
+  }, [file, enabled]);
 
   return state;
 }
@@ -140,7 +148,9 @@ export function FilePreviewModal({
           </div>
           <button
             type="button"
-            onClick={() => void filesApi.download(file.projectId, file.fileId, file.name)}
+            onClick={() =>
+              void (file.download?.() ?? filesApi.download(file.projectId, file.fileId, file.name))
+            }
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-accent"
           >
             <Download className="size-3.5" /> Descargar
