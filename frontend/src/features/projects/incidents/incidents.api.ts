@@ -54,4 +54,24 @@ export const incidentsApi = {
         timeout: 120_000,
       })
       .then((r) => r.data),
+
+  /** Descarga la evidencia con la sesión puesta (un `<a href>` no llevaría el token). */
+  downloadAttachment: async (
+    projectId: string,
+    incidentId: string,
+    attachment: { id: string; name: string },
+  ) => {
+    const blob = await incidentsApi.attachmentBlob(
+      projectId,
+      incidentId,
+      attachment.id,
+      "download",
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = attachment.name;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
 };

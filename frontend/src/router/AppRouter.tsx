@@ -105,6 +105,11 @@ const ProjectTrazabilidadPage = lazy(() =>
     default: m.ProjectTrazabilidadPage,
   })),
 );
+const ProjectIncidentsPage = lazy(() =>
+  import("@/features/projects/incidents/components/ProjectIncidentsPage.tsx").then((m) => ({
+    default: m.ProjectIncidentsPage,
+  })),
+);
 const ProjectFilesPage = lazy(() =>
   import("@/features/files/components/ProjectFilesPage.tsx").then((m) => ({
     default: m.ProjectFilesPage,
@@ -173,6 +178,7 @@ export const AppRouter = () => (
           <Route path="/projects/:projectId/equipos" element={<ProjectEquiposPage />} />
           <Route path="/projects/:projectId/trazabilidad" element={<ProjectTrazabilidadPage />} />
           <Route path="/projects/:projectId/archivos" element={<ProjectFilesPage />} />
+          <Route path="/projects/:projectId/incidentes" element={<ProjectIncidentsPage />} />
           <Route path="/projects/:projectId/tareas" element={<TasksPage />} />
           <Route path="/projects/:projectId/gantt" element={<TaskDashboardPage />} />
           <Route path="/projects/:projectId/analiticas" element={<ProjectReportPage />} />
