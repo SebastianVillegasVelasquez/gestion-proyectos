@@ -43,7 +43,7 @@ async def list_incidents(
     project_id: UUID, service: ProjectIncidentService = Depends(incident_service)
 ):
     """Bitácora de incidentes del proyecto (el más reciente primero)."""
-    return await service.list(project_id)
+    return await service.list_incidents(project_id)
 
 
 @router.post("", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
@@ -73,6 +73,14 @@ async def delete_incident(
     service: ProjectIncidentService = Depends(incident_service),
 ):
     await service.delete(project_id, incident_id)
+
+
+@router.post("/apply-pending", response_model=List[IncidentResponse])
+async def apply_pending_incidents_to_schedule(
+    project_id: UUID, service: ProjectIncidentService = Depends(incident_service)
+):
+    """Refleja en el cronograma todos los atrasos que aún no se han aplicado."""
+    return await service.apply_pending_to_schedule(project_id)
 
 
 @router.post("/{incident_id}/apply", response_model=IncidentResponse)

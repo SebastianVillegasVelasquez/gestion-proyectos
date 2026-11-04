@@ -65,7 +65,7 @@ class ProjectIncidentService:
         self._storage = storage
 
     # ── Consulta ────────────────────────────────────────────────────────────
-    async def list(self, project_id: UUID) -> list[IncidentResponse]:
+    async def list_incidents(self, project_id: UUID) -> list[IncidentResponse]:
         await self._active_project(project_id)
         return [to_response(i) for i in await self._repo.list_by_project(project_id)]
 
@@ -132,6 +132,29 @@ class ProjectIncidentService:
         incident.applied_at = datetime.now(timezone.utc)
         await self._repo.save()
         return to_response(await self._repo.reload(project_id, incident_id))
+
+    async def apply_pending_to_schedule(
+        self, project_id: UUID
+    ) -> list[IncidentResponse]:
+        """Refleja de una vez todos los atrasos aún no aplicados.
+
+        Es una sola operación (un único desplazamiento por la suma de días):
+        o se reflejan todos o ninguno, sin dejar el cronograma a medias si algo
+        falla a mitad de camino.
+        """
+        project = await self._active_project(project_id)
+        incidents = await self._repo.list_by_project(project_id)
+        pending = [i for i in incidents if i.applied_days is None and i.impact_days > 0]
+        if not pending:
+            raise ConflictError("No hay atrasos pendientes por reflejar")
+
+        await self._shift_project_end(project, sum(i.impact_days for i in pending))
+        now = datetime.now(timezone.utc)
+        for incident in pending:
+            incident.applied_days = incident.impact_days
+            incident.applied_at = now
+        await self._repo.save()
+        return [to_response(i) for i in incidents]
 
     async def revert_from_schedule(
         self, project_id: UUID, incident_id: UUID

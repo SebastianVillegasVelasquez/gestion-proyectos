@@ -138,6 +138,31 @@ class TestIncidentService:
         assert project.end_date == date(2026, 6, 30)
         assert not reverted.is_applied
 
+    async def test_apply_pending_shifts_once_by_the_sum_of_days(self):
+        service, project = make_service()
+        first = await service.create(PROJECT_ID, payload(impact_days=2), USER_ID)
+        await service.create(PROJECT_ID, payload(title="Otro", impact_days=3), USER_ID)
+        await service.create(
+            PROJECT_ID, payload(title="Sin días", impact_days=0), USER_ID
+        )
+        await service.apply_to_schedule(PROJECT_ID, first.id)
+        assert project.end_date == date(2026, 7, 2)
+
+        result = await service.apply_pending_to_schedule(PROJECT_ID)
+
+        assert project.end_date == date(2026, 7, 5)  # solo suma los 3 pendientes
+        applied = {r.title: r.applied_days for r in result}
+        assert applied == {
+            "Sin acceso SSH al servidor": 2,
+            "Otro": 3,
+            "Sin días": None,
+        }
+
+    async def test_apply_pending_without_pending_is_a_conflict(self):
+        service, _ = make_service()
+        with pytest.raises(ConflictError):
+            await service.apply_pending_to_schedule(PROJECT_ID)
+
     async def test_cannot_apply_twice(self):
         service, _ = make_service()
         created = await service.create(PROJECT_ID, payload(), USER_ID)
@@ -210,4 +235,4 @@ class TestIncidentService:
     async def test_unknown_project_is_not_found(self):
         service, _ = make_service()
         with pytest.raises(NotFoundError):
-            await service.list(uuid.uuid4())
+            await service.list_incidents(uuid.uuid4())
