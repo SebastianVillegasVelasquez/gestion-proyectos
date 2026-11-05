@@ -56,7 +56,13 @@ class ProjectIncident(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Cuerpo del correo (u otro texto) que respalda el incidente.
     email_body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     responsible: Mapped[IncidentResponsible] = mapped_column(
-        Enum(IncidentResponsible, name="incident_responsible"),
+        # `values_callable`: persistir "cliente" (el valor), no "CLIENTE" (el
+        # nombre del miembro), que es lo que define el tipo en la migración.
+        Enum(
+            IncidentResponsible,
+            name="incident_responsible",
+            values_callable=lambda enum: [member.value for member in enum],
+        ),
         nullable=False,
         default=IncidentResponsible.CLIENTE,
     )
