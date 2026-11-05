@@ -15,6 +15,7 @@ export const projectKeys = {
   areas: (id: string) => [...projectKeys.detail(id), "areas"] as const,
   clientAccess: (id: string) => [...projectKeys.detail(id), "client-access"] as const,
   notes: (id: string) => [...projectKeys.detail(id), "notes"] as const,
+  incidents: (id: string) => [...projectKeys.detail(id), "incidents"] as const,
 };
 
 export const workItemKeys = {

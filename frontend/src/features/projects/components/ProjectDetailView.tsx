@@ -14,6 +14,7 @@ import {
   ListChecks,
   Moon,
   Pencil,
+  ShieldAlert,
   Sun,
   Users,
   UsersRound,
@@ -31,6 +32,7 @@ import { UpcomingDeadlinesCard } from "./detail/UpcomingDeadlinesCard";
 import { ProjectActivityCard } from "./detail/ProjectActivityCard";
 import { ClientAccessButton } from "./detail/ClientAccessButton";
 import { ProjectNotesCard } from "./detail/ProjectNotesCard";
+import { PendingDelayButton } from "../incidents/components/PendingDelayButton";
 
 // Cada sección es una vista/pantalla independiente (ruta propia). Cronograma y
 // Tareas también son accesos aquí (sus datos ya están en el resumen). El color de
@@ -83,6 +85,13 @@ const SECTIONS: {
     meta: "Carpeta del proyecto y de cada equipo",
     icon: FolderArchive,
     accent: "bg-brand-gold/10 text-brand-gold-dark dark:text-brand-gold",
+  },
+  {
+    to: "incidentes",
+    label: "Incidentes",
+    meta: "Bitácora contractual y atrasos",
+    icon: ShieldAlert,
+    accent: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
   },
   {
     to: "trazabilidad",
@@ -285,7 +294,8 @@ export function ProjectDetailView({
               </p>
             </div>
             {/* Acciones agrupadas a la derecha */}
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-start justify-end gap-2">
+              <PendingDelayButton projectId={project.id} endDate={project.end_date} />
               <ClientAccessButton projectId={project.id} />
               <button
                 type="button"
